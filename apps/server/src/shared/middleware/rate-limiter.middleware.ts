@@ -1,13 +1,64 @@
 import rateLimit from 'express-rate-limit';
+import { type Request, type Response, type NextFunction } from 'express';
+import { getRedis } from '../../infrastructure/redis';
+import { TooManyRequestsError } from '../errors';
 
-/** Rate limit OTP: 3 lần/giờ/IP */
-export const otpRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  message: { success: false, error: 'OTP rate limit exceeded. Try again in 1 hour.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const OTP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const OTP_RATE_LIMIT_MAX = 3;
+
+function normalizeOtpIdentifier(identifier: string): string {
+  return identifier.trim().toLowerCase();
+}
+
+async function increaseCounterWithTtl(key: string): Promise<number> {
+  const redis = getRedis();
+  const result = await redis.multi().incr(key).ttl(key).exec();
+  const count = Number(result?.[0]?.[1] ?? 0);
+  const ttl = Number(result?.[1]?.[1] ?? -1);
+
+  if (ttl < 0) {
+    await redis.expire(key, OTP_RATE_LIMIT_WINDOW_SECONDS);
+  }
+
+  return count;
+}
+
+/**
+ * Rate limit OTP: 3 lần/giờ theo IP hoặc identifier.
+ * Nếu vượt một trong hai ngưỡng thì chặn request.
+ */
+export async function otpRateLimiter(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const ip = req.ip ?? 'unknown';
+    const bodyIdentifier = req.body && typeof req.body === 'object'
+      ? (req.body as { identifier?: unknown }).identifier
+      : undefined;
+    const identifier = typeof bodyIdentifier === 'string' ? normalizeOtpIdentifier(bodyIdentifier) : null;
+
+    const ipKey = `otp_rl:ip:${ip}`;
+    const ipCount = await increaseCounterWithTtl(ipKey);
+    if (ipCount > OTP_RATE_LIMIT_MAX) {
+      return next(new TooManyRequestsError('OTP rate limit exceeded for this IP. Try again in 1 hour.'));
+    }
+
+    if (identifier) {
+      const identifierKey = `otp_rl:id:${identifier}`;
+      const identifierCount = await increaseCounterWithTtl(identifierKey);
+      if (identifierCount > OTP_RATE_LIMIT_MAX) {
+        return next(new TooManyRequestsError('OTP rate limit exceeded for this phone/email. Try again in 1 hour.'));
+      }
+    }
+
+    next();
+  } catch {
+    // Fail-open để tránh chặn đăng nhập hàng loạt nếu Redis gặp sự cố
+    next();
+  }
+}
 
 /** Rate limit upload pre-signed URL: 10 lần/phút/user */
 export const uploadRateLimiter = rateLimit({

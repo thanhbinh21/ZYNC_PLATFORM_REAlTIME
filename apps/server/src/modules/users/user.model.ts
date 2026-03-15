@@ -1,7 +1,7 @@
 import { Schema, model, type Document } from 'mongoose';
 
 export interface IUser extends Document {
-  phoneNumber: string;
+  phoneNumber?: string;
   email?: string;
   displayName: string;
   avatarUrl?: string;
@@ -11,7 +11,7 @@ export interface IUser extends Document {
 
 const userSchema = new Schema<IUser>(
   {
-    phoneNumber: { type: String, required: true, unique: true },
+    phoneNumber: { type: String, unique: true, sparse: true },
     email: { type: String, sparse: true, unique: true },
     displayName: { type: String, required: true },
     avatarUrl: { type: String },
@@ -20,5 +20,13 @@ const userSchema = new Schema<IUser>(
   },
   { timestamps: true },
 );
+
+// Đảm bảo user luôn có ít nhất phoneNumber hoặc email
+userSchema.pre('validate', function validateIdentifier(next) {
+  if (!this.phoneNumber && !this.email) {
+    this.invalidate('phoneNumber', 'Either phoneNumber or email is required');
+  }
+  next();
+});
 
 export const UserModel = model<IUser>('User', userSchema);
