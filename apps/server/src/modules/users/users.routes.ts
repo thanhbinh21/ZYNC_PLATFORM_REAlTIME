@@ -1,5 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.middleware';
+import { validateBody } from '../../shared/middleware/validate.middleware';
+import { UpdateProfileSchema, UpsertDeviceTokenSchema } from '../auth/auth.schema';
+import {
+  getMeHandler,
+  getUserByIdHandler,
+  updateProfileHandler,
+  upsertDeviceTokenHandler,
+} from './users.controller';
 
 export const usersRouter = Router();
 
@@ -7,16 +15,13 @@ export const usersRouter = Router();
 usersRouter.use(authenticate);
 
 // GET /api/users/me – get own profile
-usersRouter.get('/me', (_req, res) => {
-  res.status(501).json({ success: false, error: 'Not implemented yet' });
-});
+usersRouter.get('/me', getMeHandler);
 
-// GET /api/users/:userId – get user profile
-usersRouter.get('/:userId', (_req, res) => {
-  res.status(501).json({ success: false, error: 'Not implemented yet' });
-});
+// GET /api/users/:userId – get user profile (public)
+usersRouter.get('/:userId', getUserByIdHandler);
 
 // PATCH /api/users/me – update own profile
-usersRouter.patch('/me', (_req, res) => {
-  res.status(501).json({ success: false, error: 'Not implemented yet' });
-});
+usersRouter.patch('/me', validateBody(UpdateProfileSchema), updateProfileHandler);
+
+// POST /api/users/me/device-token – register device token for push notifications
+usersRouter.post('/me/device-token', validateBody(UpsertDeviceTokenSchema), upsertDeviceTokenHandler);
