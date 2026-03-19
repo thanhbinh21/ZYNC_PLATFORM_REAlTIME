@@ -18,9 +18,22 @@ interface FriendListItem {
   bio?: string;
 }
 
+export interface FriendRequestItem {
+  requestId: string;
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
 export interface ListFriendsResult {
   friends: FriendListItem[];
   nextCursor: string | null;
+}
+
+export interface ListFriendRequestsResult {
+  incoming: FriendRequestItem[];
+  outgoing: FriendRequestItem[];
 }
 
 function buildCursor(item: IFriendship): string {
@@ -284,4 +297,54 @@ export async function listFriends(
 
   await redis.set(cacheKey, JSON.stringify(result), 'EX', FRIENDS_CACHE_TTL_SECONDS);
   return result;
+}
+
+export async function listFriendRequests(currentUserId: string): Promise<ListFriendRequestsResult> {
+  const rows = await FriendshipModel.find({ status: 'pending' })
+    .or([{ friendId: currentUserId }, { userId: currentUserId }])
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const partnerIds = rows.map((row) => (
+    row.userId === currentUserId ? row.friendId : row.userId
+  ));
+
+  const users = await UserModel.find({ _id: { $in: partnerIds } })
+    .select('displayName avatarUrl')
+    .lean();
+
+  const userMap = new Map<string, { displayName: string; avatarUrl?: string }>();
+  for (const user of users) {
+    userMap.set(user._id.toString(), {
+      displayName: user.displayName as string,
+      avatarUrl: user.avatarUrl as string | undefined,
+    });
+  }
+
+  const incoming: FriendRequestItem[] = [];
+  const outgoing: FriendRequestItem[] = [];
+
+  for (const row of rows) {
+    const partnerId = row.userId === currentUserId ? row.friendId : row.userId;
+    const partner = userMap.get(partnerId);
+    if (!partner) {
+      continue;
+    }
+
+    const item: FriendRequestItem = {
+      requestId: row._id.toString(),
+      userId: partnerId,
+      displayName: partner.displayName,
+      avatarUrl: partner.avatarUrl,
+      createdAt: row.createdAt.toISOString(),
+    };
+
+    if (row.friendId === currentUserId) {
+      incoming.push(item);
+    } else {
+      outgoing.push(item);
+    }
+  }
+
+  return { incoming, outgoing };
 }

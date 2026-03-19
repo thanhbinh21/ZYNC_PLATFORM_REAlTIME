@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-	--zync-bg-deep: #021f1a;
-	--zync-bg-mid: #04362c;
-	--zync-bg-soft: #065542;
+	--zync-bg-deep: #044f3a;
+	--zync-bg-mid: #08684a;
+	--zync-bg-soft: #0c7b58;
 }
 
 * {
@@ -19,47 +19,70 @@ body {
 }
 
 body {
-	font-family: var(--font-sora), sans-serif;
+	font-family: var(--font-nunito), sans-serif;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.font-ui-title {
+	font-family: var(--font-poppins), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 700;
+}
+
+.font-ui-brand {
+	font-family: var(--font-quicksand), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 700;
+}
+
+.font-ui-content {
+	font-family: var(--font-nunito), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 400;
+}
+
+.font-ui-meta {
+	font-family: var(--font-nunito), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 300;
 }
 
 .zync-auth-shell {
 	position: relative;
 	overflow: hidden;
 	background:
-		radial-gradient(circle at 20% 25%, rgba(36, 193, 141, 0.18), transparent 42%),
-		radial-gradient(circle at 76% 22%, rgba(22, 120, 93, 0.22), transparent 44%),
-		linear-gradient(120deg, var(--zync-bg-deep), var(--zync-bg-mid) 52%, var(--zync-bg-soft));
+		radial-gradient(circle at 18% 24%, rgba(31, 188, 129, 0.22), transparent 40%),
+		radial-gradient(circle at 78% 72%, rgba(15, 126, 89, 0.3), transparent 48%),
+		linear-gradient(135deg, var(--zync-bg-deep), var(--zync-bg-mid) 48%, var(--zync-bg-soft));
 }
 
 .zync-layer {
 	position: absolute;
-	width: min(48vw, 620px);
-	height: min(48vw, 620px);
+	width: min(46vw, 560px);
+	height: min(46vw, 560px);
 	border-radius: 999px;
-	filter: blur(72px);
-	opacity: 0.48;
-	animation: emeraldShift 12s ease-in-out infinite;
+	filter: blur(56px);
+	opacity: 0.34;
+	animation: glowDrift 10s ease-in-out infinite;
 }
 
 .zync-layer-left {
 	left: -12%;
-	top: -14%;
-	background: radial-gradient(circle, rgba(39, 216, 153, 0.46), rgba(39, 216, 153, 0));
+	top: -10%;
+	background: radial-gradient(circle, rgba(36, 217, 148, 0.38), rgba(36, 217, 148, 0));
 }
 
 .zync-layer-right {
 	right: -16%;
-	bottom: -20%;
+	bottom: -22%;
 	animation-delay: 0.8s;
-	background: radial-gradient(circle, rgba(10, 126, 92, 0.52), rgba(10, 126, 92, 0));
+	background: radial-gradient(circle, rgba(17, 150, 105, 0.4), rgba(17, 150, 105, 0));
 }
 
-@keyframes emeraldShift {
+@keyframes glowDrift {
 	0%,
 	100% {
 		transform: translate3d(0, 0, 0) scale(1);
 	}
 	50% {
-		transform: translate3d(14px, -18px, 0) scale(1.08);
+		transform: translate3d(10px, -16px, 0) scale(1.07);
 	}
 }

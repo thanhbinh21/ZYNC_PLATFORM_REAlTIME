@@ -1,11 +1,23 @@
 import type { Metadata } from 'next';
-import { Sora } from 'next/font/google';
+import { Nunito, Poppins, Quicksand } from 'next/font/google';
 import './globals.css';
 
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-sora',
+const poppins = Poppins({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '600', '700'],
+  variable: '--font-poppins',
+});
+
+const quicksand = Quicksand({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '600', '700'],
+  variable: '--font-quicksand',
+});
+
+const nunito = Nunito({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['300', '400', '500'],
+  variable: '--font-nunito',
 });
 
 export const metadata: Metadata = {
@@ -16,7 +28,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className={sora.variable}>{children}</body>
+      <body className={`${poppins.variable} ${quicksand.variable} ${nunito.variable}`}>{children}</body>
     </html>
   );
 }

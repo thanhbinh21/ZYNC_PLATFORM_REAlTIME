@@ -1,9 +1,13 @@
 // Module: auth | Component: LoginScreen | Type: types
 // Depends: none
 export interface LoginFormValues {
-  phoneNumber: string;
-  password: string;
+  identifier: string;
+  displayName: string;
+  otp: string;
 }
+
+export type AuthMode = 'login' | 'register';
+export type AuthStep = 'input' | 'verify';
 
 export interface CommunityMember {
   id: string;
@@ -15,12 +19,19 @@ export interface CommunityMember {
 export interface LoginScreenMockData {
   brand: string;
   headline: [string, string];
-  subtitle: [string, string, string];
+  subtitle: string;
   members: CommunityMember[];
   extraMembersLabel: string;
   bottomCaption: string;
   cardTitle: string;
   cardSubtitle: string;
+  loginTabLabel: string;
+  registerTabLabel: string;
+  socialTitle: string;
+  registerHint: string;
+  loginHint: string;
+  loginHintAction: string;
+  registerHintAction: string;
   footer: {
     copyright: string;
     links: string[];
@@ -30,12 +41,19 @@ export interface LoginScreenMockData {
 
 export interface LoginScreenProps {
   mockData: LoginScreenMockData;
+  mode: AuthMode;
+  step: AuthStep;
   values: LoginFormValues;
   isSubmitting: boolean;
-  showPassword: boolean;
+  infoMessage: string | null;
   errorMessage: string | null;
-  onPhoneChange: (value: string) => void;
-  onPasswordChange: (value: string) => void;
-  onToggleShowPassword: () => void;
-  onSubmit: () => Promise<void>;
+  currentUserName: string | null;
+  onModeChange: (mode: AuthMode) => void;
+  onIdentifierChange: (value: string) => void;
+  onDisplayNameChange: (value: string) => void;
+  onOtpChange: (value: string) => void;
+  onRequestOtp: () => Promise<void>;
+  onVerifyOtp: () => Promise<void>;
+  onBackToInput: () => void;
+  onLogout: () => Promise<void>;
 }

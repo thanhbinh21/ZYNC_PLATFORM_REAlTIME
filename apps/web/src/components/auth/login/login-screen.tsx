@@ -9,14 +9,21 @@ import { LoginHero } from './organisms/login-hero';
 
 export function LoginScreen({
   mockData,
+  mode,
+  step,
   values,
   isSubmitting,
-  showPassword,
+  infoMessage,
   errorMessage,
-  onPhoneChange,
-  onPasswordChange,
-  onToggleShowPassword,
-  onSubmit,
+  currentUserName,
+  onModeChange,
+  onIdentifierChange,
+  onDisplayNameChange,
+  onOtpChange,
+  onRequestOtp,
+  onVerifyOtp,
+  onBackToInput,
+  onLogout,
 }: LoginScreenProps) {
   return (
     <main className="zync-auth-shell min-h-screen text-white">
@@ -31,14 +38,28 @@ export function LoginScreen({
         <LoginCard
           title={mockData.cardTitle}
           subtitle={mockData.cardSubtitle}
+          mode={mode}
+          step={step}
           values={values}
           isSubmitting={isSubmitting}
-          showPassword={showPassword}
+          infoMessage={infoMessage}
           errorMessage={errorMessage}
-          onPhoneChange={onPhoneChange}
-          onPasswordChange={onPasswordChange}
-          onToggleShowPassword={onToggleShowPassword}
-          onSubmit={onSubmit}
+          currentUserName={currentUserName}
+          onModeChange={onModeChange}
+          onIdentifierChange={onIdentifierChange}
+          onDisplayNameChange={onDisplayNameChange}
+          onOtpChange={onOtpChange}
+          onRequestOtp={onRequestOtp}
+          onVerifyOtp={onVerifyOtp}
+          onBackToInput={onBackToInput}
+          onLogout={onLogout}
+          loginTabLabel={mockData.loginTabLabel}
+          registerTabLabel={mockData.registerTabLabel}
+          socialTitle={mockData.socialTitle}
+          registerHint={mockData.registerHint}
+          loginHint={mockData.loginHint}
+          loginHintAction={mockData.loginHintAction}
+          registerHintAction={mockData.registerHintAction}
         />
       </div>
 

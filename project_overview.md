@@ -138,6 +138,8 @@ npm run dev:web
 - [x] Verify toàn bộ connections: MongoDB Atlas + Redis + Kafka (Redpanda) <!-- done: 12/03/2026 -->
 - [x] Dựng UI theme login web theo mẫu green-glass (responsive desktop/mobile) <!-- done: 15/03/2026 -->
 - [x] Refactor Login UI theo Atomic Design từ ảnh mẫu (atoms/molecules/organisms + mock data) <!-- done: 19/03/2026 -->
+- [x] Dựng trang chủ Web (Phase 1) theo layout `trangchu.png` và điều hướng sang Auth flow <!-- done: 19/03/2026 -->
+- [x] Code lại landing route `/` theo mẫu UI mới (glassmorphism + hero + metrics + CTA + footer) <!-- done: 19/03/2026 -->
 
 ### Phase 2 – Authentication & User Management (Module F1–F4)
 - [x] POST /api/auth/register – gửi OTP qua Twilio/Email <!-- done: 15/03/2026 -->
@@ -148,6 +150,9 @@ npm run dev:web
 - [x] Rate limit OTP: 3 lần/giờ/IP hoặc SĐT <!-- done: 15/03/2026 -->
 - [x] Harden Auth middleware: kiểm tra blacklist token trên mọi route bảo vệ <!-- done: 19/03/2026 -->
 - [x] Bổ sung integration test cho users routes (me/profile/device token/revoked token) <!-- done: 19/03/2026 -->
+- [x] Cập nhật Web Auth UI tiếng Việt (Đăng nhập/Đăng ký) theo Atomic Design <!-- done: 19/03/2026 -->
+- [x] Kết nối Web Auth flow Phase 2: request OTP, verify OTP, lưu access token memory, logout <!-- done: 19/03/2026 -->
+- [x] Chuẩn hóa route web auth: `/auth` và chuyển hướng sang Phase 3 sau đăng nhập thành công <!-- done: 19/03/2026 -->
 
 ### Phase 3 – Friends & Contacts (Module F5–F9)
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->
@@ -155,6 +160,8 @@ npm run dev:web
 - [x] API danh sách bạn bè với cursor pagination <!-- done: 19/03/2026 -->
 - [x] Cache friends list trong Redis (TTL 10 phút) <!-- done: 19/03/2026 -->
 - [ ] (Optional) Đồng bộ danh bạ điện thoại
+- [x] Bổ sung API `GET /api/friends/requests` và `GET /api/users/search` phục vụ UI luồng kết bạn <!-- done: 19/03/2026 -->
+- [x] Dựng Friends Dashboard Web (search/send request/incoming-outgoing/list/unfriend/block) tại route `/friends` <!-- done: 19/03/2026 -->
 
 ### Phase 4 – Group Management (Module F10–F16)
 - [ ] Tạo nhóm (tối đa 100 thành viên)

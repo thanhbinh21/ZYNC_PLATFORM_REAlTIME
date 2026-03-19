@@ -148,6 +148,25 @@ describe('Friends routes', () => {
     expect(cachedKeys.length).toBeGreaterThan(0);
   });
 
+  it('should list incoming and outgoing pending requests', async () => {
+    const userA = await UserModel.create({ displayName: 'User A', email: 'list-a@example.com' });
+    const userB = await UserModel.create({ displayName: 'User B', email: 'list-b@example.com' });
+    const userC = await UserModel.create({ displayName: 'User C', email: 'list-c@example.com' });
+
+    await FriendshipModel.create({ userId: userA.id as string, friendId: userB.id as string, status: 'pending' });
+    await FriendshipModel.create({ userId: userC.id as string, friendId: userA.id as string, status: 'pending' });
+
+    const tokenA = issueAccessToken(userA.id as string, 'friends-jti-list-req');
+    const res = await request(app)
+      .get('/api/friends/requests')
+      .set('Authorization', `Bearer ${tokenA}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.outgoing).toHaveLength(1);
+    expect(res.body.incoming).toHaveLength(1);
+  });
+
   it('should unfriend successfully', async () => {
     const userA = await UserModel.create({ displayName: 'User A', email: 'ua@example.com' });
     const userB = await UserModel.create({ displayName: 'User B', email: 'ub@example.com' });

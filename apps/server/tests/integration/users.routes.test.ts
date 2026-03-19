@@ -117,6 +117,33 @@ describe('Users routes', () => {
     expect(stored?.platform).toBe('web');
   });
 
+  it('GET /api/users/search should return matched users', async () => {
+    const owner = await UserModel.create({
+      email: 'owner-search@example.com',
+      displayName: 'Owner Search',
+    });
+
+    await UserModel.create({
+      email: 'nguyen.a@example.com',
+      displayName: 'Nguyen Van A',
+    });
+    await UserModel.create({
+      email: 'tran.b@example.com',
+      displayName: 'Tran Thi B',
+    });
+
+    const token = issueAccessToken(owner.id as string, 'users-jti-search');
+
+    const res = await request(app)
+      .get('/api/users/search?query=nguyen&limit=10')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body.users.some((u: { displayName: string }) => u.displayName === 'Nguyen Van A')).toBe(true);
+  });
+
   it('should reject revoked access token from blacklist', async () => {
     const user = await UserModel.create({
       email: 'revoked@example.com',
