@@ -36,6 +36,21 @@ function getRefreshSecret(): string {
   return secret;
 }
 
+function parseIdentifier(identifier: string): {
+  normalized: string;
+  isPhone: boolean;
+} {
+  const trimmed = identifier.trim();
+  const compact = trimmed.replace(/\s/g, '');
+  const isPhone = /^\+?\d{9,15}$/.test(compact);
+
+  if (isPhone) {
+    return { normalized: compact, isPhone: true };
+  }
+
+  return { normalized: trimmed.toLowerCase(), isPhone: false };
+}
+
 /** Phát hành cặp access + refresh token cho một userId */
 function issueTokenPair(userId: string): TokenPair {
   const accessJti = uuidv4();
@@ -56,10 +71,11 @@ function issueTokenPair(userId: string): TokenPair {
 
 /** Tạo và gửi OTP cho identifier (phone hoặc email) */
 export async function register(identifier: string): Promise<void> {
+  const { normalized } = parseIdentifier(identifier);
   const otp = generateOtp();
-  await storeOtp(identifier, otp);
-  await sendOtp(identifier, otp);
-  logger.info(`OTP issued for ${identifier}`);
+  await storeOtp(normalized, otp);
+  await sendOtp(normalized, otp);
+  logger.info(`OTP issued for ${normalized}`);
 }
 
 // ─── Verify OTP ──────────────────────────────────────────────────────────────
@@ -86,19 +102,22 @@ export async function verifyOtpAndLogin(
   displayName?: string,
   deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
 ): Promise<VerifyOtpResult> {
-  const valid = await verifyOtpRedis(identifier, otp);
+  const { normalized, isPhone } = parseIdentifier(identifier);
+
+  const valid = await verifyOtpRedis(normalized, otp);
   if (!valid) throw new UnauthorizedError('Invalid or expired OTP');
 
-  // Phân biệt phone vs email
-  const isPhone = /^\+?\d{9,15}$/.test(identifier.replace(/\s/g, ''));
-  const query = isPhone ? { phoneNumber: identifier } : { email: identifier };
+  const query = isPhone
+    ? { phoneNumber: normalized }
+    : { email: normalized };
 
   // Upsert user
   let user = await UserModel.findOne(query);
   if (!user) {
     if (!displayName) {
-      // Tự động tạo tên hiển thị từ identifier nếu không cung cấp
-      displayName = isPhone ? `User${identifier.slice(-4)}` : identifier.split('@')[0];
+      displayName = isPhone
+        ? `User${normalized.slice(-4)}`
+        : normalized.split('@')[0];
     }
     user = await UserModel.create({
       ...query,

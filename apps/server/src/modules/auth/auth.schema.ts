@@ -1,7 +1,17 @@
 import { z } from 'zod';
 
 /** Nhận dạng người dùng – có thể là số ĐT hoặc email */
-const identifierSchema = z.string().min(5, 'Identifier must be at least 5 characters');
+const phoneRegex = /^\+?\d{9,15}$/;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const identifierSchema = z
+  .string()
+  .trim()
+  .min(5, 'Identifier must be at least 5 characters')
+  .refine((value) => {
+    const compact = value.replace(/\s/g, '');
+    return phoneRegex.test(compact) || emailRegex.test(value.toLowerCase());
+  }, 'Identifier must be a valid phone number or email');
 
 export const RegisterSchema = z.object({
   identifier: identifierSchema,

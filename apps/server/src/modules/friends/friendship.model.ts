@@ -6,6 +6,8 @@ export interface IFriendship extends Document {
   userId: string;
   friendId: string;
   status: FriendshipStatus;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const friendshipSchema = new Schema<IFriendship>(

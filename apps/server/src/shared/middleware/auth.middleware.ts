@@ -1,12 +1,17 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from '../errors';
+import { getRedis } from '../../infrastructure/redis';
 
 export interface AuthRequest extends Request {
   userId: string;
 }
 
-export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+export async function authenticate(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     return next(new UnauthorizedError('Missing or invalid Authorization header'));
@@ -17,7 +22,20 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
   if (!secret) throw new Error('JWT_SECRET not configured');
 
   try {
-    const payload = jwt.verify(token, secret) as { sub: string };
+    const payload = jwt.verify(token, secret) as { sub: string; jti?: string };
+
+    if (!payload?.sub) {
+      return next(new UnauthorizedError('Invalid token payload'));
+    }
+
+    if (payload.jti) {
+      const redis = getRedis();
+      const blacklisted = await redis.get(`blacklist:token:${payload.jti}`);
+      if (blacklisted) {
+        return next(new UnauthorizedError('Token has been revoked'));
+      }
+    }
+
     (req as AuthRequest).userId = payload.sub;
     next();
   } catch {

@@ -43,5 +43,3 @@ coverage/
 
 # Internal project docs (private)
 .github/
-project_overview.md
-project_structure.md

@@ -8,7 +8,6 @@ import type { LoginFormValues } from '@/components/auth/login/login.types';
 const DEFAULT_FORM: LoginFormValues = {
   phoneNumber: '',
   password: '',
-  rememberMe: false,
 };
 
 export function useLoginForm() {
@@ -29,10 +28,6 @@ export function useLoginForm() {
   const onPasswordChange = (value: string) => {
     setValues((prev) => ({ ...prev, password: value }));
     setErrorMessage(null);
-  };
-
-  const onToggleRemember = () => {
-    setValues((prev) => ({ ...prev, rememberMe: !prev.rememberMe }));
   };
 
   const onToggleShowPassword = () => {
@@ -63,7 +58,6 @@ export function useLoginForm() {
     errorMessage,
     onPhoneChange,
     onPasswordChange,
-    onToggleRemember,
     onToggleShowPassword,
     onSubmit,
   };

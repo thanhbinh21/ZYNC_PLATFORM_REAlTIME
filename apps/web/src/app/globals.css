@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-	--zync-bg-deep: #044f3a;
-	--zync-bg-mid: #08684a;
-	--zync-bg-soft: #0c7b58;
+	--zync-bg-deep: #021f1a;
+	--zync-bg-mid: #04362c;
+	--zync-bg-soft: #065542;
 }
 
 * {
@@ -26,40 +26,40 @@ body {
 	position: relative;
 	overflow: hidden;
 	background:
-		radial-gradient(circle at 18% 24%, rgba(31, 188, 129, 0.22), transparent 40%),
-		radial-gradient(circle at 78% 72%, rgba(15, 126, 89, 0.3), transparent 48%),
-		linear-gradient(135deg, var(--zync-bg-deep), var(--zync-bg-mid) 48%, var(--zync-bg-soft));
+		radial-gradient(circle at 20% 25%, rgba(36, 193, 141, 0.18), transparent 42%),
+		radial-gradient(circle at 76% 22%, rgba(22, 120, 93, 0.22), transparent 44%),
+		linear-gradient(120deg, var(--zync-bg-deep), var(--zync-bg-mid) 52%, var(--zync-bg-soft));
 }
 
-.zync-glow {
+.zync-layer {
 	position: absolute;
-	width: min(46vw, 560px);
-	height: min(46vw, 560px);
+	width: min(48vw, 620px);
+	height: min(48vw, 620px);
 	border-radius: 999px;
-	filter: blur(56px);
-	opacity: 0.34;
-	animation: glowDrift 10s ease-in-out infinite;
+	filter: blur(72px);
+	opacity: 0.48;
+	animation: emeraldShift 12s ease-in-out infinite;
 }
 
-.zync-glow-left {
+.zync-layer-left {
 	left: -12%;
-	top: -10%;
-	background: radial-gradient(circle, rgba(36, 217, 148, 0.38), rgba(36, 217, 148, 0));
+	top: -14%;
+	background: radial-gradient(circle, rgba(39, 216, 153, 0.46), rgba(39, 216, 153, 0));
 }
 
-.zync-glow-right {
+.zync-layer-right {
 	right: -16%;
-	bottom: -22%;
+	bottom: -20%;
 	animation-delay: 0.8s;
-	background: radial-gradient(circle, rgba(17, 150, 105, 0.4), rgba(17, 150, 105, 0));
+	background: radial-gradient(circle, rgba(10, 126, 92, 0.52), rgba(10, 126, 92, 0));
 }
 
-@keyframes glowDrift {
+@keyframes emeraldShift {
 	0%,
 	100% {
 		transform: translate3d(0, 0, 0) scale(1);
 	}
 	50% {
-		transform: translate3d(10px, -16px, 0) scale(1.07);
+		transform: translate3d(14px, -18px, 0) scale(1.08);
 	}
 }
