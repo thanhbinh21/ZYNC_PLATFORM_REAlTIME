@@ -22,12 +22,12 @@ apiClient.interceptors.response.use(
     if (err.response?.status === 401 && !err.config?._retry) {
       if (err.config) err.config._retry = true;
       try {
-        const { data } = await axios.post<{ data: { accessToken: string } }>(
+        const { data } = await axios.post<{ accessToken: string }>(
           `${process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3000'}/api/auth/refresh`,
           {},
           { withCredentials: true },
         );
-        (globalThis as Record<string, unknown>)['__accessToken'] = data.data.accessToken;
+        (globalThis as Record<string, unknown>)['__accessToken'] = data.accessToken;
         return apiClient(err.config ?? { url: '/' });
       } catch {
         return Promise.reject(error);

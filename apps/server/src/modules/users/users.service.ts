@@ -1,6 +1,7 @@
+import { Types } from 'mongoose';
 import { UserModel, type IUser } from './user.model';
 import { DeviceTokenModel } from './device-token.model';
-import { NotFoundError } from '../../shared/errors';
+import { BadRequestError, NotFoundError } from '../../shared/errors';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
 
 /** Lấy profile của bản thân (đầy đủ thông tin) */
@@ -17,6 +18,41 @@ export async function getUserById(userId: string): Promise<Partial<IUser>> {
   );
   if (!user) throw new NotFoundError('User not found');
   return user;
+}
+
+/** Tìm user theo tên hiển thị/email/số điện thoại cho luồng kết bạn */
+export async function searchUsers(
+  requesterId: string,
+  keyword: string,
+  limit: number,
+): Promise<Array<{ id: string; displayName: string; avatarUrl?: string; bio?: string }>> {
+  const queryText = keyword.trim();
+  if (queryText.length < 2) {
+    throw new BadRequestError('Query must be at least 2 characters');
+  }
+
+  const safeLimit = Math.min(Math.max(limit, 1), 20);
+  const escaped = queryText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'i');
+
+  const users = await UserModel.find({
+    _id: { $ne: new Types.ObjectId(requesterId) },
+    $or: [
+      { displayName: regex },
+      { email: regex },
+      { phoneNumber: regex },
+    ],
+  })
+    .select('displayName avatarUrl bio')
+    .limit(safeLimit)
+    .lean();
+
+  return users.map((user) => ({
+    id: user._id.toString(),
+    displayName: user.displayName as string,
+    avatarUrl: user.avatarUrl as string | undefined,
+    bio: user.bio as string | undefined,
+  }));
 }
 
 /** Cập nhật profile của bản thân */

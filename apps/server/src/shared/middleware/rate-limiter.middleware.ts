@@ -2,6 +2,7 @@ import rateLimit from 'express-rate-limit';
 import { type Request, type Response, type NextFunction } from 'express';
 import { getRedis } from '../../infrastructure/redis';
 import { TooManyRequestsError } from '../errors';
+import { type AuthRequest } from './auth.middleware';
 
 const OTP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const OTP_RATE_LIMIT_MAX = 3;
@@ -74,7 +75,7 @@ export const uploadRateLimiter = rateLimit({
 export const friendRequestRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 20,
-  keyGenerator: (req) => req.headers['x-user-id'] as string ?? req.ip ?? 'unknown',
+  keyGenerator: (req) => (req as AuthRequest).userId ?? req.ip ?? 'unknown',
   message: { success: false, error: 'Friend request rate limit exceeded. Try again in 1 hour.' },
   standardHeaders: true,
   legacyHeaders: false,

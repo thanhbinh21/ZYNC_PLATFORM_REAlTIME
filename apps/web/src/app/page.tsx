@@ -1,12 +1,10 @@
-// Module: auth | Component: LoginPage | Type: container
-// Depends: useLoginForm, LoginScreen
+// Module: home | Component: HomePage | Type: container
+// Depends: home screen data
 'use client';
 
-import { LoginScreen } from '@/components/auth/login/login-screen';
-import { useLoginForm } from '@/hooks/use-login-form';
+import { HOME_MOCK_DATA } from '@/components/home/mockData';
+import { HomeScreen } from '@/components/home/organisms/home-screen';
 
 export default function HomePage() {
-  const loginForm = useLoginForm();
-
-  return <LoginScreen {...loginForm} />;
+  return <HomeScreen data={HOME_MOCK_DATA} />;
 }

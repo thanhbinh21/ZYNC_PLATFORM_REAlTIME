@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Sora } from 'next/font/google';
+import { Be_Vietnam_Pro } from 'next/font/google';
 import './globals.css';
 
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-sora',
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-be-vietnam-pro',
 });
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className={sora.variable}>{children}</body>
+      <body className={beVietnamPro.variable}>{children}</body>
     </html>
   );
 }

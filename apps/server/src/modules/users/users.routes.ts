@@ -5,6 +5,7 @@ import { UpdateProfileSchema, UpsertDeviceTokenSchema } from '../auth/auth.schem
 import {
   getMeHandler,
   getUserByIdHandler,
+  searchUsersHandler,
   updateProfileHandler,
   upsertDeviceTokenHandler,
 } from './users.controller';
@@ -16,6 +17,9 @@ usersRouter.use(authenticate);
 
 // GET /api/users/me – get own profile
 usersRouter.get('/me', getMeHandler);
+
+// GET /api/users/search?query=...&limit=10 – search users for friend request
+usersRouter.get('/search', searchUsersHandler);
 
 // GET /api/users/:userId – get user profile (public)
 usersRouter.get('/:userId', getUserByIdHandler);

@@ -1,10 +1,24 @@
 import { Router } from 'express';
 import { otpRateLimiter } from '../../shared/middleware/rate-limiter.middleware';
 import { validateBody } from '../../shared/middleware/validate.middleware';
-import { RegisterSchema, VerifyOtpSchema, LogoutSchema } from './auth.schema';
+import {
+  RegisterSchema,
+  VerifyOtpSchema,
+  LogoutSchema,
+  LoginPasswordRequestOtpSchema,
+  LoginPasswordVerifyOtpSchema,
+  GoogleLoginSchema,
+  ForgotPasswordRequestOtpSchema,
+  ForgotPasswordResetSchema,
+} from './auth.schema';
 import {
   registerHandler,
   verifyOtpHandler,
+  loginPasswordRequestOtpHandler,
+  loginPasswordVerifyOtpHandler,
+  forgotPasswordRequestOtpHandler,
+  forgotPasswordResetHandler,
+  googleLoginHandler,
   refreshHandler,
   logoutHandler,
 } from './auth.controller';
@@ -16,6 +30,39 @@ authRouter.post('/register', otpRateLimiter, validateBody(RegisterSchema), regis
 
 // POST /api/auth/verify-otp – verify OTP, receive JWT + refresh token cookie
 authRouter.post('/verify-otp', validateBody(VerifyOtpSchema), verifyOtpHandler);
+
+// POST /api/auth/login-password/request-otp – login step 1 with email/password
+authRouter.post(
+  '/login-password/request-otp',
+  otpRateLimiter,
+  validateBody(LoginPasswordRequestOtpSchema),
+  loginPasswordRequestOtpHandler,
+);
+
+// POST /api/auth/login-password/verify-otp – login step 2 verify OTP + issue JWT
+authRouter.post(
+  '/login-password/verify-otp',
+  validateBody(LoginPasswordVerifyOtpSchema),
+  loginPasswordVerifyOtpHandler,
+);
+
+// POST /api/auth/forgot-password/request-otp – send OTP for password recovery
+authRouter.post(
+  '/forgot-password/request-otp',
+  otpRateLimiter,
+  validateBody(ForgotPasswordRequestOtpSchema),
+  forgotPasswordRequestOtpHandler,
+);
+
+// POST /api/auth/forgot-password/reset – verify OTP and reset password
+authRouter.post(
+  '/forgot-password/reset',
+  validateBody(ForgotPasswordResetSchema),
+  forgotPasswordResetHandler,
+);
+
+// POST /api/auth/google – login with Google ID token
+authRouter.post('/google', validateBody(GoogleLoginSchema), googleLoginHandler);
 
 // POST /api/auth/refresh – refresh access token using http-only cookie
 authRouter.post('/refresh', refreshHandler);

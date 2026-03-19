@@ -3,6 +3,7 @@ import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 import {
   getMe,
   getUserById,
+  searchUsers,
   updateProfile,
   upsertDeviceToken,
 } from './users.service';
@@ -34,6 +35,24 @@ export async function getUserByIdHandler(
   try {
     const user = await getUserById(req.params['userId'] as string);
     res.json({ success: true, user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /api/users/search ───────────────────────────────────────────────────
+
+export async function searchUsersHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const query = (req.query['query'] as string | undefined) ?? '';
+    const limitRaw = Number(req.query['limit'] ?? 10);
+    const users = await searchUsers(userId, query, limitRaw);
+    res.json({ success: true, users });
   } catch (err) {
     next(err);
   }

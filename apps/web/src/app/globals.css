@@ -19,7 +19,30 @@ body {
 }
 
 body {
-	font-family: var(--font-sora), sans-serif;
+	font-family: var(--font-be-vietnam-pro), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.font-ui-title {
+	font-family: var(--font-be-vietnam-pro), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 700;
+}
+
+.font-ui-brand {
+	font-family: var(--font-be-vietnam-pro), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 600;
+}
+
+.font-ui-content {
+	font-family: var(--font-be-vietnam-pro), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 400;
+}
+
+.font-ui-meta {
+	font-family: var(--font-be-vietnam-pro), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+	font-weight: 300;
 }
 
 .zync-auth-shell {
@@ -31,7 +54,7 @@ body {
 		linear-gradient(135deg, var(--zync-bg-deep), var(--zync-bg-mid) 48%, var(--zync-bg-soft));
 }
 
-.zync-glow {
+.zync-layer {
 	position: absolute;
 	width: min(46vw, 560px);
 	height: min(46vw, 560px);
@@ -41,13 +64,13 @@ body {
 	animation: glowDrift 10s ease-in-out infinite;
 }
 
-.zync-glow-left {
+.zync-layer-left {
 	left: -12%;
 	top: -10%;
 	background: radial-gradient(circle, rgba(36, 217, 148, 0.38), rgba(36, 217, 148, 0));
 }
 
-.zync-glow-right {
+.zync-layer-right {
 	right: -16%;
 	bottom: -22%;
 	animation-delay: 0.8s;
