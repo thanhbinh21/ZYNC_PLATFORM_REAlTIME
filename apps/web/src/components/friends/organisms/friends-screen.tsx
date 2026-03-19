@@ -34,8 +34,8 @@ export function FriendsScreen({
             <h1 className="font-ui-title mt-3 text-[clamp(2rem,4.5vw,3.5rem)] text-[#daf5ec]">Trung tâm bạn bè</h1>
             <p className="font-ui-content mt-1 text-base text-[#9fcabd]">Quản lý kết nối, lời mời và danh sách bạn bè ở một nơi duy nhất.</p>
           </div>
-          <Link href="/auth" className="font-ui-title rounded-full border border-[#2f8f73] px-5 py-2 text-sm text-[#c4ebde] transition hover:bg-[#0f4d3e]">
-            Quay lại Đăng nhập
+          <Link href="/home" className="font-ui-title rounded-full border border-[#2f8f73] px-5 py-2 text-sm text-[#c4ebde] transition hover:bg-[#0f4d3e]">
+            Về trang chủ
           </Link>
         </header>
 

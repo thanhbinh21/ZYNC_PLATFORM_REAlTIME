@@ -5,7 +5,7 @@ import { TooManyRequestsError } from '../errors';
 import { type AuthRequest } from './auth.middleware';
 
 const OTP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
-const OTP_RATE_LIMIT_MAX = 3;
+const OTP_RATE_LIMIT_MAX = 30 ; // Test code dev : 30 , sau sẽ chỉnh lại thành 3 thôi 
 
 function normalizeOtpIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();

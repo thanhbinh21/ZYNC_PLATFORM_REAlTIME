@@ -20,7 +20,7 @@ export function createApp(): Application {
   // Middleware bảo mật
   app.use(helmet());
   app.use(cors({
-    origin: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001').split(','),
+    origin: true,
     credentials: true,
   }));
 
