@@ -189,7 +189,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 ### Quy tắc nghiệp vụ chính
 - Đăng nhập tài khoản nội bộ bắt buộc đi qua luồng Email + Password + OTP.
 - Luồng OTP-only không dùng cho user đã tồn tại.
-- OTP hardcode chỉ dùng trong test (`NODE_ENV=test`), các môi trường khác phải gửi OTP thực.
+- Tạm thời cho phép OTP hardcode ở môi trường non-production (`OTP_HARDCODE=true`) để dev nhanh; production phải gửi OTP thực qua SMTP/SMS.
 
 ---
 

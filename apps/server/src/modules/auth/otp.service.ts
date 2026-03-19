@@ -1,13 +1,18 @@
 import nodemailer from 'nodemailer';
 import twilio from 'twilio';
 import { getRedis } from '../../infrastructure/redis';
+import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 
 const OTP_TTL_SECONDS = 5 * 60; // 5 phút
 
+function shouldUseOtpHardcode(): boolean {
+  return process.env['OTP_HARDCODE'] === 'true' && process.env['NODE_ENV'] !== 'production';
+}
+
 /** Sinh mã OTP 6 chữ số (hoặc dùng hardcode nếu môi trường dev) */
 export function generateOtp(): string {
-  if (process.env['NODE_ENV'] === 'test' && process.env['OTP_HARDCODE'] === 'true') {
+  if (shouldUseOtpHardcode()) {
     return process.env['OTP_HARDCODE_VALUE'] ?? '123456';
   }
   return Math.floor(100_000 + Math.random() * 900_000).toString();
@@ -31,8 +36,8 @@ export async function verifyOtp(identifier: string, otp: string): Promise<boolea
 
 /** Gửi OTP qua SMS (Twilio) hoặc Email (Nodemailer/Resend) tuỳ identifier */
 export async function sendOtp(identifier: string, otp: string): Promise<void> {
-  // Chỉ bỏ qua gửi OTP thật trong môi trường test
-  if (process.env['NODE_ENV'] === 'test' && process.env['OTP_HARDCODE'] === 'true') {
+  // Môi trường non-production có thể dùng OTP hardcode để tránh phụ thuộc SMTP/SMS
+  if (shouldUseOtpHardcode()) {
     logger.info(`[OTP HARDCODE] identifier=${identifier} otp=${otp}`);
     return;
   }
@@ -75,12 +80,27 @@ async function sendEmailResend(email: string, otp: string): Promise<void> {
     },
   });
 
-  await transporter.sendMail({
-    from: process.env['SMTP_FROM'] ?? 'noreply@zync.app',
-    to: email,
-    subject: 'Mã xác thực Zync',
-    text: `Mã xác thực của bạn là: ${otp}. Có hiệu lực trong 5 phút.`,
-    html: `<p>Mã xác thực của bạn là: <strong>${otp}</strong>. Có hiệu lực trong <strong>5 phút</strong>.</p>`,
-  });
-  logger.info(`OTP email sent to ${email}`);
+  try {
+    await transporter.sendMail({
+      from: process.env['SMTP_FROM'] ?? 'noreply@zync.app',
+      to: email,
+      subject: 'Mã xác thực Zync',
+      text: `Mã xác thực của bạn là: ${otp}. Có hiệu lực trong 5 phút.`,
+      html: `<p>Mã xác thực của bạn là: <strong>${otp}</strong>. Có hiệu lực trong <strong>5 phút</strong>.</p>`,
+    });
+    logger.info(`OTP email sent to ${email}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown SMTP error';
+    const isResendSandboxError =
+      message.includes('You can only send testing emails to your own email address') ||
+      message.includes('verify a domain at resend.com/domains');
+
+    if (isResendSandboxError) {
+      throw new BadRequestError(
+        'Resend đang ở chế độ test. Hãy verify domain tại resend.com/domains và đặt SMTP_FROM bằng email thuộc domain đã verify.',
+      );
+    }
+
+    throw error;
+  }
 }
