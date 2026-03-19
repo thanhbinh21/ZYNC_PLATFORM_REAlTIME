@@ -8,7 +8,7 @@ interface ShellFooterProps {
 export function ShellFooter({ brand, copyright, links, statusLabel }: ShellFooterProps) {
   return (
     <footer className="relative z-10 border-t border-[#0d4a3b] bg-[#053328]/70 px-6 py-7 backdrop-blur-sm lg:px-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 text-[#7ea79a] lg:flex-row lg:items-end lg:justify-between">
+      <div className="zync-page-container flex flex-col gap-6 text-[#7ea79a] lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="font-ui-brand text-2xl font-semibold tracking-wide text-[#39d7a8]">{brand}</p>
           <p className="font-ui-meta mt-2 text-xs">{copyright}</p>

@@ -8,7 +8,7 @@
 ## Sơ đồ thư mục
 
 ```
-zalo-clone/
+zync-platform/
 ├── apps/
 │   ├── server/                   # Backend: REST API + WebSocket server
 │   │   ├── src/
@@ -19,13 +19,10 @@ zalo-clone/
 │   │   │   │   ├── groups/       # Quản lý nhóm, thành viên, phân quyền
 │   │   │   │   ├── conversations/# Hội thoại 1-1 và nhóm
 │   │   │   │   ├── messages/     # Tin nhắn, media, idempotency
-│   │   │   │   ├── presence/     # Online/offline, typing indicator
 │   │   │   │   ├── stories/      # Story 24h
-│   │   │   │   └── notifications/# Push notification (FCM/APNs)
+│   │   │   │   └── upload/       # Cấp pre-signed URL upload media
 │   │   │   ├── socket/           # Socket.IO gateway & event handlers
 │   │   │   │   ├── gateway.ts
-│   │   │   │   ├── events/       # Từng event handler (send_message, typing, v.v.)
-│   │   │   │   └── middleware/   # Auth middleware cho socket
 │   │   │   ├── workers/          # Kafka consumers
 │   │   │   │   ├── message.worker.ts
 │   │   │   │   └── notification.worker.ts
@@ -35,8 +32,8 @@ zalo-clone/
 │   │   │   │   └── kafka.ts      # Kafka producer/consumer setup
 │   │   │   ├── shared/           # Utilities, constants, types dùng chung
 │   │   │   │   ├── errors/
-│   │   │   │   ├── middleware/   # Rate limiter, validation, auth guard
-│   │   │   │   └── types/
+│   │   │   │   ├── logger.ts
+│   │   │   │   └── middleware/   # Rate limiter, validation, auth guard
 │   │   │   └── main.ts           # Entry point
 │   │   ├── tests/
 │   │   │   ├── unit/
@@ -46,20 +43,54 @@ zalo-clone/
 │   │   └── package.json
 │   │
 │   ├── web/                      # Next.js web application
+│   │   ├── public/
 │   │   ├── src/
-│   │   │   ├── app/              # Next.js App Router pages
-│   │   │   ├── components/       # Reusable UI components
-│   │   │   ├── hooks/            # Custom hooks (useSocket, usePresence, v.v.)
-│   │   │   ├── store/            # State management (Zustand/Redux)
-│   │   │   └── services/         # API calls, socket client
+│   │   │   ├── app/              # App Router pages
+│   │   │   │   ├── auth/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── friends/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── home/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── globals.css
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── components/       # Atomic Design components
+│   │   │   │   ├── auth/
+│   │   │   │   │   └── login/
+│   │   │   │   ├── friends/
+│   │   │   │   │   ├── atoms/
+│   │   │   │   │   ├── molecules/
+│   │   │   │   │   ├── organisms/
+│   │   │   │   │   └── friends.types.ts
+│   │   │   │   ├── home/
+│   │   │   │   │   ├── atoms/
+│   │   │   │   │   ├── molecules/
+│   │   │   │   │   ├── organisms/
+│   │   │   │   │   ├── home.types.ts
+│   │   │   │   │   └── mockData.ts
+│   │   │   │   └── home-dashboard/
+│   │   │   │       ├── atoms/
+│   │   │   │       ├── molecules/
+│   │   │   │       ├── organisms/
+│   │   │   │       ├── home-dashboard.types.ts
+│   │   │   │       └── mock-data.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── use-friends-dashboard.ts
+│   │   │   │   ├── use-home-dashboard.ts
+│   │   │   │   └── use-login-form.ts
+│   │   │   └── services/
+│   │   │       ├── api.ts
+│   │   │       ├── auth.ts
+│   │   │       ├── friends.ts
+│   │   │       └── socket.ts
+│   │   ├── next-env.d.ts
+│   │   ├── next.config.mjs
 │   │   └── package.json
 │   │
 │   └── mobile/                   # React Native application
-│       ├── src/
-│       │   ├── screens/
-│       │   ├── components/
-│       │   ├── hooks/
-│       │   └── services/
+│       ├── app/
+│       │   └── index.tsx
 │       └── package.json
 │
 ├── packages/
@@ -67,19 +98,9 @@ zalo-clone/
 │
 ├── infra/
 │   ├── docker-compose.yml        # Local dev: chỉ Redis + Redpanda (~155MB RAM tổng)
-│   ├── k8s/                      # Kubernetes manifests
-│   │   ├── server-deployment.yaml
-│   │   ├── worker-deployment.yaml
-│   │   └── hpa.yaml              # Horizontal Pod Autoscaler
-│   └── helm/                     # Helm chart cho production
 │
-├── .github/
-│   ├── workflows/                # CI/CD (GitHub Actions)
-│   │   ├── ci.yml
-│   │   └── deploy.yml
-│   ├── agents/
-│   │   └── pipeline.agent.md     # Pipeline BA→DEV→QC agent
-│   └── copilot-instructions.md   # Luật chơi cho Copilot
+├── docs/
+│   └── designs/
 │
 ├── project_overview.md                     # Thông tin & Roadmap dự án
 └── project_structure.md          # File này
@@ -97,9 +118,8 @@ zalo-clone/
 | `groups` | CRUD nhóm, quản lý thành viên | `conversations`, `conversation_members` |
 | `conversations` | Danh sách hội thoại, unread count | `conversations`, `conversation_members` |
 | `messages` | Gửi/nhận tin nhắn, media, idempotency | `messages`, `message_status` |
-| `presence` | Online/offline, typing indicator | Redis only |
 | `stories` | CRUD story 24h, viewers | `stories` |
-| `notifications` | Push notification dispatch | - (gọi FCM/APNs) |
+| `upload` | Cấp pre-signed URL upload media | - (gọi Cloudinary) |
 
 ---
 
@@ -121,12 +141,10 @@ zalo-clone/
 |------|-----------|
 | Biến môi trường | `.env` (từ `.env.example`) |
 | Docker local | `infra/docker-compose.yml` |
-| Kubernetes | `infra/k8s/` |
-| Helm chart | `infra/helm/` |
 | CI/CD | `.github/workflows/` |
 | Load test | `apps/server/tests/load/` |
 | Seed data | `apps/server/scripts/seed.ts` |
-| DB migration | `apps/server/scripts/migrate.ts` |
+
 
 ---
 
@@ -189,7 +207,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 ### Quy tắc nghiệp vụ chính
 - Đăng nhập tài khoản nội bộ bắt buộc đi qua luồng Email + Password + OTP.
 - Luồng OTP-only không dùng cho user đã tồn tại.
-- OTP hardcode chỉ dùng trong test (`NODE_ENV=test`), các môi trường khác phải gửi OTP thực.
+- Tạm thời cho phép OTP hardcode ở môi trường non-production (`OTP_HARDCODE=true`) để dev nhanh; production phải gửi OTP thực qua SMTP/SMS.
 
 ---
 

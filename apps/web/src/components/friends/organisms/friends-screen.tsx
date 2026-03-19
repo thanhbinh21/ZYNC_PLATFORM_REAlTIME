@@ -27,15 +27,15 @@ export function FriendsScreen({
 }: FriendsScreenProps) {
   return (
     <main className="zync-auth-shell min-h-screen text-white">
-      <section className="mx-auto w-full max-w-6xl px-6 py-10 lg:px-10">
+      <section className="zync-page-container py-10">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-ui-brand text-4xl text-[#44ddb0]">ZYNC</p>
             <h1 className="font-ui-title mt-3 text-[clamp(2rem,4.5vw,3.5rem)] text-[#daf5ec]">Trung tâm bạn bè</h1>
             <p className="font-ui-content mt-1 text-base text-[#9fcabd]">Quản lý kết nối, lời mời và danh sách bạn bè ở một nơi duy nhất.</p>
           </div>
-          <Link href="/auth" className="font-ui-title rounded-full border border-[#2f8f73] px-5 py-2 text-sm text-[#c4ebde] transition hover:bg-[#0f4d3e]">
-            Quay lại Đăng nhập
+          <Link href="/home" className="font-ui-title rounded-full border border-[#2f8f73] px-5 py-2 text-sm text-[#c4ebde] transition hover:bg-[#0f4d3e]">
+            Về trang chủ
           </Link>
         </header>
 

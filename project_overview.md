@@ -159,6 +159,15 @@ npm run dev:web
 - [x] Bắt buộc đăng nhập bằng Email + Password + OTP (loại bỏ luồng login OTP-only cho tài khoản đã tồn tại) <!-- done: 19/03/2026 -->
 - [x] Bổ sung luồng Quên mật khẩu: request OTP + reset mật khẩu mới <!-- done: 19/03/2026 -->
 - [x] Chuẩn hóa OTP gửi thực ngoài môi trường test (OTP hardcode chỉ cho NODE_ENV=test) <!-- done: 19/03/2026 -->
+- [x] Fix OTP rate limit nhận diện đúng identifier cho các API dùng trường `email`/`phoneNumber` <!-- done: 19/03/2026 -->
+- [x] Xử lý lỗi Resend sandbox rõ ràng (không trả 500 mơ hồ, trả hướng dẫn verify domain/SMTP_FROM) <!-- done: 19/03/2026 -->
+- [x] Tạm thời bật lại OTP_HARDCODE cho môi trường dev/non-production, giữ SMTP/SMS cho production deploy <!-- done: 19/03/2026 -->
+- [x] Chuẩn hóa chiều rộng UI Web theo container dùng chung cho `/`, `/auth`, `/friends` <!-- done: 19/03/2026 -->
+- [x] Nâng cấp landing page `/` với fixed header, scroll section và bố cục chuẩn landing <!-- done: 19/03/2026 -->
+- [x] Cân đối lại bố cục trang auth theo hướng center đồng bộ design login <!-- done: 19/03/2026 -->
+- [x] Sau đăng nhập thành công chuyển về trang chủ `/` theo thiết kế trang chủ <!-- done: 19/03/2026 -->
+- [x] Tách vai trò route: `/` là landing giới thiệu, `/home` là trang chính sau đăng nhập thành công <!-- done: 19/03/2026 -->
+- [x] Dựng giao diện `/home` theo mẫu dashboard `docs/designs/login.png` với mock data khi chưa có API <!-- done: 19/03/2026 -->
 
 ### Phase 3 – Friends & Contacts (Module F5–F9)
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->

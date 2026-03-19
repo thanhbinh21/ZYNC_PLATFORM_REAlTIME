@@ -5,10 +5,37 @@ import { TooManyRequestsError } from '../errors';
 import { type AuthRequest } from './auth.middleware';
 
 const OTP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
-const OTP_RATE_LIMIT_MAX = 3;
+const OTP_RATE_LIMIT_MAX = 30 ; // Test code dev : 30 , sau sẽ chỉnh lại thành 3 thôi 
 
 function normalizeOtpIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();
+}
+
+function extractOtpIdentifierFromBody(body: unknown): string | null {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+
+  const payload = body as {
+    identifier?: unknown;
+    email?: unknown;
+    phoneNumber?: unknown;
+  };
+
+  const rawIdentifier =
+    typeof payload.identifier === 'string'
+      ? payload.identifier
+      : typeof payload.email === 'string'
+        ? payload.email
+        : typeof payload.phoneNumber === 'string'
+          ? payload.phoneNumber
+          : null;
+
+  if (!rawIdentifier) {
+    return null;
+  }
+
+  return normalizeOtpIdentifier(rawIdentifier);
 }
 
 async function increaseCounterWithTtl(key: string): Promise<number> {
@@ -35,10 +62,7 @@ export async function otpRateLimiter(
 ): Promise<void> {
   try {
     const ip = req.ip ?? 'unknown';
-    const bodyIdentifier = req.body && typeof req.body === 'object'
-      ? (req.body as { identifier?: unknown }).identifier
-      : undefined;
-    const identifier = typeof bodyIdentifier === 'string' ? normalizeOtpIdentifier(bodyIdentifier) : null;
+    const identifier = extractOtpIdentifierFromBody(req.body);
 
     const ipKey = `otp_rl:ip:${ip}`;
     const ipCount = await increaseCounterWithTtl(ipKey);
