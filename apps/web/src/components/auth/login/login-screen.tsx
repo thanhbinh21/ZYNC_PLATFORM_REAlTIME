@@ -37,7 +37,7 @@ export function LoginScreen({
         <div className="zync-layer zync-layer-right" />
       </div>
 
-      <div className="relative mx-auto grid min-h-[calc(100vh-94px)] w-full max-w-6xl items-center gap-12 px-6 py-10 lg:grid-cols-[1fr_auto] lg:gap-20 lg:px-10">
+      <div className="zync-page-container grid min-h-[calc(100vh-94px)] items-center gap-12 py-10 lg:grid-cols-[1.05fr_auto] lg:gap-20 lg:py-14">
         <LoginHero data={mockData} />
 
         <LoginCard

@@ -25,6 +25,10 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 }
 
+html {
+	scroll-behavior: smooth;
+}
+
 .font-ui-title {
 	font-family: var(--font-be-vietnam-pro), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 	font-weight: 700;
@@ -52,6 +56,24 @@ body {
 		radial-gradient(circle at 18% 24%, rgba(31, 188, 129, 0.22), transparent 40%),
 		radial-gradient(circle at 78% 72%, rgba(15, 126, 89, 0.3), transparent 48%),
 		linear-gradient(135deg, var(--zync-bg-deep), var(--zync-bg-mid) 48%, var(--zync-bg-soft));
+}
+
+.zync-page-container {
+	position: relative;
+	z-index: 10;
+	margin-left: auto;
+	margin-right: auto;
+	width: 100%;
+	max-width: 80rem;
+	padding-left: 1.5rem;
+	padding-right: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+	.zync-page-container {
+		padding-left: 2.5rem;
+		padding-right: 2.5rem;
+	}
 }
 
 .zync-layer {

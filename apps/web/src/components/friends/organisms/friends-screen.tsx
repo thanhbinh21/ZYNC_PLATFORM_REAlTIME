@@ -27,7 +27,7 @@ export function FriendsScreen({
 }: FriendsScreenProps) {
   return (
     <main className="zync-auth-shell min-h-screen text-white">
-      <section className="mx-auto w-full max-w-6xl px-6 py-10 lg:px-10">
+      <section className="zync-page-container py-10">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-ui-brand text-4xl text-[#44ddb0]">ZYNC</p>
