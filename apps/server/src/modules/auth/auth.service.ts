@@ -1,11 +1,12 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { getRedis } from '../../infrastructure/redis';
-import { UserModel } from '../users/user.model';
+import { UserModel, type IUser } from '../users/user.model';
 import { DeviceTokenModel } from '../users/device-token.model';
 import { removeDeviceToken } from '../users/users.service';
 import { generateOtp, storeOtp, sendOtp, verifyOtp as verifyOtpRedis } from './otp.service';
-import { UnauthorizedError } from '../../shared/errors';
+import { BadRequestError, UnauthorizedError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 
 const ACCESS_TOKEN_TTL = '15m';     // 15 phút
@@ -49,6 +50,53 @@ function parseIdentifier(identifier: string): {
   }
 
   return { normalized: trimmed.toLowerCase(), isPhone: false };
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+async function findUserIncludingPassword(query: { phoneNumber?: string; email?: string }): Promise<IUser | null> {
+  const result = UserModel.findOne(query) as unknown as Promise<IUser | null> & {
+    select?: (projection: string) => Promise<IUser | null>;
+  };
+
+  if (typeof result.select === 'function') {
+    return result.select('+passwordHash');
+  }
+
+  return result;
+}
+
+async function upsertDeviceToken(
+  userId: string,
+  deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
+): Promise<void> {
+  if (!deviceInfo?.deviceToken || !deviceInfo.platform) {
+    return;
+  }
+
+  await DeviceTokenModel.findOneAndUpdate(
+    { deviceToken: deviceInfo.deviceToken },
+    { userId, deviceToken: deviceInfo.deviceToken, platform: deviceInfo.platform },
+    { upsert: true, new: true },
+  );
+}
+
+function toVerifyOtpResult(user: {
+  id: string;
+  displayName: string;
+  phoneNumber?: string;
+  email?: string;
+  avatarUrl?: string;
+}): VerifyOtpResult {
+  const { accessToken, refreshToken } = issueTokenPair(user.id);
+
+  return {
+    accessToken,
+    refreshToken,
+    user,
+  };
 }
 
 /** Phát hành cặp access + refresh token cho một userId */
@@ -100,6 +148,7 @@ export async function verifyOtpAndLogin(
   identifier: string,
   otp: string,
   displayName?: string,
+  password?: string,
   deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
 ): Promise<VerifyOtpResult> {
   const { normalized, isPhone } = parseIdentifier(identifier);
@@ -112,42 +161,181 @@ export async function verifyOtpAndLogin(
     : { email: normalized };
 
   // Upsert user
-  let user = await UserModel.findOne(query);
+  let user = await findUserIncludingPassword(query);
   if (!user) {
     if (!displayName) {
       displayName = isPhone
         ? `User${normalized.slice(-4)}`
         : normalized.split('@')[0];
     }
+
+    const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
     user = await UserModel.create({
       ...query,
       displayName,
+      passwordHash,
     });
     logger.info(`New user created: ${user.id}`);
+  } else {
+    throw new UnauthorizedError('Tài khoản đã tồn tại. Vui lòng đăng nhập bằng email + mật khẩu + OTP');
   }
 
-  // Lưu device token nếu cung cấp
-  if (deviceInfo?.deviceToken && deviceInfo?.platform) {
-    await DeviceTokenModel.findOneAndUpdate(
-      { deviceToken: deviceInfo.deviceToken },
-      { userId: user.id, deviceToken: deviceInfo.deviceToken, platform: deviceInfo.platform },
-      { upsert: true, new: true },
-    );
+  await upsertDeviceToken(user.id as string, deviceInfo);
+
+  return toVerifyOtpResult({
+    id: user.id as string,
+    displayName: user.displayName,
+    phoneNumber: user.phoneNumber,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+  });
+}
+
+// ─── Email + Password + OTP Login ───────────────────────────────────────────
+
+export async function requestLoginOtpWithPassword(email: string, password: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserIncludingPassword({ email: normalizedEmail });
+
+  if (!user?.passwordHash) {
+    throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
   }
 
-  const { accessToken, refreshToken } = issueTokenPair(user.id as string);
+  const isMatched = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatched) {
+    throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
+  }
 
-  return {
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id as string,
-      displayName: user.displayName,
-      phoneNumber: user.phoneNumber,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
+  const otp = generateOtp();
+  await storeOtp(normalizedEmail, otp);
+  await sendOtp(normalizedEmail, otp);
+  logger.info(`Password OTP issued for ${normalizedEmail}`);
+}
+
+export async function verifyLoginWithPasswordAndOtp(
+  email: string,
+  password: string,
+  otp: string,
+  deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
+): Promise<VerifyOtpResult> {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserIncludingPassword({ email: normalizedEmail });
+
+  if (!user?.passwordHash) {
+    throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
+  }
+
+  const isMatched = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatched) {
+    throw new UnauthorizedError('Email hoặc mật khẩu không đúng');
+  }
+
+  const validOtp = await verifyOtpRedis(normalizedEmail, otp);
+  if (!validOtp) {
+    throw new UnauthorizedError('OTP không hợp lệ hoặc đã hết hạn');
+  }
+
+  await upsertDeviceToken(user.id as string, deviceInfo);
+
+  return toVerifyOtpResult({
+    id: user.id as string,
+    displayName: user.displayName,
+    phoneNumber: user.phoneNumber,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+  });
+}
+
+// ─── Forgot Password ────────────────────────────────────────────────────────
+
+export async function requestForgotPasswordOtp(email: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserIncludingPassword({ email: normalizedEmail });
+
+  if (!user) {
+    throw new UnauthorizedError('Email không tồn tại trong hệ thống');
+  }
+
+  const otp = generateOtp();
+  await storeOtp(normalizedEmail, otp);
+  await sendOtp(normalizedEmail, otp);
+  logger.info(`Forgot password OTP issued for ${normalizedEmail}`);
+}
+
+export async function resetForgotPassword(email: string, otp: string, newPassword: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserIncludingPassword({ email: normalizedEmail });
+
+  if (!user) {
+    throw new UnauthorizedError('Email không tồn tại trong hệ thống');
+  }
+
+  const validOtp = await verifyOtpRedis(normalizedEmail, otp);
+  if (!validOtp) {
+    throw new UnauthorizedError('OTP không hợp lệ hoặc đã hết hạn');
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  await user.save();
+}
+
+// ─── Google Login ────────────────────────────────────────────────────────────
+
+export async function loginWithGoogle(
+  idToken: string,
+  deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
+): Promise<VerifyOtpResult> {
+  const audience = process.env['GOOGLE_CLIENT_ID'];
+  if (!audience) {
+    throw new BadRequestError('GOOGLE_CLIENT_ID chưa được cấu hình');
+  }
+
+  let ticket: { getPayload: () => { email?: string; email_verified?: boolean; name?: string; picture?: string } | undefined };
+  try {
+    const { OAuth2Client } = await import('google-auth-library');
+    const googleClient = new OAuth2Client();
+    ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience,
+    });
+  } catch {
+    throw new UnauthorizedError('Google token không hợp lệ');
+  }
+
+  const payload = ticket.getPayload();
+  const email = payload?.email?.trim().toLowerCase();
+  const emailVerified = payload?.email_verified;
+
+  if (!email || !emailVerified) {
+    throw new UnauthorizedError('Tài khoản Google chưa xác thực email');
+  }
+
+  const displayName = payload?.name?.trim() || email.split('@')[0] || 'Google User';
+  const avatarUrl = payload?.picture;
+
+  const user = await UserModel.findOneAndUpdate(
+    { email },
+    {
+      email,
+      displayName,
+      avatarUrl,
     },
-  };
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+    },
+  );
+
+  await upsertDeviceToken(user.id as string, deviceInfo);
+
+  return toVerifyOtpResult({
+    id: user.id as string,
+    displayName: user.displayName,
+    phoneNumber: user.phoneNumber,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+  });
 }
 
 // ─── Refresh ─────────────────────────────────────────────────────────────────

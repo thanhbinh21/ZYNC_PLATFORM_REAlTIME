@@ -171,6 +171,28 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 
 ---
 
+## Auth API Contract
+
+### Public Endpoints
+| Method | Endpoint | Mô tả |
+|--------|----------|------|
+| POST | `/api/auth/register` | Gửi OTP đăng ký tới phone/email |
+| POST | `/api/auth/verify-otp` | Xác thực OTP đăng ký, tạo tài khoản mới và trả JWT |
+| POST | `/api/auth/login-password/request-otp` | Kiểm tra email + password hợp lệ, gửi OTP đăng nhập |
+| POST | `/api/auth/login-password/verify-otp` | Xác thực OTP đăng nhập (email + password + OTP), trả JWT |
+| POST | `/api/auth/forgot-password/request-otp` | Gửi OTP khôi phục mật khẩu theo email |
+| POST | `/api/auth/forgot-password/reset` | Xác thực OTP khôi phục và cập nhật mật khẩu mới |
+| POST | `/api/auth/google` | Đăng nhập bằng Google ID token |
+| POST | `/api/auth/refresh` | Cấp lại access token từ refresh token cookie |
+| POST | `/api/auth/logout` | Thu hồi phiên hiện tại, blacklist access token |
+
+### Quy tắc nghiệp vụ chính
+- Đăng nhập tài khoản nội bộ bắt buộc đi qua luồng Email + Password + OTP.
+- Luồng OTP-only không dùng cho user đã tồn tại.
+- OTP hardcode chỉ dùng trong test (`NODE_ENV=test`), các môi trường khác phải gửi OTP thực.
+
+---
+
 ## Socket.IO Events Contract
 
 ### Client → Server

@@ -7,7 +7,7 @@ const OTP_TTL_SECONDS = 5 * 60; // 5 phút
 
 /** Sinh mã OTP 6 chữ số (hoặc dùng hardcode nếu môi trường dev) */
 export function generateOtp(): string {
-  if (process.env['OTP_HARDCODE'] === 'true') {
+  if (process.env['NODE_ENV'] === 'test' && process.env['OTP_HARDCODE'] === 'true') {
     return process.env['OTP_HARDCODE_VALUE'] ?? '123456';
   }
   return Math.floor(100_000 + Math.random() * 900_000).toString();
@@ -31,8 +31,8 @@ export async function verifyOtp(identifier: string, otp: string): Promise<boolea
 
 /** Gửi OTP qua SMS (Twilio) hoặc Email (Nodemailer/Resend) tuỳ identifier */
 export async function sendOtp(identifier: string, otp: string): Promise<void> {
-  // Dev mode: không gửi thật
-  if (process.env['OTP_HARDCODE'] === 'true') {
+  // Chỉ bỏ qua gửi OTP thật trong môi trường test
+  if (process.env['NODE_ENV'] === 'test' && process.env['OTP_HARDCODE'] === 'true') {
     logger.info(`[OTP HARDCODE] identifier=${identifier} otp=${otp}`);
     return;
   }

@@ -28,10 +28,55 @@ export async function verifyOtp(payload: {
   identifier: string;
   otp: string;
   displayName?: string;
+  password?: string;
   deviceToken?: string;
   platform?: 'web';
 }): Promise<VerifyOtpResponse> {
   const { data } = await apiClient.post<VerifyOtpResponse>('/api/auth/verify-otp', payload);
+  return data;
+}
+
+export async function requestPasswordOtp(payload: {
+  email: string;
+  password: string;
+}): Promise<RegisterResponse> {
+  const { data } = await apiClient.post<RegisterResponse>('/api/auth/login-password/request-otp', payload);
+  return data;
+}
+
+export async function verifyPasswordOtp(payload: {
+  email: string;
+  password: string;
+  otp: string;
+  deviceToken?: string;
+  platform?: 'web';
+}): Promise<VerifyOtpResponse> {
+  const { data } = await apiClient.post<VerifyOtpResponse>('/api/auth/login-password/verify-otp', payload);
+  return data;
+}
+
+export async function requestForgotPasswordOtp(payload: {
+  email: string;
+}): Promise<RegisterResponse> {
+  const { data } = await apiClient.post<RegisterResponse>('/api/auth/forgot-password/request-otp', payload);
+  return data;
+}
+
+export async function resetForgotPassword(payload: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}): Promise<RegisterResponse> {
+  const { data } = await apiClient.post<RegisterResponse>('/api/auth/forgot-password/reset', payload);
+  return data;
+}
+
+export async function loginWithGoogle(payload: {
+  idToken: string;
+  deviceToken?: string;
+  platform?: 'web';
+}): Promise<VerifyOtpResponse> {
+  const { data } = await apiClient.post<VerifyOtpResponse>('/api/auth/google', payload);
   return data;
 }
 

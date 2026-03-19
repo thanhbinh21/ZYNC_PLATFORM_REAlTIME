@@ -11,17 +11,22 @@ export function LoginScreen({
   mockData,
   mode,
   step,
+  isRecoveryFlow,
   values,
   isSubmitting,
   infoMessage,
   errorMessage,
   currentUserName,
   onModeChange,
+  onStartRecovery,
+  onCancelRecovery,
   onIdentifierChange,
   onDisplayNameChange,
+  onPasswordChange,
   onOtpChange,
   onRequestOtp,
   onVerifyOtp,
+  onGoogleLogin,
   onBackToInput,
   onLogout,
 }: LoginScreenProps) {
@@ -40,17 +45,22 @@ export function LoginScreen({
           subtitle={mockData.cardSubtitle}
           mode={mode}
           step={step}
+          isRecoveryFlow={isRecoveryFlow}
           values={values}
           isSubmitting={isSubmitting}
           infoMessage={infoMessage}
           errorMessage={errorMessage}
           currentUserName={currentUserName}
           onModeChange={onModeChange}
+          onStartRecovery={onStartRecovery}
+          onCancelRecovery={onCancelRecovery}
           onIdentifierChange={onIdentifierChange}
           onDisplayNameChange={onDisplayNameChange}
+          onPasswordChange={onPasswordChange}
           onOtpChange={onOtpChange}
           onRequestOtp={onRequestOtp}
           onVerifyOtp={onVerifyOtp}
+          onGoogleLogin={onGoogleLogin}
           onBackToInput={onBackToInput}
           onLogout={onLogout}
           loginTabLabel={mockData.loginTabLabel}

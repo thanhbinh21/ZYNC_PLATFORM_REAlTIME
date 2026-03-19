@@ -3,6 +3,7 @@
 export interface LoginFormValues {
   identifier: string;
   displayName: string;
+  password: string;
   otp: string;
 }
 
@@ -43,17 +44,22 @@ export interface LoginScreenProps {
   mockData: LoginScreenMockData;
   mode: AuthMode;
   step: AuthStep;
+  isRecoveryFlow: boolean;
   values: LoginFormValues;
   isSubmitting: boolean;
   infoMessage: string | null;
   errorMessage: string | null;
   currentUserName: string | null;
   onModeChange: (mode: AuthMode) => void;
+  onStartRecovery: () => void;
+  onCancelRecovery: () => void;
   onIdentifierChange: (value: string) => void;
   onDisplayNameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
   onOtpChange: (value: string) => void;
   onRequestOtp: () => Promise<void>;
   onVerifyOtp: () => Promise<void>;
+  onGoogleLogin: () => Promise<void>;
   onBackToInput: () => void;
   onLogout: () => Promise<void>;
 }

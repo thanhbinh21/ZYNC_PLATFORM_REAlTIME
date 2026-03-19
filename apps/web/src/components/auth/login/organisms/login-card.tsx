@@ -7,17 +7,22 @@ interface LoginCardProps extends Pick<
   LoginScreenProps,
   | 'mode'
   | 'step'
+  | 'isRecoveryFlow'
   | 'values'
   | 'isSubmitting'
   | 'infoMessage'
   | 'errorMessage'
   | 'currentUserName'
   | 'onModeChange'
+  | 'onStartRecovery'
+  | 'onCancelRecovery'
   | 'onIdentifierChange'
   | 'onDisplayNameChange'
+  | 'onPasswordChange'
   | 'onOtpChange'
   | 'onRequestOtp'
   | 'onVerifyOtp'
+  | 'onGoogleLogin'
   | 'onBackToInput'
   | 'onLogout'
 > {
@@ -37,17 +42,22 @@ export function LoginCard({
   subtitle,
   mode,
   step,
+  isRecoveryFlow,
   values,
   isSubmitting,
   infoMessage,
   errorMessage,
   currentUserName,
   onModeChange,
+  onStartRecovery,
+  onCancelRecovery,
   onIdentifierChange,
   onDisplayNameChange,
+  onPasswordChange,
   onOtpChange,
   onRequestOtp,
   onVerifyOtp,
+  onGoogleLogin,
   onBackToInput,
   onLogout,
   loginTabLabel,
@@ -60,12 +70,18 @@ export function LoginCard({
 }: LoginCardProps) {
   const isRegister = mode === 'register';
   const isVerifyStep = step === 'verify';
+  const isLogin = mode === 'login';
+  const isPasswordOtpLogin = isLogin && !isRecoveryFlow;
 
   const submitLabel = isVerifyStep
-    ? 'Xác thực OTP'
+    ? isRecoveryFlow
+      ? 'Đặt lại mật khẩu'
+      : 'Xác thực OTP'
     : isRegister
       ? 'Gửi OTP đăng ký'
-      : 'Gửi OTP đăng nhập';
+      : isRecoveryFlow
+        ? 'Gửi OTP khôi phục'
+        : 'Gửi OTP đăng nhập';
 
   const onSubmit = async () => {
     if (isVerifyStep) {
@@ -109,12 +125,22 @@ export function LoginCard({
         }}
       >
         <FormField
-          label="Số điện thoại hoặc email"
+          label={isRegister ? 'Số điện thoại hoặc email' : 'Email đăng nhập'}
           type="text"
-          placeholder="Nhập số điện thoại hoặc email"
+          placeholder={isRegister ? 'Nhập số điện thoại hoặc email' : 'Nhập email đã đăng ký'}
           value={values.identifier}
           onChange={onIdentifierChange}
         />
+
+        {(isRegister || isPasswordOtpLogin || isRecoveryFlow) ? (
+          <FormField
+            label={isRecoveryFlow && isVerifyStep ? 'Mật khẩu mới' : 'Mật khẩu'}
+            type="password"
+            placeholder="Tối thiểu 8 ký tự"
+            value={values.password}
+            onChange={onPasswordChange}
+          />
+        ) : null}
 
         {isRegister && !isVerifyStep ? (
           <FormField
@@ -139,10 +165,20 @@ export function LoginCard({
                 onClick={onBackToInput}
                 className="text-[11px] font-medium text-[#57d9ad] transition hover:text-[#9ef0d1]"
               >
-                Đổi thông tin
+                {isRecoveryFlow ? 'Hủy khôi phục' : 'Đổi thông tin'}
               </button>
             }
           />
+        ) : null}
+
+        {isLogin && !isVerifyStep ? (
+          <button
+            type="button"
+            onClick={isRecoveryFlow ? onCancelRecovery : onStartRecovery}
+            className="font-ui-content text-sm text-[#9bd8c4] transition hover:text-[#c9ffec]"
+          >
+            {isRecoveryFlow ? 'Quay lại đăng nhập' : 'Quên mật khẩu?'}
+          </button>
         ) : null}
 
         {infoMessage ? (
@@ -178,8 +214,12 @@ export function LoginCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <SocialButton label="Google" />
-        <SocialButton label="Apple" />
+        <SocialButton
+          label="Google"
+          onClick={onGoogleLogin}
+          disabled={isSubmitting}
+        />
+        <SocialButton label="Apple" disabled />
       </div>
 
       <p className="font-ui-content mt-8 text-center text-sm text-[#8fb6aa]">

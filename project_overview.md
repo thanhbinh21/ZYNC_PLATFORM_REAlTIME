@@ -140,6 +140,7 @@ npm run dev:web
 - [x] Refactor Login UI theo Atomic Design từ ảnh mẫu (atoms/molecules/organisms + mock data) <!-- done: 19/03/2026 -->
 - [x] Dựng trang chủ Web (Phase 1) theo layout `trangchu.png` và điều hướng sang Auth flow <!-- done: 19/03/2026 -->
 - [x] Code lại landing route `/` theo mẫu UI mới (glassmorphism + hero + metrics + CTA + footer) <!-- done: 19/03/2026 -->
+- [x] Chuẩn hóa typography toàn hệ thống Web sang font Be Vietnam Pro <!-- done: 19/03/2026 -->
 
 ### Phase 2 – Authentication & User Management (Module F1–F4)
 - [x] POST /api/auth/register – gửi OTP qua Twilio/Email <!-- done: 15/03/2026 -->
@@ -153,6 +154,11 @@ npm run dev:web
 - [x] Cập nhật Web Auth UI tiếng Việt (Đăng nhập/Đăng ký) theo Atomic Design <!-- done: 19/03/2026 -->
 - [x] Kết nối Web Auth flow Phase 2: request OTP, verify OTP, lưu access token memory, logout <!-- done: 19/03/2026 -->
 - [x] Chuẩn hóa route web auth: `/auth` và chuyển hướng sang Phase 3 sau đăng nhập thành công <!-- done: 19/03/2026 -->
+- [x] Bổ sung đăng nhập Email + Password + OTP (request OTP + verify OTP) cho Phase 2 <!-- done: 19/03/2026 -->
+- [x] Bổ sung đăng nhập Google bằng Google ID Token (Backend + Web action) <!-- done: 19/03/2026 -->
+- [x] Bắt buộc đăng nhập bằng Email + Password + OTP (loại bỏ luồng login OTP-only cho tài khoản đã tồn tại) <!-- done: 19/03/2026 -->
+- [x] Bổ sung luồng Quên mật khẩu: request OTP + reset mật khẩu mới <!-- done: 19/03/2026 -->
+- [x] Chuẩn hóa OTP gửi thực ngoài môi trường test (OTP hardcode chỉ cho NODE_ENV=test) <!-- done: 19/03/2026 -->
 
 ### Phase 3 – Friends & Contacts (Module F5–F9)
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->

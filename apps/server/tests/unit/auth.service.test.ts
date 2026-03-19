@@ -86,16 +86,14 @@ describe('verifyOtpAndLogin()', () => {
     avatarUrl: undefined,
   };
 
-  it('should return token pair for valid OTP (hardcode)', async () => {
+  it('should throw when account already exists', async () => {
     redisMock.get.mockResolvedValue('123456' as never);
     redisMock.del.mockResolvedValue(1 as never);
     userFindOne.mockResolvedValue(mockUser as never);
 
-    const result = await verifyOtpAndLogin('0901234567', '123456');
-
-    expect(result.accessToken).toBeTruthy();
-    expect(result.refreshToken).toBeTruthy();
-    expect(result.user.id).toBe('user123');
+    await expect(
+      verifyOtpAndLogin('0901234567', '123456', undefined, 'Secret123!'),
+    ).rejects.toThrow('Tài khoản đã tồn tại');
   });
 
   it('should throw UnauthorizedError for wrong OTP', async () => {
@@ -116,10 +114,17 @@ describe('verifyOtpAndLogin()', () => {
     redisMock.get.mockResolvedValue('123456' as never);
     redisMock.del.mockResolvedValue(1 as never);
     userFindOne.mockResolvedValue(null as never);
-    userCreate.mockResolvedValue({ ...mockUser, id: 'new-user' } as never);
+    userCreate.mockResolvedValue({ ...mockUser, id: 'new-user', displayName: 'New User' } as never);
 
-    const result = await verifyOtpAndLogin('0901234567', '123456', 'New User');
-    expect(userCreate).toHaveBeenCalled();
+    const result = await verifyOtpAndLogin('0901234567', '123456', 'New User', 'Secret123!');
+
+    expect(userCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phoneNumber: '0901234567',
+        displayName: 'New User',
+        passwordHash: expect.any(String),
+      }),
+    );
     expect(result.user.id).toBe('new-user');
   });
 });
