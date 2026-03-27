@@ -46,3 +46,15 @@ export function createConsumer(groupId: string): Consumer {
   if (!kafka) throw new Error('Kafka not initialized. Call connectKafka() first.');
   return kafka.consumer({ groupId });
 }
+
+export async function produceMessage(
+  topic: string,
+  key: string,
+  value: Record<string, unknown>,
+): Promise<void> {
+  const producer = getProducer();
+  await producer.send({
+    topic,
+    messages: [{ key, value: JSON.stringify(value) }],
+  });
+}

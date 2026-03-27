@@ -28,3 +28,144 @@ export function getRedis(): Redis {
 export function createRedisDuplicate(): Redis {
   return getRedis().duplicate();
 }
+
+// ─── Idempotency Key Management ───
+
+/**
+ * Check if idempotency key exists and return cached message data
+ * @param key Idempotency key
+ * @returns Cached message data or null if not found
+ */
+export async function checkIdempotencyKey(key: string): Promise<Record<string, unknown> | null> {
+  const redis = getRedis();
+  const cached = await redis.get(`idempotency:${key}`);
+  return cached ? (JSON.parse(cached) as Record<string, unknown>) : null;
+}
+
+/**
+ * Set idempotency key with message data (TTL 5 minutes)
+ * @param key Idempotency key
+ * @param messageData Message data to cache
+ * @param ttl Time to live in seconds (default 300 = 5 minutes)
+ */
+export async function setIdempotencyKey(
+  key: string,
+  messageData: Record<string, unknown>,
+  ttl: number = 300,
+): Promise<void> {
+  const redis = getRedis();
+  await redis.setex(`idempotency:${key}`, ttl, JSON.stringify(messageData));
+}
+
+// ─── Typing Indicator Management ───
+
+/**
+ * Set typing indicator for a user in a conversation (TTL 3 seconds)
+ * @param conversationId Conversation ID
+ * @param userId User ID
+ * @param ttl Time to live in seconds (default 3)
+ */
+export async function setTypingIndicator(
+  conversationId: string,
+  userId: string,
+  ttl: number = 3,
+): Promise<void> {
+  const redis = getRedis();
+  await redis.setex(`typing:${conversationId}:${userId}`, ttl, '1');
+}
+
+/**
+ * Remove typing indicator for a user in a conversation
+ * @param conversationId Conversation ID
+ * @param userId User ID
+ */
+export async function removeTypingIndicator(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  const redis = getRedis();
+  await redis.del(`typing:${conversationId}:${userId}`);
+}
+
+/**
+ * Get list of users currently typing in a conversation
+ * @param conversationId Conversation ID
+ * @returns Array of user IDs who are typing
+ */
+export async function getTypingUsers(conversationId: string): Promise<string[]> {
+  const redis = getRedis();
+  const keys = await redis.keys(`typing:${conversationId}:*`);
+  
+  // Extract userId from keys like "typing:{convId}:{userId}"
+  return keys.map((key) => {
+    const parts = key.split(':');
+    return parts[2] ?? '';
+  }).filter(Boolean);
+}
+
+// ─── Online Status Management ───
+
+/**
+ * Set user as online with current timestamp
+ * @param userId User ID
+ */
+export async function setUserOnline(userId: string): Promise<void> {
+  const redis = getRedis();
+  await redis.hset('online_users', userId, Date.now().toString());
+}
+
+/**
+ * Remove user from online status
+ * @param userId User ID
+ */
+export async function removeUserOnline(userId: string): Promise<void> {
+  const redis = getRedis();
+  await redis.hdel('online_users', userId);
+}
+
+/**
+ * Get user's online status (timestamp of when they came online)
+ * @param userId User ID
+ * @returns Timestamp string or null if user is offline
+ */
+export async function getUserOnlineStatus(userId: string): Promise<string | null> {
+  const redis = getRedis();
+  return redis.hget('online_users', userId);
+}
+
+/**
+ * Get all online users with their last seen timestamp
+ * @returns Object with userId as key and timestamp as value
+ */
+export async function getAllOnlineUsers(): Promise<Record<string, string>> {
+  const redis = getRedis();
+  return redis.hgetall('online_users');
+}
+
+// ─── Rate Limiting (Sliding Window) ───
+
+const MSG_RATE_WINDOW_MS = 1000; // 1 second window
+const MSG_RATE_LIMIT = 20; // Max 20 messages per second
+
+/**
+ * Check if user has exceeded message rate limit (max 20 messages/second)
+ * Uses Redis Sorted Set (ZSET) with sliding window algorithm
+ * @param userId User ID
+ * @returns true if within limit, false if rate limit exceeded
+ */
+export async function checkMessageRateLimit(userId: string): Promise<boolean> {
+  const redis = getRedis();
+  const rateLimitKey = `msg_rate:${userId}`;
+  const now = Date.now();
+
+  // Pipeline: clean old entries → add new → count → set TTL
+  const pipe = redis.pipeline();
+  pipe.zremrangebyscore(rateLimitKey, '-inf', now - MSG_RATE_WINDOW_MS); // Remove entries older than 1s
+  pipe.zadd(rateLimitKey, now, `${now}`); // Add current timestamp
+  pipe.zcard(rateLimitKey); // Count total entries
+  pipe.expire(rateLimitKey, 2); // Set TTL to 2s
+  const results = await pipe.exec();
+  
+  const count = (results?.[2]?.[1] as number) ?? 0;
+  return count <= MSG_RATE_LIMIT;
+}
