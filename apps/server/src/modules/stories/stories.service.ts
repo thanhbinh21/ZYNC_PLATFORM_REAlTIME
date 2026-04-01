@@ -6,6 +6,7 @@ import { ConversationMemberModel } from '../conversations/conversation-member.mo
 import { MessageModel } from '../messages/message.model';
 import { UserModel } from '../users/user.model';
 import { ForbiddenError, NotFoundError } from '../../shared/errors';
+import { emitStoryReaction, emitStoryReply } from '../../socket/gateway';
 import type { CreateStoryDto } from './stories.schema';
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -131,6 +132,16 @@ export async function reactToStory(
   }
 
   await story.save();
+
+  if (story.userId !== userId) {
+    const reactor = await UserModel.findById(userId).select('displayName').lean();
+    emitStoryReaction(story.userId, {
+      storyId,
+      userId,
+      reactionType: type,
+      displayName: (reactor?.displayName as string) ?? 'Unknown',
+    });
+  }
 }
 
 export async function removeReaction(
@@ -268,6 +279,16 @@ export async function replyToStory(
       sentAt: new Date(),
     },
   });
+
+  if (story.userId !== userId) {
+    const sender = await UserModel.findById(userId).select('displayName').lean();
+    emitStoryReply(story.userId, {
+      storyId,
+      senderId: userId,
+      content,
+      displayName: (sender?.displayName as string) ?? 'Unknown',
+    });
+  }
 
   return {
     conversationId,
