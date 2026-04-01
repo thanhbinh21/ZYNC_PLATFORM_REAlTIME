@@ -10,6 +10,7 @@ import { connectDatabase } from './infrastructure/database';
 import { connectRedis } from './infrastructure/redis';
 import { connectKafka } from './infrastructure/kafka';
 import { initSocketGateway } from './socket/gateway';
+import { startMessageWorker, stopMessageWorker } from './workers/message.worker';
 import { logger } from './shared/logger';
 
 const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
@@ -22,6 +23,10 @@ async function bootstrap(): Promise<void> {
   // Kafka là optional khi dev local – bật bằng KAFKA_ENABLED=true trong .env
   if (process.env['KAFKA_ENABLED'] === 'true') {
     await connectKafka();
+    // Task 6.2: Start Kafka consumer worker
+    void startMessageWorker().catch((err: unknown) => {
+      logger.error('Message worker failed', err);
+    });
   } else {
     logger.warn('Kafka bị tắt (KAFKA_ENABLED != true). Workers sẽ không chạy.');
   }
@@ -41,6 +46,12 @@ async function bootstrap(): Promise<void> {
   // Tắt server an toàn khi nhận signal
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`Nhận tín hiệu ${signal}, đang tắt server...`);
+    
+    // Task 6.2: Stop message worker gracefully
+    if (process.env['KAFKA_ENABLED'] === 'true') {
+      await stopMessageWorker();
+    }
+    
     httpServer.close(() => {
       logger.info('HTTP server đã đóng');
       process.exit(0);

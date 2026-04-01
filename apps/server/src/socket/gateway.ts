@@ -2,9 +2,12 @@ import { type Server as HttpServer } from 'http';
 import { Server, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
-import { createRedisDuplicate, getRedis } from '../infrastructure/redis';
+import { createRedisDuplicate, getRedis, setTypingIndicator, removeTypingIndicator, setUserOnline, removeUserOnline, checkMessageRateLimit } from '../infrastructure/redis';
 import { logger } from '../shared/logger';
 import type { StoryReactionType } from '../modules/stories/story.model';
+import { MessagesService } from '../modules/messages/messages.service';
+import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
+
 
 const MSG_RATE_WINDOW_MS = 1000;
 const MSG_RATE_LIMIT = 20;
@@ -76,7 +79,7 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     void socket.join(`user:${userId}`);
 
     // Đánh dấu user đang online trong Redis
-    void getRedis().hset('online_users', userId, Date.now().toString());
+    void setUserOnline(userId);
 
     // Sự kiện gửi tin nhắn
     socket.on('send_message', async (payload: unknown) => {
@@ -90,7 +93,7 @@ export function initSocketGateway(httpServer: HttpServer): Server {
 
     // Sự kiện bắt đầu gõ phím
     socket.on('typing_start', (payload: { conversationId: string }) => {
-      void getRedis().setex(`typing:${payload.conversationId}:${userId}`, 3, '1');
+      void setTypingIndicator(payload.conversationId, userId);
       socket.to(`conv:${payload.conversationId}`).emit('typing_indicator', {
         userId,
         conversationId: payload.conversationId,
@@ -100,7 +103,7 @@ export function initSocketGateway(httpServer: HttpServer): Server {
 
     // Sự kiện dừng gõ phím
     socket.on('typing_stop', (payload: { conversationId: string }) => {
-      void getRedis().del(`typing:${payload.conversationId}:${userId}`);
+      void removeTypingIndicator(payload.conversationId, userId);
       socket.to(`conv:${payload.conversationId}`).emit('typing_indicator', {
         userId,
         conversationId: payload.conversationId,
@@ -109,18 +112,29 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     });
 
     // Sự kiện đánh dấu đã đọc tin nhắn
-    socket.on('message_read', (payload: { conversationId: string; messageIds: string[] }) => {
-      socket.to(`conv:${payload.conversationId}`).emit('status_update', {
-        messageIds: payload.messageIds,
-        status: 'read',
-        userId,
-      });
+    socket.on('message_read', async (payload: unknown) => {
+      try {
+        await handleMessageRead(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('message_read error', err);
+        socket.emit('error', { message: 'Failed to update message status' });
+      }
+    });
+
+    // Sự kiện đánh dấu tin nhắn đã được gửi tới (delivered)
+    socket.on('message_delivered', async (payload: unknown) => {
+      try {
+        await handleMessageDelivered(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('message_delivered error', err);
+        socket.emit('error', { message: 'Failed to mark message as delivered' });
+      }
     });
 
     // Xử lý ngắt kết nối
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${userId}`);
-      void getRedis().hdel('online_users', userId);
+      void removeUserOnline(userId);
       io.emit('user_online', { userId, online: false, lastSeen: new Date().toISOString() });
     });
 
@@ -138,73 +152,181 @@ async function handleSendMessage(
 ): Promise<void> {
   const { userId } = socket;
 
-  // Kiểm tra rate limit bằng Redis sliding window
-  const rateLimitKey = `msg_rate:${userId}`;
-  const now = Date.now();
-  const redisClient = getRedis();
-
-  const pipe = redisClient.pipeline();
-  pipe.zremrangebyscore(rateLimitKey, '-inf', now - MSG_RATE_WINDOW_MS);
-  pipe.zadd(rateLimitKey, now, `${now}`);
-  pipe.zcard(rateLimitKey);
-  pipe.expire(rateLimitKey, 2);
-  const results = await pipe.exec();
-  const count = (results?.[2]?.[1] as number) ?? 0;
-
-  if (count > MSG_RATE_LIMIT) {
+  // ─── Rate Limit Check ───
+  const isWithinLimit = await checkMessageRateLimit(userId);
+  if (!isWithinLimit) {
     socket.emit('error', { message: 'Rate limit exceeded: max 20 messages/second' });
     return;
   }
 
-  // Kiểm tra cấu trúc payload tối thiểu
-  if (
-    typeof payload !== 'object' ||
-    payload === null ||
-    !('conversationId' in payload) ||
-    !('content' in payload) ||
-    !('idempotencyKey' in payload)
-  ) {
+  // ─── Validate Payload ───
+  if (typeof payload !== 'object' || payload === null) {
     socket.emit('error', { message: 'Invalid payload' });
     return;
   }
 
-  const msg = payload as { conversationId: string; content: string; idempotencyKey: string; type?: string; mediaUrl?: string };
+  const msg = payload as Record<string, unknown>;
+  const { conversationId, content, type, mediaUrl, idempotencyKey } = msg;
 
-  // Kiểm tra idempotency, tránh gửi trùng tin nhắn
-  const idempotencyKey = `idempotency:${msg.idempotencyKey}`;
-  const existing = await redisClient.get(idempotencyKey);
-  if (existing) {
-    socket.emit('message_sent', JSON.parse(existing) as unknown);
+  if (!conversationId || !content || !idempotencyKey) {
+    socket.emit('error', { message: 'Missing required fields: conversationId, content, idempotencyKey' });
     return;
   }
 
-  // Tạo envelope tin nhắn
-  const messageEnvelope = {
-    messageId: msg.idempotencyKey, // dùng idempotencyKey làm ID tạm
-    senderId: userId,
-    conversationId: msg.conversationId,
-    content: msg.content,
-    type: msg.type ?? 'text',
-    mediaUrl: msg.mediaUrl,
-    idempotencyKey: msg.idempotencyKey,
-    createdAt: new Date().toISOString(),
-  };
+  if (typeof content !== 'string' || content.length < 1 || content.length > 1000) {
+    socket.emit('error', { message: 'Content must be 1-1000 characters' });
+    return;
+  }
 
-  // Lưu idempotency key vào Redis, TTL 5 phút
-  await redisClient.setex(idempotencyKey, 300, JSON.stringify(messageEnvelope));
+  // ─── Create Message via Service ───
+  try {
+    const message = await MessagesService.createMessage(
+      conversationId as string,
+      userId,
+      content,
+      type as ("text" | "image" | "video"),
+      (idempotencyKey as string),
+      mediaUrl ? (mediaUrl as string) : undefined,
+    );
 
-  // Phát tin nhắn đến tất cả thành viên trong conversation
-  io.to(`conv:${msg.conversationId}`).emit('receive_message', {
-    messageId: messageEnvelope.messageId,
-    senderId: userId,
-    content: msg.content,
-    type: messageEnvelope.type,
-    mediaUrl: msg.mediaUrl,
-    createdAt: messageEnvelope.createdAt,
-  });
+    // ─── Publish to Kafka ───
+    try {
+      await produceMessage(KAFKA_TOPICS.RAW_MESSAGES, conversationId as string, {
+        messageId: message._id.toString(),
+        conversationId,
+        senderId: userId,
+        content,
+        type: type ?? 'text',
+        mediaUrl,
+        idempotencyKey,
+        createdAt: message.createdAt,
+      });
+    } catch (err) {
+      logger.warn('Failed to produce Kafka message', err);
+      // Continue even if Kafka fails - message still created in DB
+    }
 
-  // Xác nhận gửi thành công cho người gửi
-  socket.emit('message_sent', { idempotencyKey: msg.idempotencyKey, createdAt: messageEnvelope.createdAt });
+    // ─── Emit to Recipients ───
+    io.to(`conv:${conversationId}`).emit('receive_message', {
+      messageId: message._id,
+      senderId: userId,
+      content,
+      type: type ?? 'text',
+      mediaUrl,
+      createdAt: message.createdAt,
+    });
 
-  // TODO: publish lên Kafka topic raw-messages để lưu vào MongoDB (Phase 5)
+    // ─── Emit Status Update ───
+    io.to(`conv:${conversationId}`).emit('status_update', {
+      messageId: message._id,
+      status: 'sent',
+      userId,
+    });
+
+    // ─── Confirm to Sender ───
+    socket.emit('message_sent', {
+      messageId: message._id,
+      idempotencyKey,
+      createdAt: message.createdAt,
+    });
+
+    logger.debug(`Message created: ${message._id} in conversation ${conversationId}`);
+  } catch (err) {
+    logger.error('Failed to create message', err);
+    throw err;
+  }
+}
+
+async function handleMessageRead(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const { userId } = socket;
+
+  // ─── Validate Payload ───
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const data = payload as Record<string, unknown>;
+  const { conversationId, messageIds } = data;
+
+  if (!conversationId || !messageIds || !Array.isArray(messageIds)) {
+    socket.emit('error', { message: 'Missing required fields: conversationId, messageIds (array)' });
+    return;
+  }
+
+  if (messageIds.length === 0) {
+    socket.emit('error', { message: 'messageIds cannot be empty' });
+    return;
+  }
+
+  // ─── Batch Update Message Status ───
+  try {
+    for (const messageId of messageIds) {
+      await MessagesService.markAsRead(messageId as string, userId);
+    }
+
+    // ─── Broadcast Status Update ───
+    io.to(`conv:${conversationId}`).emit('status_update', {
+      messageIds,
+      status: 'read',
+      userId,
+      updatedAt: new Date(),
+    });
+
+    logger.debug(`Marked ${messageIds.length} messages as read by ${userId}`);
+  } catch (err) {
+    logger.error('Failed to mark messages as read', err);
+    throw err;
+  }
+}
+
+async function handleMessageDelivered(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const { userId } = socket;
+
+  // ─── Validate Payload ───
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const data = payload as Record<string, unknown>;
+  const { conversationId, messageIds } = data;
+
+  if (!conversationId || !messageIds || !Array.isArray(messageIds)) {
+    socket.emit('error', { message: 'Missing required fields: conversationId, messageIds (array)' });
+    return;
+  }
+
+  if (messageIds.length === 0) {
+    socket.emit('error', { message: 'messageIds cannot be empty' });
+    return;
+  }
+
+  // ─── Batch Update Message Status to 'delivered' ───
+  try {
+    for (const messageId of messageIds) {
+      await MessagesService.updateMessageStatus(messageId as string, userId, 'delivered');
+    }
+
+    // ─── Broadcast Status Update ───
+    io.to(`conv:${conversationId}`).emit('status_update', {
+      messageIds,
+      status: 'delivered',
+      userId,
+      updatedAt: new Date(),
+    });
+
+    logger.debug(`Marked ${messageIds.length} messages as delivered by ${userId}`);
+  } catch (err) {
+    logger.error('Failed to mark messages as delivered', err);
+    throw err;
+  }
 }
