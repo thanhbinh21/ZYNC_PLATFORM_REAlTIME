@@ -101,7 +101,9 @@ export interface StoryBarProps {
   feed: StoryFeedGroup[];
   myStories: StoryItem[];
   currentUserId: string;
+  currentUserName: string;
   onViewStory: (groupIndex: number) => void;
+  onViewMyStory: () => void;
   onCreateStory: () => void;
 }
 

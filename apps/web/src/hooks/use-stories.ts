@@ -36,38 +36,39 @@ export function useStories() {
   const [feed, setFeed] = useState<StoryFeedGroup[]>([]);
   const [myStories, setMyStories] = useState<Story[]>([]);
   const [reactions, setReactions] = useState<StoryReaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isFeedLoading, setIsFeedLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadFeed = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setIsFeedLoading(true);
       setErrorMessage(null);
       const data = await fetchStoriesFeed();
       setFeed(data);
     } catch {
       setErrorMessage('Không thể tải stories.');
     } finally {
-      setIsLoading(false);
+      setIsFeedLoading(false);
     }
   }, []);
 
   const loadMyStories = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setIsFeedLoading(true);
       setErrorMessage(null);
       const data = await fetchMyStories();
       setMyStories(data);
     } catch {
       setErrorMessage('Không thể tải stories của bạn.');
     } finally {
-      setIsLoading(false);
+      setIsFeedLoading(false);
     }
   }, []);
 
   const onCreate = useCallback(async (payload: CreateStoryPayload) => {
     try {
-      setIsLoading(true);
+      setIsActionLoading(true);
       setErrorMessage(null);
       const story = await createStory(payload);
       setMyStories((prev) => [story, ...prev]);
@@ -76,20 +77,20 @@ export function useStories() {
       setErrorMessage('Không thể tạo story.');
       return null;
     } finally {
-      setIsLoading(false);
+      setIsActionLoading(false);
     }
   }, []);
 
   const onDelete = useCallback(async (storyId: string) => {
     try {
-      setIsLoading(true);
+      setIsActionLoading(true);
       setErrorMessage(null);
       await deleteStory(storyId);
       setMyStories((prev) => prev.filter((s) => s._id !== storyId));
     } catch {
       setErrorMessage('Không thể xóa story.');
     } finally {
-      setIsLoading(false);
+      setIsActionLoading(false);
     }
   }, []);
 
@@ -121,14 +122,14 @@ export function useStories() {
 
   const onLoadReactions = useCallback(async (storyId: string) => {
     try {
-      setIsLoading(true);
+      setIsActionLoading(true);
       setErrorMessage(null);
       const data = await fetchReactions(storyId);
       setReactions(data);
     } catch {
       setErrorMessage('Không thể tải danh sách reactions.');
     } finally {
-      setIsLoading(false);
+      setIsActionLoading(false);
     }
   }, []);
 
@@ -175,7 +176,7 @@ export function useStories() {
 
     const handleReply = (_event: StoryReplyEvent) => {
       // Reply creates a message in DM conversation.
-      // UI can show a toast notification; conversation list will refresh separately.
+      // Conversation list will refresh separately.
     };
 
     socket.on('story_reaction', handleReaction);
@@ -191,7 +192,8 @@ export function useStories() {
     feed,
     myStories,
     reactions,
-    isLoading,
+    isFeedLoading,
+    isActionLoading,
     errorMessage,
     loadFeed,
     loadMyStories,

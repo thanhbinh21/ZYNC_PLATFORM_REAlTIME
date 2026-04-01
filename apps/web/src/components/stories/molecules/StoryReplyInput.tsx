@@ -29,12 +29,14 @@ export function StoryReplyInput({ onSend, disabled }: StoryReplyInputProps) {
         onKeyDown={handleKeyDown}
         placeholder="Trả lời story..."
         disabled={disabled}
+        maxLength={1000}
         className="font-ui-content min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/50"
       />
       <button
         type="button"
         onClick={handleSubmit}
         disabled={!text.trim() || disabled}
+        aria-label="Gửi"
         className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition ${
           text.trim() ? 'bg-[#30d7ab] text-[#033026]' : 'bg-white/10 text-white/40'
         }`}

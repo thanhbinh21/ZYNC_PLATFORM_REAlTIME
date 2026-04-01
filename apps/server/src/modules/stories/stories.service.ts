@@ -255,6 +255,7 @@ export async function replyToStory(
   });
 
   if (!story) throw new NotFoundError('Story not found or expired');
+  if (userId === story.userId) throw new ForbiddenError('Cannot reply to your own story');
 
   const conversationId = await findOrCreateDirectConversation(userId, story.userId);
 

@@ -12,25 +12,31 @@ export function StoryAvatar({ initials, avatarUrl, seen, isOwner, size = 'md', o
     ? 'bg-[#3a4f48]'
     : 'bg-gradient-to-tr from-[#30d7ab] via-[#1abc9c] to-[#0ea87e]';
 
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group relative inline-flex ${s.outer} shrink-0 items-center justify-center rounded-full p-[2.5px] ${ringColor} transition hover:brightness-110`}
+  const className = `group relative inline-flex ${s.outer} shrink-0 items-center justify-center rounded-full p-[2.5px] ${ringColor} transition hover:brightness-110`;
+
+  const inner = (
+    <span
+      className={`inline-flex ${s.inner} items-center justify-center overflow-hidden rounded-full bg-[#0b3228] ${s.text} font-semibold text-[#e2fff5]`}
     >
-      <span
-        className={`inline-flex ${s.inner} items-center justify-center overflow-hidden rounded-full bg-[#0b3228] ${s.text} font-semibold text-[#e2fff5]`}
-      >
-        {avatarUrl ? (
-          <img src={avatarUrl} alt={initials} className="h-full w-full object-cover" />
-        ) : isOwner ? (
-          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5 text-[#30d7ab]">
-            <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
-          </svg>
-        ) : (
-          initials
-        )}
-      </span>
-    </button>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={initials} className="h-full w-full object-cover" />
+      ) : isOwner ? (
+        <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5 text-[#30d7ab]">
+          <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
+        </svg>
+      ) : (
+        initials
+      )}
+    </span>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} aria-label={isOwner ? 'Tạo story' : initials} className={className}>
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className={className}>{inner}</div>;
 }

@@ -1,25 +1,30 @@
 import { StoryAvatar } from '../atoms/StoryAvatar';
+import { getInitials } from '../utils';
 import type { StoryBarProps } from '../stories.types';
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length > 1) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-}
-
-export function StoryBar({ feed, myStories, currentUserId, onViewStory, onCreateStory }: StoryBarProps) {
+export function StoryBar({ feed, myStories, currentUserId, currentUserName, onViewStory, onViewMyStory, onCreateStory }: StoryBarProps) {
   const hasMyStory = myStories.length > 0;
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-2">
-      <div className="flex shrink-0 flex-col items-center gap-1">
+      <div className="relative flex shrink-0 flex-col items-center gap-1">
         <StoryAvatar
-          initials=""
+          initials={currentUserName ? getInitials(currentUserName) : ''}
           seen={false}
-          isOwner
+          isOwner={!hasMyStory}
           size="md"
-          onClick={onCreateStory}
+          onClick={hasMyStory ? onViewMyStory : onCreateStory}
         />
+        {hasMyStory && (
+          <button
+            type="button"
+            onClick={onCreateStory}
+            aria-label="Tạo story mới"
+            className="absolute -bottom-0.5 -right-0.5 z-10 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#30d7ab] text-[0.65rem] font-bold text-[#033026] ring-2 ring-[#062920]"
+          >
+            +
+          </button>
+        )}
         <span className="font-ui-meta text-[0.66rem] text-[#b5d8cc]">
           {hasMyStory ? 'Story của tôi' : 'Tạo Story'}
         </span>

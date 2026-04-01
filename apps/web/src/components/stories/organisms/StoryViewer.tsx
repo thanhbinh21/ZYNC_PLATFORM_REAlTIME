@@ -1,18 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StoryProgressBar } from '../atoms/StoryProgressBar';
 import { ReactionPicker } from '../molecules/ReactionPicker';
 import { StoryReplyInput } from '../molecules/StoryReplyInput';
+import { getInitials } from '../utils';
+import { FONT_CLASS_MAP } from '../utils';
 import type { StoryReactionType, StoryViewerProps } from '../stories.types';
 
 const STORY_DURATION = 5000;
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length > 1) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-}
 
 export function StoryViewer({
   feed,
@@ -31,11 +27,14 @@ export function StoryViewer({
 
   const group = feed[groupIdx];
   const story = group?.stories[storyIdx];
+  const storyId = story?._id;
   const isOwner = group?.userId === currentUserId;
 
+  const goNextRef = useRef<() => void>(() => {});
+
   useEffect(() => {
-    if (story) onView(story._id);
-  }, [story, onView]);
+    if (storyId) onView(storyId);
+  }, [storyId, onView]);
 
   const goNext = useCallback(() => {
     if (!group) return;
@@ -49,14 +48,18 @@ export function StoryViewer({
     }
   }, [group, storyIdx, groupIdx, feed.length, onClose]);
 
-  const goPrev = () => {
+  goNextRef.current = goNext;
+
+  const stableGoNext = useCallback(() => goNextRef.current(), []);
+
+  const goPrev = useCallback(() => {
     if (storyIdx > 0) {
       setStoryIdx((p) => p - 1);
     } else if (groupIdx > 0) {
       setGroupIdx((p) => p - 1);
       setStoryIdx(feed[groupIdx - 1].stories.length - 1);
     }
-  };
+  }, [storyIdx, groupIdx, feed]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -66,7 +69,17 @@ export function StoryViewer({
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  });
+  }, [onClose, goNext, goPrev]);
+
+  useEffect(() => {
+    const handleUp = () => setPaused(false);
+    document.addEventListener('mouseup', handleUp);
+    document.addEventListener('touchend', handleUp);
+    return () => {
+      document.removeEventListener('mouseup', handleUp);
+      document.removeEventListener('touchend', handleUp);
+    };
+  }, []);
 
   const handleReact = (emoji: StoryReactionType) => {
     if (story) onReact(story._id, emoji);
@@ -79,13 +92,13 @@ export function StoryViewer({
 
   if (!group || !story) return null;
 
+  const fontClass = FONT_CLASS_MAP[story.fontStyle || 'sans'] || 'font-sans';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
       onMouseDown={() => setPaused(true)}
-      onMouseUp={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
-      onTouchEnd={() => setPaused(false)}
     >
       <div className="relative flex h-full w-full max-w-md flex-col">
         {/* Progress */}
@@ -95,7 +108,7 @@ export function StoryViewer({
             current={storyIdx}
             duration={STORY_DURATION}
             paused={paused}
-            onComplete={goNext}
+            onComplete={stableGoNext}
           />
         </div>
 
@@ -118,6 +131,7 @@ export function StoryViewer({
             <button
               type="button"
               onClick={() => { onDelete(story._id); goNext(); }}
+              aria-label="Xóa story"
               className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/80 transition hover:bg-red-500/30 hover:text-white"
             >
               Xóa
@@ -126,6 +140,7 @@ export function StoryViewer({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Đóng"
             className="text-white/70 transition hover:text-white"
           >
             <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
@@ -139,13 +154,13 @@ export function StoryViewer({
           type="button"
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
           className="absolute left-0 top-0 z-10 h-full w-1/3"
-          aria-label="Previous"
+          aria-label="Story trước"
         />
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); goNext(); }}
           className="absolute right-0 top-0 z-10 h-full w-1/3"
-          aria-label="Next"
+          aria-label="Story tiếp"
         />
 
         {/* Content */}
@@ -155,9 +170,7 @@ export function StoryViewer({
               className="flex h-full w-full items-center justify-center p-8"
               style={{ backgroundColor: story.backgroundColor || '#0d3a30' }}
             >
-              <p
-                className={`max-w-prose text-center text-2xl leading-relaxed text-white font-${story.fontStyle || 'sans'}`}
-              >
+              <p className={`max-w-prose text-center text-2xl leading-relaxed text-white ${fontClass}`}>
                 {story.content}
               </p>
             </div>
@@ -191,6 +204,7 @@ export function StoryViewer({
               <button
                 type="button"
                 onClick={() => setShowReactions((p) => !p)}
+                aria-label="Thả reaction"
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/40 text-lg backdrop-blur-md transition hover:bg-black/60"
               >
                 ❤️

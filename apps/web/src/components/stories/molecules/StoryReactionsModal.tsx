@@ -1,6 +1,18 @@
+'use client';
+
+import { useEffect } from 'react';
 import { REACTION_TYPES, type StoryReactionsModalProps } from '../stories.types';
 
 export function StoryReactionsModal({ open, reactions, onClose }: StoryReactionsModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const grouped = REACTION_TYPES.map((emoji) => ({
@@ -8,12 +20,20 @@ export function StoryReactionsModal({ open, reactions, onClose }: StoryReactions
     entries: reactions.filter((r) => r.type === emoji),
   })).filter((g) => g.entries.length > 0);
 
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={handleBackdropClick}
+    >
       <div className="relative mx-4 w-full max-w-sm rounded-3xl border border-[#1a5140] bg-[#062920] p-6 shadow-2xl">
         <button
           type="button"
           onClick={onClose}
+          aria-label="Đóng"
           className="absolute right-4 top-4 text-[#87ac9f] transition hover:text-white"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
