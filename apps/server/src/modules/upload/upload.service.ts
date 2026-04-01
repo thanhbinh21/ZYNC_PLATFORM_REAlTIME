@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
+import { createHash } from 'crypto';
 import { logger } from '../../shared/logger';
 
 /**
@@ -38,17 +39,17 @@ export class UploadService {
    * @param type Media type (image, video, etc.)
    * @returns Signature params for Cloudinary widget
    */
-  static generateUploadSignature(
+  static async generateUploadSignature(
     userId: string,
     type: 'image' | 'video' | 'document',
-  ): {
+  ): Promise<{
     timestamp: number;
     signature: string;
     cloudName: string;
     apiKey: string;
     folder: string;
     publicIdPrefix: string;
-  } {
+  }> {
     const cloudName = process.env['CLOUDINARY_CLOUD_NAME'];
     const apiKey = process.env['CLOUDINARY_API_KEY'];
     const apiSecret = process.env['CLOUDINARY_API_SECRET'];
@@ -79,9 +80,7 @@ export class UploadService {
       .concat(apiSecret);
 
     // Use Node crypto to create SHA1 hash
-    const crypto = await import('crypto');
-    const signature = crypto
-      .createHash('sha1')
+    const signature = createHash('sha1')
       .update(signatureString)
       .digest('hex');
 

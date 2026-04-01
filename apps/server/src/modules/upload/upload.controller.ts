@@ -35,7 +35,7 @@ export class UploadController {
       }
 
       // Task 8.1: Generate signature
-      const signature = UploadService.generateUploadSignature(
+      const signature = await UploadService.generateUploadSignature(
         userId,
         type as 'image' | 'video' | 'document',
       );
