@@ -27,13 +27,11 @@ uploadRouter.post('/sign', uploadRateLimiter, (req: Request, res: Response) => {
 
   const paramsToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
   const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
-
-  res.json({
-    success: true,
-    data: { signature, timestamp, apiKey, cloudName, folder },
-  });
+res.json({
+  success: true,
+  data: { signature, timestamp, apiKey, cloudName, folder },
 });
-
+}); // <-- THIẾU DÒNG NÀY
 /**
  * Task 8.1: POST /api/upload/generate-signature
  * Generate Cloudinary signature for direct client upload
