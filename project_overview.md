@@ -136,6 +136,7 @@ npm run dev:web
 - [x] Fix dotenv path – load .env từ root monorepo <!-- done: 12/03/2026 -->
 - [x] Viết README.md chuẩn documentation <!-- done: 12/03/2026 -->
 - [x] Verify toàn bộ connections: MongoDB Atlas + Redis + Kafka (Redpanda) <!-- done: 12/03/2026 -->
+- [x] Bổ sung README chi tiết cho apps/server và apps/web (công nghệ, kiến trúc, cấu trúc, kỹ thuật quan trọng) <!-- done: 02/04/2026 -->
 - [x] Dựng UI theme login web theo mẫu green-glass (responsive desktop/mobile) <!-- done: 15/03/2026 -->
 - [x] Refactor Login UI theo Atomic Design từ ảnh mẫu (atoms/molecules/organisms + mock data) <!-- done: 19/03/2026 -->
 - [x] Dựng trang chủ Web (Phase 1) theo layout `trangchu.png` và điều hướng sang Auth flow <!-- done: 19/03/2026 -->
@@ -190,6 +191,7 @@ npm run dev:web
 - [ ] WebSocket server với Socket.IO + Redis adapter
 - [ ] Gửi/nhận tin nhắn văn bản + emoji (1-1 và nhóm)
 - [ ] Upload media qua pre-signed URL flow
+- [x] Fix lỗi compile upload routes (thiếu đóng route `/sign`) để server chạy dev ổn định <!-- done: 02/04/2026 -->
 - [ ] Message status: sent → delivered → read (2 tick xanh)
 - [ ] Typing indicator (TTL 3 giây trong Redis)
 - [ ] Đồng bộ đa thiết bị (multi-device sync)
