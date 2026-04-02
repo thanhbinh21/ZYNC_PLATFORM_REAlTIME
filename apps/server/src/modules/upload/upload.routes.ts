@@ -32,6 +32,8 @@ uploadRouter.post('/sign', uploadRateLimiter, (req: Request, res: Response) => {
     success: true,
     data: { signature, timestamp, apiKey, cloudName, folder },
   });
+});
+
 /**
  * Task 8.1: POST /api/upload/generate-signature
  * Generate Cloudinary signature for direct client upload
