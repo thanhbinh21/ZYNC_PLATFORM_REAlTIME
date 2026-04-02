@@ -6,6 +6,7 @@ import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data'
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
     async function fetchData() {
@@ -17,6 +18,7 @@ export function useHomeDashboard() {
         ]);
 
         const user = meRes.data.user;
+        setUserId(user._id as string);
         const pendingRequests = requestsRes.data.pendingRequests || [];
         const conversations = convosRes.data.data || [];
 
@@ -111,5 +113,5 @@ export function useHomeDashboard() {
     fetchData();
   }, []);
 
-  return { data, loading };
+  return { data, loading, userId };
 }

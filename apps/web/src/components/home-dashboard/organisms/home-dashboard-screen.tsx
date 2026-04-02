@@ -10,9 +10,10 @@ import { DashboardActivityItemRow } from '../molecules/dashboard-activity-item';
 
 interface HomeDashboardScreenProps {
   data: DashboardHomeMockData;
+  storySlot?: React.ReactNode;
 }
 
-export function HomeDashboardScreen({ data }: HomeDashboardScreenProps) {
+export function HomeDashboardScreen({ data, storySlot }: HomeDashboardScreenProps) {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_72%_18%,#0d3a30_0,#031e18_48%,#021612_100%)] text-[#d9f8ec]">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[220px_1fr]">
@@ -72,10 +73,14 @@ export function HomeDashboardScreen({ data }: HomeDashboardScreenProps) {
             </div>
           </header>
 
-          <div className="mt-5 flex gap-3 overflow-x-auto pb-1">
-            {data.stories.map((item) => (
-              <DashboardStoryItemRow key={item.id} item={item} />
-            ))}
+          <div className="mt-5">
+            {storySlot ?? (
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {data.stories.map((item) => (
+                  <DashboardStoryItemRow key={item.id} item={item} />
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-6 grid gap-4 xl:grid-cols-3">

@@ -4,13 +4,36 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import { createRedisDuplicate, getRedis, setTypingIndicator, removeTypingIndicator, setUserOnline, removeUserOnline, checkMessageRateLimit } from '../infrastructure/redis';
 import { logger } from '../shared/logger';
+import type { StoryReactionType } from '../modules/stories/story.model';
 import { MessagesService } from '../modules/messages/messages.service';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 
 
+const MSG_RATE_WINDOW_MS = 1000;
+const MSG_RATE_LIMIT = 20;
+
+let ioInstance: Server | null = null;
 
 interface AuthSocket extends Socket {
   userId: string;
+}
+
+export function getIO(): Server | null {
+  return ioInstance;
+}
+
+export function emitStoryReaction(
+  targetUserId: string,
+  payload: { storyId: string; userId: string; reactionType: StoryReactionType; displayName: string },
+): void {
+  ioInstance?.to(`user:${targetUserId}`).emit('story_reaction', payload);
+}
+
+export function emitStoryReply(
+  targetUserId: string,
+  payload: { storyId: string; senderId: string; content: string; displayName: string },
+): void {
+  ioInstance?.to(`user:${targetUserId}`).emit('story_reply', payload);
 }
 
 export function initSocketGateway(httpServer: HttpServer): Server {
@@ -21,6 +44,8 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     },
     transports: ['websocket', 'polling'],
   });
+
+  ioInstance = io;
 
   // Dùng Redis adapter để đồng bộ sự kiện giữa nhiều server instance
   const pubClient = getRedis();
