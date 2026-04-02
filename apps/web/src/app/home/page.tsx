@@ -2,12 +2,24 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { HomeDashboardScreen } from '@/components/home-dashboard/organisms/home-dashboard-screen';
+import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
+import { HomeDashboardProfilePanel } from '@/components/home-dashboard/organisms/home-dashboard-profile-panel';
+import {
+  HomeDashboardSettingsPanel,
+  type DashboardAppearanceSettings,
+} from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
 import { StoryBar } from '@/components/stories/organisms/StoryBar';
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useStories } from '@/hooks/use-stories';
+import { fetchMyProfile, type MeUser } from '@/services/users';
 import type { StoryReactionType, StoryFeedGroup } from '@/components/stories/stories.types';
+
+const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
+  theme: 'verdant',
+  messageFontSize: 'medium',
+};
 
 export default function HomePage() {
   const { data, loading, userId } = useHomeDashboard();
@@ -27,6 +39,12 @@ export default function HomePage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerGroupIdx, setViewerGroupIdx] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  const [activeNavId, setActiveNavId] = useState('chat');
+  const [profile, setProfile] = useState<MeUser | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [appearanceSettings, setAppearanceSettings] =
+    useState<DashboardAppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS);
 
   useEffect(() => {
     if (userId) {
@@ -34,6 +52,28 @@ export default function HomePage() {
       loadMyStories();
     }
   }, [userId, loadFeed, loadMyStories]);
+
+  useEffect(() => {
+    const savedTheme = globalThis.localStorage?.getItem('zync.dashboard.theme');
+    const savedFontSize = globalThis.localStorage?.getItem('zync.dashboard.messageFontSize');
+
+    const theme =
+      savedTheme === 'verdant' || savedTheme === 'dark' || savedTheme === 'light'
+        ? savedTheme
+        : DEFAULT_APPEARANCE_SETTINGS.theme;
+
+    const messageFontSize =
+      savedFontSize === 'small' || savedFontSize === 'medium' || savedFontSize === 'large'
+        ? savedFontSize
+        : DEFAULT_APPEARANCE_SETTINGS.messageFontSize;
+
+    setAppearanceSettings({ theme, messageFontSize });
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset['zyncTheme'] = appearanceSettings.theme;
+    document.documentElement.dataset['zyncMessageSize'] = appearanceSettings.messageFontSize;
+  }, [appearanceSettings.messageFontSize, appearanceSettings.theme]);
 
   const allFeed: StoryFeedGroup[] = useMemo(() => {
     const groups: StoryFeedGroup[] = [];
@@ -70,6 +110,37 @@ export default function HomePage() {
 
   const myStoryGroupOffset = myStories.length > 0 ? 1 : 0;
 
+  const handleNavSelect = async (navId: string) => {
+    setActiveNavId(navId);
+    if (navId !== 'profile') return;
+
+    setProfileLoading(true);
+    setProfileError(null);
+    try {
+      const profileData = await fetchMyProfile();
+      setProfile(profileData);
+    } catch {
+      setProfileError('Khong the lay thong tin tu server. Vui long thu lai.');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleApplyAppearance = (settings: DashboardAppearanceSettings) => {
+    setAppearanceSettings(settings);
+    globalThis.localStorage?.setItem('zync.dashboard.theme', settings.theme);
+    globalThis.localStorage?.setItem('zync.dashboard.messageFontSize', settings.messageFontSize);
+  };
+
+  const handleResetAppearance = () => {
+    setAppearanceSettings(DEFAULT_APPEARANCE_SETTINGS);
+    globalThis.localStorage?.setItem('zync.dashboard.theme', DEFAULT_APPEARANCE_SETTINGS.theme);
+    globalThis.localStorage?.setItem(
+      'zync.dashboard.messageFontSize',
+      DEFAULT_APPEARANCE_SETTINGS.messageFontSize,
+    );
+  };
+
   const handleOpenViewer = (feedIndex: number) => {
     setViewerGroupIdx(feedIndex + myStoryGroupOffset);
     setViewerOpen(true);
@@ -100,7 +171,30 @@ export default function HomePage() {
 
   return (
     <>
-      <HomeDashboardScreen data={data} storySlot={storySlot} />
+      <HomeDashboardScreen
+        data={data}
+        chatSlot={<HomeDashboardChatPanel />}
+        settingsSlot={
+          <HomeDashboardSettingsPanel
+            appearance={appearanceSettings}
+            onApplyAppearance={handleApplyAppearance}
+            onResetAppearance={handleResetAppearance}
+          />
+        }
+        storySlot={storySlot}
+        activeNavId={activeNavId}
+        onNavSelect={handleNavSelect}
+        profileSlot={
+          <HomeDashboardProfilePanel
+            profile={profile}
+            loading={profileLoading}
+            error={profileError}
+            stories={data.stories}
+            onOpenCreateStory={() => setCreateOpen(true)}
+            onProfileUpdated={(updatedProfile) => setProfile(updatedProfile)}
+          />
+        }
+      />
 
       {viewerOpen && allFeed.length > 0 && (
         <StoryViewer
