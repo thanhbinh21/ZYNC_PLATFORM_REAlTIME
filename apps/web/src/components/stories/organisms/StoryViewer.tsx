@@ -104,17 +104,18 @@ export function StoryViewer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#020806]/92 backdrop-blur-2xl animate-story-backdrop"
       onMouseDown={() => setPaused(true)}
       onTouchStart={() => setPaused(true)}
     >
-      {/* Story card container */}
-      <div className="relative flex h-full w-full max-w-[420px] flex-col overflow-hidden sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-2xl sm:shadow-2xl sm:shadow-black/50">
-        {/* Gradient overlay top */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-32 bg-gradient-to-b from-black/70 via-black/30 to-transparent" />
+      {/* Story card */}
+      <div className="relative flex h-full w-full max-w-[420px] flex-col overflow-hidden bg-story-bg sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-3xl sm:border sm:border-white/[0.06] sm:shadow-[0_0_80px_-12px_rgba(48,215,171,0.15)] animate-story-viewer-in">
 
-        {/* Progress */}
-        <div className="absolute inset-x-0 top-0 z-30 px-3 pt-2">
+        {/* Top gradient overlay */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-36 bg-gradient-to-b from-black/70 via-black/40 to-transparent" />
+
+        {/* Progress bars */}
+        <div className="absolute inset-x-0 top-0 z-30 px-3 pt-2.5">
           <StoryProgressBar
             total={group.stories.length}
             current={storyIdx}
@@ -125,9 +126,10 @@ export function StoryViewer({
         </div>
 
         {/* Header */}
-        <div className="absolute inset-x-0 top-0 z-30 flex items-center gap-3 px-4 pt-6">
-          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#30d7ab] to-[#0ea87e] p-[2px]">
-            <span className="inline-flex h-full w-full items-center justify-center rounded-full bg-[#0a2a22] text-xs font-semibold text-[#e2fff5]">
+        <div className="absolute inset-x-0 top-0 z-30 flex items-center gap-3 px-4 pt-7">
+          {/* Avatar */}
+          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-story-accent to-emerald-600 p-[2px] shadow-[0_0_12px_rgba(48,215,171,0.25)]">
+            <span className="inline-flex h-full w-full items-center justify-center rounded-full bg-story-bg text-xs font-semibold text-story-text">
               {group.avatarUrl ? (
                 <img src={group.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
               ) : (
@@ -135,16 +137,18 @@ export function StoryViewer({
               )}
             </span>
           </div>
+
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">{group.displayName}</p>
-            <p className="text-[0.65rem] text-white/50">{timeAgo}</p>
+            <p className="truncate text-sm font-semibold tracking-wide text-white">{group.displayName}</p>
+            <p className="text-[0.65rem] font-medium text-white/40">{timeAgo}</p>
           </div>
+
           {isOwner && (
             <button
               type="button"
               onClick={() => { onDelete(story._id); goNext(); }}
               aria-label="Xóa story"
-              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 backdrop-blur transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 backdrop-blur-xl transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 hover:shadow-[0_0_16px_rgba(239,68,68,0.15)]"
             >
               <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3">
                 <path d="M5.5 5.5A.5.5 0 016 6v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm2.5 0a.5.5 0 01.5.5v6a.5.5 0 01-1 0V6a.5.5 0 01.5-.5zm3 .5a.5.5 0 00-1 0v6a.5.5 0 001 0V6z" />
@@ -153,11 +157,12 @@ export function StoryViewer({
               Xóa
             </button>
           )}
+
           <button
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/60 backdrop-blur transition hover:bg-white/15 hover:text-white"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-white/5 text-white/50 backdrop-blur-xl transition-all duration-200 hover:bg-white/10 hover:text-white hover:shadow-[0_0_12px_rgba(255,255,255,0.06)]"
           >
             <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -165,14 +170,14 @@ export function StoryViewer({
           </button>
         </div>
 
-        {/* Navigation zones */}
+        {/* Tap navigation zones */}
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
-          className="absolute left-0 top-0 z-10 flex h-full w-1/3 items-center justify-start pl-2 opacity-0 transition-opacity hover:opacity-100"
+          className="absolute left-0 top-0 z-10 flex h-full w-1/3 items-center justify-start pl-2 opacity-0 transition-opacity duration-200 hover:opacity-100"
           aria-label="Story trước"
         >
-          <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white/60 backdrop-blur">
+          <div className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-black/30 text-white/60 backdrop-blur-xl transition-all duration-200 hover:bg-black/50">
             <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
               <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
             </svg>
@@ -181,24 +186,24 @@ export function StoryViewer({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); goNext(); }}
-          className="absolute right-0 top-0 z-10 flex h-full w-1/3 items-center justify-end pr-2 opacity-0 transition-opacity hover:opacity-100"
+          className="absolute right-0 top-0 z-10 flex h-full w-1/3 items-center justify-end pr-2 opacity-0 transition-opacity duration-200 hover:opacity-100"
           aria-label="Story tiếp"
         >
-          <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/30 text-white/60 backdrop-blur">
+          <div className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-black/30 text-white/60 backdrop-blur-xl transition-all duration-200 hover:bg-black/50">
             <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
               <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
             </svg>
           </div>
         </button>
 
-        {/* Content */}
+        {/* Story content */}
         <div className="flex flex-1 items-center justify-center overflow-hidden">
           {story.mediaType === 'text' && (
             <div
               className="flex h-full w-full items-center justify-center p-10"
               style={{ backgroundColor: story.backgroundColor || '#0d3a30' }}
             >
-              <p className={`max-w-prose text-center text-2xl leading-relaxed text-white drop-shadow-lg ${fontClass}`}>
+              <p className={`max-w-prose text-center text-2xl leading-relaxed text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)] ${fontClass}`}>
                 {story.content}
               </p>
             </div>
@@ -207,28 +212,22 @@ export function StoryViewer({
             <img src={story.mediaUrl} alt="" className="h-full w-full object-contain" />
           )}
           {story.mediaType === 'video' && story.mediaUrl && (
-            <video
-              src={story.mediaUrl}
-              autoPlay
-              muted
-              playsInline
-              className="h-full w-full object-contain"
-            />
+            <video src={story.mediaUrl} autoPlay muted playsInline className="h-full w-full object-contain" />
           )}
         </div>
 
-        {/* Gradient overlay bottom */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-48 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        {/* Bottom gradient overlay */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-52 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
-        {/* Footer */}
+        {/* Footer - reactions & reply */}
         {!isOwner && (
-          <div className="absolute inset-x-0 bottom-0 z-30 space-y-3 px-4 pb-5">
+          <div className="absolute inset-x-0 bottom-0 z-30 space-y-3 px-4 pb-5 animate-story-fade-up">
             {showReactions && (
               <div className="flex justify-center">
                 <ReactionPicker onSelect={handleReact} />
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2.5">
               <div className="min-w-0 flex-1">
                 <StoryReplyInput onSend={handleReply} />
               </div>
@@ -236,11 +235,13 @@ export function StoryViewer({
                 type="button"
                 onClick={() => setShowReactions((p) => !p)}
                 aria-label="Thả reaction"
-                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-lg backdrop-blur-xl transition-all duration-200 ${
+                className={[
+                  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg',
+                  'border backdrop-blur-2xl transition-all duration-300',
                   showReactions
-                    ? 'border-[#30d7ab]/40 bg-[#30d7ab]/10 shadow-[0_0_12px_rgba(48,215,171,0.2)]'
-                    : 'border-white/10 bg-black/40 hover:bg-black/60'
-                }`}
+                    ? 'border-story-accent/40 bg-story-accent/15 shadow-[0_0_20px_rgba(48,215,171,0.25)] scale-110'
+                    : 'border-white/[0.08] bg-black/40 hover:bg-black/60 hover:border-white/15 hover:scale-105',
+                ].join(' ')}
               >
                 ❤️
               </button>
@@ -248,27 +249,27 @@ export function StoryViewer({
           </div>
         )}
 
-        {/* Story counter (for owner) */}
+        {/* View count for owner */}
         {isOwner && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center pb-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-xs text-white/60 backdrop-blur-xl">
-              <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+          <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center pb-6 animate-story-fade-up">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-black/40 px-4 py-2.5 text-xs font-medium text-white/50 backdrop-blur-2xl shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+              <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5 text-story-accent/70">
                 <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 011.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0114.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 011.172 8z" />
                 <path d="M8 5.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM4.5 8a3.5 3.5 0 117 0 3.5 3.5 0 01-7 0z" />
               </svg>
-              {story.viewerIds.length} lượt xem
+              <span>{story.viewerIds.length} lượt xem</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Desktop side navigation arrows */}
+      {/* Desktop side navigation */}
       {groupIdx > 0 && (
         <button
           type="button"
           onClick={goPrev}
           aria-label="Nhóm story trước"
-          className="absolute left-4 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 p-3 text-white/50 backdrop-blur transition hover:bg-white/15 hover:text-white sm:inline-flex"
+          className="absolute left-4 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.06] bg-white/5 p-3.5 text-white/40 backdrop-blur-xl transition-all duration-300 hover:scale-110 hover:bg-white/10 hover:text-white hover:shadow-[0_0_24px_rgba(255,255,255,0.06)] sm:inline-flex"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
             <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
@@ -280,7 +281,7 @@ export function StoryViewer({
           type="button"
           onClick={goNext}
           aria-label="Nhóm story tiếp"
-          className="absolute right-4 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/5 p-3 text-white/50 backdrop-blur transition hover:bg-white/15 hover:text-white sm:inline-flex"
+          className="absolute right-4 top-1/2 z-40 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/[0.06] bg-white/5 p-3.5 text-white/40 backdrop-blur-xl transition-all duration-300 hover:scale-110 hover:bg-white/10 hover:text-white hover:shadow-[0_0_24px_rgba(255,255,255,0.06)] sm:inline-flex"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
             <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
