@@ -188,15 +188,15 @@ npm run dev:web
 - [ ] Socket event `group_updated` khi có thay đổi
 
 ### Phase 5 – Real-time Messaging (Module F17–F21)
-- [ ] WebSocket server với Socket.IO + Redis adapter
-- [ ] Gửi/nhận tin nhắn văn bản + emoji (1-1 và nhóm)
-- [ ] Upload media qua pre-signed URL flow
+- [x] WebSocket server với Socket.IO + Redis adapter <!-- done: 04/04/2026 -->
+- [x] Gửi/nhận tin nhắn văn bản + emoji (1-1 và nhóm) <!-- done: 04/04/2026 -->
+- [x] Upload media qua pre-signed URL flow <!-- done: 04/04/2026 -->
 - [x] Fix lỗi compile upload routes (thiếu đóng route `/sign`) để server chạy dev ổn định <!-- done: 02/04/2026 -->
-- [ ] Message status: sent → delivered → read (2 tick xanh)
-- [ ] Typing indicator (TTL 3 giây trong Redis)
+- [x] Message status: sent → delivered → read (2 tick xanh) <!-- done: 04/04/2026 -->
+- [x] Typing indicator (TTL 3 giây trong Redis) <!-- done: 04/04/2026 -->
 - [ ] Đồng bộ đa thiết bị (multi-device sync)
-- [ ] Kafka consumer: batch insert vào MongoDB
-- [ ] Idempotency key chống gửi trùng
+- [x] Kafka consumer: batch insert vào MongoDB <!-- done: 04/04/2026 -->
+- [x] Idempotency key chống gửi trùng <!-- done: 04/04/2026 -->
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
 - [ ] Hiển thị online/offline với bạn bè
