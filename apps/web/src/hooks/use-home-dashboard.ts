@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { getMessages } from '@/services/chat';
 import socketService from '@/services/socket';
@@ -34,6 +35,7 @@ export function useHomeDashboard() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; displayName: string }>>([]);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch initial data
   useEffect(() => {
@@ -246,9 +248,18 @@ export function useHomeDashboard() {
     };
 
     // Setup socket listeners for real-time messaging
-    socketService.listenToMessages(handleNewMessage);
-    socketService.listenToStatusUpdates(handleStatusUpdate);
-    socketService.listenToTypingIndicators(handleTypingIndicator);
+    // First, initialize socket connection with token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (token) {
+      try {
+        socketService.getSocket(token);
+        socketService.listenToMessages(handleNewMessage);
+        socketService.listenToStatusUpdates(handleStatusUpdate);
+        socketService.listenToTypingIndicators(handleTypingIndicator);
+      } catch (error) {
+        console.error('Failed to setup socket listeners:', error);
+      }
+    }
 
     return () => {
       // Cleanup listeners
@@ -294,6 +305,80 @@ export function useHomeDashboard() {
     };
   }, [conversations, selectedConversationId, userId]);
 
+  // Send message handler
+  const handleSendMessage = useCallback(
+    async (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => {
+      if (!selectedConversationId || !userId) return;
+
+      try {
+        const idempotencyKey = uuidv4();
+        
+        // Optimistic update - add message immediately
+        const optimisticMessage: Message = {
+          _id: uuidv4(),
+          conversationId: selectedConversationId,
+          senderId: userId,
+          content,
+          type,
+          mediaUrl,
+          createdAt: new Date().toISOString(),
+          idempotencyKey,
+          status: 'sent',
+        };
+
+        setMessages(prev => [...prev, optimisticMessage]);
+
+        // Emit via Socket.IO
+        socketService.sendMessage(selectedConversationId, content, type, idempotencyKey, mediaUrl);
+
+        // Clear typing indicator after sending
+        setTypingUsers(prev => prev.filter(u => u.userId !== userId));
+      } catch (error) {
+        console.error('Failed to send message:', error);
+      }
+    },
+    [selectedConversationId, userId],
+  );
+
+  // Start typing handler
+  const handleStartTyping = useCallback(() => {
+    if (!selectedConversationId) return;
+
+    socketService.startTyping(selectedConversationId);
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set debounce timeout (3s)
+    typingTimeoutRef.current = setTimeout(() => {
+      socketService.stopTyping(selectedConversationId);
+      typingTimeoutRef.current = null;
+    }, 3000);
+  }, [selectedConversationId]);
+
+  // Stop typing handler
+  const handleStopTyping = useCallback(() => {
+    if (!selectedConversationId) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+
+    socketService.stopTyping(selectedConversationId);
+  }, [selectedConversationId]);
+
+  // Cleanup typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return {
     data,
     loading,
@@ -305,5 +390,8 @@ export function useHomeDashboard() {
     messagesLoading,
     conversationInfo: getSelectedConversationInfo(),
     typingUsers,
+    onSendMessage: handleSendMessage,
+    onStartTyping: handleStartTyping,
+    onStopTyping: handleStopTyping,
   };
 }

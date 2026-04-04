@@ -33,6 +33,9 @@ export default function HomePage() {
     messagesLoading,
     conversationInfo,
     typingUsers,
+    onSendMessage,
+    onStartTyping,
+    onStopTyping,
   } = useHomeDashboard();
   const {
     feed,
@@ -198,6 +201,9 @@ export default function HomePage() {
               messages: messages,
               typingUsers: typingUsers,
               isLoading: messagesLoading,
+              onSendMessage: onSendMessage,
+              onStartTyping: onStartTyping,
+              onStopTyping: onStopTyping,
             }}
           />
         }
