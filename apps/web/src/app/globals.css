@@ -149,3 +149,25 @@ html {
 		transform: translate3d(10px, -16px, 0) scale(1.07);
 	}
 }
+
+/* ─── Story Ring (conic-gradient needs CSS @property) ─── */
+
+@property --story-ring-angle {
+	syntax: '<angle>';
+	initial-value: 0deg;
+	inherits: false;
+}
+
+@layer utilities {
+	.story-ring-unseen {
+		--story-ring-angle: 0deg;
+		background: conic-gradient(
+			from var(--story-ring-angle),
+			#30d7ab 0%,
+			#0ea87e 25%,
+			#f0b429 50%,
+			#30d7ab 75%,
+			#0ea87e 100%
+		);
+	}
+}

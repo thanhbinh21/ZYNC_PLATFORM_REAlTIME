@@ -40,15 +40,15 @@ export function StoryProgressBar({ total, current, duration, paused, onComplete 
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
-          className="h-[2.5px] flex-1 overflow-hidden rounded-full bg-white/20 backdrop-blur-sm"
+          className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-white/[0.12] backdrop-blur-sm"
         >
           {i < current && (
-            <div className="h-full w-full rounded-full bg-[#30d7ab] shadow-[0_0_4px_rgba(48,215,171,0.5)]" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-story-accent to-story-accent-warm shadow-[0_0_6px_rgba(48,215,171,0.5)]" />
           )}
           {i === current && (
             <div
               ref={progressRef}
-              className="h-full rounded-full bg-[#30d7ab] shadow-[0_0_4px_rgba(48,215,171,0.5)] transition-[width] duration-[50ms] ease-linear"
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-story-accent to-story-accent-warm shadow-[0_0_8px_rgba(48,215,171,0.6)] transition-[width] duration-[50ms] ease-linear"
               style={{ width: '0%' }}
             />
           )}
