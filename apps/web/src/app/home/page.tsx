@@ -33,6 +33,10 @@ export default function HomePage() {
     messagesLoading,
     conversationInfo,
     typingUsers,
+    friendsForGroup,
+    groupActionLoading,
+    onCreateGroup,
+    onAddGroupMembers,
     onSendMessage,
     onStartTyping,
     onStopTyping,
@@ -192,6 +196,10 @@ export default function HomePage() {
             conversations={conversations}
             selectedConversationId={selectedConversationId}
             onSelectConversation={onSelectConversation}
+            friends={friendsForGroup}
+            onCreateGroup={onCreateGroup}
+            onAddGroupMembers={onAddGroupMembers}
+            isCreatingGroup={groupActionLoading}
             chatPanelProps={{
               conversationId: selectedConversationId,
               currentUserId: userId,

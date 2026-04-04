@@ -36,6 +36,11 @@ export function MessageBubble({
     minute: '2-digit',
   });
 
+  const hasImageAvatar = Boolean(senderAvatar && /^(https?:\/\/|\/)/.test(senderAvatar));
+  const avatarLabel = senderAvatar && !hasImageAvatar
+    ? senderAvatar.slice(0, 2).toUpperCase()
+    : 'U';
+
   const statusIcon = {
     sent: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
     delivered: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
@@ -45,7 +50,7 @@ export function MessageBubble({
   return (
     <div className={`flex gap-2 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* Avatar (chỉ hiển thị nếu không phải của mình) */}
-      {!isOwn && senderAvatar && (
+      {!isOwn && hasImageAvatar && senderAvatar && (
         <div className="w-8 h-8 rounded-full bg-[#2f6657] flex-shrink-0">
           <Image
             src={senderAvatar}
@@ -56,8 +61,10 @@ export function MessageBubble({
           />
         </div>
       )}
-      {!isOwn && !senderAvatar && (
-        <div className="w-8 h-8 rounded-full bg-[#2f6657] flex-shrink-0" />
+      {!isOwn && !hasImageAvatar && (
+        <div className="w-8 h-8 rounded-full bg-[#2f6657] text-[#dffef1] text-xs font-semibold flex-shrink-0 flex items-center justify-center">
+          {avatarLabel}
+        </div>
       )}
 
       {/* Message Content */}

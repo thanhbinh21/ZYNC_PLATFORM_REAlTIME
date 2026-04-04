@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { getMessages } from '@/services/chat';
+import { fetchFriends, type FriendUser } from '@/services/friends';
+import { addGroupMembers, createGroup } from '@/services/groups';
 import socketService from '@/services/socket';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
@@ -10,8 +12,10 @@ import type { Message } from '@zync/shared-types';
 interface Conversation {
   _id: string;
   name?: string;
-  type: 'individual' | 'group';
-  users: Array<{ _id: string; displayName: string; avatar?: string }>;
+  avatarUrl?: string;
+  type: 'direct' | 'group';
+  adminIds?: string[];
+  users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   lastMessage?: { senderId: string; content: string; sentAt: string };
   unreadCounts?: Record<string, number>;
 }
@@ -22,6 +26,10 @@ interface ConversationListItem {
   preview: string;
   time: string;
   avatar: string;
+  avatarUrl?: string;
+  isGroup?: boolean;
+  memberCount?: number;
+  members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
 }
@@ -35,6 +43,8 @@ export function useHomeDashboard() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; displayName: string }>>([]);
+  const [friendsForGroup, setFriendsForGroup] = useState<FriendUser[]>([]);
+  const [groupActionLoading, setGroupActionLoading] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch initial data
@@ -53,6 +63,15 @@ export function useHomeDashboard() {
         const convos: Conversation[] = convosRes.data.data || [];
         
         setConversations(convos);
+
+        const allFriends: FriendUser[] = [];
+        let cursor: string | undefined;
+        do {
+          const page = await fetchFriends(cursor);
+          allFriends.push(...page.friends);
+          cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        setFriendsForGroup(allFriends);
         
         // Select first conversation
         if (convos.length > 0) {
@@ -171,15 +190,19 @@ export function useHomeDashboard() {
   useEffect(() => {
     const handleNewMessage = (data: {
       messageId: string;
+      conversationId?: string;
       senderId: string;
       content: string;
       type: string;
       mediaUrl?: string;
       createdAt: string;
     }) => {
+      const targetConversationId = data.conversationId ?? selectedConversationId;
+      if (!targetConversationId) return;
+
       const message: Message = {
         _id: data.messageId,
-        conversationId: selectedConversationId,
+        conversationId: targetConversationId,
         senderId: data.senderId,
         content: data.content,
         type: data.type as any,
@@ -189,14 +212,20 @@ export function useHomeDashboard() {
         status: 'sent',
       };
 
-      setMessages(prev => [...prev, message]);
+      // Prevent duplicate append when same message event arrives more than once.
+      setMessages((prev) => {
+        if (prev.some((item) => item._id === message._id)) {
+          return prev;
+        }
+        return [...prev, message];
+      });
       
       // Clear typing indicator for sender (they finished typing and sent message)
       setTypingUsers(prev => prev.filter(u => u.userId !== data.senderId));
       
       // Update conversation
       setConversations(prev => prev.map(conv => {
-        if (conv._id === selectedConversationId) {
+        if (conv._id === targetConversationId) {
           return {
             ...conv,
             lastMessage: {
@@ -249,10 +278,15 @@ export function useHomeDashboard() {
 
     // Setup socket listeners for real-time messaging
     // First, initialize socket connection with token
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const tokenFromMemory = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
+    const tokenFromStorage = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const token = tokenFromMemory ?? tokenFromStorage;
     if (token) {
       try {
         socketService.getSocket(token);
+        if (selectedConversationId) {
+          socketService.joinConversation(selectedConversationId);
+        }
         socketService.listenToMessages(handleNewMessage);
         socketService.listenToStatusUpdates(handleStatusUpdate);
         socketService.listenToTypingIndicators(handleTypingIndicator);
@@ -279,11 +313,77 @@ export function useHomeDashboard() {
       time: conv.lastMessage?.sentAt 
         ? new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         : '',
-      avatar: conv.users.find(u => u._id !== userId)?.displayName?.substring(0, 2).toUpperCase() || 'U',
+      avatar: conv.type === 'group'
+        ? (conv.name?.substring(0, 2).toUpperCase() || 'GR')
+        : (conv.users.find(u => u._id !== userId)?.displayName?.substring(0, 2).toUpperCase() || 'U'),
+      avatarUrl: conv.type === 'group'
+        ? conv.avatarUrl
+        : conv.users.find(u => u._id !== userId)?.avatarUrl,
+      isGroup: conv.type === 'group',
+      memberCount: conv.users.length,
+      members: conv.users,
       online: true,
       active: conv._id === selectedConversationId,
     }));
   }, [conversations, selectedConversationId, userId]);
+
+  const createGroupConversation = useCallback(
+    async (name: string, memberIds: string[]) => {
+      setGroupActionLoading(true);
+      try {
+        const createdGroup = await createGroup({ name, memberIds });
+
+        const normalizedConversation: Conversation = {
+          _id: createdGroup._id,
+          type: 'group',
+          name: createdGroup.name,
+          avatarUrl: createdGroup.avatarUrl,
+          adminIds: createdGroup.adminIds,
+          users: createdGroup.users,
+          unreadCounts: {},
+        };
+
+        setConversations((prev) => [normalizedConversation, ...prev.filter((c) => c._id !== createdGroup._id)]);
+        setSelectedConversationId(createdGroup._id);
+        setMessages([]);
+
+        return createdGroup;
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [],
+  );
+
+  const addMembersToGroupConversation = useCallback(
+    async (groupId: string, memberIds: string[]) => {
+      if (memberIds.length === 0) {
+        return;
+      }
+
+      setGroupActionLoading(true);
+      try {
+        const updatedGroup = await addGroupMembers(groupId, { memberIds });
+
+        setConversations((prev) => prev.map((conversation) => {
+          if (conversation._id !== groupId) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            name: updatedGroup.name,
+            avatarUrl: updatedGroup.avatarUrl,
+            adminIds: updatedGroup.adminIds,
+            users: updatedGroup.users,
+          };
+        }));
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [],
+  );
 
   const getSelectedConversationInfo = useCallback(() => {
     const conv = conversations.find(c => c._id === selectedConversationId);
@@ -292,7 +392,7 @@ export function useHomeDashboard() {
     if (conv.type === 'group') {
       return {
         participantName: conv.name || 'Nhóm',
-        participantAvatar: conv.name?.substring(0, 2).toUpperCase(),
+        participantAvatar: conv.name?.substring(0, 2).toUpperCase() || 'GR',
         isOnline: true,
       };
     }
@@ -312,21 +412,6 @@ export function useHomeDashboard() {
 
       try {
         const idempotencyKey = uuidv4();
-        
-        // Optimistic update - add message immediately
-        const optimisticMessage: Message = {
-          _id: uuidv4(),
-          conversationId: selectedConversationId,
-          senderId: userId,
-          content,
-          type,
-          mediaUrl,
-          createdAt: new Date().toISOString(),
-          idempotencyKey,
-          status: 'sent',
-        };
-
-        setMessages(prev => [...prev, optimisticMessage]);
 
         // Emit via Socket.IO
         socketService.sendMessage(selectedConversationId, content, type, idempotencyKey, mediaUrl);
@@ -390,6 +475,10 @@ export function useHomeDashboard() {
     messagesLoading,
     conversationInfo: getSelectedConversationInfo(),
     typingUsers,
+    friendsForGroup,
+    groupActionLoading,
+    onCreateGroup: createGroupConversation,
+    onAddGroupMembers: addMembersToGroupConversation,
     onSendMessage: handleSendMessage,
     onStartTyping: handleStartTyping,
     onStopTyping: handleStopTyping,

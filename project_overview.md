@@ -180,12 +180,12 @@ npm run dev:web
 - [x] Dựng Friends Dashboard Web (search/send request/incoming-outgoing/list/unfriend/block) tại route `/friends` <!-- done: 19/03/2026 -->
 
 ### Phase 4 – Group Management (Module F10–F16)
-- [ ] Tạo nhóm (tối đa 100 thành viên)
-- [ ] Cập nhật thông tin nhóm (admin only)
-- [ ] Thêm / xóa thành viên, rời nhóm
-- [ ] Phân quyền admin/member
-- [ ] Xóa nhóm (admin only)
-- [ ] Socket event `group_updated` khi có thay đổi
+- [x] Tạo nhóm (tối đa 100 thành viên) <!-- done: 04/04/2026 -->
+- [x] Cập nhật thông tin nhóm (admin only) <!-- done: 04/04/2026 -->
+- [x] Thêm / xóa thành viên, rời nhóm <!-- done: 04/04/2026 -->
+- [x] Phân quyền admin/member <!-- done: 04/04/2026 -->
+- [x] Xóa nhóm (admin only) <!-- done: 04/04/2026 -->
+- [x] Socket event `group_updated` khi có thay đổi <!-- done: 04/04/2026 -->
 
 ### Phase 5 – Real-time Messaging (Module F17–F21)
 - [x] WebSocket server với Socket.IO + Redis adapter <!-- done: 04/04/2026 -->

@@ -1,0 +1,27 @@
+import { z } from 'zod';
+
+export const CreateGroupSchema = z.object({
+  name: z.string().trim().min(1, 'Group name is required').max(100, 'Group name too long'),
+  avatarUrl: z.string().url('avatarUrl must be a valid URL').optional(),
+  memberIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid user id')).min(2, 'Select at least 2 members').max(100, 'Maximum 100 members'),
+});
+
+export const UpdateGroupSchema = z.object({
+  name: z.string().trim().min(1, 'Group name is required').max(100, 'Group name too long').optional(),
+  avatarUrl: z.string().url('avatarUrl must be a valid URL').nullable().optional(),
+}).refine((data) => data.name !== undefined || data.avatarUrl !== undefined, {
+  message: 'At least one field must be provided',
+});
+
+export const AddGroupMembersSchema = z.object({
+  memberIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid user id')).min(1, 'Select at least 1 member').max(100, 'Maximum 100 members per request'),
+});
+
+export const UpdateGroupMemberRoleSchema = z.object({
+  role: z.enum(['admin', 'member']),
+});
+
+export type CreateGroupDto = z.infer<typeof CreateGroupSchema>;
+export type UpdateGroupDto = z.infer<typeof UpdateGroupSchema>;
+export type AddGroupMembersDto = z.infer<typeof AddGroupMembersSchema>;
+export type UpdateGroupMemberRoleDto = z.infer<typeof UpdateGroupMemberRoleSchema>;

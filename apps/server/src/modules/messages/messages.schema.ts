@@ -33,7 +33,7 @@ export const GetMessageHistorySchema = z.object({
     .optional()
     .describe('Base64 encoded cursor for pagination (createdAt_messageId)'),
   limit: z
-    .number()
+    .coerce.number()
     .int()
     .min(1, 'Limit must be at least 1')
     .max(100, 'Limit must not exceed 100')
