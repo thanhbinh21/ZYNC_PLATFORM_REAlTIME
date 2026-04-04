@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['zync-media.s3.ap-southeast-1.amazonaws.com'],
+    domains: ['zync-media.s3.ap-southeast-1.amazonaws.com', 'res.cloudinary.com'],
   },
   webpack: (config) => {
     config.resolve.alias = {

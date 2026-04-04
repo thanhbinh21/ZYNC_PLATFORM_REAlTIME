@@ -60,16 +60,19 @@ export class UploadService {
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
+    const publicIdPrefix = `${userId}_${timestamp}`;
 
     // Task 8.2: Generate signature
     // Cloudinary signing: SHA1(params + api_secret)
+    // IMPORTANT: Must include ALL params that will be sent in FormData
     const paramsToSign = {
-      timestamp,
       folder: `zync/${type}s/${userId}`, // e.g., zync/images/user123
-      resource_type: type === 'video' ? 'video' : 'image',
+      public_id: publicIdPrefix,
+      // resource_type: type === 'video' ? 'video' : 'image',
+      timestamp,
     };
 
-    // Build signature string (canonical form)
+    // Build signature string (canonical form - must be sorted)
     const signatureString = Object.keys(paramsToSign)
       .sort()
       .map(
@@ -92,7 +95,7 @@ export class UploadService {
       cloudName,
       apiKey,
       folder: `zync/${type}s/${userId}`,
-      publicIdPrefix: `${userId}_${Date.now()}`,
+      publicIdPrefix,
     };
   }
 
@@ -100,13 +103,15 @@ export class UploadService {
    * Task 8.2: Verify upload result from Cloudinary webhook or client callback
    * Validate that the uploaded file exists and belongs to current user
    *
-   * @param publicId Cloudinary public ID of uploaded file
+   * @param publicId Cloudinary public ID of uploaded file (includes folder path)
    * @param userId User ID (verify ownership)
+   * @param type Media type (image or video)
    * @returns File metadata if verification succeeds
    */
   static async verifyUploadResult(
     publicId: string,
     userId: string,
+    type: 'image' | 'video',
   ): Promise<{
     publicId: string;
     url: string;
@@ -116,14 +121,16 @@ export class UploadService {
   } | null> {
     try {
       // Task 8.2: Verify publicId contains userId (ownership check)
-      if (!publicId.startsWith(userId)) {
-        logger.warn(`Upload verification failed: publicId ${publicId} does not belong to user ${userId}`);
+      // publicId format: zync/images/userId/userId_timestamp
+      if (!publicId.includes(userId)) {
+        logger.warn(`Upload verification failed: publicId ${publicId} does not contain userId ${userId}`);
         return null;
       }
 
-      // Fetch resource info from Cloudinary
+      // Fetch resource info from Cloudinary with correct resource_type
+      // publicId already contains folder path, so pass it directly
       const resource = await cloudinary.api.resource(publicId, {
-        resource_type: 'auto',
+        resource_type: type,
       });
 
       if (!resource) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { generateUploadSignature, verifyUpload } from '@/services/chat';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
@@ -29,7 +30,7 @@ return (
   );}
 
 interface MessageInputProps {
-  onSend: (content: string, type: 'text' | 'image' | 'video') => void;
+  onSend: (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => void;
   onStartTyping: () => void;
   onStopTyping: () => void;
   isLoading?: boolean;
@@ -44,6 +45,7 @@ export function MessageInput({
   disabled = false,
 }: MessageInputProps) {
   const [input, setInput] = useState('');
+  const [uploading, setUploading] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,21 +88,64 @@ export function MessageInput({
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // TODO: Upload file and get mediaUrl
-      // For now, just handle the file selection
-      const type = file.type.startsWith('image/') ? 'image' : 'video';
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onSend(`Shared a ${type}`, type as any);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileType = file.type.startsWith('image/') ? 'image' : 'video';
+      
+      // Step 1: Get upload signature from server (middleware extracts userId from JWT)
+      const signatureData = await generateUploadSignature(fileType);
+      console.log('✅ Step 1: Got signature');
+      
+      // Step 2: Upload file to Cloudinary using FormData
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', signatureData.apiKey);
+      formData.append('signature', signatureData.signature);
+      formData.append('timestamp', signatureData.timestamp.toString());
+      formData.append('folder', signatureData.folder);
+      formData.append('public_id', signatureData.publicIdPrefix);
+      
+      const uploadResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${fileType === 'image' ? 'image' : 'video'}/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        },
+      );
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Cloudinary upload failed: ${uploadResponse.status}`);
+      }
+
+      const uploadedData = await uploadResponse.json() as { public_id: string; secure_url: string };
+      console.log('✅ Step 2: Uploaded to Cloudinary');
+
+      // Step 3: Verify upload with backend (middleware extracts userId from JWT)
+      const verifyResult = await verifyUpload(uploadedData.public_id, fileType);
+      console.log('✅ Step 3: Verified with backend');
+
+      // Step 4: Send message with media URL
+      const messageContent = `Shared a ${fileType}`;
+      await onSend(messageContent, fileType as 'image' | 'video', verifyResult.secureUrl);
+      console.log('✅ Step 4: Message sent');
+
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('❌ File upload failed:', error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploading(false);
     }
   };
 
-  const isButtonDisabled = !input.trim() || disabled || isLoading;
+  const isButtonDisabled = !input.trim() || disabled || isLoading || uploading;
 
   return (
     <div className="border-t border-[#114538] p-4 bg-[#0d2c24]">
@@ -108,7 +153,7 @@ export function MessageInput({
       <div className="flex items-center gap-3 mb-3">
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isLoading}
+          disabled={disabled || isLoading || uploading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Attachment"
         >
@@ -117,7 +162,7 @@ export function MessageInput({
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isLoading}
+          disabled={disabled || isLoading || uploading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Images/Videos"
         >
@@ -125,7 +170,7 @@ export function MessageInput({
         </button>
 
         <button
-          disabled={disabled || isLoading}
+          disabled={disabled || isLoading || uploading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Emoji"
         >
@@ -144,11 +189,11 @@ export function MessageInput({
       {/* Input Area */}
       <div className="flex items-end gap-3">
         <textarea
-          value={input}
+          value={uploading ? `${input || ''}` : input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Nhập tin nhắn..."
-          disabled={disabled || isLoading}
+          placeholder={uploading ? 'Uploading...' : 'Nhập tin nhắn...'}
+          disabled={disabled || isLoading || uploading}
           rows={1}
           className="flex-1 bg-[#0d2c24] text-[#dffcf2] placeholder:text-[#80ac9d] rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#33deb3] disabled:opacity-50"
           style={{
