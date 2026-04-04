@@ -22,7 +22,18 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 };
 
 export default function HomePage() {
-  const { data, loading, userId } = useHomeDashboard();
+  const {
+    data,
+    loading,
+    userId,
+    conversations,
+    selectedConversationId,
+    onSelectConversation,
+    messages,
+    messagesLoading,
+    conversationInfo,
+    typingUsers,
+  } = useHomeDashboard();
   const {
     feed,
     myStories,
@@ -173,7 +184,23 @@ export default function HomePage() {
     <>
       <HomeDashboardScreen
         data={data}
-        chatSlot={<HomeDashboardChatPanel />}
+        chatSlot={
+          <HomeDashboardChatPanel
+            conversations={conversations}
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={onSelectConversation}
+            chatPanelProps={{
+              conversationId: selectedConversationId,
+              currentUserId: userId,
+              participantName: conversationInfo?.participantName,
+              participantAvatar: conversationInfo?.participantAvatar,
+              isOnline: conversationInfo?.isOnline,
+              messages: messages,
+              typingUsers: typingUsers,
+              isLoading: messagesLoading,
+            }}
+          />
+        }
         settingsSlot={
           <HomeDashboardSettingsPanel
             appearance={appearanceSettings}
