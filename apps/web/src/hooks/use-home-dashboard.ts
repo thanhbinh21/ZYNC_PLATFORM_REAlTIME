@@ -1,40 +1,74 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/services/api';
+import { getMessages } from '@/services/chat';
+import socketService from '@/services/socket';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
+import type { Message } from '@zync/shared-types';
+
+interface Conversation {
+  _id: string;
+  name?: string;
+  type: 'individual' | 'group';
+  users: Array<{ _id: string; displayName: string; avatar?: string }>;
+  lastMessage?: { senderId: string; content: string; sentAt: string };
+  unreadCounts?: Record<string, number>;
+}
+
+interface ConversationListItem {
+  id: string;
+  name: string;
+  preview: string;
+  time: string;
+  avatar: string;
+  online?: boolean;
+  active?: boolean;
+}
 
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>('');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; displayName: string }>>([]);
 
+  // Fetch initial data
   useEffect(() => {
     async function fetchData() {
       try {
         const [meRes, requestsRes, convosRes] = await Promise.all([
           apiClient.get('/api/users/me'),
           apiClient.get('/api/friends/requests'),
-          apiClient.get('/api/conversations')
+          apiClient.get('/api/conversations'),
         ]);
 
         const user = meRes.data.user;
         setUserId(user._id as string);
         const pendingRequests = requestsRes.data.pendingRequests || [];
-        const conversations = convosRes.data.data || [];
+        const convos: Conversation[] = convosRes.data.data || [];
+        
+        setConversations(convos);
+        
+        // Select first conversation
+        if (convos.length > 0) {
+          setSelectedConversationId(convos[0]._id);
+        }
 
         let unreadMessagesCount = 0;
         let activeGroupsCount = 0;
         const activities: any[] = [];
 
-        conversations.forEach((conv: any, index: number) => {
+        convos.forEach((conv: Conversation, index: number) => {
           if (conv.type === 'group') activeGroupsCount++;
           
           const unreadForMe = conv.unreadCounts?.[user._id] || 0;
           unreadMessagesCount += unreadForMe;
 
-          if (conv.lastMessage && conv.lastMessage.content) {
-            // Tìm ngươì gửi từ list users của conversation
-            const sender = conv.users?.find((u: any) => u._id === conv.lastMessage.senderId);
+          if (conv.lastMessage && conv.lastMessage?.content) {
+            const sender = conv.users?.find((u: any) => u._id === conv.lastMessage?.senderId);
             
             let title = sender?.displayName || 'Người dùng';
             let messageStr = conv.lastMessage.content;
@@ -44,7 +78,6 @@ export function useHomeDashboard() {
               messageStr = `${sender?.displayName || 'Ai đó'}: ${messageStr}`;
             }
 
-            // Fallback initials
             let initials = 'U';
             if (sender?.displayName) {
               const parts = sender.displayName.split(' ');
@@ -113,5 +146,164 @@ export function useHomeDashboard() {
     fetchData();
   }, []);
 
-  return { data, loading, userId };
+  // Fetch messages for selected conversation
+  useEffect(() => {
+    async function loadMessages() {
+      if (!selectedConversationId) return;
+      
+      setMessagesLoading(true);
+      try {
+        const { messages: fetchedMessages } = await getMessages(selectedConversationId, undefined, 30);
+        setMessages(fetchedMessages.reverse()); // Oldest first
+      } catch (error) {
+        console.error('Failed to fetch messages', error);
+      } finally {
+        setMessagesLoading(false);
+      }
+    }
+
+    loadMessages();
+  }, [selectedConversationId]);
+
+  // Socket listeners for real-time updates
+  useEffect(() => {
+    const handleNewMessage = (data: {
+      messageId: string;
+      senderId: string;
+      content: string;
+      type: string;
+      mediaUrl?: string;
+      createdAt: string;
+    }) => {
+      const message: Message = {
+        _id: data.messageId,
+        conversationId: selectedConversationId,
+        senderId: data.senderId,
+        content: data.content,
+        type: data.type as any,
+        mediaUrl: data.mediaUrl,
+        createdAt: data.createdAt,
+        idempotencyKey: '',
+        status: 'sent',
+      };
+
+      setMessages(prev => [...prev, message]);
+      
+      // Clear typing indicator for sender (they finished typing and sent message)
+      setTypingUsers(prev => prev.filter(u => u.userId !== data.senderId));
+      
+      // Update conversation
+      setConversations(prev => prev.map(conv => {
+        if (conv._id === selectedConversationId) {
+          return {
+            ...conv,
+            lastMessage: {
+              senderId: data.senderId,
+              content: data.content,
+              sentAt: data.createdAt,
+            },
+          };
+        }
+        return conv;
+      }));
+    };
+
+    const handleStatusUpdate = (update: any) => {
+      setMessages(prev => prev.map(msg => {
+        if (msg._id === update.messageId) {
+          return { ...msg, status: update.status };
+        }
+        return msg;
+      }));
+    };
+
+    const handleTypingIndicator = (typing: {
+      userId: string;
+      conversationId: string;
+      isTyping: boolean;
+    }) => {
+      // Only handle typing for current conversation
+      if (typing.conversationId !== selectedConversationId) return;
+      
+      // Get user info from conversation
+      const conversation = conversations.find(c => c._id === selectedConversationId);
+      const typingUser = conversation?.users.find(u => u._id === typing.userId);
+      
+      if (!typingUser) return;
+
+      setTypingUsers(prev => {
+        if (typing.isTyping) {
+          // Add user if not already in list
+          if (!prev.find(u => u.userId === typing.userId)) {
+            return [...prev, { userId: typing.userId, displayName: typingUser.displayName }];
+          }
+          return prev;
+        } else {
+          // Remove user from typing list
+          return prev.filter(u => u.userId !== typing.userId);
+        }
+      });
+    };
+
+    // Setup socket listeners for real-time messaging
+    socketService.listenToMessages(handleNewMessage);
+    socketService.listenToStatusUpdates(handleStatusUpdate);
+    socketService.listenToTypingIndicators(handleTypingIndicator);
+
+    return () => {
+      // Cleanup listeners
+      socketService.unlistenToMessages();
+      socketService.unlistenToStatusUpdates();
+      socketService.unlistenToTypingIndicators();
+    };
+  }, [selectedConversationId]);
+
+  const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
+    return conversations.map((conv, idx) => ({
+      id: conv._id,
+      name: conv.type === 'group' 
+        ? conv.name || 'Nhóm'
+        : conv.users.find(u => u._id !== userId)?.displayName || 'Người dùng',
+      preview: conv.lastMessage?.content || 'Không có tin nhắn',
+      time: conv.lastMessage?.sentAt 
+        ? new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        : '',
+      avatar: conv.users.find(u => u._id !== userId)?.displayName?.substring(0, 2).toUpperCase() || 'U',
+      online: true,
+      active: conv._id === selectedConversationId,
+    }));
+  }, [conversations, selectedConversationId, userId]);
+
+  const getSelectedConversationInfo = useCallback(() => {
+    const conv = conversations.find(c => c._id === selectedConversationId);
+    if (!conv) return null;
+
+    if (conv.type === 'group') {
+      return {
+        participantName: conv.name || 'Nhóm',
+        participantAvatar: conv.name?.substring(0, 2).toUpperCase(),
+        isOnline: true,
+      };
+    }
+
+    const otherUser = conv.users.find(u => u._id !== userId);
+    return {
+      participantName: otherUser?.displayName || 'Người dùng',
+      participantAvatar: otherUser?.displayName?.substring(0, 2).toUpperCase(),
+      isOnline: true,
+    };
+  }, [conversations, selectedConversationId, userId]);
+
+  return {
+    data,
+    loading,
+    userId,
+    conversations: convertConversationsToListItems(),
+    selectedConversationId,
+    onSelectConversation: setSelectedConversationId,
+    messages,
+    messagesLoading,
+    conversationInfo: getSelectedConversationInfo(),
+    typingUsers,
+  };
 }
