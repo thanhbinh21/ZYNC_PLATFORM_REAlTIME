@@ -7,6 +7,7 @@ import { logger } from '../shared/logger';
 import type { StoryReactionType } from '../modules/stories/story.model';
 import { MessagesService } from '../modules/messages/messages.service';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
+import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
 
 
 const MSG_RATE_WINDOW_MS = 1000;
@@ -80,6 +81,29 @@ export function initSocketGateway(httpServer: HttpServer): Server {
 
     // Đánh dấu user đang online trong Redis
     void setUserOnline(userId);
+
+    socket.on('join_conversation', async (payload: { conversationId?: string }) => {
+      const conversationId = payload?.conversationId;
+      if (!conversationId) {
+        return;
+      }
+
+      try {
+        const member = await ConversationMemberModel.exists({
+          conversationId,
+          userId,
+        });
+
+        if (!member) {
+          socket.emit('error', { message: 'Not allowed to join this conversation' });
+          return;
+        }
+
+        await socket.join(`conv:${conversationId}`);
+      } catch (err) {
+        logger.error('join_conversation error', err);
+      }
+    });
 
     // Sự kiện gửi tin nhắn
     socket.on('send_message', async (payload: unknown) => {
@@ -178,6 +202,9 @@ async function handleSendMessage(
     return;
   }
 
+  // Ensure sender has joined this conversation room for self-receive status events.
+  await socket.join(`conv:${conversationId as string}`);
+
   // ─── Create Message via Service ───
   try {
     const message = await MessagesService.createMessage(
@@ -209,6 +236,7 @@ async function handleSendMessage(
     // ─── Emit to Recipients ───
     io.to(`conv:${conversationId}`).emit('receive_message', {
       messageId: message._id,
+      conversationId,
       senderId: userId,
       content,
       type: type ?? 'text',
@@ -263,6 +291,8 @@ async function handleMessageRead(
     return;
   }
 
+  await socket.join(`conv:${conversationId as string}`);
+
   // ─── Batch Update Message Status ───
   try {
     for (const messageId of messageIds) {
@@ -309,6 +339,8 @@ async function handleMessageDelivered(
     socket.emit('error', { message: 'messageIds cannot be empty' });
     return;
   }
+
+  await socket.join(`conv:${conversationId as string}`);
 
   // ─── Batch Update Message Status to 'delivered' ───
   try {

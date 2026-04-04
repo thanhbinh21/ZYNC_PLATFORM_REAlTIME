@@ -44,6 +44,14 @@ export function disconnectSocket(): void {
   }
 }
 
+export function joinConversation(conversationId: string): void {
+  if (!socket?.connected) {
+    return;
+  }
+
+  socket.emit('join_conversation', { conversationId });
+}
+
 // ─── Message Events ───
 
 /**
@@ -81,6 +89,7 @@ export function sendMessage(
 export function listenToMessages(
   callback: (data: {
     messageId: string;
+    conversationId?: string;
     senderId: string;
     content: string;
     type: string;
@@ -264,6 +273,7 @@ export const socketService = {
   getSocket,
   isConnected,
   disconnectSocket,
+  joinConversation,
   sendMessage,
   listenToMessages,
   unlistenToMessages,

@@ -43,6 +43,7 @@ interface ChatPanelProps {
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
+  onInfoClick?: () => void;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -53,8 +54,18 @@ interface ConversationItem {
   preview: string;
   time: string;
   avatar: string;
+  avatarUrl?: string;
+  isGroup?: boolean;
+  memberCount?: number;
+  members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+}
+
+interface GroupFriendOption {
+  id: string;
+  displayName: string;
+  avatarUrl?: string;
 }
 
 // ==================== CONVERSATION LIST ====================
@@ -70,6 +81,15 @@ function ConversationList({
   selectedId,
   onSelectConversation = () => {},
 }: ConversationListProps) {
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredConversations = normalizedQuery
+    ? conversations.filter((item) => {
+      return item.name.toLowerCase().includes(normalizedQuery)
+        || item.preview.toLowerCase().includes(normalizedQuery);
+    })
+    : conversations;
+
   return (
     <aside className="border-r border-[#114538] bg-[linear-gradient(180deg,#06271f_0%,#052019_100%)] p-4 overflow-y-auto">
       <h2 className="text-2xl font-bold text-[#e6fff5] mb-4">Tin nhắn</h2>
@@ -79,19 +99,21 @@ function ConversationList({
         <SearchIcon />
         <input
           type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Tìm kiếm cuộc hội thoại"
           className="w-full bg-transparent text-sm text-[#d8f7ec] outline-none placeholder:text-[#90b8a9]"
         />
       </label>
 
       {/* Conversations */}
-      {conversations.length === 0 ? (
+      {filteredConversations.length === 0 ? (
         <div className="flex items-center justify-center h-40 text-[#99c2b3] text-center">
-          <p>Không có cuộc hội thoại nào. Bắt đầu trò chuyện!</p>
+          <p>{normalizedQuery ? 'Không tìm thấy hội thoại phù hợp.' : 'Không có cuộc hội thoại nào. Bắt đầu trò chuyện!'}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {conversations.map((item) => (
+          {filteredConversations.map((item) => (
             <button
               key={item.id}
               onClick={() => onSelectConversation(item.id)}
@@ -142,6 +164,7 @@ function ChatPanel({
   onLoadMore = async () => {},
   isLoading = false,
   error = null,
+  onInfoClick,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -203,6 +226,7 @@ function ChatPanel({
             type="button"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a] hover:bg-[#16473a] transition-colors"
             title="Info"
+            onClick={onInfoClick}
           >
             <InfoIcon className="w-5 h-5" />
           </button>
@@ -285,18 +309,378 @@ interface HomeDashboardChatPanelProps {
   conversations?: ConversationItem[];
   selectedConversationId?: string;
   onSelectConversation?: (id: string) => void;
+  friends?: GroupFriendOption[];
+  onCreateGroup?: (name: string, memberIds: string[]) => Promise<{ _id: string }>;
+  onAddGroupMembers?: (groupId: string, memberIds: string[]) => Promise<void>;
+  isCreatingGroup?: boolean;
   chatPanelProps?: Partial<ChatPanelProps>;
+}
+
+interface CreateGroupModalProps {
+  open: boolean;
+  friends: GroupFriendOption[];
+  selectedFriendIds: string[];
+  groupName: string;
+  query: string;
+  isCreatingGroup: boolean;
+  onClose: () => void;
+  onChangeGroupName: (value: string) => void;
+  onChangeQuery: (value: string) => void;
+  onToggleFriend: (friendId: string) => void;
+  onSubmit: () => void;
+}
+
+interface AddMembersModalProps {
+  open: boolean;
+  friends: GroupFriendOption[];
+  existingMemberIds: string[];
+  selectedMemberIds: string[];
+  query: string;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onChangeQuery: (value: string) => void;
+  onToggleMember: (friendId: string) => void;
+  onSubmit: () => void;
+}
+
+function CreateGroupModal({
+  open,
+  friends,
+  selectedFriendIds,
+  groupName,
+  query,
+  isCreatingGroup,
+  onClose,
+  onChangeGroupName,
+  onChangeQuery,
+  onToggleFriend,
+  onSubmit,
+}: CreateGroupModalProps) {
+  if (!open) return null;
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredFriends = normalizedQuery
+    ? friends.filter((friend) => friend.displayName.toLowerCase().includes(normalizedQuery))
+    : friends;
+
+  const selectedSet = new Set(selectedFriendIds);
+  const selectedFriends = friends.filter((friend) => selectedSet.has(friend.id));
+  const canSubmit = selectedFriendIds.length >= 2 && selectedFriendIds.length <= 100 && !isCreatingGroup;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+      <div className="w-full max-w-4xl rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#1a5c4a] px-6 py-4">
+          <h3 className="text-2xl font-semibold text-[#dffef2]">Tạo nhóm</h3>
+          <button
+            type="button"
+            className="rounded-full bg-[#0f4335] px-3 py-1.5 text-sm text-[#9ed0be] hover:bg-[#145845]"
+            onClick={onClose}
+          >
+            Đóng
+          </button>
+        </div>
+
+        <div className="px-6 py-4">
+          <input
+            value={groupName}
+            onChange={(e) => onChangeGroupName(e.target.value)}
+            placeholder="Nhập tên nhóm"
+            className="mb-3 h-11 w-full rounded-xl border border-[#1d5b4a] bg-[#0b3b2f] px-4 text-sm text-[#d7f6eb] outline-none placeholder:text-[#7eb5a2] focus:border-[#2de3b3]"
+          />
+
+          <input
+            value={query}
+            onChange={(e) => onChangeQuery(e.target.value)}
+            placeholder="Nhập tên bạn để tìm"
+            className="h-11 w-full rounded-xl border border-[#1d5b4a] bg-[#0b3b2f] px-4 text-sm text-[#d7f6eb] outline-none placeholder:text-[#7eb5a2] focus:border-[#2de3b3]"
+          />
+
+          <p className="mt-3 text-sm text-[#8cc4b0]">
+            Đã chọn {selectedFriendIds.length}/100 bạn. Cần tối thiểu 2 bạn để tạo nhóm.
+          </p>
+        </div>
+
+        <div className="grid gap-4 border-t border-[#1a5c4a] px-6 py-4 lg:grid-cols-[1.4fr_1fr]">
+          <div className="max-h-[380px] overflow-y-auto rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
+            <p className="mb-3 text-sm font-semibold text-[#d8fbed]">Bạn bè của tôi</p>
+            <div className="space-y-2">
+              {filteredFriends.map((friend) => {
+                const isSelected = selectedSet.has(friend.id);
+                return (
+                  <button
+                    key={friend.id}
+                    type="button"
+                    onClick={() => onToggleFriend(friend.id)}
+                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                      isSelected
+                        ? 'border-[#2de3b3] bg-[#0f4335]'
+                        : 'border-[#175443] hover:border-[#22705b] hover:bg-[#0b3a2f]'
+                    }`}
+                  >
+                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                      isSelected ? 'border-[#2de3b3] bg-[#2de3b3] text-[#073428]' : 'border-[#5b9785] text-transparent'
+                    }`}>
+                      ✓
+                    </span>
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#235646] text-sm font-semibold text-[#d8fbed]">
+                      {friend.displayName.substring(0, 2).toUpperCase()}
+                    </span>
+                    <span className="truncate text-sm font-medium text-[#d6f8ec]">{friend.displayName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="max-h-[380px] overflow-y-auto rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
+            <p className="mb-3 text-sm font-semibold text-[#d8fbed]">Đã chọn</p>
+            {selectedFriends.length === 0 ? (
+              <p className="text-sm text-[#7ab09e]">Chưa có thành viên nào được chọn.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {selectedFriends.map((friend) => (
+                  <button
+                    key={friend.id}
+                    type="button"
+                    onClick={() => onToggleFriend(friend.id)}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf]"
+                  >
+                    <span>{friend.displayName}</span>
+                    <span>x</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-[#1a5c4a] px-6 py-4">
+          <button
+            type="button"
+            className="rounded-lg bg-[#0f4335] px-6 py-2 font-semibold text-[#a6e3cf] hover:bg-[#145845]"
+            onClick={onClose}
+            disabled={isCreatingGroup}
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            className="rounded-lg bg-[#1e6f59] px-6 py-2 font-semibold text-[#e6fff5] transition enabled:bg-[#2ab98f] enabled:hover:bg-[#22a17d] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onSubmit}
+            disabled={!canSubmit}
+          >
+            {isCreatingGroup ? 'Đang tạo...' : 'Tạo nhóm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddMembersModal({
+  open,
+  friends,
+  existingMemberIds,
+  selectedMemberIds,
+  query,
+  isSubmitting,
+  onClose,
+  onChangeQuery,
+  onToggleMember,
+  onSubmit,
+}: AddMembersModalProps) {
+  if (!open) return null;
+
+  const existingSet = new Set(existingMemberIds);
+  const selectedSet = new Set(selectedMemberIds);
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const filteredFriends = normalizedQuery
+    ? friends.filter((friend) => friend.displayName.toLowerCase().includes(normalizedQuery))
+    : friends;
+
+  const canSubmit = selectedMemberIds.length > 0 && !isSubmitting;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+      <div className="w-full max-w-2xl rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#1a5c4a] px-6 py-4">
+          <h3 className="text-2xl font-semibold text-[#dffef2]">Thêm thành viên</h3>
+          <button
+            type="button"
+            className="rounded-full bg-[#0f4335] px-3 py-1.5 text-sm text-[#9ed0be] hover:bg-[#145845]"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Đóng
+          </button>
+        </div>
+
+        <div className="px-6 py-4">
+          <label className="flex h-11 items-center gap-2 rounded-xl border border-[#1d5b4a] bg-[#0b3b2f] px-3 text-[#7eb5a2]">
+            <SearchIcon />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => onChangeQuery(e.target.value)}
+              placeholder="Nhập tên, số điện thoại"
+              className="w-full bg-transparent text-sm text-[#d7f6eb] outline-none placeholder:text-[#7eb5a2]"
+            />
+          </label>
+        </div>
+
+        <div className="max-h-[420px] overflow-y-auto border-t border-[#1a5c4a] px-6 py-4">
+          <p className="mb-3 text-sm font-semibold text-[#d8fbed]">Trò chuyện gần đây</p>
+          <div className="space-y-2">
+            {filteredFriends.map((friend) => {
+              const isExisting = existingSet.has(friend.id);
+              const isSelected = selectedSet.has(friend.id);
+
+              return (
+                <button
+                  key={friend.id}
+                  type="button"
+                  disabled={isExisting}
+                  onClick={() => onToggleMember(friend.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                    isExisting
+                      ? 'cursor-not-allowed border-[#2c6858] bg-[#0d3a2f] opacity-70'
+                      : isSelected
+                        ? 'border-[#2de3b3] bg-[#0f4335]'
+                        : 'border-[#175443] hover:border-[#22705b] hover:bg-[#0b3a2f]'
+                  }`}
+                >
+                  <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                    isExisting || isSelected
+                      ? 'border-[#2de3b3] bg-[#2de3b3] text-[#073428]'
+                      : 'border-[#5b9785] text-transparent'
+                  }`}>
+                    ✓
+                  </span>
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#235646] text-sm font-semibold text-[#d8fbed]">
+                    {friend.displayName.substring(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[#d6f8ec]">{friend.displayName}</p>
+                    {isExisting && <p className="text-xs text-[#8cc4b0]">Đã tham gia</p>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-[#1a5c4a] px-6 py-4">
+          <button
+            type="button"
+            className="rounded-lg bg-[#0f4335] px-6 py-2 font-semibold text-[#a6e3cf] hover:bg-[#145845]"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            className="rounded-lg bg-[#1e6f59] px-6 py-2 font-semibold text-[#e6fff5] transition enabled:bg-[#2ab98f] enabled:hover:bg-[#22a17d] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onSubmit}
+            disabled={!canSubmit}
+          >
+            {isSubmitting ? 'Đang thêm...' : 'Xác nhận'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function HomeDashboardChatPanel({
   conversations,
   selectedConversationId = 'c1',
   onSelectConversation = () => {},
+  friends = [],
+  onCreateGroup,
+  onAddGroupMembers,
+  isCreatingGroup = false,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupQuery, setGroupQuery] = useState('');
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [selectedAddMemberIds, setSelectedAddMemberIds] = useState<string[]>([]);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+
+  const selectedConversation = (conversations ?? []).find((item) => item.id === selectedConversationId);
+
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriendIds((prev) => {
+      if (prev.includes(friendId)) {
+        return prev.filter((id) => id !== friendId);
+      }
+
+      if (prev.length >= 100) {
+        return prev;
+      }
+
+      return [...prev, friendId];
+    });
+  };
+
+  const openCreateGroupModal = () => {
+    setGroupName('');
+    setGroupQuery('');
+    setSelectedFriendIds([]);
+    setIsCreateGroupOpen(true);
+  };
+
+  const handleCreateGroup = async () => {
+    if (!onCreateGroup) {
+      return;
+    }
+
+    const trimmedName = groupName.trim();
+    const finalName = trimmedName.length > 0 ? trimmedName : 'Nhóm mới';
+    await onCreateGroup(finalName, selectedFriendIds);
+    setIsCreateGroupOpen(false);
+    setIsInfoOpen(false);
+  };
+
+  const openAddMembersModal = () => {
+    setMemberSearchQuery('');
+    setSelectedAddMemberIds([]);
+    setIsAddMembersOpen(true);
+  };
+
+  const toggleAddMemberSelection = (friendId: string) => {
+    setSelectedAddMemberIds((prev) => {
+      if (prev.includes(friendId)) {
+        return prev.filter((id) => id !== friendId);
+      }
+      return [...prev, friendId];
+    });
+  };
+
+  const handleConfirmAddMembers = async () => {
+    if (!onAddGroupMembers || !selectedConversationId || selectedAddMemberIds.length === 0) {
+      return;
+    }
+
+    await onAddGroupMembers(selectedConversationId, selectedAddMemberIds);
+    setIsAddMembersOpen(false);
+  };
+
+  const groupMemberPreview = selectedConversation?.members ?? [];
+  const existingMemberIds = groupMemberPreview.map((member) => member._id);
+  const isGroupConversation = Boolean(selectedConversation?.isGroup);
+  const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
+
   return (
-    <section className="h-full overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
-      <div className="grid h-full grid-cols-1 gap-0 xl:grid-cols-[300px_1fr]">
+    <>
+      <section className="h-full overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
+        <div className={`grid h-full grid-cols-1 gap-0 ${isInfoOpen ? 'xl:grid-cols-[300px_1fr_320px]' : 'xl:grid-cols-[300px_1fr]'}`}>
         {/* Left: Conversation List */}
         <ConversationList
           conversations={conversations}
@@ -305,8 +689,238 @@ export function HomeDashboardChatPanel({
         />
 
         {/* Right: Chat Panel */}
-        <ChatPanel {...chatPanelProps} />
-      </div>
-    </section>
+          <ChatPanel
+            {...chatPanelProps}
+            onInfoClick={() => setIsInfoOpen((prev) => !prev)}
+          />
+
+          {isInfoOpen && (
+            <aside className="hidden border-l border-[#114538] bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
+              <div className="border-b border-[#114538] px-5 py-4">
+                <h3 className="text-xl font-semibold text-[#e2fff4]">{infoTitle}</h3>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-5 py-5">
+                <div className="mb-6 flex flex-col items-center text-center">
+                  <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#245948] text-lg font-bold text-[#d6fbee]">
+                    {selectedConversation?.avatar ?? 'N'}
+                  </div>
+                  <p className="text-xl font-semibold text-[#e2fff4]">{selectedConversation?.name ?? 'Hội thoại'}</p>
+                  <p className="text-sm text-[#8abfab]">
+                    {selectedConversation?.isGroup
+                      ? `${selectedConversation.memberCount ?? 0} thành viên`
+                      : 'Hội thoại cá nhân'}
+                  </p>
+                </div>
+
+                <div className="mb-5 grid grid-cols-3 gap-2">
+                  <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Tắt thông báo</button>
+                  <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
+                  {isGroupConversation ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={openAddMembersModal}
+                        className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
+                      >
+                        Thêm thành viên
+                      </button>
+                      <button type="button" className="col-span-3 rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Quản lý nhóm</button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openCreateGroupModal}
+                      className="rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5] hover:bg-[#1a664f]"
+                    >
+                      Tạo nhóm trò chuyện
+                    </button>
+                  )}
+                </div>
+
+                {!isGroupConversation && (
+                  <>
+                    <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Nhắc hẹn</p>
+                      <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
+                      <p className="text-sm text-[#d6f8ec]">22 nhóm chung</p>
+                    </div>
+                    <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {Array.from({ length: 8 }).map((_, idx) => (
+                          <div key={`direct-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
+                        ))}
+                      </div>
+                      <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                    </div>
+                    <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
+                      <p className="text-sm text-[#d6f8ec]">File2_Architecture_OnThi.docx</p>
+                      <p className="text-sm text-[#d6f8ec]">File1_Design_Patterns_OnThi.docx</p>
+                      <p className="text-sm text-[#d6f8ec]">project-thi.zip</p>
+                      <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                    </div>
+                  </>
+                )}
+
+                {isGroupConversation && (
+                  <>
+                    <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
+                      <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
+                    </div>
+                    <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
+                      <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
+                      <p className="text-sm text-[#d6f8ec]">Ghi chú, ghim, bình chọn</p>
+                    </div>
+                    <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {Array.from({ length: 8 }).map((_, idx) => (
+                          <div key={`group-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
+                        ))}
+                      </div>
+                      <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </aside>
+          )}
+        </div>
+      </section>
+
+      {isInfoOpen && (
+        <div className="fixed inset-0 z-40 bg-black/45 xl:hidden">
+          <aside className="ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l border-[#114538] bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[#e2fff4]">{infoTitle}</h3>
+              <button
+                type="button"
+                className="rounded-full bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf]"
+                onClick={() => setIsInfoOpen(false)}
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="mb-5 flex flex-col items-center text-center">
+              <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#245948] text-lg font-bold text-[#d6fbee]">
+                {selectedConversation?.avatar ?? 'N'}
+              </div>
+              <p className="text-lg font-semibold text-[#e2fff4]">{selectedConversation?.name ?? 'Hội thoại'}</p>
+              <p className="text-sm text-[#8abfab]">
+                {selectedConversation?.isGroup
+                  ? `${selectedConversation.memberCount ?? 0} thành viên`
+                  : 'Hội thoại cá nhân'}
+              </p>
+            </div>
+
+            <div className="mb-5 grid grid-cols-3 gap-2">
+              <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Tắt thông báo</button>
+              <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
+              {isGroupConversation ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={openAddMembersModal}
+                    className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
+                  >
+                    Thêm thành viên
+                  </button>
+                  <button type="button" className="col-span-3 rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Quản lý nhóm</button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={openCreateGroupModal}
+                  className="rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5]"
+                >
+                  Tạo nhóm trò chuyện
+                </button>
+              )}
+            </div>
+
+            {!isGroupConversation && (
+              <>
+                <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Nhắc hẹn</p>
+                  <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
+                  <p className="text-sm text-[#d6f8ec]">22 nhóm chung</p>
+                </div>
+                <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Array.from({ length: 8 }).map((_, idx) => (
+                      <div key={`mobile-direct-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
+                    ))}
+                  </div>
+                  <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                </div>
+                <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
+                  <p className="text-sm text-[#d6f8ec]">File2_Architecture_OnThi.docx</p>
+                  <p className="text-sm text-[#d6f8ec]">File1_Design_Patterns_OnThi.docx</p>
+                  <p className="text-sm text-[#d6f8ec]">project-thi.zip</p>
+                  <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                </div>
+              </>
+            )}
+
+            {isGroupConversation && (
+              <>
+                <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
+                  <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
+                </div>
+                <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
+                  <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
+                  <p className="text-sm text-[#d6f8ec]">Ghi chú, ghim, bình chọn</p>
+                </div>
+                <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Array.from({ length: 8 }).map((_, idx) => (
+                      <div key={`mobile-group-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
+                    ))}
+                  </div>
+                  <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+      )}
+
+      <CreateGroupModal
+        open={isCreateGroupOpen}
+        friends={friends}
+        selectedFriendIds={selectedFriendIds}
+        groupName={groupName}
+        query={groupQuery}
+        isCreatingGroup={isCreatingGroup}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onChangeGroupName={setGroupName}
+        onChangeQuery={setGroupQuery}
+        onToggleFriend={toggleFriendSelection}
+        onSubmit={handleCreateGroup}
+      />
+
+      <AddMembersModal
+        open={isAddMembersOpen}
+        friends={friends}
+        existingMemberIds={existingMemberIds}
+        selectedMemberIds={selectedAddMemberIds}
+        query={memberSearchQuery}
+        isSubmitting={isCreatingGroup}
+        onClose={() => setIsAddMembersOpen(false)}
+        onChangeQuery={setMemberSearchQuery}
+        onToggleMember={toggleAddMemberSelection}
+        onSubmit={handleConfirmAddMembers}
+      />
+    </>
   );
 }
