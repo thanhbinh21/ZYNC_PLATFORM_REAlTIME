@@ -26,7 +26,7 @@ export const sendMessageHandler = (async (
     const message = await MessagesService.createMessage(
       conversationId,
       userId,
-      content as string,
+      content ?? '',
       type,
       idempotencyKey,
       mediaUrl ?? undefined,

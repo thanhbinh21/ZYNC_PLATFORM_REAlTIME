@@ -70,7 +70,7 @@ export function MessageBubble({
       {/* Message Content */}
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-xs lg:max-w-md`}>
         {/* Media */}
-        {mediaUrl && (type === 'image' || type === 'video') && (
+        {mediaUrl && (type === 'image' || type === 'video' || type === 'file') && (
           <div className="mb-1 rounded-lg overflow-hidden">
             {type === 'image' && (
               <Image
@@ -87,6 +87,16 @@ export function MessageBubble({
                 controls
                 className="max-w-xs max-h-80"
               />
+            )}
+            {type === 'file' && (
+              <a
+                href={mediaUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336]"
+              >
+                Mở tệp đính kèm
+              </a>
             )}
           </div>
         )}

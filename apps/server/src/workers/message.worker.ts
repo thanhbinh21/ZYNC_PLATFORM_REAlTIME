@@ -14,7 +14,7 @@ interface RawMessage {
   conversationId: string;
   senderId: string;
   content: string;
-  type: 'text' | 'image' | 'video' | 'emoji';
+  type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker';
   mediaUrl?: string;
   idempotencyKey: string;
   createdAt: string;
@@ -88,7 +88,7 @@ export async function startMessageWorker(): Promise<void> {
               msg.conversationId,
               msg.senderId,
               msg.content,
-              msg.type as 'text' | 'image' | 'video',
+              msg.type as 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
               msg.idempotencyKey,
               msg.mediaUrl,
             );

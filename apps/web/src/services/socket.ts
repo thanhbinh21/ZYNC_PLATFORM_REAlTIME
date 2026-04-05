@@ -65,7 +65,7 @@ export function joinConversation(conversationId: string): void {
 export function sendMessage(
   conversationId: string,
   content: string,
-  type: 'text' | 'image' | 'video' | 'emoji',
+  type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
   idempotencyKey: string,
   mediaUrl?: string,
 ): void {

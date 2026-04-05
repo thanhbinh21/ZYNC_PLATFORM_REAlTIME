@@ -71,13 +71,13 @@ export class UploadController {
       }
 
       // Validate type
-      if (!type || !['image', 'video'].includes(type)) {
+      if (!type || !['image', 'video', 'document'].includes(type)) {
         res.status(400).json({ error: 'Missing or invalid type' });
         return;
       }
 
       // Task 8.1: Verify upload
-      const uploadInfo = await UploadService.verifyUploadResult(publicId, userId, type as 'image' | 'video');
+      const uploadInfo = await UploadService.verifyUploadResult(publicId, userId, type as 'image' | 'video' | 'document');
 
       if (!uploadInfo) {
         res.status(400).json({ error: 'Upload verification failed' });

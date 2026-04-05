@@ -41,7 +41,7 @@ interface UseChatReturn {
   messages: Message[];
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
-  sendMessage: (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => Promise<void>;
+  sendMessage: (content: string, type: 'text' | 'image' | 'video' | 'file', mediaUrl?: string) => Promise<void>;
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
@@ -89,7 +89,7 @@ export function useChat({
         conversationId,
         senderId: data.senderId,
         content: data.content,
-        type: data.type as any,
+        type: data.type as Message['type'],
         mediaUrl: data.mediaUrl,
         idempotencyKey: '', // Will be set on send
         status: 'delivered',
@@ -214,7 +214,7 @@ export function useChat({
 
   // Send message
   const handleSendMessage = useCallback(
-    async (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => {
+    async (content: string, type: 'text' | 'image' | 'video' | 'file', mediaUrl?: string) => {
       if (!isConnected()) {
         setError('Not connected to messaging service');
         return;
@@ -233,7 +233,7 @@ export function useChat({
           conversationId,
           senderId: userId,
           content,
-          type: type as any,
+          type,
           mediaUrl,
           idempotencyKey,
           status: 'sent',

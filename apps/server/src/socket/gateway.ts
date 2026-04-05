@@ -136,23 +136,69 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     });
 
     // Sự kiện bắt đầu gõ phím
-    socket.on('typing_start', (payload: { conversationId: string }) => {
-      void setTypingIndicator(payload.conversationId, userId);
-      socket.to(`conv:${payload.conversationId}`).emit('typing_indicator', {
-        userId,
-        conversationId: payload.conversationId,
-        isTyping: true,
-      });
+    socket.on('typing_start', async (payload: unknown) => {
+      try {
+        if (typeof payload !== 'object' || payload === null) {
+          socket.emit('error', { message: 'Invalid typing_start payload' });
+          return;
+        }
+
+        const { conversationId } = payload as { conversationId?: string };
+        if (!conversationId) {
+          socket.emit('error', { message: 'Missing conversationId' });
+          return;
+        }
+
+        const membership = await ConversationMemberModel.exists({ conversationId, userId });
+        if (!membership) {
+          socket.emit('error', { message: 'Not allowed to type in this conversation' });
+          return;
+        }
+
+        await socket.join(`conv:${conversationId}`);
+        await setTypingIndicator(conversationId, userId);
+        socket.to(`conv:${conversationId}`).emit('typing_indicator', {
+          userId,
+          conversationId,
+          isTyping: true,
+        });
+      } catch (err) {
+        logger.error('typing_start error', err);
+        socket.emit('error', { message: 'Failed to update typing status' });
+      }
     });
 
     // Sự kiện dừng gõ phím
-    socket.on('typing_stop', (payload: { conversationId: string }) => {
-      void removeTypingIndicator(payload.conversationId, userId);
-      socket.to(`conv:${payload.conversationId}`).emit('typing_indicator', {
-        userId,
-        conversationId: payload.conversationId,
-        isTyping: false,
-      });
+    socket.on('typing_stop', async (payload: unknown) => {
+      try {
+        if (typeof payload !== 'object' || payload === null) {
+          socket.emit('error', { message: 'Invalid typing_stop payload' });
+          return;
+        }
+
+        const { conversationId } = payload as { conversationId?: string };
+        if (!conversationId) {
+          socket.emit('error', { message: 'Missing conversationId' });
+          return;
+        }
+
+        const membership = await ConversationMemberModel.exists({ conversationId, userId });
+        if (!membership) {
+          socket.emit('error', { message: 'Not allowed to type in this conversation' });
+          return;
+        }
+
+        await socket.join(`conv:${conversationId}`);
+        await removeTypingIndicator(conversationId, userId);
+        socket.to(`conv:${conversationId}`).emit('typing_indicator', {
+          userId,
+          conversationId,
+          isTyping: false,
+        });
+      } catch (err) {
+        logger.error('typing_stop error', err);
+        socket.emit('error', { message: 'Failed to update typing status' });
+      }
     });
 
     // Sự kiện đánh dấu đã đọc tin nhắn
@@ -232,6 +278,23 @@ async function handleSendMessage(
     return;
   }
 
+  const allowedMessageTypes = new Set(['text', 'image', 'video', 'audio', 'file', 'sticker']);
+  const normalizedType = typeof type === 'string' ? type : 'text';
+  if (!allowedMessageTypes.has(normalizedType)) {
+    socket.emit('error', { message: 'Invalid message type' });
+    return;
+  }
+
+  const membership = await ConversationMemberModel.exists({
+    conversationId: conversationId as string,
+    userId,
+  });
+
+  if (!membership) {
+    socket.emit('error', { message: 'Not allowed to send message in this conversation' });
+    return;
+  }
+
   // Ensure sender has joined this conversation room for self-receive status events.
   await socket.join(`conv:${conversationId as string}`);
 
@@ -240,8 +303,8 @@ async function handleSendMessage(
     const message = await MessagesService.createMessage(
       conversationId as string,
       userId,
-      content as string,
-      type as ("text" | "image" | "video"),
+      typeof content === 'string' ? content : '',
+      normalizedType as ('text' | 'image' | 'video' | 'audio' | 'file' | 'sticker'),
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
     );
@@ -255,8 +318,8 @@ async function handleSendMessage(
       messageId: message._id,
       conversationId,
       senderId: userId,
-      content: content as string,
-      type: type ?? 'text',
+      content: typeof content === 'string' ? content : '',
+      type: normalizedType,
       mediaUrl,
       createdAt: message.createdAt,
     });
@@ -308,6 +371,16 @@ async function handleMessageRead(
     return;
   }
 
+  const membership = await ConversationMemberModel.exists({
+    conversationId: conversationId as string,
+    userId,
+  });
+
+  if (!membership) {
+    socket.emit('error', { message: 'Not allowed to update read status in this conversation' });
+    return;
+  }
+
   await socket.join(`conv:${conversationId as string}`);
 
   // ─── Batch Update Message Status ───
@@ -354,6 +427,16 @@ async function handleMessageDelivered(
 
   if (messageIds.length === 0) {
     socket.emit('error', { message: 'messageIds cannot be empty' });
+    return;
+  }
+
+  const membership = await ConversationMemberModel.exists({
+    conversationId: conversationId as string,
+    userId,
+  });
+
+  if (!membership) {
+    socket.emit('error', { message: 'Not allowed to update delivery status in this conversation' });
     return;
   }
 

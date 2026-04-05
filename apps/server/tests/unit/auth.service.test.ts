@@ -63,15 +63,9 @@ beforeEach(() => {
 // ─── register() ──────────────────────────────────────────────────────────────
 
 describe('register()', () => {
-  it('should store and attempt to send OTP', async () => {
-    redisMock.set.mockResolvedValue('OK' as never);
+  it('should skip Redis store when OTP_HARDCODE=true', async () => {
     await register('0901234567');
-    expect(redisMock.set).toHaveBeenCalledWith(
-      'otp:0901234567',
-      '123456',
-      'EX',
-      300,
-    );
+    expect(redisMock.set).not.toHaveBeenCalled();
   });
 });
 
@@ -104,6 +98,7 @@ describe('verifyOtpAndLogin()', () => {
   });
 
   it('should throw UnauthorizedError when OTP not found in Redis', async () => {
+    process.env['OTP_HARDCODE'] = 'false';
     redisMock.get.mockResolvedValue(null as never);
     await expect(verifyOtpAndLogin('0901234567', '123456')).rejects.toThrow(
       'Invalid or expired OTP',

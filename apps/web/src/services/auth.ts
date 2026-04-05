@@ -56,14 +56,14 @@ export async function verifyPasswordOtp(payload: {
 }
 
 export async function requestForgotPasswordOtp(payload: {
-  email: string;
+  identifier: string;
 }): Promise<RegisterResponse> {
   const { data } = await apiClient.post<RegisterResponse>('/api/auth/forgot-password/request-otp', payload);
   return data;
 }
 
 export async function resetForgotPassword(payload: {
-  email: string;
+  identifier: string;
   otp: string;
   newPassword: string;
 }): Promise<RegisterResponse> {

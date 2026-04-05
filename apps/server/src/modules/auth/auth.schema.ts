@@ -62,22 +62,28 @@ export const GoogleLoginSchema = z.object({
 export type GoogleLoginDto = z.infer<typeof GoogleLoginSchema>;
 
 export const ForgotPasswordRequestOtpSchema = z.object({
-  email: emailIdentifierSchema,
+  identifier: identifierSchema.optional(),
+  email: emailIdentifierSchema.optional(),
+}).refine((payload) => Boolean(payload.identifier ?? payload.email), {
+  message: 'Identifier is required',
 });
 export type ForgotPasswordRequestOtpDto = z.infer<typeof ForgotPasswordRequestOtpSchema>;
 
 export const ForgotPasswordResetSchema = z.object({
-  email: emailIdentifierSchema,
+  identifier: identifierSchema.optional(),
+  email: emailIdentifierSchema.optional(),
   otp: z.string().length(6, 'OTP must be exactly 6 digits').regex(/^\d{6}$/, 'OTP must be numeric'),
   newPassword: passwordSchema,
+}).refine((payload) => Boolean(payload.identifier ?? payload.email), {
+  message: 'Identifier is required',
 });
 export type ForgotPasswordResetDto = z.infer<typeof ForgotPasswordResetSchema>;
 
 export const UpdateProfileSchema = z.object({
-  displayName: z.string().min(1).max(50).optional(),
+  displayName: z.string().trim().min(1).max(50).optional(),
   avatarUrl: z.string().url().optional(),
-  bio: z.string().max(200).optional(),
-});
+  bio: z.string().trim().max(200).optional(),
+}).strict();
 export type UpdateProfileDto = z.infer<typeof UpdateProfileSchema>;
 
 export const UpsertDeviceTokenSchema = z.object({

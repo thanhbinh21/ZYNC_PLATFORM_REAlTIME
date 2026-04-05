@@ -248,29 +248,33 @@ export async function verifyLoginWithPasswordAndOtp(
 
 // ─── Forgot Password ────────────────────────────────────────────────────────
 
-export async function requestForgotPasswordOtp(email: string): Promise<void> {
-  const normalizedEmail = normalizeEmail(email);
-  const user = await findUserIncludingPassword({ email: normalizedEmail });
+export async function requestForgotPasswordOtp(identifier: string): Promise<void> {
+  const { normalized, isPhone } = parseIdentifier(identifier);
+  const user = await findUserIncludingPassword(
+    isPhone ? { phoneNumber: normalized } : { email: normalizeEmail(normalized) },
+  );
 
   if (!user) {
-    throw new UnauthorizedError('Email không tồn tại trong hệ thống');
+    throw new UnauthorizedError('Tài khoản không tồn tại trong hệ thống');
   }
 
   const otp = generateOtp();
-  await storeOtp(normalizedEmail, otp);
-  await sendOtp(normalizedEmail, otp);
-  logger.info(`Forgot password OTP issued for ${normalizedEmail}`);
+  await storeOtp(normalized, otp);
+  await sendOtp(normalized, otp);
+  logger.info(`Forgot password OTP issued for ${normalized}`);
 }
 
-export async function resetForgotPassword(email: string, otp: string, newPassword: string): Promise<void> {
-  const normalizedEmail = normalizeEmail(email);
-  const user = await findUserIncludingPassword({ email: normalizedEmail });
+export async function resetForgotPassword(identifier: string, otp: string, newPassword: string): Promise<void> {
+  const { normalized, isPhone } = parseIdentifier(identifier);
+  const user = await findUserIncludingPassword(
+    isPhone ? { phoneNumber: normalized } : { email: normalizeEmail(normalized) },
+  );
 
   if (!user) {
-    throw new UnauthorizedError('Email không tồn tại trong hệ thống');
+    throw new UnauthorizedError('Tài khoản không tồn tại trong hệ thống');
   }
 
-  const validOtp = await verifyOtpRedis(normalizedEmail, otp);
+  const validOtp = await verifyOtpRedis(normalized, otp);
   if (!validOtp) {
     throw new UnauthorizedError('OTP không hợp lệ hoặc đã hết hạn');
   }
