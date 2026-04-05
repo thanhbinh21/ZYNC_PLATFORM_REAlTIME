@@ -3,7 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { getMessages } from '@/services/chat';
 import { fetchFriends, type FriendUser } from '@/services/friends';
-import { addGroupMembers, createGroup } from '@/services/groups';
+import {
+  addGroupMembers,
+  createGroup,
+  disbandGroup,
+  removeGroupMember,
+  updateGroupMemberRole,
+} from '@/services/groups';
 import socketService from '@/services/socket';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
@@ -14,6 +20,7 @@ interface Conversation {
   name?: string;
   avatarUrl?: string;
   type: 'direct' | 'group';
+  createdBy?: string;
   adminIds?: string[];
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   lastMessage?: { senderId: string; content: string; sentAt: string };
@@ -28,6 +35,8 @@ interface ConversationListItem {
   avatar: string;
   avatarUrl?: string;
   isGroup?: boolean;
+  createdBy?: string;
+  adminIds?: string[];
   memberCount?: number;
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
@@ -320,6 +329,8 @@ export function useHomeDashboard() {
         ? conv.avatarUrl
         : conv.users.find(u => u._id !== userId)?.avatarUrl,
       isGroup: conv.type === 'group',
+      createdBy: conv.createdBy,
+      adminIds: conv.adminIds,
       memberCount: conv.users.length,
       members: conv.users,
       online: true,
@@ -338,6 +349,7 @@ export function useHomeDashboard() {
           type: 'group',
           name: createdGroup.name,
           avatarUrl: createdGroup.avatarUrl,
+          createdBy: createdGroup.createdBy,
           adminIds: createdGroup.adminIds,
           users: createdGroup.users,
           unreadCounts: {},
@@ -374,6 +386,7 @@ export function useHomeDashboard() {
             ...conversation,
             name: updatedGroup.name,
             avatarUrl: updatedGroup.avatarUrl,
+            createdBy: updatedGroup.createdBy,
             adminIds: updatedGroup.adminIds,
             users: updatedGroup.users,
           };
@@ -383,6 +396,81 @@ export function useHomeDashboard() {
       }
     },
     [],
+  );
+
+  const updateGroupMemberRoleConversation = useCallback(
+    async (groupId: string, targetUserId: string, role: 'admin' | 'member') => {
+      setGroupActionLoading(true);
+      try {
+        const updatedGroup = await updateGroupMemberRole(groupId, targetUserId, { role });
+
+        setConversations((prev) => prev.map((conversation) => {
+          if (conversation._id !== groupId) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            name: updatedGroup.name,
+            avatarUrl: updatedGroup.avatarUrl,
+            createdBy: updatedGroup.createdBy,
+            adminIds: updatedGroup.adminIds,
+            users: updatedGroup.users,
+          };
+        }));
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [],
+  );
+
+  const removeGroupMemberConversation = useCallback(
+    async (groupId: string, targetUserId: string) => {
+      setGroupActionLoading(true);
+      try {
+        const updatedGroup = await removeGroupMember(groupId, targetUserId);
+
+        setConversations((prev) => prev.map((conversation) => {
+          if (conversation._id !== groupId) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            name: updatedGroup.name,
+            avatarUrl: updatedGroup.avatarUrl,
+            createdBy: updatedGroup.createdBy,
+            adminIds: updatedGroup.adminIds,
+            users: updatedGroup.users,
+          };
+        }));
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [],
+  );
+
+  const disbandGroupConversation = useCallback(
+    async (groupId: string) => {
+      setGroupActionLoading(true);
+      try {
+        await disbandGroup(groupId);
+
+        setConversations((prev) => {
+          const filtered = prev.filter((conversation) => conversation._id !== groupId);
+          if (selectedConversationId === groupId) {
+            setSelectedConversationId(filtered[0]?._id ?? '');
+            setMessages([]);
+          }
+          return filtered;
+        });
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [selectedConversationId],
   );
 
   const getSelectedConversationInfo = useCallback(() => {
@@ -479,6 +567,9 @@ export function useHomeDashboard() {
     groupActionLoading,
     onCreateGroup: createGroupConversation,
     onAddGroupMembers: addMembersToGroupConversation,
+    onUpdateGroupMemberRole: updateGroupMemberRoleConversation,
+    onRemoveGroupMember: removeGroupMemberConversation,
+    onDisbandGroup: disbandGroupConversation,
     onSendMessage: handleSendMessage,
     onStartTyping: handleStartTyping,
     onStopTyping: handleStopTyping,

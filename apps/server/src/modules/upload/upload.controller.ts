@@ -3,6 +3,14 @@ import type { AuthRequest } from '../../shared/middleware/auth.middleware';
 import { UploadService } from './upload.service';
 import { logger } from '../../shared/logger';
 
+<<<<<<< HEAD
+export interface AuthRequest extends Request {
+  userId?: string;
+  user?: { id: string };
+}
+
+=======
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
 /**
  * Task 8.1: Upload Controller
  * Handle upload-related HTTP requests
@@ -17,7 +25,11 @@ export class UploadController {
    */
   static async generateSignatureHandler(req: Request, res: Response): Promise<void> {
     try {
+<<<<<<< HEAD
+      const userId = req.userId ?? req.user?.id;
+=======
       const { userId } = req as AuthRequest;
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -56,7 +68,11 @@ export class UploadController {
    */
   static async verifyUploadHandler(req: Request, res: Response): Promise<void> {
     try {
+<<<<<<< HEAD
+      const userId = req.userId ?? req.user?.id;
+=======
       const { userId } = req as AuthRequest
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -103,7 +119,11 @@ export class UploadController {
    */
   static async deleteUploadHandler(req: Request, res: Response): Promise<void> {
     try {
+<<<<<<< HEAD
+      const userId = req.userId ?? req.user?.id;
+=======
       const { userId } = req as AuthRequest;
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;

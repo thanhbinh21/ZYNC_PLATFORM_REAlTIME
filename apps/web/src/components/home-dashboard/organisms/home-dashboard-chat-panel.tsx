@@ -56,6 +56,8 @@ interface ConversationItem {
   avatar: string;
   avatarUrl?: string;
   isGroup?: boolean;
+  createdBy?: string;
+  adminIds?: string[];
   memberCount?: number;
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
@@ -312,6 +314,9 @@ interface HomeDashboardChatPanelProps {
   friends?: GroupFriendOption[];
   onCreateGroup?: (name: string, memberIds: string[]) => Promise<{ _id: string }>;
   onAddGroupMembers?: (groupId: string, memberIds: string[]) => Promise<void>;
+  onUpdateGroupMemberRole?: (groupId: string, targetUserId: string, role: 'admin' | 'member') => Promise<void>;
+  onRemoveGroupMember?: (groupId: string, targetUserId: string) => Promise<void>;
+  onDisbandGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
   chatPanelProps?: Partial<ChatPanelProps>;
 }
@@ -341,6 +346,19 @@ interface AddMembersModalProps {
   onChangeQuery: (value: string) => void;
   onToggleMember: (friendId: string) => void;
   onSubmit: () => void;
+}
+
+interface ManageGroupModalProps {
+  open: boolean;
+  members: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
+  adminIds: string[];
+  creatorId?: string;
+  isSubmitting: boolean;
+  groupName: string;
+  onClose: () => void;
+  onAssignRole: (memberId: string, role: 'admin' | 'member') => Promise<void>;
+  onRemoveMember: (memberId: string) => Promise<void>;
+  onDisbandGroup: () => Promise<void>;
 }
 
 function CreateGroupModal({
@@ -594,6 +612,146 @@ function AddMembersModal({
   );
 }
 
+function GroupMembersPreview({
+  members,
+  adminIds,
+  creatorId,
+}: {
+  members: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
+  adminIds: string[];
+  creatorId?: string;
+}) {
+  if (members.length === 0) {
+    return <p className="text-sm text-[#7ab09e]">Nhóm chưa có thành viên.</p>;
+  }
+
+  const adminSet = new Set(adminIds);
+
+  return (
+    <div className="space-y-2">
+      {members.map((member) => {
+        const isCreator = creatorId === member._id;
+        const isAdmin = adminSet.has(member._id);
+
+        return (
+          <div key={member._id} className="flex items-center justify-between gap-3 rounded-xl bg-[#0d3a2f] px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-[#d6f8ec]">{member.displayName}</p>
+              <p className="text-xs text-[#8cc4b0]">
+                {isCreator ? 'Người tạo nhóm' : isAdmin ? 'Quản trị viên' : 'Thành viên'}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ManageGroupModal({
+  open,
+  members,
+  adminIds,
+  creatorId,
+  isSubmitting,
+  groupName,
+  onClose,
+  onAssignRole,
+  onRemoveMember,
+  onDisbandGroup,
+}: ManageGroupModalProps) {
+  if (!open) return null;
+
+  const adminSet = new Set(adminIds);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+      <div className="w-full max-w-3xl rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#1a5c4a] px-6 py-4">
+          <h3 className="text-2xl font-semibold text-[#dffef2]">Quản lý nhóm</h3>
+          <button
+            type="button"
+            className="rounded-full bg-[#0f4335] px-3 py-1.5 text-sm text-[#9ed0be] hover:bg-[#145845]"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Đóng
+          </button>
+        </div>
+
+        <div className="max-h-[430px] overflow-y-auto px-6 py-4">
+          <p className="mb-3 text-sm font-semibold text-[#d8fbed]">Thành viên nhóm</p>
+          <div className="space-y-2">
+            {members.map((member) => {
+              const isCreator = creatorId === member._id;
+              const isAdmin = adminSet.has(member._id);
+
+              return (
+                <div
+                  key={member._id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#175443] bg-[#072d24] px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[#d6f8ec]">{member.displayName}</p>
+                    <p className="text-xs text-[#8cc4b0]">
+                      {isCreator ? 'Người tạo nhóm' : isAdmin ? 'Quản trị viên' : 'Thành viên'}
+                    </p>
+                  </div>
+
+                  {!isCreator && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={() => onAssignRole(member._id, 'member')}
+                          className="rounded-lg bg-[#0f4335] px-3 py-1 text-xs font-semibold text-[#a6e3cf] hover:bg-[#145845] disabled:opacity-60"
+                        >
+                          Gỡ quyền
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={() => onAssignRole(member._id, 'admin')}
+                          className="rounded-lg bg-[#1e6f59] px-3 py-1 text-xs font-semibold text-[#e6fff5] hover:bg-[#22a17d] disabled:opacity-60"
+                        >
+                          Gán quyền
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => onRemoveMember(member._id)}
+                        className="rounded-lg bg-[#6e2a2a] px-3 py-1 text-xs font-semibold text-[#ffdcdc] hover:bg-[#8b3535] disabled:opacity-60"
+                      >
+                        Xóa thành viên
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-[#1a5c4a] px-6 py-4">
+          <p className="text-xs text-[#8cc4b0]">Nhóm: {groupName}</p>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={onDisbandGroup}
+            className="rounded-lg bg-[#822d2d] px-4 py-2 text-sm font-semibold text-[#ffe3e3] hover:bg-[#9a3838] disabled:opacity-60"
+          >
+            Giải tán nhóm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HomeDashboardChatPanel({
   conversations,
   selectedConversationId = 'c1',
@@ -601,17 +759,27 @@ export function HomeDashboardChatPanel({
   friends = [],
   onCreateGroup,
   onAddGroupMembers,
+  onUpdateGroupMemberRole,
+  onRemoveGroupMember,
+  onDisbandGroup,
   isCreatingGroup = false,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
+  const [isManageGroupOpen, setIsManageGroupOpen] = useState(false);
+  const [groupManageError, setGroupManageError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState('');
   const [groupQuery, setGroupQuery] = useState('');
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [selectedAddMemberIds, setSelectedAddMemberIds] = useState<string[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setIsManageGroupOpen(false);
+    setGroupManageError(null);
+  }, [selectedConversationId]);
 
   const selectedConversation = (conversations ?? []).find((item) => item.id === selectedConversationId);
 
@@ -672,9 +840,68 @@ export function HomeDashboardChatPanel({
     setIsAddMembersOpen(false);
   };
 
+  const handleAssignMemberRole = async (memberId: string, role: 'admin' | 'member') => {
+    if (!onUpdateGroupMemberRole || !selectedConversationId) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onUpdateGroupMemberRole(selectedConversationId, memberId, role);
+    } catch {
+      setGroupManageError('Không thể cập nhật quyền thành viên. Vui lòng thử lại.');
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!onRemoveGroupMember || !selectedConversationId) {
+      return;
+    }
+
+    const confirmed = globalThis.confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onRemoveGroupMember(selectedConversationId, memberId);
+    } catch {
+      setGroupManageError('Không thể xóa thành viên. Vui lòng thử lại.');
+    }
+  };
+
+  const handleDisbandGroup = async () => {
+    if (!onDisbandGroup || !selectedConversationId) {
+      return;
+    }
+
+    const confirmed = globalThis.confirm('Giải tán nhóm sẽ xóa toàn bộ nhóm. Bạn có chắc muốn tiếp tục?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onDisbandGroup(selectedConversationId);
+      setIsManageGroupOpen(false);
+      setIsInfoOpen(false);
+    } catch {
+      setGroupManageError('Không thể giải tán nhóm. Vui lòng thử lại.');
+    }
+  };
+
   const groupMemberPreview = selectedConversation?.members ?? [];
+  const groupAdminIds = selectedConversation?.adminIds ?? [];
   const existingMemberIds = groupMemberPreview.map((member) => member._id);
   const isGroupConversation = Boolean(selectedConversation?.isGroup);
+  const groupCreatorId = selectedConversation?.createdBy ?? selectedConversation?.adminIds?.[0];
+  const isCurrentUserGroupCreator = Boolean(
+    isGroupConversation
+      && chatPanelProps.currentUserId
+      && groupCreatorId
+      && chatPanelProps.currentUserId === groupCreatorId,
+  );
   const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
 
   return (
@@ -718,14 +945,28 @@ export function HomeDashboardChatPanel({
                   <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
                   {isGroupConversation ? (
                     <>
-                      <button
-                        type="button"
-                        onClick={openAddMembersModal}
-                        className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
-                      >
-                        Thêm thành viên
-                      </button>
-                      <button type="button" className="col-span-3 rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Quản lý nhóm</button>
+                      {isCurrentUserGroupCreator ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={openAddMembersModal}
+                            className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
+                          >
+                            Thêm thành viên
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsManageGroupOpen(true)}
+                            className="col-span-3 rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5] hover:bg-[#1a664f]"
+                          >
+                            Quản lý nhóm
+                          </button>
+                        </>
+                      ) : (
+                        <p className="col-span-3 rounded-xl bg-[#0d3b2f] px-3 py-2 text-xs text-[#9bcbb9]">
+                          Chỉ người tạo nhóm có thể thêm thành viên, gán quyền, xóa thành viên hoặc giải tán nhóm.
+                        </p>
+                      )}
                     </>
                   ) : (
                     <button
@@ -769,6 +1010,11 @@ export function HomeDashboardChatPanel({
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
                       <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
+                      <GroupMembersPreview
+                        members={groupMemberPreview}
+                        adminIds={groupAdminIds}
+                        creatorId={groupCreatorId}
+                      />
                     </div>
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
@@ -823,14 +1069,28 @@ export function HomeDashboardChatPanel({
               <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
               {isGroupConversation ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={openAddMembersModal}
-                    className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
-                  >
-                    Thêm thành viên
-                  </button>
-                  <button type="button" className="col-span-3 rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Quản lý nhóm</button>
+                  {isCurrentUserGroupCreator ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={openAddMembersModal}
+                        className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
+                      >
+                        Thêm thành viên
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsManageGroupOpen(true)}
+                        className="col-span-3 rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5]"
+                      >
+                        Quản lý nhóm
+                      </button>
+                    </>
+                  ) : (
+                    <p className="col-span-3 rounded-xl bg-[#0d3b2f] px-3 py-2 text-xs text-[#9bcbb9]">
+                      Chỉ người tạo nhóm được quyền quản lý nhóm.
+                    </p>
+                  )}
                 </>
               ) : (
                 <button
@@ -874,6 +1134,11 @@ export function HomeDashboardChatPanel({
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
                   <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
+                  <GroupMembersPreview
+                    members={groupMemberPreview}
+                    adminIds={groupAdminIds}
+                    creatorId={groupCreatorId}
+                  />
                 </div>
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
@@ -894,6 +1159,25 @@ export function HomeDashboardChatPanel({
           </aside>
         </div>
       )}
+
+      {groupManageError && (
+        <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-lg -translate-x-1/2 rounded-xl border border-[#7a3131] bg-[#421f1f] px-4 py-3 text-sm text-[#ffd0d0]">
+          {groupManageError}
+        </div>
+      )}
+
+      <ManageGroupModal
+        open={isManageGroupOpen}
+        members={groupMemberPreview}
+        adminIds={groupAdminIds}
+        creatorId={groupCreatorId}
+        isSubmitting={isCreatingGroup}
+        groupName={selectedConversation?.name ?? 'Nhóm'}
+        onClose={() => setIsManageGroupOpen(false)}
+        onAssignRole={handleAssignMemberRole}
+        onRemoveMember={handleRemoveMember}
+        onDisbandGroup={handleDisbandGroup}
+      />
 
       <CreateGroupModal
         open={isCreateGroupOpen}

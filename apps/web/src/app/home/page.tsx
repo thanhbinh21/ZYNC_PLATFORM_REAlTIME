@@ -37,6 +37,9 @@ export default function HomePage() {
     groupActionLoading,
     onCreateGroup,
     onAddGroupMembers,
+    onUpdateGroupMemberRole,
+    onRemoveGroupMember,
+    onDisbandGroup,
     onSendMessage,
     onStartTyping,
     onStopTyping,
@@ -199,6 +202,9 @@ export default function HomePage() {
             friends={friendsForGroup}
             onCreateGroup={onCreateGroup}
             onAddGroupMembers={onAddGroupMembers}
+            onUpdateGroupMemberRole={onUpdateGroupMemberRole}
+            onRemoveGroupMember={onRemoveGroupMember}
+            onDisbandGroup={onDisbandGroup}
             isCreatingGroup={groupActionLoading}
             chatPanelProps={{
               conversationId: selectedConversationId,

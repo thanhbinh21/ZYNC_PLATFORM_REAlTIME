@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import crypto from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
 import { authenticate } from '../../shared/middleware/auth.middleware';
 import { uploadRateLimiter } from '../../shared/middleware/rate-limiter.middleware';
 import { UploadController } from './upload.controller';
@@ -25,13 +25,16 @@ uploadRouter.post('/sign', uploadRateLimiter, (req: Request, res: Response) => {
   const folder = (req.body as { folder?: string }).folder || 'stories';
   const timestamp = Math.floor(Date.now() / 1000);
 
-  const paramsToSign = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
-  const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
-res.json({
-  success: true,
-  data: { signature, timestamp, apiKey, cloudName, folder },
+  const signature = cloudinary.utils.api_sign_request(
+    { folder, timestamp },
+    apiSecret,
+  );
+
+  res.json({
+    success: true,
+    data: { signature, timestamp, apiKey, cloudName, folder },
+  });
 });
-}); // <-- THIẾU DÒNG NÀY
 /**
  * Task 8.1: POST /api/upload/generate-signature
  * Generate Cloudinary signature for direct client upload
