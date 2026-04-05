@@ -21,7 +21,6 @@ export interface VerifyUploadResponse {
   url: string;
   secureUrl: string;
   size: number;
-  format: string;
 }
 
 // ==================== MESSAGE ENDPOINTS ====================
@@ -90,9 +89,10 @@ export async function generateUploadSignature(
 /**
  * Verify upload completion and get URL
  */
-export async function verifyUpload(publicId: string): Promise<VerifyUploadResponse> {
+export async function verifyUpload(publicId: string, type: 'image' | 'video'): Promise<VerifyUploadResponse> {
   const { data } = await apiClient.post<VerifyUploadResponse>('/api/upload/verify', {
     publicId,
+    type,
   });
   return data;
 }

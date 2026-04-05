@@ -7,8 +7,9 @@ export const SendMessageSchema = z.object({
     .regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId format'),
   content: z
     .string()
-    .min(1, 'Message content is required')
-    .max(1000, 'Message content must not exceed 1000 characters'),
+    .max(1000, 'Message content must not exceed 1000 characters')
+    .optional()
+    .nullable(),
   type: z
     .enum(['text', 'image', 'video', 'emoji'], {
       errorMap: () => ({ message: 'Invalid message type. Must be: text, image, video, or emoji' }),
@@ -23,7 +24,10 @@ export const SendMessageSchema = z.object({
     .string()
     .uuid('Idempotency key must be a valid UUID')
     .describe('Unique key to prevent duplicate messages on retry'),
-});
+}).refine(
+  (data) => data.content || data.mediaUrl,
+  { message: 'Either content or mediaUrl must be provided' }
+);
 
 export type SendMessageDto = z.infer<typeof SendMessageSchema>;
 

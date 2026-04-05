@@ -1,12 +1,16 @@
 import type { Request, Response } from 'express';
+import type { AuthRequest } from '../../shared/middleware/auth.middleware';
 import { UploadService } from './upload.service';
 import { logger } from '../../shared/logger';
 
+<<<<<<< HEAD
 export interface AuthRequest extends Request {
   userId?: string;
   user?: { id: string };
 }
 
+=======
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
 /**
  * Task 8.1: Upload Controller
  * Handle upload-related HTTP requests
@@ -19,9 +23,13 @@ export class UploadController {
    * Request body: { type: 'image' | 'video' | 'document' }
    * Response: { timestamp, signature, cloudName, apiKey, folder, publicIdPrefix }
    */
-  static async generateSignatureHandler(req: AuthRequest, res: Response): Promise<void> {
+  static async generateSignatureHandler(req: Request, res: Response): Promise<void> {
     try {
+<<<<<<< HEAD
       const userId = req.userId ?? req.user?.id;
+=======
+      const { userId } = req as AuthRequest;
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -43,10 +51,7 @@ export class UploadController {
 
       logger.debug(`Generated upload signature for user ${userId}`);
 
-      res.status(200).json({
-        success: true,
-        data: signature,
-      });
+      res.status(200).json(signature);
     } catch (err) {
       logger.error('Error generating upload signature', err);
       res.status(500).json({ error: 'Failed to generate signature' });
@@ -58,18 +63,22 @@ export class UploadController {
    * Verify Cloudinary upload was successful
    * Client sends publicId after successful upload
    *
-   * Request body: { publicId: string }
-   * Response: { success: true, url, secureUrl, size }
+   * Request body: { publicId: string, type: 'image' | 'video' }
+   * Response: { url, secureUrl, size }
    */
-  static async verifyUploadHandler(req: AuthRequest, res: Response): Promise<void> {
+  static async verifyUploadHandler(req: Request, res: Response): Promise<void> {
     try {
+<<<<<<< HEAD
       const userId = req.userId ?? req.user?.id;
+=======
+      const { userId } = req as AuthRequest
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
-      const { publicId } = req.body as { publicId?: string };
+      const { publicId, type } = req.body as { publicId?: string; type?: string };
 
       // Validate publicId
       if (!publicId || typeof publicId !== 'string') {
@@ -77,8 +86,14 @@ export class UploadController {
         return;
       }
 
+      // Validate type
+      if (!type || !['image', 'video'].includes(type)) {
+        res.status(400).json({ error: 'Missing or invalid type' });
+        return;
+      }
+
       // Task 8.1: Verify upload
-      const uploadInfo = await UploadService.verifyUploadResult(publicId, userId);
+      const uploadInfo = await UploadService.verifyUploadResult(publicId, userId, type as 'image' | 'video');
 
       if (!uploadInfo) {
         res.status(400).json({ error: 'Upload verification failed' });
@@ -88,13 +103,9 @@ export class UploadController {
       logger.debug(`Verified upload for user ${userId}: ${publicId}`);
 
       res.status(200).json({
-        success: true,
-        data: {
-          publicId: uploadInfo.publicId,
-          url: uploadInfo.url,
-          secureUrl: uploadInfo.secureUrl,
-          size: uploadInfo.size,
-        },
+        url: uploadInfo.url,
+        secureUrl: uploadInfo.secureUrl,
+        size: uploadInfo.size,
       });
     } catch (err) {
       logger.error('Error verifying upload', err);
@@ -106,9 +117,13 @@ export class UploadController {
    * Task 8.2: DELETE /api/upload/:publicId
    * Delete uploaded file from Cloudinary
    */
-  static async deleteUploadHandler(req: AuthRequest, res: Response): Promise<void> {
+  static async deleteUploadHandler(req: Request, res: Response): Promise<void> {
     try {
+<<<<<<< HEAD
       const userId = req.userId ?? req.user?.id;
+=======
+      const { userId } = req as AuthRequest;
+>>>>>>> f622d5ef26e17c718a3995d1bc66e7a27cac177c
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -130,10 +145,7 @@ export class UploadController {
 
       logger.debug(`Deleted upload for user ${userId}: ${publicId}`);
 
-      res.status(200).json({
-        success: true,
-        message: 'Upload deleted successfully',
-      });
+      res.status(200).json({ success: true });
     } catch (err) {
       logger.error('Error deleting upload', err);
       res.status(500).json({ error: 'Failed to delete upload' });

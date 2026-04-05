@@ -14,7 +14,7 @@ export interface IStoryRef {
 export interface IMessage extends Document {
   conversationId: string;
   senderId: string;
-  content: string;
+  content?: string;
   type: MessageType;
   mediaUrl?: string;
   storyRef?: IStoryRef;
@@ -36,7 +36,7 @@ const messageSchema = new Schema<IMessage>(
   {
     conversationId: { type: String, required: true },
     senderId: { type: String, required: true },
-    content: { type: String, required: true },
+    content: { type: String, required: false },
     type: {
       type: String,
       enum: ['text', 'image', 'video', 'audio', 'file', 'sticker'],
