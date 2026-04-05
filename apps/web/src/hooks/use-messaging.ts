@@ -334,9 +334,11 @@ export function useMessageHistory({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch messages with cursor
-  const fetchMessages = useCallback(async () => {
-    if (loading || !hasMore) return;
+  const fetchMessages = useCallback(async (overrideCursor?: string) => {
+    if (!conversationId || loading) return;
+
+    const currentCursor = overrideCursor ?? cursor;
+    if (currentCursor && !hasMore) return;
 
     try {
       setLoading(true);
@@ -344,17 +346,15 @@ export function useMessageHistory({
 
       const params = {
         limit: 20,
-        ...(cursor && { cursor }),
+        ...(currentCursor && { cursor: currentCursor }),
       };
 
       const response = await apiClient.get(`/api/messages/${conversationId}`, { params });
       const { messages, nextCursor, hasMore: responseHasMore } = response.data;
 
       if (messages && Array.isArray(messages)) {
-        // Reverse to show old → new order
         const reversedMessages = messages.reverse();
-        // First load: set directly, Load more: prepend to top (old messages on top)
-        setMessages((prev) => (cursor ? [...reversedMessages, ...prev] : reversedMessages));
+        setMessages((prev) => (currentCursor ? [...reversedMessages, ...prev] : reversedMessages));
         setCursor(nextCursor);
         setHasMore(responseHasMore ?? messages.length === 20);
       }
@@ -367,25 +367,29 @@ export function useMessageHistory({
     }
   }, [conversationId, cursor, hasMore, loading]);
 
-  // Auto-reset state when conversationId changes
   useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      setCursor(undefined);
+      setHasMore(true);
+      setError(null);
+      return;
+    }
+
     setMessages([]);
     setCursor(undefined);
     setHasMore(true);
     setError(null);
+
+    void fetchMessages('');
   }, [conversationId]);
 
-  // Auto-fetch initial messages when conversationId changes
-  useEffect(() => {
-    if (conversationId && messages.length === 0 && !loading) {
-      fetchMessages();
-    }
-  }, [conversationId]);
-
-  // Load more (fetch with current cursor)
   const loadMore = useCallback(async () => {
+    if (!hasMore || loading) {
+      return;
+    }
     await fetchMessages();
-  }, [fetchMessages]);
+  }, [fetchMessages, hasMore, loading]);
 
   return {
     messages,

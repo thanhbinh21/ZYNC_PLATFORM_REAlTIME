@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import type { DashboardHomeMockData } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
@@ -28,16 +30,123 @@ export function HomeDashboardScreen({
   onNavSelect,
 }: HomeDashboardScreenProps) {
   const selectedNavId = activeNavId ?? data.navItems.find((item) => item.active)?.id ?? data.navItems[0]?.id;
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const sectionClassName = selectedNavId === 'chat'
+    ? 'flex h-screen min-h-0 flex-col overflow-hidden px-4 py-5 sm:px-6 lg:px-8'
+    : 'flex h-screen flex-col overflow-y-auto px-4 py-5 sm:px-6 lg:px-8';
+  const handleSelectNav = (id: string) => {
+    onNavSelect?.(id);
+    setIsMobileSidebarOpen(false);
+  };
 
   return (
-    <main className="zync-dashboard-main min-h-screen text-[#d9f8ec]">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[220px_1fr]">
-        <aside className="flex flex-col border-r border-[#124335] bg-[linear-gradient(180deg,#0a2d24_0,#08241e_100%)] px-4 py-6">
-          <p className="font-ui-brand px-2 text-4xl leading-none text-[#39e0af]">{data.brand}</p>
+    <main className="zync-dashboard-main h-screen overflow-hidden text-[#d9f8ec]">
+      <button
+        type="button"
+        onClick={() => setIsMobileSidebarOpen(true)}
+        className="fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#1a5140] bg-[#0d3128]/95 text-[#d7f3e9] lg:hidden"
+        aria-label="Mở thanh điều hướng"
+      >
+        <span className="text-lg leading-none">☰</span>
+      </button>
+
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 bg-black/55 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)}>
+          <aside
+            className="h-full w-[84%] max-w-[320px] overflow-y-auto border-r border-[#124335] bg-[linear-gradient(180deg,#0a2d24_0,#08241e_100%)] px-4 py-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3 px-1">
+                <span className="relative block h-9 w-9 overflow-hidden rounded-xl bg-[#0a3e31] ring-1 ring-[#57d2a5]/35">
+                  <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="36px" priority />
+                </span>
+                <p className="font-ui-brand text-3xl leading-none text-[#39e0af]">{data.brand}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d3128] text-[#d7f3e9]"
+                aria-label="Đóng thanh điều hướng"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-6 flex items-center gap-3 rounded-2xl bg-[#0d3228] px-3 py-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#b0e4d2] text-sm font-semibold text-[#0a2a22]">
+                {data.user.avatarUrl ? (
+                  <Image
+                    src={data.user.avatarUrl}
+                    alt={data.user.displayName}
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  data.user.initials
+                )}
+              </span>
+              <div>
+                <p className="font-ui-title text-[0.97rem] text-[#dcfff3]">{data.user.displayName}</p>
+                <p className="font-ui-content text-xs text-[#87ac9f]">{data.user.roleLabel}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-1">
+              {data.navItems.map((item) => (
+                <DashboardNavItemRow
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === selectedNavId}
+                  onClick={(navItem) => handleSelectNav(navItem.id)}
+                />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="font-ui-title mt-8 h-12 w-full rounded-xl bg-[#30d7ab] text-lg text-[#033026] transition hover:brightness-110"
+            >
+              {data.primaryAction}
+            </button>
+
+            <div className="mt-6 space-y-1 border-t border-[#143d32] pt-4">
+              {data.sideFooterItems.map((item) => (
+                <DashboardNavItemRow
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === selectedNavId}
+                  onClick={(navItem) => handleSelectNav(navItem.id)}
+                />
+              ))}
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <div className="grid h-screen grid-cols-1 lg:grid-cols-[220px_1fr]">
+        <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto border-r border-[#124335] bg-[linear-gradient(180deg,#0a2d24_0,#08241e_100%)] px-4 py-6 lg:flex">
+          <div className="flex items-center gap-3 px-2">
+            <span className="relative block h-10 w-10 overflow-hidden rounded-xl bg-[#0a3e31] ring-1 ring-[#57d2a5]/35">
+              <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
+            </span>
+            <p className="font-ui-brand text-4xl leading-none text-[#39e0af]">{data.brand}</p>
+          </div>
 
           <div className="mt-8 flex items-center gap-3 rounded-2xl bg-[#0d3228] px-3 py-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#b0e4d2] text-sm font-semibold text-[#0a2a22]">
-              {data.user.initials}
+            <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#b0e4d2] text-sm font-semibold text-[#0a2a22]">
+              {data.user.avatarUrl ? (
+                <Image
+                  src={data.user.avatarUrl}
+                  alt={data.user.displayName}
+                  width={40}
+                  height={40}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                data.user.initials
+              )}
             </span>
             <div>
               <p className="font-ui-title text-[0.97rem] text-[#dcfff3]">{data.user.displayName}</p>
@@ -51,7 +160,7 @@ export function HomeDashboardScreen({
                 key={item.id}
                 item={item}
                 isActive={item.id === selectedNavId}
-                onClick={(navItem) => onNavSelect?.(navItem.id)}
+                  onClick={(navItem) => handleSelectNav(navItem.id)}
               />
             ))}
           </div>
@@ -69,13 +178,13 @@ export function HomeDashboardScreen({
                 key={item.id}
                 item={item}
                 isActive={item.id === selectedNavId}
-                onClick={(navItem) => onNavSelect?.(navItem.id)}
+                  onClick={(navItem) => handleSelectNav(navItem.id)}
               />
             ))}
           </div>
         </aside>
 
-        <section className="flex min-h-screen flex-col px-4 py-5 sm:px-6 lg:px-8">
+        <section className={sectionClassName}>
           {selectedNavId === 'home' && (
             <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#062920]/80 px-4 py-3">
               <h1 className="font-ui-title text-[clamp(1.3rem,2.3vw,2rem)] text-[#e4fff5]">{data.greeting}</h1>
@@ -101,7 +210,7 @@ export function HomeDashboardScreen({
           )}
 
           {selectedNavId === 'chat' ? (
-            chatSlot
+            <div className="mt-1 flex min-h-0 w-full flex-1">{chatSlot}</div>
           ) : selectedNavId === 'settings' ? (
             <div className="mt-1">{settingsSlot}</div>
           ) : selectedNavId === 'profile' ? (

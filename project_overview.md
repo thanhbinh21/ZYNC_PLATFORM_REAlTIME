@@ -142,6 +142,7 @@ npm run dev:web
 - [x] Dựng trang chủ Web (Phase 1) theo layout `trangchu.png` và điều hướng sang Auth flow <!-- done: 19/03/2026 -->
 - [x] Code lại landing route `/` theo mẫu UI mới (glassmorphism + hero + metrics + CTA + footer) <!-- done: 19/03/2026 -->
 - [x] Chuẩn hóa typography toàn hệ thống Web sang font Be Vietnam Pro <!-- done: 19/03/2026 -->
+- [x] Thêm hiệu ứng loading mở trang cho landing `/` và auth `/auth` (bao gồm luồng đăng nhập/đăng ký) <!-- done: 05/04/2026 -->
 
 ### Phase 2 – Authentication & User Management (Module F1–F4)
 - [x] POST /api/auth/register – gửi OTP qua Twilio/Email <!-- done: 15/03/2026 -->
@@ -214,6 +215,15 @@ npm run dev:web
 - [x] Fix lỗi upload chat Cloudinary 401 bằng signature chuẩn từ Cloudinary utils cho endpoint generate-signature <!-- done: 05/04/2026 -->
 - [x] Hotfix bổ sung upload 401: đồng bộ tập params ký/upload (không ép public_id) để tránh lệch signature khi gửi ảnh/file <!-- done: 05/04/2026 -->
 - [x] Bổ sung gửi tin nhắn icon nhanh (emoji/sticker quick picker) trên Web chat input <!-- done: 05/04/2026 -->
+- [x] Cải tiến Web chat UI: cố định khung nhập tin nhắn ở đáy, thêm logo Zync ở dashboard và lời chào động theo user thật <!-- done: 05/04/2026 -->
+- [x] Sửa race condition load lịch sử chat sau login để không cần F5 mới thấy tin nhắn cũ <!-- done: 05/04/2026 -->
+- [x] Tối ưu UX gửi ảnh/tệp chat: hiện preview ngay, upload chạy nền và không khóa ô nhập <!-- done: 05/04/2026 -->
+- [x] Fix layout dashboard: cố định navbar theo viewport, bind avatar thật sau khi cập nhật profile và giữ khung soạn tin nhắn neo đáy khi chat <!-- done: 05/04/2026 -->
+- [x] Bổ sung animation reveal trái/phải/dưới lên khi refresh cho landing và auth để tăng cảm giác tải giao diện <!-- done: 05/04/2026 -->
+- [x] Bổ sung thanh tiến trình upload theo phần trăm cho avatar profile và media chat để phản hồi trạng thái rõ ràng hơn <!-- done: 05/04/2026 -->
+- [x] Tinh chỉnh mobile dashboard: chuyển sidebar sticky thành drawer để tránh chiếm chiều cao nội dung <!-- done: 05/04/2026 -->
+- [x] Hotfix UI chat: khôi phục danh sách hội thoại và header khung chat sau khi chỉnh layout chiều ngang <!-- done: 05/04/2026 -->
+
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)

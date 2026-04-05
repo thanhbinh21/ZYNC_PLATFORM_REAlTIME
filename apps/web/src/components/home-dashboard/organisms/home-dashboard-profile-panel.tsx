@@ -32,6 +32,7 @@ export function HomeDashboardProfilePanel({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [formValues, setFormValues] = useState({
@@ -144,7 +145,11 @@ export function HomeDashboardProfilePanel({
 
       if (avatarFile) {
         setIsUploadingAvatar(true);
-        avatarUrlToSave = await uploadFile(avatarFile, 'avatars');
+        setAvatarUploadProgress(0);
+        avatarUrlToSave = await uploadFile(avatarFile, 'avatars', {
+          onProgress: (percent) => setAvatarUploadProgress(percent),
+        });
+        setAvatarUploadProgress(100);
       }
 
       const updated = await updateMyProfile({
@@ -164,6 +169,7 @@ export function HomeDashboardProfilePanel({
       }
     } finally {
       setIsUploadingAvatar(false);
+      setAvatarUploadProgress(0);
       setIsSaving(false);
     }
   };
@@ -307,6 +313,20 @@ export function HomeDashboardProfilePanel({
                   )}
                 </div>
                 <p className="font-ui-content mt-2 text-xs text-[#7ba999]">Ảnh sẽ tự upload và cập nhật URL khi bạn bấm Lưu thay đổi.</p>
+                {isUploadingAvatar && (
+                  <div className="mt-3 rounded-lg border border-[#1a5444] bg-[#0a2d24] p-2.5">
+                    <div className="mb-1 flex items-center justify-between text-xs text-[#9bcfbe]">
+                      <span>Đang tải ảnh đại diện</span>
+                      <span>{avatarUploadProgress}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[#143e32]">
+                      <div
+                        className="h-full rounded-full bg-[#2fe0b4] transition-all"
+                        style={{ width: `${avatarUploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </label>
 

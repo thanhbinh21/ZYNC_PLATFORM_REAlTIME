@@ -44,6 +44,7 @@ export default function HomePage() {
     onStartTyping,
     onStopTyping,
     onLoadMore,
+    onPatchDashboardUser,
   } = useHomeDashboard();
   const {
     feed,
@@ -240,7 +241,13 @@ export default function HomePage() {
             error={profileError}
             stories={data.stories}
             onOpenCreateStory={() => setCreateOpen(true)}
-            onProfileUpdated={(updatedProfile) => setProfile(updatedProfile)}
+            onProfileUpdated={(updatedProfile) => {
+              setProfile(updatedProfile);
+              onPatchDashboardUser({
+                displayName: updatedProfile.displayName,
+                avatarUrl: updatedProfile.avatarUrl,
+              });
+            }}
           />
         }
       />
