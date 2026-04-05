@@ -11,6 +11,7 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups';
 import socketService from '@/services/socket';
+import { useMessageHistory } from '@/hooks/use-messaging';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import type { Message } from '@zync/shared-types';
@@ -55,6 +56,11 @@ export function useHomeDashboard() {
   const [friendsForGroup, setFriendsForGroup] = useState<FriendUser[]>([]);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use message history hook for pagination
+  const messageHistory = useMessageHistory({
+    conversationId: selectedConversationId,
+  });
 
   // Fetch initial data
   useEffect(() => {
@@ -181,19 +187,18 @@ export function useHomeDashboard() {
     async function loadMessages() {
       if (!selectedConversationId) return;
       
-      setMessagesLoading(true);
-      try {
-        const { messages: fetchedMessages } = await getMessages(selectedConversationId, undefined, 30);
-        setMessages(fetchedMessages.reverse()); // Oldest first
-      } catch (error) {
-        console.error('Failed to fetch messages', error);
-      } finally {
-        setMessagesLoading(false);
-      }
+      // Use messageHistory hook to fetch initial messages
+      await messageHistory.fetchMessages();
     }
 
     loadMessages();
   }, [selectedConversationId]);
+
+  // Sync messageHistory messages to local state
+  useEffect(() => {
+    setMessages(messageHistory.messages);
+    setMessagesLoading(messageHistory.loading);
+  }, [messageHistory.messages, messageHistory.loading]);
 
   // Socket listeners for real-time updates
   useEffect(() => {
@@ -573,5 +578,6 @@ export function useHomeDashboard() {
     onSendMessage: handleSendMessage,
     onStartTyping: handleStartTyping,
     onStopTyping: handleStopTyping,
+    onLoadMore: messageHistory.loadMore,
   };
 }

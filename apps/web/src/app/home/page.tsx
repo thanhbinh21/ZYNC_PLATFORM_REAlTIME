@@ -43,6 +43,7 @@ export default function HomePage() {
     onSendMessage,
     onStartTyping,
     onStopTyping,
+    onLoadMore,
   } = useHomeDashboard();
   const {
     feed,
@@ -206,6 +207,7 @@ export default function HomePage() {
             onRemoveGroupMember={onRemoveGroupMember}
             onDisbandGroup={onDisbandGroup}
             isCreatingGroup={groupActionLoading}
+            onLoadMore={onLoadMore}
             chatPanelProps={{
               conversationId: selectedConversationId,
               currentUserId: userId,

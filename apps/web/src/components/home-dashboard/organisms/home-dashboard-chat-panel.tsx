@@ -246,7 +246,7 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-5 py-4 space-y-2"
+        className="max-h-[calc(100vh-229px)] overflow-y-auto px-5 py-4 space-y-2"
       >
         {/* Load More Button */}
         {messages.length > 0 && (
@@ -318,6 +318,7 @@ interface HomeDashboardChatPanelProps {
   onRemoveGroupMember?: (groupId: string, targetUserId: string) => Promise<void>;
   onDisbandGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
+  onLoadMore?: () => Promise<void>;
   chatPanelProps?: Partial<ChatPanelProps>;
 }
 
@@ -763,6 +764,7 @@ export function HomeDashboardChatPanel({
   onRemoveGroupMember,
   onDisbandGroup,
   isCreatingGroup = false,
+  onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -918,6 +920,7 @@ export function HomeDashboardChatPanel({
         {/* Right: Chat Panel */}
           <ChatPanel
             {...chatPanelProps}
+            onLoadMore={onLoadMore}
             onInfoClick={() => setIsInfoOpen((prev) => !prev)}
           />
 
