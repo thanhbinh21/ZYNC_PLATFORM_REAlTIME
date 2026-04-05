@@ -144,28 +144,37 @@ export async function getAllOnlineUsers(): Promise<Record<string, string>> {
 
 // ─── Rate Limiting (Sliding Window) ───
 
-const MSG_RATE_WINDOW_MS = 1000; // 1 second window
-const MSG_RATE_LIMIT = 20; // Max 20 messages per second
+// Normal mode: Kafka batch insert working (300 msgs/500ms)
+const MSG_RATE_WINDOW_MS_NORMAL = 500;
+const MSG_RATE_LIMIT_NORMAL = 300;
+
+// Fallback mode: Direct insert when Kafka fails (200 msgs/500ms)
+const MSG_RATE_WINDOW_MS_FALLBACK = 500;
+const MSG_RATE_LIMIT_FALLBACK = 200;
 
 /**
- * Check if user has exceeded message rate limit (max 20 messages/second)
+ * Check if user has exceeded message rate limit
  * Uses Redis Sorted Set (ZSET) with sliding window algorithm
  * @param userId User ID
+ * @param isFallbackMode Whether Kafka is in failure/fallback mode
  * @returns true if within limit, false if rate limit exceeded
  */
-export async function checkMessageRateLimit(userId: string): Promise<boolean> {
+export async function checkMessageRateLimit(userId: string, isFallbackMode: boolean = false): Promise<boolean> {
   const redis = getRedis();
   const rateLimitKey = `msg_rate:${userId}`;
   const now = Date.now();
+  
+  const windowMs = isFallbackMode ? MSG_RATE_WINDOW_MS_FALLBACK : MSG_RATE_WINDOW_MS_NORMAL;
+  const limit = isFallbackMode ? MSG_RATE_LIMIT_FALLBACK : MSG_RATE_LIMIT_NORMAL;
 
   // Pipeline: clean old entries → add new → count → set TTL
   const pipe = redis.pipeline();
-  pipe.zremrangebyscore(rateLimitKey, '-inf', now - MSG_RATE_WINDOW_MS); // Remove entries older than 1s
+  pipe.zremrangebyscore(rateLimitKey, '-inf', now - windowMs); // Remove old entries
   pipe.zadd(rateLimitKey, now, `${now}`); // Add current timestamp
   pipe.zcard(rateLimitKey); // Count total entries
   pipe.expire(rateLimitKey, 2); // Set TTL to 2s
   const results = await pipe.exec();
   
   const count = (results?.[2]?.[1] as number) ?? 0;
-  return count <= MSG_RATE_LIMIT;
+  return count <= limit;
 }

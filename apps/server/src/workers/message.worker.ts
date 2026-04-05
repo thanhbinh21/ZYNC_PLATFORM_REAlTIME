@@ -1,10 +1,11 @@
 import type { Consumer, EachMessagePayload } from 'kafkajs';
 import { createConsumer, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { MessageModel } from '../modules/messages/message.model';
+import { MessagesService } from '../modules/messages/messages.service';
 import { logger } from '../shared/logger';
 
 const BATCH_SIZE = 100;
-const BATCH_TIMEOUT_MS = 5000; // 5 seconds (as per spec)
+const BATCH_TIMEOUT_MS = 500; // 500ms for Phase 5 MVP
 const MSG_WORKER_GROUP_ID = 'message-worker-group'; // Task 6.2 spec
 const SESSION_TIMEOUT = 30000; // Task 6.2 spec
 
@@ -20,6 +21,29 @@ interface RawMessage {
 }
 
 let messageWorkerConsumer: Consumer | null = null;
+let kafkaInsertFailureCallback: ((messages: any[]) => Promise<void>) | null = null;
+
+/**
+ * Set callback for when Kafka batch insert fails
+ * Used for fallback to direct DB insert via service
+ */
+export function setKafkaInsertFailureCallback(callback: (messages: any[]) => Promise<void>): void {
+  kafkaInsertFailureCallback = callback;
+}
+
+/**
+ * Notify gateway that Kafka batch insert has recovered
+ * Used to disable fallback mode when Kafka recovers
+ */
+export function notifyKafkaRecovery(): void {
+  try {
+    // Import here to avoid circular dependency
+    const { setKafkaFailureMode } = require('../socket/gateway');
+    setKafkaFailureMode(false);
+  } catch (err) {
+    // Ignore circular dependency errors
+  }
+}
 
 export async function startMessageWorker(): Promise<void> {
   try {
@@ -47,21 +71,53 @@ export async function startMessageWorker(): Promise<void> {
     let batchTimer: NodeJS.Timeout | null = null;
 
     /**
-     * Task 6.2: Batch insert to MongoDB
-     * Uses ordered: false to continue on duplicate idempotencyKey errors
+     * Task 6.2: Batch insert to MongoDB with metadata
+     * Calls MessagesService.insertMessageWithMetadata for each message
+     * Handles all DB operations: Message + MessageStatus + conversation metadata
      */
     const processBatch = async (): Promise<void> => {
       if (batch.length === 0) return;
 
       const toInsert = batch.splice(0, batch.length);
+      let successCount = 0;
+      
       try {
-        const result = await MessageModel.insertMany(toInsert, { ordered: false });
-        logger.debug(`✓ Batch inserted ${result.length}/${toInsert.length} messages`);
+        for (const msg of toInsert) {
+          try {
+            await MessagesService.insertMessageWithMetadata(
+              msg.conversationId,
+              msg.senderId,
+              msg.content,
+              msg.type as 'text' | 'image' | 'video',
+              msg.idempotencyKey,
+              msg.mediaUrl,
+            );
+            successCount++;
+          } catch (err) {
+            logger.error(`[Batch] Failed to insert message ${msg.idempotencyKey}`, err);
+            // Continue with next message
+          }
+        }
+        
+        logger.debug(`✓ Batch inserted ${successCount}/${toInsert.length} messages`);
+        
+        // Kafka batch insert successful, disable fallback mode if it was enabled
+        if (successCount > 0) {
+          notifyKafkaRecovery();
+        }
       } catch (err: unknown) {
-        // ordered: false allows duplicates (idempotency) to be skipped
-        logger.error('Message batch insert error (partial success possible)', err);
-        // Task 6.2: Error handling - log but continue
-        // Note: Failed messages remain in Kafka until consumer crashes/restarts
+        logger.error('Message batch processing error (triggering fallback)', err);
+        
+        // Trigger fallback for any failed messages
+        if (kafkaInsertFailureCallback && successCount < toInsert.length) {
+          const failedMessages = toInsert.slice(successCount);
+          try {
+            await kafkaInsertFailureCallback(failedMessages);
+            logger.info(`✓ Fallback inserted ${failedMessages.length} messages via service`);
+          } catch (fallbackErr) {
+            logger.error('Fallback insert also failed', fallbackErr);
+          }
+        }
       }
     };
 
