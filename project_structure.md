@@ -217,7 +217,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 ### Client → Server
 | Event | Payload | Mô tả |
 |-------|---------|-------|
-| `send_message` | `{conversationId, content, type, idempotencyKey}` | Gửi tin nhắn |
+| `send_message` | `{conversationId, content?, type, mediaUrl?, idempotencyKey}` | Gửi tin nhắn (`type`: `text`/`image`/`video`/`audio`/`file`/`sticker`) |
 | `message_read` | `{conversationId, messageIds[]}` | Báo đã đọc |
 | `typing_start` | `{conversationId}` | Bắt đầu gõ |
 | `typing_stop` | `{conversationId}` | Dừng gõ |
@@ -231,6 +231,17 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `user_online` | `{userId, online, lastSeen}` | Trạng thái online |
 | `friend_request` | `{requestId, fromUserId, createdAt}` | Lời mời kết bạn mới |
 | `group_updated` | `{groupId, type, data}` | Cập nhật nhóm |
+
+---
+
+## Upload API Contract
+
+| Method | Endpoint | Payload | Mô tả |
+|--------|----------|---------|-------|
+| POST | `/api/upload/sign` | `{folder}` | Cấp chữ ký upload tương thích luồng stories/profile cũ |
+| POST | `/api/upload/generate-signature` | `{type}` (`image`/`video`/`document`) | Cấp chữ ký upload cho chat/media flow |
+| POST | `/api/upload/verify` | `{publicId, type}` (`image`/`video`/`document`) | Xác minh upload thành công và trả URL an toàn |
+| DELETE | `/api/upload/:publicId` | - | Xóa file upload theo quyền sở hữu user |
 
 ---
 

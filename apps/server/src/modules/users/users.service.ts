@@ -60,9 +60,27 @@ export async function updateProfile(
   userId: string,
   dto: UpdateProfileDto,
 ): Promise<IUser> {
+  const updates: UpdateProfileDto = {};
+
+  if (dto.displayName !== undefined) {
+    updates.displayName = dto.displayName.trim();
+  }
+
+  if (dto.avatarUrl !== undefined) {
+    updates.avatarUrl = dto.avatarUrl;
+  }
+
+  if (dto.bio !== undefined) {
+    updates.bio = dto.bio.trim();
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new BadRequestError('No valid profile fields to update');
+  }
+
   const user = await UserModel.findByIdAndUpdate(
     userId,
-    { $set: dto },
+    { $set: updates },
     { new: true, runValidators: true },
   );
   if (!user) throw new NotFoundError('User not found');

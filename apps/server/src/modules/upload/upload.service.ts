@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { createHash } from 'crypto';
 import { logger } from '../../shared/logger';
 
 /**
@@ -60,32 +59,14 @@ export class UploadService {
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
-    const publicIdPrefix = `${userId}_${timestamp}`;
 
-    // Task 8.2: Generate signature
-    // Cloudinary signing: SHA1(params + api_secret)
-    // IMPORTANT: Must include ALL params that will be sent in FormData
+    // Ky signature bang utility chinh thuc cua Cloudinary de tranh sai khac thu tu params.
     const paramsToSign = {
       folder: `zync/${type}s/${userId}`, // e.g., zync/images/user123
-      public_id: publicIdPrefix,
-      // resource_type: type === 'video' ? 'video' : 'image',
       timestamp,
     };
 
-    // Build signature string (canonical form - must be sorted)
-    const signatureString = Object.keys(paramsToSign)
-      .sort()
-      .map(
-        (key) =>
-          `${key}=${(paramsToSign as Record<string, unknown>)[key]}`
-      )
-      .join('&')
-      .concat(apiSecret);
-
-    // Use Node crypto to create SHA1 hash
-    const signature = createHash('sha1')
-      .update(signatureString)
-      .digest('hex');
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
 
     logger.debug(`Generated upload signature for user ${userId}`);
 
@@ -95,7 +76,7 @@ export class UploadService {
       cloudName,
       apiKey,
       folder: `zync/${type}s/${userId}`,
-      publicIdPrefix,
+      publicIdPrefix: '',
     };
   }
 
@@ -111,7 +92,7 @@ export class UploadService {
   static async verifyUploadResult(
     publicId: string,
     userId: string,
-    type: 'image' | 'video',
+    type: 'image' | 'video' | 'document',
   ): Promise<{
     publicId: string;
     url: string;
@@ -130,7 +111,7 @@ export class UploadService {
       // Fetch resource info from Cloudinary with correct resource_type
       // publicId already contains folder path, so pass it directly
       const resource = await cloudinary.api.resource(publicId, {
-        resource_type: type,
+        resource_type: type === 'document' ? 'raw' : type,
       });
 
       if (!resource) {
@@ -163,7 +144,7 @@ export class UploadService {
   static async deleteUpload(publicId: string, userId: string): Promise<boolean> {
     try {
       // Verify ownership
-      if (!publicId.startsWith(userId)) {
+      if (!publicId.includes(`/${userId}/`) && !publicId.startsWith(`${userId}_`)) {
         logger.warn(`Delete failed: publicId ${publicId} does not belong to user ${userId}`);
         return false;
       }

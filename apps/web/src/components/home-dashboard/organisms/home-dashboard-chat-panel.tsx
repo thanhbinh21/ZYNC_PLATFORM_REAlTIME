@@ -39,7 +39,7 @@ interface ChatPanelProps {
   isOnline?: boolean;
   messages?: Message[];
   typingUsers?: Array<{ userId: string; displayName: string }>;
-  onSendMessage?: (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => Promise<void>;
+  onSendMessage?: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => Promise<void>;
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;

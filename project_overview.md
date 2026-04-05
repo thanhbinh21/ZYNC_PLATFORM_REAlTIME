@@ -169,6 +169,7 @@ npm run dev:web
 - [x] Bổ sung cấu hình Gmail SMTP để test OTP email nhanh không cần verify domain Resend <!-- done: 05/04/2026 -->
 - [x] Mở rộng luồng quên mật khẩu hỗ trợ identifier (email hoặc phone) cho tài khoản xác thực OTP <!-- done: 05/04/2026 -->
 - [x] Chuẩn hóa toggle OTP_HARDCODE: true dùng OTP cố định 123456 và không gọi mail thật, false dùng OTP thực qua provider email/SMS <!-- done: 05/04/2026 -->
+- [x] Harden cập nhật profile: validate strict payload, trim dữ liệu và chặn request rỗng cho PATCH /api/users/me <!-- done: 05/04/2026 -->
 - [ ] Bổ sung integration test cho fallback Resend API -> SMTP khi provider lỗi
 - [x] Chuẩn hóa chiều rộng UI Web theo container dùng chung cho `/`, `/auth`, `/friends` <!-- done: 19/03/2026 -->
 - [x] Nâng cấp landing page `/` với fixed header, scroll section và bố cục chuẩn landing <!-- done: 19/03/2026 -->
@@ -205,6 +206,14 @@ npm run dev:web
 - [x] Kafka consumer: batch insert vào MongoDB <!-- done: 04/04/2026 -->
 - [x] Idempotency key chống gửi trùng <!-- done: 04/04/2026 -->
 - [x] Bổ sung seed data QA cho tài khoản có friends + lịch sử chat 1-1/nhóm + message status để test nhanh luồng đã làm <!-- done: 05/04/2026 -->
+- [x] Chuẩn hóa contract message type giữa schema/model/socket/web (text/image/video/audio/file/sticker) <!-- done: 05/04/2026 -->
+- [x] Siết quyền membership ở Socket event send_message/message_read/message_delivered để tránh thao tác trái phép ngoài conversation <!-- done: 05/04/2026 -->
+- [x] Hoàn thiện upload chat media hỗ trợ file document + render tin nhắn file trên Web dashboard <!-- done: 05/04/2026 -->
+- [x] Harden typing realtime: kiểm tra membership và validate payload cho typing_start/typing_stop <!-- done: 05/04/2026 -->
+- [x] Ổn định preview hội thoại cho media-only message (ảnh/video/file/audio/sticker) ở cả backend và web realtime <!-- done: 05/04/2026 -->
+- [x] Fix lỗi upload chat Cloudinary 401 bằng signature chuẩn từ Cloudinary utils cho endpoint generate-signature <!-- done: 05/04/2026 -->
+- [x] Hotfix bổ sung upload 401: đồng bộ tập params ký/upload (không ép public_id) để tránh lệch signature khi gửi ảnh/file <!-- done: 05/04/2026 -->
+- [x] Bổ sung gửi tin nhắn icon nhanh (emoji/sticker quick picker) trên Web chat input <!-- done: 05/04/2026 -->
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)

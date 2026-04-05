@@ -31,11 +31,11 @@ return (
 
 interface UploadedMedia {
   url: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'file';
 }
 
 interface MessageInputProps {
-  onSend: (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => void;
+  onSend: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => void;
   onStartTyping: () => void;
   onStopTyping: () => void;
   isLoading?: boolean;
@@ -53,8 +53,11 @@ export function MessageInput({
   const [uploading, setUploading] = useState(false);
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const QUICK_EMOJIS = ['😀', '😂', '😍', '👍', '❤️', '🔥', '👏', '🎉'];
 
   const handleInputChange = (value: string) => {
     const wasEmpty = input.length === 0;
@@ -104,11 +107,15 @@ export function MessageInput({
   const handleUploadFile = async (file: File, autoSend = false) => {
     setUploading(true);
     try {
-      const fileType = file.type.startsWith('image/') ? 'image' : 'video';
+      const uploadType = file.type.startsWith('image/')
+        ? 'image'
+        : file.type.startsWith('video/')
+          ? 'video'
+          : 'document';
+      const messageType = uploadType === 'document' ? 'file' : uploadType;
       
       // Step 1: Get upload signature from server
-      const signatureData = await generateUploadSignature(fileType);
-      console.log('✅ Step 1: Got signature');
+      const signatureData = await generateUploadSignature(uploadType);
       
       // Step 2: Upload file to Cloudinary using FormData
       const formData = new FormData();
@@ -117,10 +124,9 @@ export function MessageInput({
       formData.append('signature', signatureData.signature);
       formData.append('timestamp', signatureData.timestamp.toString());
       formData.append('folder', signatureData.folder);
-      formData.append('public_id', signatureData.publicIdPrefix);
       
       const uploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${fileType === 'image' ? 'image' : 'video'}/upload`,
+        `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${uploadType === 'document' ? 'raw' : uploadType}/upload`,
         {
           method: 'POST',
           body: formData,
@@ -128,29 +134,34 @@ export function MessageInput({
       );
 
       if (!uploadResponse.ok) {
-        throw new Error(`Cloudinary upload failed: ${uploadResponse.status}`);
+        let cloudinaryMessage = `Cloudinary upload failed: ${uploadResponse.status}`;
+        try {
+          const failed = await uploadResponse.json() as { error?: { message?: string } };
+          if (failed.error?.message) {
+            cloudinaryMessage = `Cloudinary upload failed: ${failed.error.message}`;
+          }
+        } catch {
+          // noop
+        }
+        throw new Error(cloudinaryMessage);
       }
 
       const uploadedData = await uploadResponse.json() as { public_id: string; secure_url: string };
-      console.log('✅ Step 2: Uploaded to Cloudinary');
 
       // Step 3: Verify upload with backend
-      const verifyResult = await verifyUpload(uploadedData.public_id, fileType);
-      console.log('✅ Step 3: Verified with backend');
+      const verifyResult = await verifyUpload(uploadedData.public_id, uploadType);
 
       const media: UploadedMedia = {
         url: verifyResult.secureUrl,
-        type: fileType as 'image' | 'video',
+        type: messageType,
       };
 
       if (autoSend) {
-        // // Auto-send (from button click): send immediately with default message
+        // Auto-send (from button click): send immediately with default message
         await onSend('', media.type, media.url);
-        console.log('✅ Step 4: Media sent');
       } else {
         // From paste: store for user to add text and send
         setUploadedMedia(media);
-        console.log('📸 Media ready to send with message');
       }
     } catch (error) {
       console.error('❌ File upload failed:', error);
@@ -192,6 +203,15 @@ export function MessageInput({
 
   const isButtonDisabled = (!input.trim() && !uploadedMedia) || disabled || isLoading || uploading || isSending;
 
+  const handleSendEmoji = (emoji: string) => {
+    if (disabled || isLoading || uploading || isSending) {
+      return;
+    }
+
+    onSend(emoji, 'sticker');
+    setIsEmojiPickerOpen(false);
+  };
+
   return (
     <div className="border-t border-[#114538] p-4 bg-[#0d2c24]">
       {/* Action Buttons */}
@@ -215,6 +235,7 @@ export function MessageInput({
         </button>
 
         <button
+          onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
           disabled={disabled || isLoading || uploading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Emoji"
@@ -230,6 +251,21 @@ export function MessageInput({
           accept="image/*,video/*,.pdf,.doc,.docx"
         />
       </div>
+
+      {isEmojiPickerOpen && (
+        <div className="mb-3 flex flex-wrap gap-2 rounded-lg border border-[#1e5a49] bg-[#12392f] p-2">
+          {QUICK_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => handleSendEmoji(emoji)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#0d2c24] text-lg hover:bg-[#164336]"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input Area */}
       <div className="flex items-end gap-3">
@@ -266,12 +302,21 @@ export function MessageInput({
               alt="Preview"
               className="max-w-xs rounded-lg"
             />
-          ) : (
+          ) : uploadedMedia.type === 'video' ? (
             <video
               src={uploadedMedia.url}
               controls
               className="max-w-xs rounded-lg"
             />
+          ) : (
+            <a
+              href={uploadedMedia.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex max-w-xs items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336]"
+            >
+              Tệp đính kèm sẵn sàng gửi
+            </a>
           )}
           <button
             onClick={() => setUploadedMedia(null)}

@@ -107,7 +107,7 @@ export function useHomeDashboard() {
             const sender = conv.users?.find((u: any) => u._id === conv.lastMessage?.senderId);
             
             let title = sender?.displayName || 'Người dùng';
-            let messageStr = conv.lastMessage.content;
+            let messageStr = conv.lastMessage.content || 'Tin nhan media';
             
             if (conv.type === 'group') {
               title = conv.name || 'Nhóm';
@@ -219,7 +219,7 @@ export function useHomeDashboard() {
         conversationId: targetConversationId,
         senderId: data.senderId,
         content: data.content,
-        type: data.type as any,
+        type: data.type as Message['type'],
         mediaUrl: data.mediaUrl,
         createdAt: data.createdAt,
         idempotencyKey: '',
@@ -240,11 +240,25 @@ export function useHomeDashboard() {
       // Update conversation
       setConversations(prev => prev.map(conv => {
         if (conv._id === targetConversationId) {
+          const messagePreview = data.content && data.content.trim().length > 0
+            ? data.content
+            : data.type === 'image'
+              ? 'Da gui anh'
+              : data.type === 'video'
+                ? 'Da gui video'
+                : data.type === 'file'
+                  ? 'Da gui tep dinh kem'
+                  : data.type === 'audio'
+                    ? 'Da gui am thanh'
+                    : data.type === 'sticker'
+                      ? 'Da gui sticker'
+                      : 'Tin nhan media';
+
           return {
             ...conv,
             lastMessage: {
               senderId: data.senderId,
-              content: data.content,
+              content: messagePreview,
               sentAt: data.createdAt,
             },
           };
@@ -253,9 +267,18 @@ export function useHomeDashboard() {
       }));
     };
 
-    const handleStatusUpdate = (update: any) => {
+    const handleStatusUpdate = (update: {
+      messageId?: string;
+      messageIds?: string[];
+      status: Message['status'];
+    }) => {
+      const ids = update.messageIds ?? (update.messageId ? [update.messageId] : []);
+      if (ids.length === 0) {
+        return;
+      }
+
       setMessages(prev => prev.map(msg => {
-        if (msg._id === update.messageId) {
+        if (ids.includes(msg._id)) {
           return { ...msg, status: update.status };
         }
         return msg;
@@ -500,7 +523,7 @@ export function useHomeDashboard() {
 
   // Send message handler
   const handleSendMessage = useCallback(
-    async (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => {
+    async (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => {
       if (!selectedConversationId || !userId) return;
 
       try {

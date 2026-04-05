@@ -47,12 +47,11 @@ export async function getMessages(
  * Mark messages as read
  */
 export async function markMessagesAsRead(
-  conversationId: string,
   messageIds: string[],
 ): Promise<{ success: boolean }> {
   const { data } = await apiClient.post<{ success: boolean }>(
-    `/api/messages/read`,
-    { conversationId, messageIds },
+    `/api/messages/batch/read`,
+    { messageIds },
   );
   return data;
 }
@@ -61,14 +60,18 @@ export async function markMessagesAsRead(
  * Mark messages as delivered
  */
 export async function markMessagesAsDelivered(
-  conversationId: string,
+  _conversationId: string,
   messageIds: string[],
 ): Promise<{ success: boolean }> {
-  const { data } = await apiClient.post<{ success: boolean }>(
-    `/api/messages/delivered`,
-    { conversationId, messageIds },
+  await Promise.all(
+    messageIds.map((messageId) =>
+      apiClient.put(`/api/messages/${messageId}/status`, {
+        status: 'delivered',
+      }),
+    ),
   );
-  return data;
+
+  return { success: true };
 }
 
 // ==================== UPLOAD ENDPOINTS ====================
@@ -89,7 +92,7 @@ export async function generateUploadSignature(
 /**
  * Verify upload completion and get URL
  */
-export async function verifyUpload(publicId: string, type: 'image' | 'video'): Promise<VerifyUploadResponse> {
+export async function verifyUpload(publicId: string, type: 'image' | 'video' | 'document'): Promise<VerifyUploadResponse> {
   const { data } = await apiClient.post<VerifyUploadResponse>('/api/upload/verify', {
     publicId,
     type,

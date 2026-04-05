@@ -20,6 +20,23 @@ export interface MessageWithStatus extends IMessage {
 export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
 
+  private static getLastMessagePreview(
+    content: string,
+    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+  ): string {
+    const trimmed = content.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+
+    if (type === 'image') return 'Da gui anh';
+    if (type === 'video') return 'Da gui video';
+    if (type === 'file') return 'Da gui tep dinh kem';
+    if (type === 'audio') return 'Da gui am thanh';
+    if (type === 'sticker') return 'Da gui sticker';
+    return '';
+  }
+
   /**
    * Tạo tin nhắn nhanh (chỉ publish Kafka, không insert vào DB)
    * - Check Redis idempotency cache
@@ -32,7 +49,7 @@ export class MessagesService {
     conversationId: string,
     senderId: string,
     content: string,
-    type: 'text' | 'image' | 'video' | 'emoji',
+    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
     idempotencyKey: string,
     mediaUrl?: string,
   ): Promise<IMessage> {
@@ -106,7 +123,7 @@ export class MessagesService {
     conversationId: string,
     senderId: string,
     content: string,
-    type: 'text' | 'image' | 'video' | 'emoji',
+    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
     idempotencyKey: string,
     mediaUrl?: string,
   ): Promise<IMessage> {
@@ -143,8 +160,9 @@ export class MessagesService {
 
     // Step 4: Update conversation's lastMessage
     try {
+      const previewContent = this.getLastMessagePreview(content, type);
       await ConversationsService.updateLastMessage(conversationId, {
-        content,
+        content: previewContent,
         senderId,
         sentAt: savedMessage.createdAt,
       });
@@ -191,7 +209,7 @@ export class MessagesService {
           msg.conversationId,
           msg.senderId,
           msg.content,
-          msg.type as 'text' | 'image' | 'video' | 'emoji',
+          msg.type as 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
           msg.idempotencyKey,
           msg.mediaUrl,
         );
