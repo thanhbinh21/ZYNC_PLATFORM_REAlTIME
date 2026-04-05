@@ -246,7 +246,7 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-5 py-4 space-y-2"
+        className="max-h-[calc(100vh-229px)] overflow-y-auto px-5 py-4 space-y-2"
       >
         {/* Load More Button */}
         {messages.length > 0 && (
