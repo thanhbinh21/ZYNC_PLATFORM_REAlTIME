@@ -4,8 +4,29 @@ import { getRedis } from '../../infrastructure/redis';
 import { TooManyRequestsError } from '../errors';
 import { type AuthRequest } from './auth.middleware';
 
-const OTP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
-const OTP_RATE_LIMIT_MAX = 30 ; // Test code dev : 30 , sau sẽ chỉnh lại thành 3 thôi 
+function parseEnvPositiveInt(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+const DEFAULT_OTP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const DEFAULT_OTP_RATE_LIMIT_MAX = process.env['NODE_ENV'] === 'production' ? 3 : 100;
+
+const OTP_RATE_LIMIT_WINDOW_SECONDS =
+  parseEnvPositiveInt(process.env['OTP_RATE_LIMIT_WINDOW_SECONDS'])
+  ?? DEFAULT_OTP_RATE_LIMIT_WINDOW_SECONDS;
+
+const OTP_RATE_LIMIT_MAX =
+  parseEnvPositiveInt(process.env['OTP_RATE_LIMIT_MAX'])
+  ?? DEFAULT_OTP_RATE_LIMIT_MAX;
 
 function normalizeOtpIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();
@@ -63,18 +84,27 @@ export async function otpRateLimiter(
   try {
     const ip = req.ip ?? 'unknown';
     const identifier = extractOtpIdentifierFromBody(req.body);
+    const retryAfterMinutes = Math.ceil(OTP_RATE_LIMIT_WINDOW_SECONDS / 60);
 
     const ipKey = `otp_rl:ip:${ip}`;
     const ipCount = await increaseCounterWithTtl(ipKey);
     if (ipCount > OTP_RATE_LIMIT_MAX) {
-      return next(new TooManyRequestsError('OTP rate limit exceeded for this IP. Try again in 1 hour.'));
+      return next(
+        new TooManyRequestsError(
+          `OTP rate limit exceeded for this IP. Max ${OTP_RATE_LIMIT_MAX} requests/${retryAfterMinutes} minutes.`,
+        ),
+      );
     }
 
     if (identifier) {
       const identifierKey = `otp_rl:id:${identifier}`;
       const identifierCount = await increaseCounterWithTtl(identifierKey);
       if (identifierCount > OTP_RATE_LIMIT_MAX) {
-        return next(new TooManyRequestsError('OTP rate limit exceeded for this phone/email. Try again in 1 hour.'));
+        return next(
+          new TooManyRequestsError(
+            `OTP rate limit exceeded for this phone/email. Max ${OTP_RATE_LIMIT_MAX} requests/${retryAfterMinutes} minutes.`,
+          ),
+        );
       }
     }
 

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "seed:friends:test": "ts-node-dev --transpile-only scripts/seed-friend-test-data.ts",
+    "seed:qa": "ts-node-dev --transpile-only scripts/seed-friend-test-data.ts",
     "build": "tsc",
     "start": "node dist/main.js",
     "test": "jest --passWithNoTests",
@@ -36,6 +37,7 @@
     "nodemailer": "^8.0.2",
     "prom-client": "^15.1.2",
     "rate-limit-redis": "^4.2.0",
+    "resend": "^4.0.1",
     "socket.io": "^4.7.5",
     "twilio": "^5.1.0",
     "uuid": "^9.0.1",

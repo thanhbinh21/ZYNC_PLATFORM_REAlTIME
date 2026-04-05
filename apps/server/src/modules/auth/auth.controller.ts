@@ -81,7 +81,7 @@ export async function loginPasswordRequestOtpHandler(
   try {
     const { email, password } = req.body as { email: string; password: string };
     await requestLoginOtpWithPassword(email, password);
-    res.json({ success: true, message: 'OTP sent. Check your email.' });
+    res.json({ success: true, message: 'OTP sent. Check your phone or email.' });
   } catch (err) {
     next(err);
   }
@@ -133,8 +133,9 @@ export async function forgotPasswordRequestOtpHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { email } = req.body as { email: string };
-    await requestForgotPasswordOtp(email);
+    const { identifier, email } = req.body as { identifier?: string; email?: string };
+    const resolvedIdentifier = (identifier ?? email ?? '').trim();
+    await requestForgotPasswordOtp(resolvedIdentifier);
     res.json({ success: true, message: 'OTP sent. Check your email.' });
   } catch (err) {
     next(err);
@@ -149,13 +150,15 @@ export async function forgotPasswordResetHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { email, otp, newPassword } = req.body as {
-      email: string;
+    const { identifier, email, otp, newPassword } = req.body as {
+      identifier?: string;
+      email?: string;
       otp: string;
       newPassword: string;
     };
 
-    await resetForgotPassword(email, otp, newPassword);
+    const resolvedIdentifier = (identifier ?? email ?? '').trim();
+    await resetForgotPassword(resolvedIdentifier, otp, newPassword);
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (err) {
     next(err);

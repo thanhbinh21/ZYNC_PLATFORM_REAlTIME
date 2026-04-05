@@ -129,6 +129,7 @@ export function LoginCard({
           type="text"
           placeholder={isRegister ? 'Nhập số điện thoại hoặc email' : 'Nhập email đã đăng ký'}
           value={values.identifier}
+          disabled={isVerifyStep}
           onChange={onIdentifierChange}
         />
 

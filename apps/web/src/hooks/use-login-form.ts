@@ -57,6 +57,10 @@ function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim().toLowerCase());
 }
 
+function isPhone(value: string): boolean {
+  return /^\+?\d{9,15}$/.test(value.trim().replace(/\s/g, ''));
+}
+
 function resolveDeviceToken(): string {
   if (typeof window === 'undefined') {
     return 'web-device';
@@ -79,6 +83,7 @@ export function useLoginForm() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [step, setStep] = useState<AuthStep>('input');
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(false);
+  const [pendingIdentifier, setPendingIdentifier] = useState<string | null>(null);
   const [values, setValues] = useState<LoginFormValues>(DEFAULT_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -86,14 +91,19 @@ export function useLoginForm() {
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
 
   const canRequestOtp = useMemo(() => {
-    const hasIdentifier = values.identifier.trim().length >= 5;
+    const hasMinimumIdentifierLength = values.identifier.trim().length >= 5;
     const hasDisplayName = mode === 'register' ? values.displayName.trim().length >= 1 : true;
     const hasPassword = mode !== 'register' && isRecoveryFlow
       ? true
       : values.password.trim().length >= 8;
-    const hasEmail = mode === 'register' ? true : isEmail(values.identifier);
+    const hasValidIdentifier =
+      mode === 'register'
+        ? true
+        : isRecoveryFlow
+          ? isEmail(values.identifier) || isPhone(values.identifier)
+          : isEmail(values.identifier);
 
-    return hasIdentifier && hasDisplayName && hasPassword && hasEmail;
+    return hasMinimumIdentifierLength && hasDisplayName && hasPassword && hasValidIdentifier;
   }, [isRecoveryFlow, mode, values.displayName, values.identifier, values.password]);
 
   const canVerifyOtp = useMemo(() => {
@@ -128,6 +138,7 @@ export function useLoginForm() {
   const onModeChange = (nextMode: AuthMode) => {
     setMode(nextMode);
     setIsRecoveryFlow(false);
+    setPendingIdentifier(null);
     setStep('input');
     setValues((prev) => ({ ...prev, otp: '' }));
     setErrorMessage(null);
@@ -137,6 +148,7 @@ export function useLoginForm() {
   const onStartRecovery = () => {
     setMode('login');
     setIsRecoveryFlow(true);
+    setPendingIdentifier(null);
     setStep('input');
     setValues((prev) => ({ ...prev, otp: '' }));
     setErrorMessage(null);
@@ -145,6 +157,7 @@ export function useLoginForm() {
 
   const onCancelRecovery = () => {
     setIsRecoveryFlow(false);
+    setPendingIdentifier(null);
     setStep('input');
     setValues((prev) => ({ ...prev, otp: '' }));
     setErrorMessage(null);
@@ -173,6 +186,7 @@ export function useLoginForm() {
   };
 
   const onBackToInput = () => {
+    setPendingIdentifier(null);
     setStep('input');
     setValues((prev) => ({ ...prev, otp: '' }));
     setErrorMessage(null);
@@ -194,7 +208,7 @@ export function useLoginForm() {
         await requestOtp(identifier);
       } else if (isRecoveryFlow) {
         await requestForgotPasswordOtp({
-          email: identifier,
+          identifier,
         });
       } else {
         await requestPasswordOtp({
@@ -204,9 +218,10 @@ export function useLoginForm() {
       }
 
       setStep('verify');
+      setPendingIdentifier(identifier);
       setInfoMessage(
         isRecoveryFlow
-          ? 'Mã OTP khôi phục đã được gửi về email. Vui lòng kiểm tra hộp thư của bạn.'
+          ? 'Mã OTP khôi phục đã được gửi. Vui lòng kiểm tra email hoặc số điện thoại của bạn.'
           : 'Mã OTP đã được gửi. Vui lòng kiểm tra điện thoại hoặc email của bạn.',
       );
       setValues((prev) => ({ ...prev, identifier, otp: '' }));
@@ -234,14 +249,16 @@ export function useLoginForm() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      const verifyIdentifier = pendingIdentifier ?? normalizeIdentifier(values.identifier);
       if (isRecoveryFlow) {
         await resetForgotPassword({
-          email: values.identifier,
+          identifier: verifyIdentifier,
           otp: values.otp,
           newPassword: values.password,
         });
 
         setIsRecoveryFlow(false);
+        setPendingIdentifier(null);
         setStep('input');
         setValues((prev) => ({ ...prev, otp: '' }));
         setInfoMessage('Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.');
@@ -252,14 +269,14 @@ export function useLoginForm() {
       const deviceToken = resolveDeviceToken();
       const response = mode === 'login'
         ? await verifyPasswordOtp({
-            email: values.identifier,
+            email: verifyIdentifier,
             password: values.password,
             otp: values.otp,
             deviceToken,
             platform: 'web',
           })
         : await verifyOtp({
-            identifier: values.identifier,
+            identifier: verifyIdentifier,
             otp: values.otp,
             displayName: values.displayName.trim(),
             password: values.password,
@@ -269,6 +286,7 @@ export function useLoginForm() {
 
       (globalThis as Record<string, unknown>)['__accessToken'] = response.accessToken;
       setCurrentUserName(response.user.displayName);
+      setPendingIdentifier(null);
       setInfoMessage('Xác thực thành công. Bạn đã đăng nhập vào hệ thống.');
       setErrorMessage(null);
       router.push('/home');
@@ -281,7 +299,11 @@ export function useLoginForm() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
           ? (error as { response: { data: { error: string } } }).response.data.error
           : fallbackMessage;
-      setErrorMessage(message);
+      if (message === 'Invalid or expired OTP' || message.includes('OTP không hợp lệ')) {
+        setErrorMessage('OTP không hợp lệ hoặc đã hết hạn. Hãy bấm "Đổi thông tin" và gửi lại OTP mới.');
+      } else {
+        setErrorMessage(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -360,6 +382,7 @@ export function useLoginForm() {
       await logout({ deviceToken });
       (globalThis as Record<string, unknown>)['__accessToken'] = undefined;
       setCurrentUserName(null);
+      setPendingIdentifier(null);
       setStep('input');
       setValues((prev) => ({ ...prev, otp: '' }));
       setInfoMessage('Bạn đã đăng xuất khỏi hệ thống.');

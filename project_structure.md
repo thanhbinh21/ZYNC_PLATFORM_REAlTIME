@@ -144,6 +144,7 @@ zync-platform/
 | CI/CD | `.github/workflows/` |
 | Load test | `apps/server/tests/load/` |
 | Seed data | `apps/server/scripts/seed.ts` |
+| Seed data QA (friends/chat/group) | `apps/server/scripts/seed-friend-test-data.ts` |
 
 
 ---
@@ -198,8 +199,8 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | POST | `/api/auth/verify-otp` | Xác thực OTP đăng ký, tạo tài khoản mới và trả JWT |
 | POST | `/api/auth/login-password/request-otp` | Kiểm tra email + password hợp lệ, gửi OTP đăng nhập |
 | POST | `/api/auth/login-password/verify-otp` | Xác thực OTP đăng nhập (email + password + OTP), trả JWT |
-| POST | `/api/auth/forgot-password/request-otp` | Gửi OTP khôi phục mật khẩu theo email |
-| POST | `/api/auth/forgot-password/reset` | Xác thực OTP khôi phục và cập nhật mật khẩu mới |
+| POST | `/api/auth/forgot-password/request-otp` | Gửi OTP khôi phục mật khẩu theo identifier (email hoặc phone) |
+| POST | `/api/auth/forgot-password/reset` | Xác thực OTP khôi phục theo identifier và cập nhật mật khẩu mới |
 | POST | `/api/auth/google` | Đăng nhập bằng Google ID token |
 | POST | `/api/auth/refresh` | Cấp lại access token từ refresh token cookie |
 | POST | `/api/auth/logout` | Thu hồi phiên hiện tại, blacklist access token |

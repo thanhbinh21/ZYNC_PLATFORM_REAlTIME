@@ -163,6 +163,13 @@ npm run dev:web
 - [x] Fix OTP rate limit nhận diện đúng identifier cho các API dùng trường `email`/`phoneNumber` <!-- done: 19/03/2026 -->
 - [x] Xử lý lỗi Resend sandbox rõ ràng (không trả 500 mơ hồ, trả hướng dẫn verify domain/SMTP_FROM) <!-- done: 19/03/2026 -->
 - [x] Tạm thời bật lại OTP_HARDCODE cho môi trường dev/non-production, giữ SMTP/SMS cho production deploy <!-- done: 19/03/2026 -->
+- [x] Hotfix OTP rate limit về đúng 3 lần/giờ theo IP/identifier (sửa lệch cấu hình dev) <!-- done: 05/04/2026 -->
+- [x] Setup Resend API cho OTP email (register/login), fallback SMTP khi chưa cấu hình API key <!-- done: 05/04/2026 -->
+- [x] Mở rộng OTP rate limit cho môi trường dev qua biến cấu hình (tránh nghẽn khi test liên tục) <!-- done: 05/04/2026 -->
+- [x] Bổ sung cấu hình Gmail SMTP để test OTP email nhanh không cần verify domain Resend <!-- done: 05/04/2026 -->
+- [x] Mở rộng luồng quên mật khẩu hỗ trợ identifier (email hoặc phone) cho tài khoản xác thực OTP <!-- done: 05/04/2026 -->
+- [x] Chuẩn hóa toggle OTP_HARDCODE: true dùng OTP cố định 123456 và không gọi mail thật, false dùng OTP thực qua provider email/SMS <!-- done: 05/04/2026 -->
+- [ ] Bổ sung integration test cho fallback Resend API -> SMTP khi provider lỗi
 - [x] Chuẩn hóa chiều rộng UI Web theo container dùng chung cho `/`, `/auth`, `/friends` <!-- done: 19/03/2026 -->
 - [x] Nâng cấp landing page `/` với fixed header, scroll section và bố cục chuẩn landing <!-- done: 19/03/2026 -->
 - [x] Cân đối lại bố cục trang auth theo hướng center đồng bộ design login <!-- done: 19/03/2026 -->
@@ -197,6 +204,8 @@ npm run dev:web
 - [ ] Đồng bộ đa thiết bị (multi-device sync)
 - [x] Kafka consumer: batch insert vào MongoDB <!-- done: 04/04/2026 -->
 - [x] Idempotency key chống gửi trùng <!-- done: 04/04/2026 -->
+- [x] Bổ sung seed data QA cho tài khoản có friends + lịch sử chat 1-1/nhóm + message status để test nhanh luồng đã làm <!-- done: 05/04/2026 -->
+- [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
 - [ ] Hiển thị online/offline với bạn bè
@@ -210,6 +219,7 @@ npm run dev:web
 - [ ] Kafka consumer worker xử lý gửi notification
 
 ### Phase 8 – Quality & Hardening
+- [x] Chuẩn hóa pipeline QC: sau khi test phải dọn process/service để tránh chiếm port dev (`3000`, `3001`) <!-- done: 05/04/2026 -->
 - [ ] Unit test coverage > 80% (Jest + React Testing Library)
 - [ ] Integration test: API + Socket.IO + Kafka mock
 - [ ] Load test: Artillery/K6 – 1000 user, 500 msg/s

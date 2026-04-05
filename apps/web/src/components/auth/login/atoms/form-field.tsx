@@ -3,6 +3,7 @@ interface FormFieldProps {
   type: 'tel' | 'password' | 'text';
   placeholder: string;
   value: string;
+  disabled?: boolean;
   showPassword?: boolean;
   onChange: (value: string) => void;
   rightNode?: React.ReactNode;
@@ -35,6 +36,7 @@ export function FormField({
   type,
   placeholder,
   value,
+  disabled,
   showPassword,
   onChange,
   rightNode,
@@ -52,6 +54,7 @@ export function FormField({
         <input
           type={realType}
           value={value}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           className="h-full w-full bg-transparent text-[15px] text-[#d8eee6] outline-none placeholder:text-[#5f897d]"

@@ -109,8 +109,35 @@ Doc file `.env.example` o root. Cac bien can chu y:
 - `KAFKA_ENABLED`, `KAFKA_BROKERS`
 - `JWT_SECRET`, `JWT_REFRESH_SECRET`
 - `OTP_HARDCODE`, `OTP_HARDCODE_VALUE`
+- `OTP_RATE_LIMIT_MAX`, `OTP_RATE_LIMIT_WINDOW_SECONDS`
 - `CLOUDINARY_*`
 - `SMTP_*`
+- `RESEND_API_KEY`, `RESEND_FROM`
+
+Dev de test OTP nhieu lan:
+- Dat `OTP_RATE_LIMIT_MAX=100`
+- Dat `OTP_RATE_LIMIT_WINDOW_SECONDS=3600`
+
+Neu can test OTP email nhanh khong verify domain Resend:
+- Dat `OTP_EMAIL_PROVIDER=smtp`
+- Dat `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`
+- Dat `SMTP_USER=<gmail_that>`, `SMTP_PASS=<gmail_app_password>`, `SMTP_FROM=<gmail_that>`
+
+OTP email mac dinh gui qua SMTP. Neu can Resend API, dat `OTP_EMAIL_PROVIDER=resend`
+va them `RESEND_API_KEY`.
+
+## 7.1 Seed data de test friends + messages + groups
+
+Chay tai root monorepo:
+
+```bash
+npm run seed:qa --workspace=apps/server
+```
+
+Script se tao bo tai khoan test co:
+- Quan he ban be (`accepted`, `pending`, `blocked`)
+- Lich su chat 1-1
+- Nhom chat va message status (`sent/delivered/read`)
 
 ## 7. Cac ky thuat quan trong
 
