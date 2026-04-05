@@ -29,6 +29,11 @@ return (
     </svg>
   );}
 
+interface UploadedMedia {
+  url: string;
+  type: 'image' | 'video';
+}
+
 interface MessageInputProps {
   onSend: (content: string, type: 'text' | 'image' | 'video', mediaUrl?: string) => void;
   onStartTyping: () => void;
@@ -46,6 +51,8 @@ export function MessageInput({
 }: MessageInputProps) {
   const [input, setInput] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,13 +78,18 @@ export function MessageInput({
   };
 
   const handleSend = () => {
-    if (input.trim() && !isLoading && !disabled) {
-      onSend(input.trim(), 'text');
+    if ((input.trim() || uploadedMedia) && !isLoading && !disabled && !isSending) {
+      setIsSending(true);
+      const messageContent = input.trim();
+      onSend(messageContent, uploadedMedia?.type || 'text', uploadedMedia?.url);
       setInput('');
+      setUploadedMedia(null);
       onStopTyping();
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+      // Prevent double-click for 500ms
+      setTimeout(() => setIsSending(false), 500);
     }
   };
 
@@ -88,15 +100,13 @@ export function MessageInput({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Shared upload logic for both file select and paste
+  const handleUploadFile = async (file: File, autoSend = false) => {
     setUploading(true);
     try {
       const fileType = file.type.startsWith('image/') ? 'image' : 'video';
       
-      // Step 1: Get upload signature from server (middleware extracts userId from JWT)
+      // Step 1: Get upload signature from server
       const signatureData = await generateUploadSignature(fileType);
       console.log('✅ Step 1: Got signature');
       
@@ -124,18 +134,23 @@ export function MessageInput({
       const uploadedData = await uploadResponse.json() as { public_id: string; secure_url: string };
       console.log('✅ Step 2: Uploaded to Cloudinary');
 
-      // Step 3: Verify upload with backend (middleware extracts userId from JWT)
+      // Step 3: Verify upload with backend
       const verifyResult = await verifyUpload(uploadedData.public_id, fileType);
       console.log('✅ Step 3: Verified with backend');
 
-      // Step 4: Send message with media URL
-      const messageContent = `Shared a ${fileType}`;
-      await onSend(messageContent, fileType as 'image' | 'video', verifyResult.secureUrl);
-      console.log('✅ Step 4: Message sent');
+      const media: UploadedMedia = {
+        url: verifyResult.secureUrl,
+        type: fileType as 'image' | 'video',
+      };
 
-      // Clear file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      if (autoSend) {
+        // // Auto-send (from button click): send immediately with default message
+        await onSend('', media.type, media.url);
+        console.log('✅ Step 4: Media sent');
+      } else {
+        // From paste: store for user to add text and send
+        setUploadedMedia(media);
+        console.log('📸 Media ready to send with message');
       }
     } catch (error) {
       console.error('❌ File upload failed:', error);
@@ -145,7 +160,37 @@ export function MessageInput({
     }
   };
 
-  const isButtonDisabled = !input.trim() || disabled || isLoading || uploading;
+  // Handle paste event (Ctrl+V)
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) {
+          await handleUploadFile(file, false);
+        }
+        break;
+      }
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Auto-send when using file picker (button clicks)
+    await handleUploadFile(file, true);
+
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const isButtonDisabled = (!input.trim() && !uploadedMedia) || disabled || isLoading || uploading || isSending;
 
   return (
     <div className="border-t border-[#114538] p-4 bg-[#0d2c24]">
@@ -192,6 +237,7 @@ export function MessageInput({
           value={uploading ? `${input || ''}` : input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={uploading ? 'Uploading...' : 'Nhập tin nhắn...'}
           disabled={disabled || isLoading || uploading}
           rows={1}
@@ -210,6 +256,32 @@ export function MessageInput({
           <SendIcon className={`w-5 h-5 transition-colors ${isButtonDisabled ? 'text-[#80ac9d]' : 'text-[#043329]'}`} />
         </button>
       </div>
+
+      {/* Media Preview */}
+      {uploadedMedia && (
+        <div className="mt-3 relative">
+          {uploadedMedia.type === 'image' ? (
+            <img
+              src={uploadedMedia.url}
+              alt="Preview"
+              className="max-w-xs rounded-lg"
+            />
+          ) : (
+            <video
+              src={uploadedMedia.url}
+              controls
+              className="max-w-xs rounded-lg"
+            />
+          )}
+          <button
+            onClick={() => setUploadedMedia(null)}
+            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 w-7 h-7 flex items-center justify-center"
+            title="Remove media"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }

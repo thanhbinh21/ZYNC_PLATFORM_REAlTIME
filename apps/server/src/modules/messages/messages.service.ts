@@ -5,6 +5,7 @@ import { ConversationsService } from '../conversations/conversations.service';
 import { ConversationMemberModel } from '../conversations/conversation-member.model';
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
+import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -20,10 +21,12 @@ export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
 
   /**
-   * Tạo tin nhắn mới với check idempotency
-   * - Check Redis: nếu key exists → return cached result
-   * - Insert Message + MessageStatus
-   * - Cache result trong Redis (TTL 5 phút)
+   * Tạo tin nhắn nhanh (chỉ publish Kafka, không insert vào DB)
+   * - Check Redis idempotency cache
+   * - Publish to Kafka topic (for Kafka worker to insert)
+   * - Cache MessageId + return mock message object
+   * 
+   * Note: Actual DB insert sẽ do Kafka worker (hoặc fallback nếu fail)
    */
   static async createMessage(
     conversationId: string,
@@ -37,10 +40,81 @@ export class MessagesService {
     const cachedMessage = await checkIdempotencyKey(idempotencyKey);
     if (cachedMessage) {
       logger.info(`[Idempotency] Found cached message for key: ${idempotencyKey}`);
-      const message = await MessageModel.findById(cachedMessage.messageId).lean();
-      if (message) {
-        return message as unknown as IMessage;
-      }
+      return {
+        _id: cachedMessage.messageId,
+        conversationId,
+        senderId,
+        content: cachedMessage.content,
+        type: cachedMessage.type,
+        mediaUrl: cachedMessage.mediaUrl,
+        idempotencyKey,
+        createdAt: new Date(cachedMessage.createdAt as number),
+      } as unknown as IMessage;
+    }
+
+    // Step 2: Cache idempotency key immediately (before publishing)
+    const now = new Date();
+    const mockId = `${senderId}_${Date.now()}`; // Temporary ID
+    
+    await setIdempotencyKey(idempotencyKey, {
+      messageId: mockId,
+      conversationId,
+      senderId,
+      content,
+      type,
+      mediaUrl,
+      createdAt: now,
+    });
+
+    // Step 3: Publish to Kafka (worker will insert)
+    try {
+      await produceMessage(KAFKA_TOPICS.RAW_MESSAGES, conversationId, {
+        messageId: mockId,
+        conversationId,
+        senderId,
+        content,
+        type,
+        mediaUrl,
+        idempotencyKey,
+        createdAt: now,
+      });
+      logger.debug(`[Message] Published to Kafka: ${mockId}`);
+    } catch (err) {
+      logger.error('[Message] Failed to publish to Kafka', err);
+      throw err;
+    }
+
+    // Step 4: Return mock message object (real DB insert will happen in Kafka worker)
+    return {
+      _id: mockId,
+      conversationId,
+      senderId,
+      content,
+      type,
+      mediaUrl,
+      idempotencyKey,
+      createdAt: now,
+    } as unknown as IMessage;
+  }
+
+  /**
+   * Insert message with full metadata (MessageStatus, lastMessage, unreadCount)
+   * Used by Kafka worker and fallback insert
+   * Handles all DB operations after Kafka publishes message
+   */
+  static async insertMessageWithMetadata(
+    conversationId: string,
+    senderId: string,
+    content: string,
+    type: 'text' | 'image' | 'video' | 'emoji',
+    idempotencyKey: string,
+    mediaUrl?: string,
+  ): Promise<IMessage> {
+    // Step 1: Check if message already exists (idempotency)
+    const existing = await MessageModel.findOne({ idempotencyKey }).lean();
+    if (existing) {
+      logger.debug(`[InsertMetadata] Message already exists: ${idempotencyKey}`);
+      return existing as unknown as IMessage;
     }
 
     // Step 2: Create Message document
@@ -55,7 +129,7 @@ export class MessagesService {
     });
 
     const savedMessage = await message.save();
-    logger.info(`[Message] Created message: ${savedMessage._id}`);
+    logger.info(`[InsertMetadata] Created message: ${savedMessage._id}`);
 
     // Step 3: Create MessageStatus (sent for sender)
     const messageStatus = new MessageStatusModel({
@@ -65,7 +139,7 @@ export class MessagesService {
     });
 
     await messageStatus.save();
-    logger.info(`[MessageStatus] Created initial status for message: ${savedMessage._id}`);
+    logger.info(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id}`);
 
     // Step 4: Update conversation's lastMessage
     try {
@@ -75,8 +149,7 @@ export class MessagesService {
         sentAt: savedMessage.createdAt,
       });
     } catch (err) {
-      logger.warn('Failed to update conversation lastMessage', err);
-      // Continue - don't fail message creation if conversation update fails
+      logger.warn('[InsertMetadata] Failed to update conversation lastMessage', err);
     }
 
     // Step 5: Increment unread count for other conversation members
@@ -84,28 +157,48 @@ export class MessagesService {
       const members = await ConversationMemberModel.find({ conversationId });
       for (const member of members) {
         if (member.userId !== senderId) {
-          // Increment unread count for non-sender members
           await ConversationsService.incrementUnreadCount(conversationId, member.userId);
         }
       }
     } catch (err) {
-      logger.warn('Failed to increment unread counts', err);
-      // Continue - don't fail message creation
+      logger.warn('[InsertMetadata] Failed to increment unread counts', err);
     }
 
-    // Step 6: Cache idempotency key with message data
-    const messageObject = savedMessage.toObject() as IMessage;
-    await setIdempotencyKey(idempotencyKey, {
-      messageId: savedMessage._id.toString(),
-      conversationId,
-      senderId,
-      content,
-      type,
-      mediaUrl,
-      createdAt: messageObject.createdAt,
-    });
+    return savedMessage.toObject() as unknown as IMessage;
+  }
 
-    return messageObject;
+  /**
+   * Fallback batch insert when Kafka batch fails
+   * Inserts messages directly with all metadata
+   * Used when message.worker fails to batch insert
+   */
+  static async fallbackBatchInsert(
+    messages: Array<{
+      conversationId: string;
+      senderId: string;
+      content: string;
+      type: string;
+      mediaUrl?: string;
+      idempotencyKey: string;
+      createdAt: Date;
+    }>
+  ): Promise<void> {
+    if (messages.length === 0) return;
+
+    for (const msg of messages) {
+      try {
+        await this.insertMessageWithMetadata(
+          msg.conversationId,
+          msg.senderId,
+          msg.content,
+          msg.type as 'text' | 'image' | 'video' | 'emoji',
+          msg.idempotencyKey,
+          msg.mediaUrl,
+        );
+      } catch (err) {
+        logger.error(`[Fallback] Failed to insert message ${msg.idempotencyKey}`, err);
+      }
+    }
   }
 
   /**

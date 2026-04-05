@@ -8,12 +8,13 @@ import type { StoryReactionType } from '../modules/stories/story.model';
 import { MessagesService } from '../modules/messages/messages.service';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
+import { setKafkaInsertFailureCallback } from '../workers/message.worker';
 
 
-const MSG_RATE_WINDOW_MS = 1000;
-const MSG_RATE_LIMIT = 20;
+// Rate limits: normal (300/500ms) vs fallback (200/500ms)
 
 let ioInstance: Server | null = null;
+let kafkaFailureMode = false; // Track if Kafka batch insert is failing
 
 interface AuthSocket extends Socket {
   userId: string;
@@ -21,6 +22,13 @@ interface AuthSocket extends Socket {
 
 export function getIO(): Server | null {
   return ioInstance;
+}
+
+export function setKafkaFailureMode(failed: boolean): void {
+  if (failed !== kafkaFailureMode) {
+    kafkaFailureMode = failed;
+    logger.warn(`[Gateway] Kafka failure mode: ${failed ? 'ENABLED' : 'DISABLED'}`);
+  }
 }
 
 export function emitStoryReaction(
@@ -47,6 +55,18 @@ export function initSocketGateway(httpServer: HttpServer): Server {
   });
 
   ioInstance = io;
+
+  // Setup fallback callback for Kafka worker failures
+  setKafkaInsertFailureCallback(async (failedMessages) => {
+    try {
+      // Enable fallback mode: reduce rate limit to 200/500ms
+      setKafkaFailureMode(true);
+      await MessagesService.fallbackBatchInsert(failedMessages);
+      logger.info(`[Fallback] Successfully inserted ${failedMessages.length} messages via service`);
+    } catch (err) {
+      logger.error('[Fallback] Failed to insert messages', err);
+    }
+  });
 
   // Dùng Redis adapter để đồng bộ sự kiện giữa nhiều server instance
   const pubClient = getRedis();
@@ -177,9 +197,12 @@ async function handleSendMessage(
   const { userId } = socket;
 
   // ─── Rate Limit Check ───
-  const isWithinLimit = await checkMessageRateLimit(userId);
+  const isWithinLimit = await checkMessageRateLimit(userId, kafkaFailureMode);
   if (!isWithinLimit) {
-    socket.emit('error', { message: 'Rate limit exceeded: max 20 messages/second' });
+    const limitMsg = kafkaFailureMode
+      ? 'Rate limit exceeded: max 200 messages/500ms (fallback mode)'
+      : 'Rate limit exceeded: max 300 messages/500ms';
+    socket.emit('error', { message: limitMsg });
     return;
   }
 
@@ -190,14 +213,21 @@ async function handleSendMessage(
   }
 
   const msg = payload as Record<string, unknown>;
-  const { conversationId, content, type, mediaUrl, idempotencyKey } = msg;
+  let { conversationId, content, type, mediaUrl, idempotencyKey } = msg;
 
-  if (!conversationId || !content || !idempotencyKey) {
-    socket.emit('error', { message: 'Missing required fields: conversationId, content, idempotencyKey' });
+  if (!conversationId || !idempotencyKey) {
+    socket.emit('error', { message: 'Missing required fields: conversationId, idempotencyKey' });
     return;
   }
 
-  if (typeof content !== 'string' || content.length < 1 || content.length > 1000) {
+  // Allow empty content if mediaUrl is provided, otherwise content is required
+  if (!content && !mediaUrl) {
+    socket.emit('error', { message: 'Either content or mediaUrl must be provided' });
+    return;
+  }
+
+  // Validate content if provided
+  if (content && (typeof content !== 'string' || content.length > 1000)) {
     socket.emit('error', { message: 'Content must be 1-1000 characters' });
     return;
   }
@@ -210,35 +240,22 @@ async function handleSendMessage(
     const message = await MessagesService.createMessage(
       conversationId as string,
       userId,
-      content,
+      content as string,
       type as ("text" | "image" | "video"),
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
     );
 
-    // ─── Publish to Kafka ───
-    try {
-      await produceMessage(KAFKA_TOPICS.RAW_MESSAGES, conversationId as string, {
-        messageId: message._id.toString(),
-        conversationId,
-        senderId: userId,
-        content,
-        type: type ?? 'text',
-        mediaUrl,
-        idempotencyKey,
-        createdAt: message.createdAt,
-      });
-    } catch (err) {
-      logger.warn('Failed to produce Kafka message', err);
-      // Continue even if Kafka fails - message still created in DB
-    }
+    // Note: createMessage already publishes to Kafka (worker will insert)
+    // Message object here is a mock with temporary ID until Kafka worker inserts real DB
 
     // ─── Emit to Recipients ───
+    // Emit with temporary ID (will be updated with real DB _id once Kafka worker processes)
     io.to(`conv:${conversationId}`).emit('receive_message', {
       messageId: message._id,
       conversationId,
       senderId: userId,
-      content,
+      content: content as string,
       type: type ?? 'text',
       mediaUrl,
       createdAt: message.createdAt,
