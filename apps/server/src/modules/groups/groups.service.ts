@@ -17,6 +17,7 @@ interface GroupSummary {
   type: 'group';
   name?: string;
   avatarUrl?: string;
+  createdBy: string;
   adminIds: string[];
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   updatedAt: Date;
@@ -52,9 +53,14 @@ async function ensureGroupMember(groupId: string, userId: string): Promise<void>
   }
 }
 
-function ensureGroupAdmin(group: IConversation, userId: string): void {
-  if (!group.adminIds.includes(userId)) {
-    throw new ForbiddenError('Only group admin can perform this action');
+function getGroupCreatorId(group: IConversation): string {
+  return group.createdBy ?? group.adminIds[0] ?? '';
+}
+
+function ensureGroupCreator(group: IConversation, userId: string): void {
+  const creatorId = getGroupCreatorId(group);
+  if (!creatorId || creatorId !== userId) {
+    throw new ForbiddenError('Only group creator can perform this action');
   }
 }
 
@@ -107,6 +113,7 @@ async function buildGroupSummary(groupId: string): Promise<GroupSummary> {
     type: 'group',
     name: group.name,
     avatarUrl: group.avatarUrl,
+    createdBy: getGroupCreatorId(group),
     adminIds: group.adminIds,
     users: normalizedUsers,
     updatedAt: group.updatedAt,
@@ -152,6 +159,7 @@ export class GroupsService {
       type: 'group',
       name: input.name.trim(),
       avatarUrl: input.avatarUrl,
+      createdBy: creatorId,
       adminIds: [creatorId],
       unreadCounts: new Map<string, number>(),
     });
@@ -182,7 +190,7 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupAdmin(group, currentUserId);
+    ensureGroupCreator(group, currentUserId);
 
     const changedFields: Array<'name_changed' | 'avatar_changed'> = [];
 
@@ -226,7 +234,7 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupAdmin(group, currentUserId);
+    ensureGroupCreator(group, currentUserId);
 
     const uniqueMembers = Array.from(new Set(memberIds.filter((id) => id !== currentUserId)));
     if (uniqueMembers.length === 0) {
@@ -281,7 +289,7 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupAdmin(group, currentUserId);
+    ensureGroupCreator(group, currentUserId);
 
     if (targetUserId === currentUserId) {
       throw new BadRequestError('Use leave endpoint to leave group');
@@ -317,6 +325,10 @@ export class GroupsService {
   static async leaveGroup(currentUserId: string, groupId: string): Promise<{ disbanded: boolean; groupId: string }> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
+
+    if (getGroupCreatorId(group) === currentUserId) {
+      throw new ForbiddenError('Group creator cannot leave. Please disband the group instead');
+    }
 
     await ConversationMemberModel.deleteOne({
       conversationId: groupId,
@@ -373,7 +385,7 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupAdmin(group, currentUserId);
+    ensureGroupCreator(group, currentUserId);
 
     const targetMember = await ConversationMemberModel.findOne({
       conversationId: groupId,
@@ -418,7 +430,7 @@ export class GroupsService {
   static async deleteGroup(currentUserId: string, groupId: string): Promise<void> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupAdmin(group, currentUserId);
+    ensureGroupCreator(group, currentUserId);
 
     const memberIds = await getGroupMemberIds(groupId);
     await ConversationMemberModel.deleteMany({ conversationId: groupId });

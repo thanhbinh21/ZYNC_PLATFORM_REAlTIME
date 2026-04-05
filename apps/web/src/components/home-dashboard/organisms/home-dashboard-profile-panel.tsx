@@ -155,8 +155,13 @@ export function HomeDashboardProfilePanel({
       onProfileUpdated?.(updated);
       setAvatarFile(null);
       setIsEditing(false);
-    } catch {
-      setSaveError('Cập nhật hồ sơ thất bại. Vui lòng thử lại.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.toLowerCase().includes('invalid api key') || message.toLowerCase().includes('invalid signature')) {
+        setSaveError('Không thể upload ảnh đại diện do cấu hình Cloudinary không hợp lệ. Vui lòng kiểm tra CLOUDINARY_* trong server.');
+      } else {
+        setSaveError('Cập nhật hồ sơ thất bại. Vui lòng thử lại.');
+      }
     } finally {
       setIsUploadingAvatar(false);
       setIsSaving(false);

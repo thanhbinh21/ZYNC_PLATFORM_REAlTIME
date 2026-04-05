@@ -3,6 +3,7 @@ import { UploadService } from './upload.service';
 import { logger } from '../../shared/logger';
 
 export interface AuthRequest extends Request {
+  userId?: string;
   user?: { id: string };
 }
 
@@ -20,7 +21,7 @@ export class UploadController {
    */
   static async generateSignatureHandler(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId ?? req.user?.id;
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -62,7 +63,7 @@ export class UploadController {
    */
   static async verifyUploadHandler(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId ?? req.user?.id;
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
@@ -107,7 +108,7 @@ export class UploadController {
    */
   static async deleteUploadHandler(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id;
+      const userId = req.userId ?? req.user?.id;
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
         return;

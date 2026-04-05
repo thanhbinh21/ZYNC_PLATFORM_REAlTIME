@@ -14,14 +14,14 @@ export async function uploadFile(file: File, folder = 'stories'): Promise<string
     { folder },
   );
 
-  const { signature, timestamp, apiKey, cloudName } = data.data;
+  const { signature, timestamp, apiKey, cloudName, folder: signedFolder } = data.data;
 
   const formData = new FormData();
   formData.append('file', file);
   formData.append('api_key', apiKey);
   formData.append('timestamp', String(timestamp));
   formData.append('signature', signature);
-  formData.append('folder', folder);
+  formData.append('folder', signedFolder);
 
   const resourceType = file.type.startsWith('video/') ? 'video' : 'image';
 
@@ -31,7 +31,15 @@ export async function uploadFile(file: File, folder = 'stories'): Promise<string
   );
 
   if (!res.ok) {
-    throw new Error('Upload failed');
+    const fallbackMessage = 'Upload failed';
+    let errorMessage = fallbackMessage;
+    try {
+      const errorPayload = await res.json() as { error?: { message?: string } };
+      errorMessage = errorPayload.error?.message || fallbackMessage;
+    } catch {
+      errorMessage = fallbackMessage;
+    }
+    throw new Error(errorMessage);
   }
 
   const result = await res.json() as { secure_url: string };

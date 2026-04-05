@@ -6,6 +6,7 @@ export interface IConversation extends Document {
   type: ConversationType;
   name?: string;
   avatarUrl?: string;
+  createdBy?: string;
   adminIds: string[];
   lastMessage?: {
     content: string;
@@ -21,6 +22,7 @@ const conversationSchema = new Schema<IConversation>(
     type: { type: String, enum: ['direct', 'group'], required: true },
     name: { type: String },
     avatarUrl: { type: String },
+    createdBy: { type: String },
     adminIds: [{ type: String }],
     lastMessage: {
       content: { type: String },
