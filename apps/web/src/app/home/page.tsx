@@ -8,6 +8,7 @@ import {
   HomeDashboardSettingsPanel,
   type DashboardAppearanceSettings,
 } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
+import { UserProfileModal } from '@/components/home-dashboard/molecules/user-profile-modal';
 import { StoryBar } from '@/components/stories/organisms/StoryBar';
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
@@ -68,6 +69,7 @@ export default function HomePage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [appearanceSettings, setAppearanceSettings] =
     useState<DashboardAppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS);
+  const [profileViewUserId, setProfileViewUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (userId) {
@@ -234,13 +236,21 @@ export default function HomePage() {
         storySlot={storySlot}
         activeNavId={activeNavId}
         onNavSelect={handleNavSelect}
+        onViewUserProfile={(uid) => setProfileViewUserId(uid)}
         profileSlot={
           <HomeDashboardProfilePanel
             profile={profile}
             loading={profileLoading}
             error={profileError}
-            stories={data.stories}
+            myStories={myStories}
+            feed={feed}
+            friends={friendsForGroup}
             onOpenCreateStory={() => setCreateOpen(true)}
+            onViewStoryFeed={(feedIndex) => {
+              setViewerGroupIdx(feedIndex + myStoryGroupOffset);
+              setViewerOpen(true);
+            }}
+            onViewUserProfile={(uid) => setProfileViewUserId(uid)}
             onProfileUpdated={(updatedProfile) => {
               setProfile(updatedProfile);
               onPatchDashboardUser({
@@ -250,6 +260,11 @@ export default function HomePage() {
             }}
           />
         }
+      />
+
+      <UserProfileModal
+        userId={profileViewUserId}
+        onClose={() => setProfileViewUserId(null)}
       />
 
       {viewerOpen && allFeed.length > 0 && (

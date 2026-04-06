@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { UserModel, type IUser } from './user.model';
 import { DeviceTokenModel } from './device-token.model';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
+import { getFriendsCount, getMutualFriendsCount } from '../friends/friends.service';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
 
 /** Lấy profile của bản thân (đầy đủ thông tin) */
@@ -11,13 +12,60 @@ export async function getMe(userId: string): Promise<IUser> {
   return user;
 }
 
-/** Lấy profile của người dùng khác (thông tin công khai) */
-export async function getUserById(userId: string): Promise<Partial<IUser>> {
+/** Mask sensitive field: "user@example.com" → "us***@example.com" */
+function maskField(value: string | undefined, type: 'email' | 'phone'): string | undefined {
+  if (!value) return undefined;
+  if (type === 'email') {
+    const [local, domain] = value.split('@');
+    if (!local || !domain) return '***@***';
+    const visible = local.slice(0, Math.min(2, local.length));
+    return `${visible}***@${domain}`;
+  }
+  // phone: show last 3 digits
+  if (value.length <= 3) return '***';
+  return `${'*'.repeat(value.length - 3)}${value.slice(-3)}`;
+}
+
+export interface PublicUserProfile {
+  _id: string;
+  displayName: string;
+  avatarUrl?: string;
+  bio?: string;
+  emailMasked?: string;
+  phoneMasked?: string;
+  friendCount: number;
+  mutualFriends: number;
+  createdAt?: string;
+}
+
+/** Lấy profile công khai của người dùng khác (thông tin masked + friend count) */
+export async function getUserById(
+  userId: string,
+  requesterId?: string,
+): Promise<PublicUserProfile> {
   const user = await UserModel.findById(userId).select(
-    'displayName avatarUrl bio createdAt',
+    'displayName avatarUrl bio email phoneNumber createdAt',
   );
   if (!user) throw new NotFoundError('User not found');
-  return user;
+
+  const [friendCount, mutualFriends] = await Promise.all([
+    getFriendsCount(userId),
+    requesterId && requesterId !== userId
+      ? getMutualFriendsCount(requesterId, userId)
+      : Promise.resolve(0),
+  ]);
+
+  return {
+    _id: user._id.toString(),
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    bio: user.bio,
+    emailMasked: maskField(user.email, 'email'),
+    phoneMasked: maskField(user.phoneNumber, 'phone'),
+    friendCount,
+    mutualFriends,
+    createdAt: (user as unknown as { createdAt?: Date }).createdAt?.toISOString(),
+  };
 }
 
 /** Tìm user theo tên hiển thị/email/số điện thoại cho luồng kết bạn */
