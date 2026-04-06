@@ -6,6 +6,7 @@ import { SendFriendRequestSchema } from './friends.schema';
 import {
   acceptFriendRequestHandler,
   blockUserHandler,
+  getFriendsCountHandler,
   listFriendRequestsHandler,
   listFriendsHandler,
   rejectFriendRequestHandler,
@@ -43,6 +44,9 @@ friendsRouter.delete('/:userId/block', unblockUserHandler);
 
 // GET /api/friends/requests – incoming/outgoing pending requests
 friendsRouter.get('/requests', listFriendRequestsHandler);
+
+// GET /api/friends/count – get total friends count
+friendsRouter.get('/count', getFriendsCountHandler);
 
 // GET /api/friends – list friends (cursor paginated)
 friendsRouter.get('/', listFriendsHandler);

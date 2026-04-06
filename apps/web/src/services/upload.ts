@@ -8,7 +8,15 @@ interface SignResponse {
   folder: string;
 }
 
-export async function uploadFile(file: File, folder = 'stories'): Promise<string> {
+interface UploadFileOptions {
+  onProgress?: (percent: number) => void;
+}
+
+export async function uploadFile(
+  file: File,
+  folder = 'stories',
+  options?: UploadFileOptions,
+): Promise<string> {
   const { data } = await apiClient.post<{ success: boolean; data: SignResponse }>(
     '/api/upload/sign',
     { folder },
@@ -24,24 +32,45 @@ export async function uploadFile(file: File, folder = 'stories'): Promise<string
   formData.append('folder', signedFolder);
 
   const resourceType = file.type.startsWith('video/') ? 'video' : 'image';
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
-    { method: 'POST', body: formData },
-  );
+  const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', uploadUrl);
 
-  if (!res.ok) {
-    const fallbackMessage = 'Upload failed';
-    let errorMessage = fallbackMessage;
-    try {
-      const errorPayload = await res.json() as { error?: { message?: string } };
-      errorMessage = errorPayload.error?.message || fallbackMessage;
-    } catch {
-      errorMessage = fallbackMessage;
-    }
-    throw new Error(errorMessage);
-  }
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || !options?.onProgress) {
+        return;
+      }
 
-  const result = await res.json() as { secure_url: string };
+      const percent = Math.round((event.loaded / event.total) * 100);
+      options.onProgress(percent);
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as { secure_url: string });
+        } catch {
+          reject(new Error('Upload failed'));
+        }
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(xhr.responseText) as { error?: { message?: string } };
+        reject(new Error(parsed.error?.message ?? 'Upload failed'));
+      } catch {
+        reject(new Error('Upload failed'));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Upload failed'));
+    };
+
+    xhr.send(formData);
+  });
+
   return result.secure_url;
 }

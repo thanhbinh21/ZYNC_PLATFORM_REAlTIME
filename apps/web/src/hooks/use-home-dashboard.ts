@@ -16,6 +16,11 @@ import type { DashboardHomeMockData } from '@/components/home-dashboard/home-das
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import type { Message } from '@zync/shared-types';
 
+interface DashboardUserPatch {
+  displayName?: string;
+  avatarUrl?: string;
+}
+
 interface Conversation {
   _id: string;
   name?: string;
@@ -142,10 +147,12 @@ export function useHomeDashboard() {
 
         setData(prev => ({
           ...prev,
+          greeting: `Xin chào, ${user.displayName}`,
           user: {
             displayName: user.displayName,
             roleLabel: 'Trực tuyến',
             initials: userInitials,
+            avatarUrl: user.avatarUrl,
           },
           stats: [
             { 
@@ -181,18 +188,6 @@ export function useHomeDashboard() {
 
     fetchData();
   }, []);
-
-  // Fetch messages for selected conversation
-  useEffect(() => {
-    async function loadMessages() {
-      if (!selectedConversationId) return;
-      
-      // Use messageHistory hook to fetch initial messages
-      await messageHistory.fetchMessages();
-    }
-
-    loadMessages();
-  }, [selectedConversationId]);
 
   // Sync messageHistory messages to local state
   useEffect(() => {
@@ -338,7 +333,7 @@ export function useHomeDashboard() {
       socketService.unlistenToStatusUpdates();
       socketService.unlistenToTypingIndicators();
     };
-  }, [selectedConversationId]);
+  }, [selectedConversationId, conversations, userId]);
 
   const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
     return conversations.map((conv, idx) => ({
@@ -602,5 +597,27 @@ export function useHomeDashboard() {
     onStartTyping: handleStartTyping,
     onStopTyping: handleStopTyping,
     onLoadMore: messageHistory.loadMore,
+    onPatchDashboardUser: (payload: DashboardUserPatch) => {
+      setData((prev) => {
+        const displayName = payload.displayName ?? prev.user.displayName;
+        const nameParts = displayName.trim().split(/\s+/).filter(Boolean);
+        const initials = nameParts.length === 0
+          ? prev.user.initials
+          : nameParts.length === 1
+            ? nameParts[0].slice(0, 2).toUpperCase()
+            : `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+
+        return {
+          ...prev,
+          greeting: `Xin chào, ${displayName}`,
+          user: {
+            ...prev.user,
+            displayName,
+            initials,
+            avatarUrl: payload.avatarUrl ?? prev.user.avatarUrl,
+          },
+        };
+      });
+    },
   };
 }

@@ -348,3 +348,30 @@ export async function listFriendRequests(currentUserId: string): Promise<ListFri
 
   return { incoming, outgoing };
 }
+
+/** Đếm tổng số bạn bè đang accepted của một user */
+export async function getFriendsCount(userId: string): Promise<number> {
+  return FriendshipModel.countDocuments({ userId, status: 'accepted' });
+}
+
+/** Đếm số bạn chung giữa hai user */
+export async function getMutualFriendsCount(
+  userA: string,
+  userB: string,
+): Promise<number> {
+  const [friendsA, friendsB] = await Promise.all([
+    FriendshipModel.find({ userId: userA, status: 'accepted' })
+      .select('friendId')
+      .lean(),
+    FriendshipModel.find({ userId: userB, status: 'accepted' })
+      .select('friendId')
+      .lean(),
+  ]);
+
+  const setB = new Set(friendsB.map((f) => f.friendId));
+  let count = 0;
+  for (const f of friendsA) {
+    if (setB.has(f.friendId)) count++;
+  }
+  return count;
+}
