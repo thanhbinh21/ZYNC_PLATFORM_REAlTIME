@@ -7,6 +7,7 @@ import {
   getSocket,
   isConnected,
   joinConversation,
+  leaveConversation,
   listenToMessages,
   listenToStatusUpdates,
   listenToTypingIndicators,
@@ -65,6 +66,7 @@ export function useChat({
 
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const previousConversationId = useRef<string>('');
 
   // Initialize socket on mount or when token changes
   useEffect(() => {
@@ -85,7 +87,13 @@ export function useChat({
   // Join conversation when it changes
   useEffect(() => {
     if (conversationId && isConnected()) {
+      // Leave previous conversation if it exists and is different
+      if (previousConversationId.current && previousConversationId.current !== conversationId) {
+        leaveConversation(previousConversationId.current);
+      }
+      // Join new conversation
       joinConversation(conversationId);
+      previousConversationId.current = conversationId;
     }
   }, [conversationId]);
 
@@ -202,7 +210,7 @@ export function useChat({
         console.error('Failed to cleanup status listener:', err);
       }
     };
-  }, []);
+  }, [conversationId, token]);
 
   // Setup typing indicator listener
   useEffect(() => {

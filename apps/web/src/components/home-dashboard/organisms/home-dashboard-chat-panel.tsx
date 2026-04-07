@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Message } from '@zync/shared-types';
+import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
@@ -38,6 +38,7 @@ interface ChatPanelProps {
   participantAvatar?: string;
   isOnline?: boolean;
   messages?: Message[];
+  messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
   onSendMessage?: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => Promise<void>;
   onStartTyping?: () => void;
@@ -159,6 +160,7 @@ function ChatPanel({
   participantAvatar,
   isOnline = true,
   messages = [],
+  messageStatus = {},
   typingUsers = [],
   onSendMessage = async () => {},
   onStartTyping = () => {},
@@ -275,7 +277,7 @@ function ChatPanel({
                 content={message.content}
                 type={message.type}
                 mediaUrl={message.mediaUrl}
-                status={message.status}
+                status={(messageStatus?.[message._id] || message.status) as MessageStatus | undefined}
                 timestamp={message.createdAt}
                 senderAvatar={participantAvatar}
               />

@@ -39,6 +39,35 @@ export class MessagesService {
   }
 
   /**
+   * Aggregate message status for sender vs recipient view
+   * - Sender sees: Best case among recipients (read > delivered > sent)
+   * - Recipient sees: Own status only
+   */
+  private static aggregateMessageStatus(
+    messageId: string,
+    senderId: string,
+    requestingUserId: string,
+    allStatuses: Array<{ userId: string; status: string }>,
+  ): 'sent' | 'delivered' | 'read' {
+    // If requesting user is sender
+    if (requestingUserId === senderId) {
+      // Show best case among recipients (exclude sender)
+      const recipientStatuses = allStatuses
+        .filter(s => s.userId !== senderId)
+        .map(s => s.status as 'sent' | 'delivered' | 'read');
+
+      // Priority: read > delivered > sent (best case)
+      if (recipientStatuses.includes('read')) return 'read';
+      if (recipientStatuses.includes('delivered')) return 'delivered';
+      return 'sent';
+    }
+
+    // Recipient: show own status
+    const ownStatus = allStatuses.find(s => s.userId === requestingUserId);
+    return (ownStatus?.status as 'sent' | 'delivered' | 'read') || 'delivered';
+  }
+
+  /**
    * Tạo tin nhắn nhanh (chỉ publish Kafka, không insert vào DB)
    * - Check Redis idempotency cache
    * - Publish to Kafka topic (for Kafka worker to insert)
@@ -326,17 +355,36 @@ export class MessagesService {
 
       // Fetch status for current user for all messages
       const messageIds = messages.map(m => m._id.toString());
-      const statuses = await MessageStatusModel.find({
+      const allStatuses = await MessageStatusModel.find({
         messageId: { $in: messageIds },
-        userId,
       }).lean();
 
-      const statusMap = new Map(statuses.map(s => [s.messageId.toString(), s.status]));
+      // Group statuses by messageId for aggregation
+      const statusByMessageId = new Map<string, Array<{ userId: string; status: string }>>();
+      for (const status of allStatuses) {
+        const msgId = status.messageId.toString();
+        if (!statusByMessageId.has(msgId)) {
+          statusByMessageId.set(msgId, []);
+        }
+        statusByMessageId.get(msgId)!.push({
+          userId: status.userId,
+          status: status.status,
+        });
+      }
 
-      // Add status to each message (or default to 'sent' for sender's own messages)
+      // Add aggregated status to each message
       const messagesWithStatus = messages.map(msg => {
         const msgId = msg._id.toString();
-        const status = statusMap.get(msgId) || (msg.senderId === userId ? 'sent' : 'delivered');
+        const msgStatuses = statusByMessageId.get(msgId) || [];
+
+        // Aggregate: sender sees best case, others see own
+        const status = this.aggregateMessageStatus(
+          msgId,
+          msg.senderId,
+          userId,
+          msgStatuses,
+        );
+
         return {
           ...msg,
           status,

@@ -52,6 +52,14 @@ export function joinConversation(conversationId: string): void {
   socket.emit('join_conversation', { conversationId });
 }
 
+export function leaveConversation(conversationId: string): void {
+  if (!socket?.connected) {
+    return;
+  }
+
+  socket.emit('leave_conversation', { conversationId });
+}
+
 // ─── Message Events ───
 
 /**
@@ -164,7 +172,7 @@ export function listenToStatusUpdates(
     throw new Error('Socket not initialized');
   }
 
-  socket.on('status_update', callback);
+  socket.on('status_update', (data) => callback(data));
 }
 
 /**
@@ -274,6 +282,7 @@ export const socketService = {
   isConnected,
   disconnectSocket,
   joinConversation,
+  leaveConversation,
   sendMessage,
   listenToMessages,
   unlistenToMessages,

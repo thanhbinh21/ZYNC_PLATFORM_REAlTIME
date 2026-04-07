@@ -6,6 +6,8 @@ import { createRedisDuplicate, getRedis, setTypingIndicator, removeTypingIndicat
 import { logger } from '../shared/logger';
 import type { StoryReactionType } from '../modules/stories/story.model';
 import { MessagesService } from '../modules/messages/messages.service';
+import { MessageModel } from '../modules/messages/message.model';
+import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
@@ -122,6 +124,19 @@ export function initSocketGateway(httpServer: HttpServer): Server {
         await socket.join(`conv:${conversationId}`);
       } catch (err) {
         logger.error('join_conversation error', err);
+      }
+    });
+
+    socket.on('leave_conversation', async (payload: { conversationId?: string }) => {
+      const conversationId = payload?.conversationId;
+      if (!conversationId) {
+        return;
+      }
+
+      try {
+        await socket.leave(`conv:${conversationId}`);
+      } catch (err) {
+        logger.error('leave_conversation error', err);
       }
     });
 
@@ -388,7 +403,9 @@ async function handleMessageRead(
       await MessagesService.markAsRead(messageId as string, userId);
     }
 
-    // ─── Broadcast Status Update ───
+    // ─── Simply emit read status back to sender ───
+    // Note: We don't query MongoDB for aggregation here because it's async
+    // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
       messageIds,
       status: 'read',
@@ -447,7 +464,9 @@ async function handleMessageDelivered(
       await MessagesService.updateMessageStatus(messageId as string, userId, 'delivered');
     }
 
-    // ─── Broadcast Status Update ───
+    // ─── Simply emit delivered status to conversation group ───
+    // Note: We don't query MongoDB for aggregation here because it's async
+    // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
       messageIds,
       status: 'delivered',
