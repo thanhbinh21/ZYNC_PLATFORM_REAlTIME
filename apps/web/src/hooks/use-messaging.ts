@@ -6,9 +6,11 @@ import type { Message, MessageStatus } from '@zync/shared-types';
 import {
   getSocket,
   isConnected,
+  joinConversation,
   listenToMessages,
   listenToStatusUpdates,
   listenToTypingIndicators,
+  markAsDelivered,
   markAsRead,
   sendMessage as emitSendMessage,
   startTyping as emitStartTyping,
@@ -17,7 +19,7 @@ import {
   unlistenToStatusUpdates,
   unlistenToTypingIndicators,
 } from '@/services/socket';
-import { apiClient } from '@/services/api';
+import { getMessages } from '@/services/chat';
 
 // ─── useChat Hook ───
 
@@ -25,7 +27,7 @@ interface MessageStatusMap {
   [messageId: string]: MessageStatus;
 }
 
-interface TypingUser {
+export interface TypingUser {
   userId: string;
   displayName: string;
 }
@@ -41,7 +43,7 @@ interface UseChatReturn {
   messages: Message[];
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
-  sendMessage: (content: string, type: 'text' | 'image' | 'video' | 'file', mediaUrl?: string) => Promise<void>;
+  sendMessage: (content: string, type: 'text' | 'image' | 'video' | 'file' | "sticker", mediaUrl?: string) => Promise<void>;
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
@@ -64,8 +66,14 @@ export function useChat({
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-  // Initialize socket on mount
+  // Initialize socket on mount or when token changes
   useEffect(() => {
+    // Only initialize socket if token is available
+    if (!token) {
+      setError('No authentication token available');
+      return;
+    }
+
     try {
       getSocket(token);
     } catch (err) {
@@ -73,6 +81,13 @@ export function useChat({
       setError('Failed to connect to messaging service');
     }
   }, [token]);
+
+  // Join conversation when it changes
+  useEffect(() => {
+    if (conversationId && isConnected()) {
+      joinConversation(conversationId);
+    }
+  }, [conversationId]);
 
   // Setup message listener
   useEffect(() => {
@@ -101,14 +116,45 @@ export function useChat({
         [data.messageId]: 'delivered',
       }));
 
+      // Notify backend that message was delivered
+      markAsDelivered(conversationId, [data.messageId]);
+
       // Auto-mark as read after 500ms
       setTimeout(() => {
         markAsRead(conversationId, [data.messageId]);
       }, 500);
     };
 
+    const handleMessageSent = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      createdAt: string;
+    }) => {
+      // Replace optimistic message (using idempotencyKey) with real message (using messageId)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === data.idempotencyKey
+            ? { ...msg, _id: data.messageId, createdAt: data.createdAt }
+            : msg,
+        ),
+      );
+
+      // Transfer status tracking from idempotencyKey to real messageId (keep status as is)
+      setMessageStatus((prev) => {
+        const newStatus = { ...prev };
+        if (prev[data.idempotencyKey]) {
+          // Keep the same status, just move it to the real messageId
+          newStatus[data.messageId] = prev[data.idempotencyKey];
+          delete newStatus[data.idempotencyKey];
+        }
+        return newStatus;
+      });
+    };
+
     try {
       listenToMessages(handleReceiveMessage);
+      const socket = getSocket(token);
+      socket.on('message_sent', handleMessageSent);
     } catch (err) {
       console.error('Failed to setup message listener:', err);
     }
@@ -116,11 +162,13 @@ export function useChat({
     return () => {
       try {
         unlistenToMessages();
+        const socket = getSocket(token);
+        socket.off('message_sent', handleMessageSent);
       } catch (err) {
         console.error('Failed to cleanup message listener:', err);
       }
     };
-  }, [conversationId]);
+  }, [conversationId, token]);
 
   // Setup status update listener
   useEffect(() => {
@@ -214,7 +262,7 @@ export function useChat({
 
   // Send message
   const handleSendMessage = useCallback(
-    async (content: string, type: 'text' | 'image' | 'video' | 'file', mediaUrl?: string) => {
+    async (content: string, type: 'text' | 'image' | 'video' | 'file' | "sticker", mediaUrl?: string) => {
       if (!isConnected()) {
         setError('Not connected to messaging service');
         return;
@@ -342,13 +390,8 @@ export function useMessageHistory({
       setLoading(true);
       setError(null);
 
-      const params = {
-        limit: 20,
-        ...(cursor && { cursor }),
-      };
-
-      const response = await apiClient.get(`/api/messages/${conversationId}`, { params });
-      const { messages, nextCursor, hasMore: responseHasMore } = response.data;
+      const response = await getMessages(conversationId, cursor, 20);
+      const { messages, nextCursor } = response;
 
       if (messages && Array.isArray(messages)) {
         // Reverse to show old → new order
@@ -356,7 +399,7 @@ export function useMessageHistory({
         // First load: set directly, Load more: prepend to top (old messages on top)
         setMessages((prev) => (cursor ? [...reversedMessages, ...prev] : reversedMessages));
         setCursor(nextCursor);
-        setHasMore(responseHasMore ?? messages.length === 20);
+        setHasMore(nextCursor ? messages.length === 20 : false);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch messages';

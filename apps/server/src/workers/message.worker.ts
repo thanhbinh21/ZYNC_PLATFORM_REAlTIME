@@ -59,6 +59,7 @@ export async function startMessageWorker(): Promise<void> {
 
     // Task 6.2: Batch collection variables
     const batch: Array<{
+      mockId: string;
       conversationId: string;
       senderId: string;
       content: string;
@@ -91,6 +92,7 @@ export async function startMessageWorker(): Promise<void> {
               msg.type as 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
               msg.idempotencyKey,
               msg.mediaUrl,
+              msg.mockId,
             );
             successCount++;
           } catch (err) {
@@ -151,6 +153,7 @@ export async function startMessageWorker(): Promise<void> {
           const rawMessage = JSON.parse(payload.message.value.toString()) as RawMessage;
 
           batch.push({
+            mockId: rawMessage.messageId,
             conversationId: rawMessage.conversationId,
             senderId: rawMessage.senderId,
             content: rawMessage.content,

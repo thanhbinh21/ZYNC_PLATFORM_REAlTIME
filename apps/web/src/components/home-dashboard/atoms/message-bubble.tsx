@@ -12,6 +12,21 @@ function CheckCircleIcon({ filled, className }: { filled: boolean; className: st
   );
 }
 
+function DoubleCheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
+  return (
+    <div className="relative inline-flex">
+      <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className={`${className} absolute`} aria-hidden>
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className={`${className} relative`} style={{ marginLeft: '-6px' }} aria-hidden>
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
 interface MessageBubbleProps {
   isOwn: boolean;
   content: string;
@@ -43,8 +58,8 @@ export function MessageBubble({
 
   const statusIcon = {
     sent: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
-    delivered: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
-    read: <CheckCircleIcon filled={true} className="w-4 h-4 text-[#88b8a7]" />,
+    delivered: <DoubleCheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
+    read: <DoubleCheckCircleIcon filled={true} className="w-4 h-4 text-[#88b8a7]" />,
   }[status || 'sent'];
 
   return (

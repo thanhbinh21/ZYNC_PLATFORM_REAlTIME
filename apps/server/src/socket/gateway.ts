@@ -312,9 +312,8 @@ async function handleSendMessage(
     // Note: createMessage already publishes to Kafka (worker will insert)
     // Message object here is a mock with temporary ID until Kafka worker inserts real DB
 
-    // ─── Emit to Recipients ───
-    // Emit with temporary ID (will be updated with real DB _id once Kafka worker processes)
-    io.to(`conv:${conversationId}`).emit('receive_message', {
+    // ─── Emit to Recipients (NOT to sender - they already have optimistic update) ───
+    socket.to(`conv:${conversationId}`).emit('receive_message', {
       messageId: message._id,
       conversationId,
       senderId: userId,
@@ -324,14 +323,14 @@ async function handleSendMessage(
       createdAt: message.createdAt,
     });
 
-    // ─── Emit Status Update ───
+    // ─── Emit Status Update to ALL (including sender) ───
     io.to(`conv:${conversationId}`).emit('status_update', {
       messageId: message._id,
       status: 'sent',
       userId,
     });
 
-    // ─── Confirm to Sender ───
+    // ─── Confirm to Sender (replace optimistic message ID) ───
     socket.emit('message_sent', {
       messageId: message._id,
       idempotencyKey,

@@ -6,6 +6,7 @@ import { ConversationMemberModel } from '../conversations/conversation-member.mo
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
+import { getRedis } from '../../infrastructure/redis';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -118,6 +119,8 @@ export class MessagesService {
    * Insert message with full metadata (MessageStatus, lastMessage, unreadCount)
    * Used by Kafka worker and fallback insert
    * Handles all DB operations after Kafka publishes message
+   * 
+   * @param mockId - Temporary server-generated ID (userId_timestamp) for mapping
    */
   static async insertMessageWithMetadata(
     conversationId: string,
@@ -126,6 +129,7 @@ export class MessagesService {
     type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
     idempotencyKey: string,
     mediaUrl?: string,
+    mockId?: string,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
     const existing = await MessageModel.findOne({ idempotencyKey }).lean();
@@ -149,14 +153,63 @@ export class MessagesService {
     logger.info(`[InsertMetadata] Created message: ${savedMessage._id}`);
 
     // Step 3: Create MessageStatus (sent for sender)
+    // Store BOTH real messageId AND temp mockId for proper ID mapping
     const messageStatus = new MessageStatusModel({
       messageId: savedMessage._id.toString(),
+      idempotencyKey: mockId, // Store temp ID for frontend mapping
       userId: senderId,
       status: 'sent',
     });
 
     await messageStatus.save();
-    logger.info(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id}`);
+    logger.info(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id} (mockId: ${mockId})`);
+
+    // Step 3.5: Apply pending status updates from Redis queue
+    // During Kafka processing time, frontend may have called updateMessageStatus()
+    // Those updates were queued to Redis (since Message wasn't inserted yet)
+    // Now that Message exists, apply all pending updates
+    if (mockId) {
+      try {
+        const redis = getRedis();
+        
+        const pendingKey = `pending_status:${mockId}`;
+        const pendingUpdates = await redis.hgetall(pendingKey);
+
+        if (pendingUpdates && Object.keys(pendingUpdates).length > 0) {
+          logger.info(`[ApplyPending] Found ${Object.keys(pendingUpdates).length} pending updates for ${mockId}`);
+
+          for (const [userId, status] of Object.entries(pendingUpdates)) {
+            // Skip sender (already created above)
+            if (userId === senderId) continue;
+
+            try {
+              const pendingStatus = new MessageStatusModel({
+                messageId: savedMessage._id.toString(),
+                idempotencyKey: mockId,
+                userId,
+                status,
+              });
+              await pendingStatus.save();
+              logger.info(`[ApplyPending] Applied pending status: ${userId}=${status} for message ${savedMessage._id}`);
+            } catch (err) {
+              // Ignore duplicate key errors (already created elsewhere)
+              if ((err as any).code === 11000) {
+                logger.debug(`[ApplyPending] Duplicate status record for ${userId}, skipping`);
+              } else {
+                logger.warn(`[ApplyPending] Error creating MessageStatus for ${userId}`, err);
+              }
+            }
+          }
+
+          // Clean up Redis queue
+          await redis.del(pendingKey);
+          logger.info(`[ApplyPending] Cleaned up Redis queue: ${pendingKey}`);
+        }
+      } catch (err) {
+        logger.warn('[InsertMetadata] Failed to apply pending status updates', err);
+        // Continue anyway - pending updates will be lost but message is still created
+      }
+    }
 
     // Step 4: Update conversation's lastMessage
     try {
@@ -192,6 +245,7 @@ export class MessagesService {
    */
   static async fallbackBatchInsert(
     messages: Array<{
+      mockId?: string;
       conversationId: string;
       senderId: string;
       content: string;
@@ -212,6 +266,7 @@ export class MessagesService {
           msg.type as 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
           msg.idempotencyKey,
           msg.mediaUrl,
+          msg.mockId,
         );
       } catch (err) {
         logger.error(`[Fallback] Failed to insert message ${msg.idempotencyKey}`, err);
@@ -222,10 +277,12 @@ export class MessagesService {
   /**
    * Lấy lịch sử tin nhắn của một hội thoại
    * - Cursor-based pagination (dùng createdAt + _id)
-   * - Return { messages, nextCursor, hasMore }
+   * - Populate status cho current user
+   * - Return { messages (with status), nextCursor, hasMore }
    */
   static async getMessageHistory(
     conversationId: string,
+    userId: string,
     cursor?: string,
     limit: number = 20,
   ): Promise<PaginatedMessages> {
@@ -267,8 +324,27 @@ export class MessagesService {
         ).toString('base64');
       }
 
+      // Fetch status for current user for all messages
+      const messageIds = messages.map(m => m._id.toString());
+      const statuses = await MessageStatusModel.find({
+        messageId: { $in: messageIds },
+        userId,
+      }).lean();
+
+      const statusMap = new Map(statuses.map(s => [s.messageId.toString(), s.status]));
+
+      // Add status to each message (or default to 'sent' for sender's own messages)
+      const messagesWithStatus = messages.map(msg => {
+        const msgId = msg._id.toString();
+        const status = statusMap.get(msgId) || (msg.senderId === userId ? 'sent' : 'delivered');
+        return {
+          ...msg,
+          status,
+        };
+      });
+
       return {
-        messages: messages as unknown as IMessage[],
+        messages: messagesWithStatus as unknown as IMessage[],
         nextCursor,
         hasMore,
       };
@@ -280,7 +356,10 @@ export class MessagesService {
 
   /**
    * Cập nhật status của một tin nhắn cho một user
-   * - Update MessageStatus document
+   * - Optimized: 2 paths
+   * - Path A (fast): MessageStatus exists → update immediately
+   * - Path B (pending): MessageStatus NOT found → queue to Redis, Kafka worker applies later
+   * - Support both real messageId AND idempotencyKey (temp) lookup
    */
   static async updateMessageStatus(
     messageId: string,
@@ -288,14 +367,42 @@ export class MessagesService {
     status: 'sent' | 'delivered' | 'read',
   ): Promise<IMessageStatus | null> {
     try {
-      const messageStatus = await MessageStatusModel.findOneAndUpdate(
-        { messageId, userId },
-        { status, updatedAt: new Date() },
-        { new: true, upsert: true }, // Create if not exists
-      );
+      // Step 1: Try find existing MessageStatus
+      // (handles case where Message already inserted)
+      const existingStatus = await MessageStatusModel.findOne({
+        userId,
+        $or: [
+          { messageId },           // Real MongoDB ID
+          { idempotencyKey: messageId }, // Temp ID
+        ],
+      });
 
-      logger.info(`[MessageStatus] Updated status for message ${messageId} user ${userId}: ${status}`);
-      return messageStatus;
+      if (existingStatus) {
+        // Status record exists → update immediately (fast path)
+        existingStatus.status = status;
+        await existingStatus.save();
+        logger.info(
+          `[MessageStatus] Updated existing: ${messageId}:${userId}=${status}`
+        );
+        return existingStatus;
+      }
+
+      // Step 2: Not found → Queue to Redis pending (Message still inserting)
+      // Kafka worker will apply this after insertMessageWithMetadata() completes
+      const pendingKey = `pending_status:${messageId}`;
+      const redis = getRedis();
+      
+      await redis.hset(pendingKey, userId, status);
+      await redis.expire(pendingKey, 300); // 5 min TTL auto-cleanup
+      
+      logger.info(
+        `[PendingQueue] Queued status update: ${pendingKey}:${userId}=${status}`
+      );
+      
+      // Return null for pending (consistent with "not yet stored in DB")
+      // Frontend will be updated via Socket.io status_update event later
+      return null;
+
     } catch (error) {
       logger.error('[MessagesService] Error in updateMessageStatus:', error);
       throw error;
@@ -357,10 +464,17 @@ export class MessagesService {
 
   /**
    * Lấy status của một tin nhắn cho user
+   * - Support both real messageId AND idempotencyKey lookup
    */
   static async getMessageStatus(messageId: string, userId: string): Promise<IMessageStatus | null> {
     try {
-      const status = await MessageStatusModel.findOne({ messageId, userId }).lean();
+      const status = await MessageStatusModel.findOne({
+        userId,
+        $or: [
+          { messageId },           // Real ID
+          { idempotencyKey: messageId }, // Temp ID
+        ],
+      }).lean();
       return status as IMessageStatus | null;
     } catch (error) {
       logger.error('[MessagesService] Error in getMessageStatus:', error);

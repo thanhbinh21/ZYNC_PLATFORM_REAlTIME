@@ -64,9 +64,10 @@ export const getMessageHistoryHandler = (async (
     }
 
     const { cursor, limit } = validationResult.data;
+    const userId = req.userId;
 
-    // Fetch message history
-    const result = await MessagesService.getMessageHistory(conversationId, cursor, limit);
+    // Fetch message history with status for current user
+    const result = await MessagesService.getMessageHistory(conversationId, userId, cursor, limit);
 
     res.json({
       success: true,

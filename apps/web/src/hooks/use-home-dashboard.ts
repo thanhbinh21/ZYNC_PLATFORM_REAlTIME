@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
-import { getMessages } from '@/services/chat';
 import { fetchFriends, type FriendUser } from '@/services/friends';
 import {
   addGroupMembers,
@@ -10,8 +9,7 @@ import {
   removeGroupMember,
   updateGroupMemberRole,
 } from '@/services/groups';
-import socketService from '@/services/socket';
-import { useMessageHistory } from '@/hooks/use-messaging';
+import { useChat, useMessageHistory } from '@/hooks/use-messaging';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import type { Message } from '@zync/shared-types';
@@ -50,17 +48,71 @@ export function useHomeDashboard() {
   const [userId, setUserId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string>('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; displayName: string }>>([]);
   const [friendsForGroup, setFriendsForGroup] = useState<FriendUser[]>([]);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize chat hook for real-time messaging
+  const {
+    messages,
+    typingUsers,
+    messageStatus,
+    sendMessage,
+    markAsRead,
+    startTyping,
+    stopTyping,
+    isLoading: chatLoading,
+  } = useChat({
+    conversationId: selectedConversationId,
+    userId,
+    token: (globalThis as Record<string, unknown>)['__accessToken'] as string,
+    displayName: data.user.displayName,
+  });
 
   // Use message history hook for pagination
   const messageHistory = useMessageHistory({
     conversationId: selectedConversationId,
   });
+
+  // Build combined message status from both real-time (useChat) and history messages
+  const [combinedMessageStatus, setCombinedMessageStatus] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    // Populate status from all loaded messages
+    const statusMap: Record<string, string> = { ...messageStatus };
+    
+    // Extract status from loaded messages (both real-time and history)
+    messageHistory.messages.forEach((msg) => {
+      if (msg.status && !statusMap[msg._id]) {
+        statusMap[msg._id] = msg.status;
+      }
+    });
+    
+    setCombinedMessageStatus(statusMap);
+  }, [messageHistory.messages, messageStatus]);
+
+  // Subscribe to new messages from useChat and add them to messageHistory
+  useEffect(() => {
+    if (messages.length > 0) {
+      const latestMessage = messages[messages.length - 1];
+      
+      // Check by idempotencyKey first (to replace optimistic), then by _id
+      const existingIndex = messageHistory.messages.findIndex(m => 
+        m.idempotencyKey === latestMessage.idempotencyKey || 
+        m._id === latestMessage._id
+      );
+      
+      if (existingIndex === -1) {
+        // New message, add it
+        messageHistory.setMessages([...messageHistory.messages, latestMessage]);
+      } else {
+        // Replace existing (to transition from optimistic to real ID)
+        const updated = [...messageHistory.messages];
+        updated[existingIndex] = latestMessage;
+        messageHistory.setMessages(updated);
+      }
+    }
+  }, [messages]);
 
   // Fetch initial data
   useEffect(() => {
@@ -194,151 +246,41 @@ export function useHomeDashboard() {
     loadMessages();
   }, [selectedConversationId]);
 
-  // Sync messageHistory messages to local state
+
+
+  // Update conversations list when receiving new messages
   useEffect(() => {
-    setMessages(messageHistory.messages);
-    setMessagesLoading(messageHistory.loading);
-  }, [messageHistory.messages, messageHistory.loading]);
+    if (messages.length === 0) return;
+    
+    const latestMessage = messages[messages.length - 1];
+    setConversations(prev => prev.map(conv => {
+      if (conv._id === latestMessage.conversationId) {
+        const messagePreview = latestMessage.content && latestMessage.content.trim().length > 0
+          ? latestMessage.content
+          : latestMessage.type === 'image'
+            ? 'Da gui anh'
+            : latestMessage.type === 'video'
+              ? 'Da gui video'
+              : latestMessage.type === 'file'
+                ? 'Da gui tep dinh kem'
+                : latestMessage.type === 'audio'
+                  ? 'Da gui am thanh'
+                  : latestMessage.type === 'sticker'
+                    ? 'Da gui sticker'
+                    : 'Tin nhan media';
 
-  // Socket listeners for real-time updates
-  useEffect(() => {
-    const handleNewMessage = (data: {
-      messageId: string;
-      conversationId?: string;
-      senderId: string;
-      content: string;
-      type: string;
-      mediaUrl?: string;
-      createdAt: string;
-    }) => {
-      const targetConversationId = data.conversationId ?? selectedConversationId;
-      if (!targetConversationId) return;
-
-      const message: Message = {
-        _id: data.messageId,
-        conversationId: targetConversationId,
-        senderId: data.senderId,
-        content: data.content,
-        type: data.type as Message['type'],
-        mediaUrl: data.mediaUrl,
-        createdAt: data.createdAt,
-        idempotencyKey: '',
-        status: 'sent',
-      };
-
-      // Prevent duplicate append when same message event arrives more than once.
-      setMessages((prev) => {
-        if (prev.some((item) => item._id === message._id)) {
-          return prev;
-        }
-        return [...prev, message];
-      });
-      
-      // Clear typing indicator for sender (they finished typing and sent message)
-      setTypingUsers(prev => prev.filter(u => u.userId !== data.senderId));
-      
-      // Update conversation
-      setConversations(prev => prev.map(conv => {
-        if (conv._id === targetConversationId) {
-          const messagePreview = data.content && data.content.trim().length > 0
-            ? data.content
-            : data.type === 'image'
-              ? 'Da gui anh'
-              : data.type === 'video'
-                ? 'Da gui video'
-                : data.type === 'file'
-                  ? 'Da gui tep dinh kem'
-                  : data.type === 'audio'
-                    ? 'Da gui am thanh'
-                    : data.type === 'sticker'
-                      ? 'Da gui sticker'
-                      : 'Tin nhan media';
-
-          return {
-            ...conv,
-            lastMessage: {
-              senderId: data.senderId,
-              content: messagePreview,
-              sentAt: data.createdAt,
-            },
-          };
-        }
-        return conv;
-      }));
-    };
-
-    const handleStatusUpdate = (update: {
-      messageId?: string;
-      messageIds?: string[];
-      status: Message['status'];
-    }) => {
-      const ids = update.messageIds ?? (update.messageId ? [update.messageId] : []);
-      if (ids.length === 0) {
-        return;
+        return {
+          ...conv,
+          lastMessage: {
+            senderId: latestMessage.senderId,
+            content: messagePreview,
+            sentAt: latestMessage.createdAt,
+          },
+        };
       }
-
-      setMessages(prev => prev.map(msg => {
-        if (ids.includes(msg._id)) {
-          return { ...msg, status: update.status };
-        }
-        return msg;
-      }));
-    };
-
-    const handleTypingIndicator = (typing: {
-      userId: string;
-      conversationId: string;
-      isTyping: boolean;
-    }) => {
-      // Only handle typing for current conversation
-      if (typing.conversationId !== selectedConversationId) return;
-      
-      // Get user info from conversation
-      const conversation = conversations.find(c => c._id === selectedConversationId);
-      const typingUser = conversation?.users.find(u => u._id === typing.userId);
-      
-      if (!typingUser) return;
-
-      setTypingUsers(prev => {
-        if (typing.isTyping) {
-          // Add user if not already in list
-          if (!prev.find(u => u.userId === typing.userId)) {
-            return [...prev, { userId: typing.userId, displayName: typingUser.displayName }];
-          }
-          return prev;
-        } else {
-          // Remove user from typing list
-          return prev.filter(u => u.userId !== typing.userId);
-        }
-      });
-    };
-
-    // Setup socket listeners for real-time messaging
-    // First, initialize socket connection with token
-    const tokenFromMemory = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
-    const tokenFromStorage = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const token = tokenFromMemory ?? tokenFromStorage;
-    if (token) {
-      try {
-        socketService.getSocket(token);
-        if (selectedConversationId) {
-          socketService.joinConversation(selectedConversationId);
-        }
-        socketService.listenToMessages(handleNewMessage);
-        socketService.listenToStatusUpdates(handleStatusUpdate);
-        socketService.listenToTypingIndicators(handleTypingIndicator);
-      } catch (error) {
-        console.error('Failed to setup socket listeners:', error);
-      }
-    }
-
-    return () => {
-      // Cleanup listeners
-      socketService.unlistenToMessages();
-      socketService.unlistenToStatusUpdates();
-      socketService.unlistenToTypingIndicators();
-    };
-  }, [selectedConversationId]);
+      return conv;
+    }));
+  }, [messages]);
 
   const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
     return conversations.map((conv, idx) => ({
@@ -385,7 +327,6 @@ export function useHomeDashboard() {
 
         setConversations((prev) => [normalizedConversation, ...prev.filter((c) => c._id !== createdGroup._id)]);
         setSelectedConversationId(createdGroup._id);
-        setMessages([]);
 
         return createdGroup;
       } finally {
@@ -490,7 +431,6 @@ export function useHomeDashboard() {
           const filtered = prev.filter((conversation) => conversation._id !== groupId);
           if (selectedConversationId === groupId) {
             setSelectedConversationId(filtered[0]?._id ?? '');
-            setMessages([]);
           }
           return filtered;
         });
@@ -527,25 +467,20 @@ export function useHomeDashboard() {
       if (!selectedConversationId || !userId) return;
 
       try {
-        const idempotencyKey = uuidv4();
-
-        // Emit via Socket.IO
-        socketService.sendMessage(selectedConversationId, content, type, idempotencyKey, mediaUrl);
-
-        // Clear typing indicator after sending
-        setTypingUsers(prev => prev.filter(u => u.userId !== userId));
+        // Use sendMessage from useChat hook
+        await sendMessage(content, type, mediaUrl);
       } catch (error) {
         console.error('Failed to send message:', error);
       }
     },
-    [selectedConversationId, userId],
+    [selectedConversationId, userId, sendMessage],
   );
 
   // Start typing handler
   const handleStartTyping = useCallback(() => {
     if (!selectedConversationId) return;
 
-    socketService.startTyping(selectedConversationId);
+    startTyping();
 
     // Clear existing timeout
     if (typingTimeoutRef.current) {
@@ -554,10 +489,10 @@ export function useHomeDashboard() {
 
     // Set debounce timeout (3s)
     typingTimeoutRef.current = setTimeout(() => {
-      socketService.stopTyping(selectedConversationId);
+      stopTyping();
       typingTimeoutRef.current = null;
     }, 3000);
-  }, [selectedConversationId]);
+  }, [selectedConversationId, startTyping, stopTyping]);
 
   // Stop typing handler
   const handleStopTyping = useCallback(() => {
@@ -568,8 +503,8 @@ export function useHomeDashboard() {
       typingTimeoutRef.current = null;
     }
 
-    socketService.stopTyping(selectedConversationId);
-  }, [selectedConversationId]);
+    stopTyping();
+  }, [selectedConversationId, stopTyping]);
 
   // Cleanup typing timeout on unmount
   useEffect(() => {
@@ -587,8 +522,9 @@ export function useHomeDashboard() {
     conversations: convertConversationsToListItems(),
     selectedConversationId,
     onSelectConversation: setSelectedConversationId,
-    messages,
-    messagesLoading,
+    messages: messageHistory.messages,
+    messageStatus: combinedMessageStatus,
+    messagesLoading: messageHistory.loading,
     conversationInfo: getSelectedConversationInfo(),
     typingUsers,
     friendsForGroup,
