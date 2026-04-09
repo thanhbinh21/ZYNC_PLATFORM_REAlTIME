@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
+import { MessageType } from '../home-dashboard.types';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
@@ -31,11 +32,11 @@ return (
 
 interface UploadedMedia {
   url: string;
-  type: 'image' | 'video' | 'file';
+  type: MessageType;
 }
 
 interface MessageInputProps {
-  onSend: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => void;
+  onSend: (content: string, type: MessageType, mediaUrl?: string) => void;
   onStartTyping: () => void;
   onStopTyping: () => void;
   isLoading?: boolean;
@@ -138,7 +139,7 @@ export function MessageInput({
         : file.type.startsWith('video/')
           ? 'video'
           : 'document';
-      const messageType = uploadType === 'document' ? 'file' : uploadType;
+      const messageType: MessageType = uploadType === 'document' ? `file/${file.name}` : uploadType;
       
       // Step 1: Get upload signature from server
       const signatureData = await generateUploadSignature(uploadType);

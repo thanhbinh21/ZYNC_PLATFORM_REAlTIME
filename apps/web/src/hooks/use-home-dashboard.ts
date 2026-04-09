@@ -10,7 +10,7 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups';
 import { useChat, useMessageHistory } from '@/hooks/use-messaging';
-import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
+import type { DashboardHomeMockData, MessageType } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import type { Message } from '@zync/shared-types';
 
@@ -262,7 +262,7 @@ export function useHomeDashboard() {
             ? 'Da gui anh'
             : latestMessage.type === 'video'
               ? 'Da gui video'
-              : latestMessage.type === 'file'
+              : latestMessage.type?.startsWith('file/')
                 ? 'Da gui tep dinh kem'
                 : latestMessage.type === 'audio'
                   ? 'Da gui am thanh'
@@ -464,7 +464,7 @@ export function useHomeDashboard() {
 
   // Send message handler
   const handleSendMessage = useCallback(
-    async (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => {
+    async (content: string, type: MessageType, mediaUrl?: string) => {
       if (!selectedConversationId || !userId) return;
 
       try {

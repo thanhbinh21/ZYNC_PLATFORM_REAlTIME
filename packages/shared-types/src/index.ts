@@ -42,7 +42,7 @@ export interface Conversation {
 }
 
 // Kiểu dữ liệu Message
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}`;
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export interface Message {

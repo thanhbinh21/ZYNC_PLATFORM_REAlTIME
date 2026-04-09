@@ -22,6 +22,7 @@ import {
   unlistenToTypingIndicators,
 } from '@/services/socket';
 import { getMessages } from '@/services/chat';
+import { MessageType } from '@/components/home-dashboard/home-dashboard.types';
 
 // ─── useChat Hook ───
 
@@ -45,7 +46,7 @@ interface UseChatReturn {
   messages: Message[];
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
-  sendMessage: (content: string, type: 'text' | 'image' | 'video' | 'file' | "sticker", mediaUrl?: string) => Promise<void>;
+  sendMessage: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
@@ -293,7 +294,7 @@ export function useChat({
 
   // Send message
   const handleSendMessage = useCallback(
-    async (content: string, type: 'text' | 'image' | 'video' | 'file' | "sticker", mediaUrl?: string) => {
+    async (content: string, type: MessageType, mediaUrl?: string) => {
       if (!isConnected()) {
         setError('Not connected to messaging service');
         return;

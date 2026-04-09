@@ -68,3 +68,6 @@ export interface DashboardHomeMockData {
   activityCtaLabel: string;
   activities: DashboardActivityItem[];
 }
+
+
+export type MessageType = 'text' | 'image' | 'audio' | 'video' | `file/${string}` | 'sticker'

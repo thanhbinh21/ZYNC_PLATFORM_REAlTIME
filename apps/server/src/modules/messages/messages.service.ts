@@ -1,4 +1,4 @@
-import { MessageModel, type IMessage } from './message.model';
+import { MessageModel, MessageType, type IMessage } from './message.model';
 import { MessageStatusModel, type IMessageStatus } from './message-status.model';
 import { checkIdempotencyKey, setIdempotencyKey } from '../../infrastructure/redis';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -23,7 +23,7 @@ export class MessagesService {
 
   private static getLastMessagePreview(
     content: string,
-    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+    type: MessageType,
   ): string {
     const trimmed = content.trim();
     if (trimmed.length > 0) {
@@ -32,7 +32,7 @@ export class MessagesService {
 
     if (type === 'image') return 'Da gui anh';
     if (type === 'video') return 'Da gui video';
-    if (type === 'file') return 'Da gui tep dinh kem';
+    if (type?.startsWith('file/')) return 'Da gui tep dinh kem';
     if (type === 'audio') return 'Da gui am thanh';
     if (type === 'sticker') return 'Da gui sticker';
     return '';
@@ -79,7 +79,7 @@ export class MessagesService {
     conversationId: string,
     senderId: string,
     content: string,
-    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+    type: MessageType,
     idempotencyKey: string,
     mediaUrl?: string,
   ): Promise<IMessage> {
@@ -154,7 +154,7 @@ export class MessagesService {
     conversationId: string,
     senderId: string,
     content: string,
-    type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+    type: MessageType,
     idempotencyKey: string,
     mediaUrl?: string,
     mockId?: string,
@@ -291,7 +291,7 @@ export class MessagesService {
           msg.conversationId,
           msg.senderId,
           msg.content,
-          msg.type as 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+          msg.type as MessageType,
           msg.idempotencyKey,
           msg.mediaUrl,
           msg.mockId,

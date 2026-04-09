@@ -1,7 +1,7 @@
 import { Schema, model, type Document } from 'mongoose';
 import { type StoryMediaType } from '../stories/story.model';
 
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}`;
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export interface IStoryRef {
@@ -39,7 +39,10 @@ const messageSchema = new Schema<IMessage>(
     content: { type: String, required: false },
     type: {
       type: String,
-      enum: ['text', 'image', 'video', 'audio', 'file', 'sticker'],
+      validate: {
+        validator: (v: string) => /^(text|image|video|audio|sticker|file\/.+)$/.test(v),
+        message: 'Invalid message type. Must be: text, image, video, audio, sticker, or file/<filename>'
+      },
       default: 'text',
     },
     mediaUrl: { type: String },

@@ -11,6 +11,7 @@ import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
+import { MessageType } from '../modules/messages/message.model';
 
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
@@ -293,9 +294,11 @@ async function handleSendMessage(
     return;
   }
 
-  const allowedMessageTypes = new Set(['text', 'image', 'video', 'audio', 'file', 'sticker']);
+  const isValidMessageType = (type: string): boolean => {
+    return ['text', 'image', 'video', 'audio', 'sticker'].includes(type) || type.startsWith('file/');
+  };
   const normalizedType = typeof type === 'string' ? type : 'text';
-  if (!allowedMessageTypes.has(normalizedType)) {
+  if (!isValidMessageType(normalizedType)) {
     socket.emit('error', { message: 'Invalid message type' });
     return;
   }
@@ -319,7 +322,7 @@ async function handleSendMessage(
       conversationId as string,
       userId,
       typeof content === 'string' ? content : '',
-      normalizedType as ('text' | 'image' | 'video' | 'audio' | 'file' | 'sticker'),
+      normalizedType as MessageType,
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
     );

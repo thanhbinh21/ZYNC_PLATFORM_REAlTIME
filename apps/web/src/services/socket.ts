@@ -1,3 +1,4 @@
+import { MessageType } from '@/components/home-dashboard/home-dashboard.types';
 import { io, type Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
@@ -73,7 +74,7 @@ export function leaveConversation(conversationId: string): void {
 export function sendMessage(
   conversationId: string,
   content: string,
-  type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+  type: MessageType,
   idempotencyKey: string,
   mediaUrl?: string,
 ): void {

@@ -5,6 +5,7 @@ import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
+import { MessageType } from '../home-dashboard.types';
 
 // ==================== ICONS ====================
 
@@ -40,7 +41,7 @@ interface ChatPanelProps {
   messages?: Message[];
   messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
-  onSendMessage?: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => Promise<void>;
+  onSendMessage?: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;

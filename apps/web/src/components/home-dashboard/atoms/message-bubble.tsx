@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { MessageStatus } from '@zync/shared-types';
+import { GetFileIcon } from './file-type-icons';
 
 function CheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
   return (
@@ -24,6 +25,24 @@ function DoubleCheckCircleIcon({ filled, className }: { filled: boolean; classNa
         <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
+  );
+}
+
+function FileMessagePreview({ filename, mediaUrl }: { filename: string; mediaUrl?: string }) {
+  const extension = filename.split('.').pop() || '';
+
+  return (
+    <a
+      href={mediaUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-3 rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336] transition-colors"
+    >
+      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+        <GetFileIcon extension={extension} />
+      </div>
+      <span className="truncate max-w-xs">{filename}</span>
+    </a>
   );
 }
 
@@ -82,10 +101,10 @@ export function MessageBubble({
         </div>
       )}
 
-      {/* Message Content */}
+      {/* Media */}
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-xs lg:max-w-md`}>
         {/* Media */}
-        {mediaUrl && (type === 'image' || type === 'video' || type === 'file') && (
+        {mediaUrl && (type === 'image' || type === 'video' || type?.startsWith('file/')) && (
           <div className="mb-1 rounded-lg overflow-hidden">
             {type === 'image' && (
               <Image
@@ -103,15 +122,11 @@ export function MessageBubble({
                 className="max-w-xs max-h-80"
               />
             )}
-            {type === 'file' && (
-              <a
-                href={mediaUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336]"
-              >
-                Mở tệp đính kèm
-              </a>
+            {type?.startsWith('file/') && (
+              <FileMessagePreview
+                filename={type.replace('file/', '')}
+                mediaUrl={mediaUrl}
+              />
             )}
           </div>
         )}
