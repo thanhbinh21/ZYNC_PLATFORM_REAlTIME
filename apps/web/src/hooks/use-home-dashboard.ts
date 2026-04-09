@@ -80,14 +80,14 @@ export function useHomeDashboard() {
   useEffect(() => {
     // Populate status from all loaded messages
     const statusMap: Record<string, string> = { ...messageStatus };
-    
+
     // Extract status from loaded messages (both real-time and history)
     messageHistory.messages.forEach((msg) => {
       if (msg.status && !statusMap[msg._id]) {
         statusMap[msg._id] = msg.status;
       }
     });
-    
+
     setCombinedMessageStatus(statusMap);
   }, [messageHistory.messages, messageStatus]);
 
@@ -95,22 +95,23 @@ export function useHomeDashboard() {
   useEffect(() => {
     if (messages.length > 0) {
       const latestMessage = messages[messages.length - 1];
-      
-      // Check by idempotencyKey first (to replace optimistic), then by _id
-      const existingIndex = messageHistory.messages.findIndex(m => 
-        m.idempotencyKey === latestMessage.idempotencyKey || 
-        m._id === latestMessage._id
-      );
-      
-      if (existingIndex === -1) {
-        // New message, add it
-        messageHistory.setMessages([...messageHistory.messages, latestMessage]);
-      } else {
-        // Replace existing (to transition from optimistic to real ID)
-        const updated = [...messageHistory.messages];
-        updated[existingIndex] = latestMessage;
-        messageHistory.setMessages(updated);
-      }
+
+      // // Check by idempotencyKey first (to replace optimistic), then by _id
+      // const existingIndex = messageHistory.messages.findIndex(m =>
+      //   m.idempotencyKey === latestMessage.idempotencyKey ||
+      //   m._id === latestMessage._id
+      // );
+
+      // if (existingIndex === -1) {
+      //   // New message, add it
+      //   messageHistory.setMessages([...messageHistory.messages, latestMessage]);
+      // } else {
+      //   // Replace existing (to transition from optimistic to real ID)
+      //   const updated = [...messageHistory.messages];
+      //   updated[existingIndex] = latestMessage;
+      //   messageHistory.setMessages(updated);
+      // }
+      messageHistory.setMessages([...messageHistory.messages, latestMessage]);
     }
   }, [messages]);
 
@@ -128,7 +129,7 @@ export function useHomeDashboard() {
         setUserId(user._id as string);
         const pendingRequests = requestsRes.data.pendingRequests || [];
         const convos: Conversation[] = convosRes.data.data || [];
-        
+
         setConversations(convos);
 
         const allFriends: FriendUser[] = [];
@@ -139,7 +140,7 @@ export function useHomeDashboard() {
           cursor = page.nextCursor ?? undefined;
         } while (cursor);
         setFriendsForGroup(allFriends);
-        
+
         // Select first conversation
         if (convos.length > 0) {
           setSelectedConversationId(convos[0]._id);
@@ -151,16 +152,16 @@ export function useHomeDashboard() {
 
         convos.forEach((conv: Conversation, index: number) => {
           if (conv.type === 'group') activeGroupsCount++;
-          
+
           const unreadForMe = conv.unreadCounts?.[user._id] || 0;
           unreadMessagesCount += unreadForMe;
 
           if (conv.lastMessage && conv.lastMessage?.content) {
             const sender = conv.users?.find((u: any) => u._id === conv.lastMessage?.senderId);
-            
+
             let title = sender?.displayName || 'Người dùng';
             let messageStr = conv.lastMessage.content || 'Tin nhan media';
-            
+
             if (conv.type === 'group') {
               title = conv.name || 'Nhóm';
               messageStr = `${sender?.displayName || 'Ai đó'}: ${messageStr}`;
@@ -169,8 +170,8 @@ export function useHomeDashboard() {
             let initials = 'U';
             if (sender?.displayName) {
               const parts = sender.displayName.split(' ');
-              initials = parts.length > 1 
-                ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() 
+              initials = parts.length > 1
+                ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
                 : parts[0].substring(0, 2).toUpperCase();
             }
 
@@ -200,26 +201,26 @@ export function useHomeDashboard() {
             initials: userInitials,
           },
           stats: [
-            { 
-              id: 'stat-1', 
-              value: unreadMessagesCount.toString().padStart(2, '0'), 
-              label: 'Số tin nhắn mới', 
-              badge: unreadMessagesCount > 0 ? `+${unreadMessagesCount}` : '', 
-              icon: 'message' 
+            {
+              id: 'stat-1',
+              value: unreadMessagesCount.toString().padStart(2, '0'),
+              label: 'Số tin nhắn mới',
+              badge: unreadMessagesCount > 0 ? `+${unreadMessagesCount}` : '',
+              icon: 'message'
             },
-            { 
-              id: 'stat-2', 
-              value: pendingRequests.length.toString().padStart(2, '0'), 
-              label: 'Lời mời kết bạn', 
-              badge: pendingRequests.length > 0 ? pendingRequests.length.toString() : '', 
-              icon: 'friends' 
+            {
+              id: 'stat-2',
+              value: pendingRequests.length.toString().padStart(2, '0'),
+              label: 'Lời mời kết bạn',
+              badge: pendingRequests.length > 0 ? pendingRequests.length.toString() : '',
+              icon: 'friends'
             },
-            { 
-              id: 'stat-3', 
-              value: activeGroupsCount.toString().padStart(2, '0'), 
-              label: 'Nhóm đang hoạt động', 
-              badge: '', 
-              icon: 'group' 
+            {
+              id: 'stat-3',
+              value: activeGroupsCount.toString().padStart(2, '0'),
+              label: 'Nhóm đang hoạt động',
+              badge: '',
+              icon: 'group'
             },
           ],
           activities: activities.slice(0, 5),
@@ -238,7 +239,7 @@ export function useHomeDashboard() {
   useEffect(() => {
     async function loadMessages() {
       if (!selectedConversationId) return;
-      
+
       // Use messageHistory hook to fetch initial messages
       await messageHistory.fetchMessages();
     }
@@ -251,7 +252,7 @@ export function useHomeDashboard() {
   // Update conversations list when receiving new messages
   useEffect(() => {
     if (messages.length === 0) return;
-    
+
     const latestMessage = messages[messages.length - 1];
     setConversations(prev => prev.map(conv => {
       if (conv._id === latestMessage.conversationId) {
@@ -285,11 +286,11 @@ export function useHomeDashboard() {
   const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
     return conversations.map((conv, idx) => ({
       id: conv._id,
-      name: conv.type === 'group' 
+      name: conv.type === 'group'
         ? conv.name || 'Nhóm'
         : conv.users.find(u => u._id !== userId)?.displayName || 'Người dùng',
       preview: conv.lastMessage?.content || 'Không có tin nhắn',
-      time: conv.lastMessage?.sentAt 
+      time: conv.lastMessage?.sentAt
         ? new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         : '',
       avatar: conv.type === 'group'

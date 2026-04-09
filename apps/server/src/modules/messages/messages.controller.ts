@@ -4,6 +4,7 @@ import { SendMessageSchema, GetMessageHistorySchema, UpdateMessageStatusSchema, 
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
+import { getIO } from '../../socket/gateway';
 
 // ─── POST /api/messages/send ─────────────────────────────────────────────────
 
@@ -68,6 +69,37 @@ export const getMessageHistoryHandler = (async (
 
     // Fetch message history with status for current user
     const result = await MessagesService.getMessageHistory(conversationId, userId, cursor, limit);
+
+    // ─── AUTO-MARK UNDELIVERED MESSAGES ───
+    // When user fetches old messages (before they were online), auto-mark them as delivered
+    try {
+      const undeliveredIds = await MessagesService.findUndeliveredForUser(conversationId, userId);
+
+      if (undeliveredIds.length > 0) {
+        // Mark each message as delivered using real IDs
+        for (const { id } of undeliveredIds) {
+          await MessagesService.updateMessageStatus(id, userId, 'read');
+        }
+
+        // Broadcast status update to all users in conversation using idempotencyKeys
+        const io = getIO();
+        if (io) {
+          io.to(`conv:${conversationId}`).emit('status_update', {
+            messageIds: undeliveredIds.map((u) => u.id),
+            idempotencyKeys: undeliveredIds.map((u) => u.idempotencyKey),
+            status: 'read',
+            userId,
+            updatedAt: new Date(),
+          });
+          logger.info(
+            `[Auto-mark] Marked ${undeliveredIds.length} messages as delivered for user ${userId} in conversation ${conversationId}`,
+          );
+        }
+      }
+    } catch (err) {
+      // Don't fail the request if auto-mark fails
+      logger.error('[Auto-mark] Error marking messages as delivered:', err);
+    }
 
     res.json({
       success: true,

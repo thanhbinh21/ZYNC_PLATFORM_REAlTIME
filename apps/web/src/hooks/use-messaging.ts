@@ -117,7 +117,7 @@ export function useChat({
         idempotencyKey: '', // Will be set on send
         status: 'delivered',
         createdAt: data.createdAt,
-      };
+      }; console.log(newMessage)
       setMessages((prev) => [...prev, newMessage]);
       setMessageStatus((prev) => ({
         ...prev,
@@ -138,25 +138,25 @@ export function useChat({
       idempotencyKey: string;
       createdAt: string;
     }) => {
-      // Replace optimistic message (using idempotencyKey) with real message (using messageId)
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === data.idempotencyKey
-            ? { ...msg, _id: data.messageId, createdAt: data.createdAt }
-            : msg,
-        ),
-      );
+      // // Replace optimistic message (using idempotencyKey) with real message (using messageId)
+      // setMessages((prev) =>
+      //   prev.map((msg) =>
+      //     msg._id === data.idempotencyKey
+      //       ? { ...msg, _id: data.messageId, createdAt: data.createdAt }
+      //       : msg,
+      //   ),
+      // );
 
       // Transfer status tracking from idempotencyKey to real messageId (keep status as is)
-      setMessageStatus((prev) => {
-        const newStatus = { ...prev };
-        if (prev[data.idempotencyKey]) {
-          // Keep the same status, just move it to the real messageId
-          newStatus[data.messageId] = prev[data.idempotencyKey];
-          delete newStatus[data.idempotencyKey];
-        }
-        return newStatus;
-      });
+      // setMessageStatus((prev) => {
+      //   const newStatus = { ...prev };
+      //   if (prev[data.idempotencyKey]) {
+      //     // Keep the same status, just move it to the real messageId
+      //     newStatus[data.messageId] = prev[data.idempotencyKey];
+      //     delete newStatus[data.idempotencyKey];
+      //   }
+      //   return newStatus;
+      // });
     };
 
     try {
@@ -183,16 +183,38 @@ export function useChat({
     const handleStatusUpdate = (data: {
       messageId?: string;
       messageIds?: string[];
+      idempotencyKeys?: string[];
       status: MessageStatus;
       userId: string;
       updatedAt: string;
     }) => {
-      const ids = data.messageIds || (data.messageId ? [data.messageId] : []);
+      const ids = data.messageIds || [];
+      const idems = data.idempotencyKeys || [];
+
+      // Single message status update (sent event)
+      if (ids.length === 0 && data.messageId) {
+        const messageId = data.messageId;
+        setMessageStatus((prev) => ({
+          ...prev,
+          [messageId]: data.status,
+        }));
+        return;
+      }
+
+      // Batch status update (auto-mark from getMessageHistory)
+      // Backend sends idempotencyKeys = frontend mockIds (now guaranteed to match)
       setMessageStatus((prev) => {
         const updated = { ...prev };
-        ids.forEach((id) => {
-          updated[id] = data.status;
+        ids.forEach((id, i) => {
+          if (updated[idems[i]]) {
+            updated[idems[i]] = data.status;
+          } else {
+            updated[id] = data.status;
+          }
         });
+        // [...idems, ...ids].forEach((key) => {
+        //   if (key) updated[key] = data.status;
+        // });
         return updated;
       });
     };

@@ -163,6 +163,7 @@ export function listenToStatusUpdates(
   callback: (data: {
     messageIds?: string[];
     messageId?: string;
+    idempotencyKeys?: string[];
     status: 'sent' | 'delivered' | 'read';
     userId: string;
     updatedAt: string;

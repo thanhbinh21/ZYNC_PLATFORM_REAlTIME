@@ -101,10 +101,9 @@ export class MessagesService {
 
     // Step 2: Cache idempotency key immediately (before publishing)
     const now = new Date();
-    const mockId = `${senderId}_${Date.now()}`; // Temporary ID
     
     await setIdempotencyKey(idempotencyKey, {
-      messageId: mockId,
+      messageId: idempotencyKey,
       conversationId,
       senderId,
       content,
@@ -116,7 +115,7 @@ export class MessagesService {
     // Step 3: Publish to Kafka (worker will insert)
     try {
       await produceMessage(KAFKA_TOPICS.RAW_MESSAGES, conversationId, {
-        messageId: mockId,
+        messageId: idempotencyKey,
         conversationId,
         senderId,
         content,
@@ -125,7 +124,7 @@ export class MessagesService {
         idempotencyKey,
         createdAt: now,
       });
-      logger.debug(`[Message] Published to Kafka: ${mockId}`);
+      logger.debug(`[Message] Published to Kafka: ${idempotencyKey}`);
     } catch (err) {
       logger.error('[Message] Failed to publish to Kafka', err);
       throw err;
@@ -133,7 +132,7 @@ export class MessagesService {
 
     // Step 4: Return mock message object (real DB insert will happen in Kafka worker)
     return {
-      _id: mockId,
+      _id: idempotencyKey,
       conversationId,
       senderId,
       content,
@@ -182,10 +181,10 @@ export class MessagesService {
     logger.info(`[InsertMetadata] Created message: ${savedMessage._id}`);
 
     // Step 3: Create MessageStatus (sent for sender)
-    // Store BOTH real messageId AND temp mockId for proper ID mapping
+    // Store exact idempotencyKey from frontend for proper ID mapping
     const messageStatus = new MessageStatusModel({
       messageId: savedMessage._id.toString(),
-      idempotencyKey: mockId, // Store temp ID for frontend mapping
+      idempotencyKey: idempotencyKey, // Store exact frontend mockId for matching
       userId: senderId,
       status: 'sent',
     });
@@ -214,7 +213,7 @@ export class MessagesService {
             try {
               const pendingStatus = new MessageStatusModel({
                 messageId: savedMessage._id.toString(),
-                idempotencyKey: mockId,
+                idempotencyKey: idempotencyKey,
                 userId,
                 status,
               });
@@ -553,6 +552,81 @@ export class MessagesService {
       logger.info(`[Message] Deleted message: ${messageId}`);
     } catch (error) {
       logger.error('[MessagesService] Error in deleteMessage:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Tìm các tin nhắn chưa được deliver cho user trong conversation
+   * - Lấy tất cả messages trong conversation
+   * - Filter: senderId !== userId (không phải tin nhắn của user này gửi)
+   * - Filter: MessageStatus không tồn tại hoặc status != 'read'
+   * - Return: Array of {id, idempotencyKey} để có thể match với mockId ở frontend
+   */
+  static async findUndeliveredForUser(
+    conversationId: string,
+    userId: string,
+  ): Promise<Array<{ id: string; idempotencyKey: string }>> {
+    try {
+      // Get all messages in conversation sent by others
+      const messages = await MessageModel
+        .find({
+          conversationId,
+          senderId: { $ne: userId },
+        })
+        .select('_id idempotencyKey')
+        .lean();
+
+      if (messages.length === 0) {
+        return [];
+      }
+
+      const messageIds = messages.map(m => m._id.toString());
+
+      // Get all MessageStatus for these messages + user combination
+      const statuses = await MessageStatusModel
+        .find({
+          messageId: { $in: messageIds },
+          userId,
+        })
+        .select('messageId status')
+        .lean();
+
+      // Build set of already-read message IDs
+      const readMessageIds = new Set<string>();
+      for (const status of statuses) {
+        if (status.status === 'read') {
+          readMessageIds.add(status.messageId.toString());
+        }
+      }
+
+      // Build map of messageId -> status
+      const statusByMessageId = new Map<string, string>();
+      for (const status of statuses) {
+        statusByMessageId.set(status.messageId.toString(), status.status);
+      }
+
+      // Return messages where:
+      // - No status exists (never marked), OR
+      // - Status exists but is not 'read' (still sent/delivered only)
+      const undeliveredIds = messages
+        .filter((msg) => {
+          const msgId = msg._id.toString();
+          const currentStatus = statusByMessageId.get(msgId);
+          return !currentStatus || currentStatus !== 'read';
+        })
+        .map((msg) => ({
+          id: msg._id.toString(),
+          idempotencyKey: msg.idempotencyKey,
+        }));
+
+      logger.info(
+        `[MessagesService] Found ${undeliveredIds.length} undelivered messages for user ${userId} in conversation ${conversationId}`,
+      );
+
+      return undeliveredIds;
+    } catch (error) {
+      logger.error('[MessagesService] Error in findUndeliveredForUser:', error);
       throw error;
     }
   }
