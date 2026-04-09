@@ -2,12 +2,13 @@ import type { DashboardHomeMockData } from './home-dashboard.types';
 
 export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
   brand: 'ZYNC',
-  greeting: 'Chào buổi sáng, Nam!',
+  greeting: 'Xin chào, bạn',
   searchPlaceholder: 'Tìm kiếm cuộc hội thoại',
   user: {
     displayName: 'Trung tâm điều khiển',
     roleLabel: 'Trực tuyến',
     initials: 'NM',
+    avatarUrl: undefined,
   },
   primaryAction: 'Tin nhắn mới',
   navItems: [

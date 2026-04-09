@@ -53,7 +53,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
       <div className="zync-page-container pb-10 pt-28 lg:pt-32">
 
         <section className="mt-10 grid items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-          <div>
+          <div className="zync-reveal-left">
             <p className="font-ui-meta inline-flex rounded-full border border-[#58c9a3]/45 bg-[#0c4e3f]/65 px-4 py-1 text-xs tracking-[0.22em] text-[#c8f4e5]">
               {data.releaseLabel}
             </p>
@@ -70,7 +70,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
             </div>
           </div>
 
-          <aside className="rounded-[2rem] border border-white/15 bg-white/8 p-6 backdrop-blur-xl">
+          <aside className="zync-reveal-right zync-reveal-delay-1 rounded-[2rem] border border-white/15 bg-white/8 p-6 backdrop-blur-xl">
             <p className="font-ui-title text-lg text-[#e6fff5]">{data.globalTitle}</p>
             <p className="font-ui-content mt-3 text-sm leading-7 text-[#b5ddcc]">{data.globalSubtitle}</p>
             <div className="mt-6 space-y-3">
@@ -84,19 +84,19 @@ export function HomeScreen({ data }: HomeScreenProps) {
           </aside>
         </section>
 
-        <section id="features" className="mt-12 grid gap-4 md:grid-cols-3">
+        <section id="features" className="zync-reveal-up zync-reveal-delay-1 mt-12 grid gap-4 md:grid-cols-3">
           {data.features.map((feature) => (
             <HomeFeatureCard key={feature.id} item={feature} />
           ))}
         </section>
 
-        <section id="security" className="mt-8 grid gap-4 md:grid-cols-3" aria-label="Thống kê hiệu năng">
+        <section id="security" className="zync-reveal-up zync-reveal-delay-2 mt-8 grid gap-4 md:grid-cols-3" aria-label="Thống kê hiệu năng">
           {data.metrics.map((metric) => (
             <HomeMetricCard key={`detail-${metric.id}`} item={metric} />
           ))}
         </section>
 
-        <section id="platforms" className="mt-10 rounded-[2rem] border border-[#65d8b1]/35 bg-gradient-to-r from-[#0a4738]/80 to-[#0d5844]/70 p-7 backdrop-blur-xl">
+        <section id="platforms" className="zync-reveal-up zync-reveal-delay-2 mt-10 rounded-[2rem] border border-[#65d8b1]/35 bg-gradient-to-r from-[#0a4738]/80 to-[#0d5844]/70 p-7 backdrop-blur-xl">
           <h2 className="font-ui-title max-w-[26ch] text-balance text-[clamp(1.5rem,3vw,2.15rem)] leading-tight text-[#ecfff8]">
             {data.ctaBlockTitle}
           </h2>
@@ -106,7 +106,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
           </div>
         </section>
 
-        <footer id="pricing" className="mt-8 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
+        <footer id="pricing" className="zync-reveal-up zync-reveal-delay-3 mt-8 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="font-ui-brand text-base tracking-wide text-[#d7f6ea]">{data.footerBrand}</p>
             <p className="font-ui-content mt-1 text-sm text-[#9fcab9]">{data.footerCopyright}</p>

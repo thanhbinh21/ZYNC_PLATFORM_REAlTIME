@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
-import type { DashboardIconName, DashboardStoryItem } from '../home-dashboard.types';
+import type { DashboardIconName } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
-import { updateMyProfile, type MeUser } from '@/services/users';
+import { updateMyProfile, fetchFriendsCount, type MeUser } from '@/services/users';
 import { uploadFile } from '@/services/upload';
+import type { FriendUser } from '@/services/friends';
+import type { Story, StoryFeedGroup } from '@/services/stories';
 
 interface HomeDashboardProfilePanelProps {
   profile: MeUser | null;
   loading: boolean;
   error: string | null;
-  stories: DashboardStoryItem[];
+  myStories?: Story[];
+  feed?: StoryFeedGroup[];
+  friends?: FriendUser[];
   onProfileUpdated?: (user: MeUser) => void;
   onOpenCreateStory?: () => void;
+  onViewStoryFeed?: (feedIndex: number) => void;
+  onViewUserProfile?: (userId: string) => void;
 }
 
 function getInitials(name: string): string {
@@ -24,20 +30,27 @@ export function HomeDashboardProfilePanel({
   profile,
   loading,
   error,
-  stories,
+  myStories = [],
+  feed = [],
+  friends = [],
   onProfileUpdated,
   onOpenCreateStory,
+  onViewStoryFeed,
+  onViewUserProfile,
 }: HomeDashboardProfilePanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [formValues, setFormValues] = useState({
     displayName: '',
     bio: '',
   });
+  const [friendsCount, setFriendsCount] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'friends' | 'stories'>('info');
 
   useEffect(() => {
     if (!profile) return;
@@ -45,6 +58,10 @@ export function HomeDashboardProfilePanel({
       displayName: profile.displayName ?? '',
       bio: profile.bio ?? '',
     });
+    // Fetch friend count
+    fetchFriendsCount()
+      .then(setFriendsCount)
+      .catch(() => setFriendsCount(0));
   }, [profile]);
 
   useEffect(() => {
@@ -106,29 +123,6 @@ export function HomeDashboardProfilePanel({
     { label: 'Username', value: username, icon: 'profile' },
   ];
 
-  const deviceItems: Array<{
-    name: string;
-    location: string;
-    status: string;
-    active: boolean;
-    icon: DashboardIconName;
-  }> = [
-    {
-      name: 'MacBook Pro M2',
-      location: 'TP. Hồ Chí Minh',
-      status: 'Đang hoạt động',
-      active: true,
-      icon: 'settings',
-    },
-    {
-      name: 'iPhone 15 Pro',
-      location: 'TP. Hồ Chí Minh',
-      status: '2 giờ trước',
-      active: false,
-      icon: 'profile',
-    },
-  ];
-
   // ─── Save handler ─────────────────────────────────────────────────────────────
   const handleSaveProfile = async () => {
     const displayName = formValues.displayName.trim();
@@ -144,7 +138,11 @@ export function HomeDashboardProfilePanel({
 
       if (avatarFile) {
         setIsUploadingAvatar(true);
-        avatarUrlToSave = await uploadFile(avatarFile, 'avatars');
+        setAvatarUploadProgress(0);
+        avatarUrlToSave = await uploadFile(avatarFile, 'avatars', {
+          onProgress: (percent) => setAvatarUploadProgress(percent),
+        });
+        setAvatarUploadProgress(100);
       }
 
       const updated = await updateMyProfile({
@@ -164,6 +162,7 @@ export function HomeDashboardProfilePanel({
       }
     } finally {
       setIsUploadingAvatar(false);
+      setAvatarUploadProgress(0);
       setIsSaving(false);
     }
   };
@@ -179,6 +178,12 @@ export function HomeDashboardProfilePanel({
     setSaveError(null);
     setAvatarFile(file);
   };
+
+  const tabs: Array<{ id: 'info' | 'friends' | 'stories'; label: string; count?: number }> = [
+    { id: 'info', label: 'Thông tin' },
+    { id: 'friends', label: 'Bạn bè', count: friendsCount ?? friends.length },
+    { id: 'stories', label: 'Stories', count: feed.length },
+  ];
 
   return (
     <section className="space-y-5">
@@ -237,14 +242,6 @@ export function HomeDashboardProfilePanel({
               >
                 <DashboardIcon name="edit" className="h-4 w-4" />
                 Chỉnh sửa hồ sơ
-              </button>
-
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-[#1a5444] text-[#7cb3a1] transition hover:bg-[#0e3429]"
-                aria-label="Cài đặt"
-              >
-                <DashboardIcon name="settings" className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -307,6 +304,20 @@ export function HomeDashboardProfilePanel({
                   )}
                 </div>
                 <p className="font-ui-content mt-2 text-xs text-[#7ba999]">Ảnh sẽ tự upload và cập nhật URL khi bạn bấm Lưu thay đổi.</p>
+                {isUploadingAvatar && (
+                  <div className="mt-3 rounded-lg border border-[#1a5444] bg-[#0a2d24] p-2.5">
+                    <div className="mb-1 flex items-center justify-between text-xs text-[#9bcfbe]">
+                      <span>Đang tải ảnh đại diện</span>
+                      <span>{avatarUploadProgress}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[#143e32]">
+                      <div
+                        className="h-full rounded-full bg-[#2fe0b4] transition-all"
+                        style={{ width: `${avatarUploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </label>
 
@@ -348,140 +359,230 @@ export function HomeDashboardProfilePanel({
         </section>
       )}
 
-      {/* ── Body grid ───────────────────────────────────────────────────────────── */}
-      <div className="grid gap-4 xl:grid-cols-[1.02fr_1.35fr]">
+      {/* ── Tab navigation ──────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 rounded-2xl bg-[#0b2f25] p-1.5">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`font-ui-title flex-1 rounded-xl px-4 py-2.5 text-sm transition ${
+              activeTab === tab.id
+                ? 'bg-[#2fe0b4] text-[#04342a]'
+                : 'text-[#8ec5b4] hover:bg-[#0d3228]'
+            }`}
+          >
+            {tab.label}
+            {tab.count !== undefined && tab.count > 0 && (
+              <span className={`ml-1.5 text-xs ${activeTab === tab.id ? 'text-[#04342a]/70' : 'text-[#4cf0bf]'}`}>
+                ({tab.count})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
-        {/* Left column */}
-        <div className="space-y-4">
+      {/* ── Tab: Thông tin ──────────────────────────────────────────────────────── */}
+      {activeTab === 'info' && (
+        <div className="grid gap-4 xl:grid-cols-[1.02fr_1.35fr]">
 
-          {/* Personal info */}
-          <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
-            <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
-              Thông tin cá nhân
-            </h3>
-            <div className="mt-4 space-y-3">
-              {personalInfoItems.map(({ label, value, icon }) => (
-                <div key={label} className="flex items-center gap-3 rounded-2xl bg-[#0b2f25] p-3">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#0f3a2e]">
-                    <DashboardIcon name={icon} className="h-4 w-4 text-[#4cf0bf]" />
+          {/* Left column */}
+          <div className="space-y-4">
+
+            {/* Personal info */}
+            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+              <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
+                Thông tin cá nhân
+              </h3>
+              <div className="mt-4 space-y-3">
+                {personalInfoItems.map(({ label, value, icon }) => (
+                  <div key={label} className="flex items-center gap-3 rounded-2xl bg-[#0b2f25] p-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#0f3a2e]">
+                      <DashboardIcon name={icon} className="h-4 w-4 text-[#4cf0bf]" />
+                    </div>
+                    <div>
+                      <p className="font-ui-meta text-[0.62rem] uppercase tracking-[0.12em] text-[#78ad9d]">
+                        {label}
+                      </p>
+                      <p className="font-ui-content mt-0.5 break-all text-sm text-[#d4f8eb]">
+                        {value}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-ui-meta text-[0.62rem] uppercase tracking-[0.12em] text-[#78ad9d]">
+                ))}
+              </div>
+            </section>
+
+            {/* Security placeholder */}
+            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+              <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
+                Bảo mật
+              </h3>
+              <div className="mt-3 rounded-2xl bg-[#0b2f25] p-3">
+                <p className="font-ui-content text-sm text-[#c5e8dd]">Quản lý thiết bị</p>
+                <p className="font-ui-content mt-1 text-xs text-[#7eac9d]">Tính năng đang được phát triển.</p>
+              </div>
+            </section>
+          </div>
+
+          {/* Right column */}
+          <div className="space-y-4">
+
+            {/* My Stories (real) */}
+            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="font-ui-title text-lg text-[#dffcf0]">Story của tôi</h3>
+                <span className="font-ui-content text-sm text-[#7cb3a1]">{myStories.length} story</span>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {/* Add story card */}
+                <div className="flex h-36 min-w-[84px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#1b5143] bg-[#0a3228]">
+                  <button
+                    type="button"
+                    onClick={() => onOpenCreateStory?.()}
+                    className="flex h-full w-full flex-col items-center justify-center gap-2"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2fe0b4]">
+                      <DashboardIcon name="plus" className="h-4 w-4 text-[#2fe0b4]" />
+                    </div>
+                    <p className="font-ui-meta text-[0.6rem] uppercase tracking-[0.1em] text-[#4cf0bf]">
+                      Thêm Story
+                    </p>
+                  </button>
+                </div>
+
+                {myStories.slice(0, 5).map((story) => (
+                  <div
+                    key={story._id}
+                    className="h-36 min-w-[84px] rounded-2xl border border-[#1b5143] bg-[#0a3228] overflow-hidden"
+                  >
+                    {story.mediaType === 'image' && story.mediaUrl ? (
+                      <img src={story.mediaUrl} alt="story" className="h-full w-full object-cover" />
+                    ) : story.mediaType === 'video' && story.mediaUrl ? (
+                      <div className="flex h-full items-center justify-center bg-[#0d3228]">
+                        <span className="text-2xl">🎬</span>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex h-full items-center justify-center p-2"
+                        style={{ backgroundColor: story.backgroundColor || '#1a6f58' }}
+                      >
+                        <p className="font-ui-content text-xs text-white text-center line-clamp-3">
+                          {story.content || 'Story'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {myStories.length === 0 && (
+                  <p className="flex items-center px-4 font-ui-content text-sm text-[#7cb3a1]">Bạn chưa có story nào.</p>
+                )}
+              </div>
+            </section>
+
+            {/* Bio + Real stats */}
+            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+              <h3 className="font-ui-title text-lg text-[#dffcf0]">Giới thiệu</h3>
+              <p className="font-ui-content mt-3 text-sm leading-relaxed text-[#cbeee2]">
+                {profile.bio ?? 'Chưa cập nhật giới thiệu.'}
+              </p>
+
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {[
+                  { value: friendsCount ?? friends.length, label: 'Bạn bè' },
+                  { value: myStories.length, label: 'Story' },
+                  { value: joinedYear ?? '-', label: 'Tham gia' },
+                ].map(({ value, label }) => (
+                  <div key={label} className="rounded-2xl bg-[#193f34] p-3 text-center">
+                    <p className="font-ui-title text-2xl text-[#41e8ba]">{value}</p>
+                    <p className="font-ui-meta mt-1 text-[0.62rem] uppercase tracking-[0.08em] text-[#91baa9]">
                       {label}
                     </p>
-                    <p className="font-ui-content mt-0.5 break-all text-sm text-[#d4f8eb]">
-                      {value}
-                    </p>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Logged-in devices */}
-          <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
-            <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
-              Thiết bị đã đăng nhập
-            </h3>
-            <div className="mt-3 space-y-4">
-              {deviceItems.map(({ name, location, status, active, icon }) => (
-                <div key={name} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#0b2f25]">
-                    <DashboardIcon name={icon} className="h-4 w-4 text-[#78ad9d]" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-ui-content text-sm text-[#c5e8dd]">{name}</p>
-                    <p className="font-ui-content text-xs text-[#7eac9d]">
-                      {location} •{' '}
-                      <span className={active ? 'text-[#32ddb2]' : ''}>{status}</span>
-                    </p>
-                  </div>
-                  {active && (
-                    <span className="h-2 w-2 rounded-full bg-[#32ddb2]" />
-                  )}
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="font-ui-meta mt-4 w-full rounded-2xl border border-[#1a5444] py-2.5 text-[0.7rem] uppercase tracking-[0.12em] text-[#bbebdc] transition hover:bg-[#10382d]"
-            >
-              Quản lý tất cả thiết bị
-            </button>
-          </section>
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-4">
-
-          {/* Stories */}
-          <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="font-ui-title text-lg text-[#dffcf0]">Story của tôi</h3>
-              <button
-                type="button"
-                className="font-ui-title text-sm text-[#4cf0bf] hover:text-[#8effdb]"
-              >
-                Xem tất cả
-              </button>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {/* Add story card */}
-              <div className="flex h-36 min-w-[84px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#1b5143] bg-[#0a3228]">
-                <button
-                  type="button"
-                  onClick={() => onOpenCreateStory?.()}
-                  className="flex h-full w-full flex-col items-center justify-center gap-2"
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#2fe0b4]">
-                    <DashboardIcon name="plus" className="h-4 w-4 text-[#2fe0b4]" />
-                  </div>
-                  <p className="font-ui-meta text-[0.6rem] uppercase tracking-[0.1em] text-[#4cf0bf]">
-                    Thêm Story
-                  </p>
-                </button>
+                ))}
               </div>
-
-              {stories.slice(0, 4).map((item) => (
-                <div
-                  key={item.id}
-                  className="h-36 min-w-[84px] rounded-2xl border border-[#1b5143] bg-[#0a3228] p-2"
-                >
-                  <div
-                    className={`h-full rounded-xl ${item.toneClass} flex items-end p-2 text-[#eafff7]`}
-                  >
-                    <p className="font-ui-title text-xs">{item.name}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Bio + stats */}
-          <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
-            <h3 className="font-ui-title text-lg text-[#dffcf0]">Giới thiệu</h3>
-            <p className="font-ui-content mt-3 text-sm leading-relaxed text-[#cbeee2]">
-              {profile.bio ?? 'Chưa cập nhật giới thiệu.'}
-            </p>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { value: '1.2k', label: 'Bạn bè' },
-                { value: '850', label: 'Theo dõi' },
-                { value: '156', label: 'Khoảnh khắc' },
-                { value: joinedYear ?? '-', label: 'Tham gia' },
-              ].map(({ value, label }) => (
-                <div key={label} className="rounded-2xl bg-[#193f34] p-3 text-center">
-                  <p className="font-ui-title text-2xl text-[#41e8ba]">{value}</p>
-                  <p className="font-ui-meta mt-1 text-[0.62rem] uppercase tracking-[0.08em] text-[#91baa9]">
-                    {label}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Tab: Bạn bè ────────────────────────────────────────────────────────── */}
+      {activeTab === 'friends' && (
+        <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+          <h3 className="font-ui-title mb-4 text-lg text-[#dffcf0]">
+            Danh sách bạn bè ({friendsCount ?? friends.length})
+          </h3>
+          {friends.length === 0 ? (
+            <p className="font-ui-content text-sm text-[#7cb3a1]">Bạn chưa có bạn bè nào.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {friends.map((friend) => (
+                <button
+                  key={friend.id}
+                  type="button"
+                  onClick={() => onViewUserProfile?.(friend.id)}
+                  className="flex items-center gap-3 rounded-2xl bg-[#0b2f25] p-3 text-left transition hover:bg-[#10382d]"
+                >
+                  <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-[#b0e4d2]">
+                    {friend.avatarUrl ? (
+                      <img src={friend.avatarUrl} alt={friend.displayName} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="font-ui-title flex h-full w-full items-center justify-center text-sm text-[#0a2a22]">
+                        {getInitials(friend.displayName)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-ui-title truncate text-sm text-[#e4fff5]">{friend.displayName}</p>
+                    {friend.bio && <p className="font-ui-content truncate text-xs text-[#7cb3a1]">{friend.bio}</p>}
+                  </div>
+                  <span className="font-ui-content text-xs text-[#4cf0bf]">Xem →</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Tab: Stories Feed ───────────────────────────────────────────────────── */}
+      {activeTab === 'stories' && (
+        <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+          <h3 className="font-ui-title mb-4 text-lg text-[#dffcf0]">
+            Story của bạn bè ({feed.length})
+          </h3>
+          {feed.length === 0 ? (
+            <p className="font-ui-content text-sm text-[#7cb3a1]">Bạn bè chưa đăng story nào.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {feed.map((group, idx) => (
+                <button
+                  key={group.userId}
+                  type="button"
+                  onClick={() => onViewStoryFeed?.(idx)}
+                  className="flex items-center gap-3 rounded-2xl bg-[#0b2f25] p-3 text-left transition hover:bg-[#10382d]"
+                >
+                  <div className="relative h-12 w-12 flex-shrink-0">
+                    <div className="h-full w-full overflow-hidden rounded-full ring-2 ring-[#2fe0b4] ring-offset-2 ring-offset-[#051f19]">
+                      {group.avatarUrl ? (
+                        <img src={group.avatarUrl} alt={group.displayName} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[#b0e4d2] text-sm font-bold text-[#0a2a22]">
+                          {getInitials(group.displayName)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-ui-title truncate text-sm text-[#e4fff5]">{group.displayName}</p>
+                    <p className="font-ui-content text-xs text-[#7cb3a1]">{group.stories.length} story</p>
+                  </div>
+                  <span className="font-ui-content text-xs text-[#4cf0bf]">Xem →</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </section>
   );
 }

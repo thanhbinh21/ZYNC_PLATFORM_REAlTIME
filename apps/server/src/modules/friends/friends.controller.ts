@@ -6,6 +6,7 @@ import { ListFriendsQuerySchema, type SendFriendRequestDto } from './friends.sch
 import {
   acceptFriendRequest,
   blockUser,
+  getFriendsCount,
   listFriendRequests,
   listFriends,
   rejectFriendRequest,
@@ -138,6 +139,20 @@ export async function listFriendRequestsHandler(
     const { userId } = req as AuthRequest;
     const data = await listFriendRequests(userId);
     res.json({ success: true, ...data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getFriendsCountHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const count = await getFriendsCount(userId);
+    res.json({ success: true, count });
   } catch (err) {
     next(err);
   }
