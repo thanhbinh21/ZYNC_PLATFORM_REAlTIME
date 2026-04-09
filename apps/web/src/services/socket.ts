@@ -223,6 +223,26 @@ export function stopTyping(conversationId: string): void {
 }
 
 /**
+ * Clear pending typing indicator immediately (e.g., when message is sent)
+ * Don't wait for 3s debounce - emit typing_stop right away
+ * @param conversationId Conversation ID
+ */
+export function clearPendingTyping(conversationId: string): void {
+  if (!socket?.connected) {
+    return;
+  }
+
+  // Clear timeout if pending
+  if (typingTimeout) {
+    clearTimeout(typingTimeout);
+    typingTimeout = null;
+  }
+
+  // Emit typing_stop immediately (don't wait 3s)
+  socket.emit('typing_stop', { conversationId });
+}
+
+/**
  * Listen to typing indicators from other users
  * @param callback Handler for typing indicator updates
  */
@@ -293,6 +313,7 @@ export const socketService = {
   unlistenToStatusUpdates,
   startTyping,
   stopTyping,
+  clearPendingTyping,
   listenToTypingIndicators,
   unlistenToTypingIndicators,
   listenToErrors,

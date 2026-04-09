@@ -55,28 +55,49 @@ export function MessageInput({
   const [isSending, setIsSending] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const QUICK_EMOJIS = ['😀', '😂', '😍', '👍', '❤️', '🔥', '👏', '🎉'];
 
   const handleInputChange = (value: string) => {
-    const wasEmpty = input.length === 0;
     setInput(value);
 
-    // Emit typing_start if just started typing
-    if (wasEmpty && value.length > 0) {
-      onStartTyping();
-    }
-
-    // Debounce typing_stop event
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
     if (value.length > 0) {
+      // Emit typing_start if interval isn't running (first keystroke or resuming after stop)
+      if (!typingIntervalRef.current) {
+        onStartTyping();
+
+        // Start throttle interval: re-emit every 2s to refresh Redis TTL
+        typingIntervalRef.current = setInterval(() => {
+          onStartTyping();
+        }, 2000);
+      }
+
+      // Reset stop debounce: clears any pending stop, sets new 3s timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
       typingTimeoutRef.current = setTimeout(() => {
         onStopTyping();
+        // Cleanup interval when typing stops
+        if (typingIntervalRef.current) {
+          clearInterval(typingIntervalRef.current);
+          typingIntervalRef.current = null;
+        }
       }, 3000);
+    } else {
+      // User cleared all text: stop immediately
+      onStopTyping();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
     }
   };
 
@@ -90,6 +111,11 @@ export function MessageInput({
       onStopTyping();
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
       }
       // Prevent double-click for 500ms
       setTimeout(() => setIsSending(false), 500);

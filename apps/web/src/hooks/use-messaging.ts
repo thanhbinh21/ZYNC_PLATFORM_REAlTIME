@@ -16,6 +16,7 @@ import {
   sendMessage as emitSendMessage,
   startTyping as emitStartTyping,
   stopTyping as emitStopTyping,
+  clearPendingTyping as emitClearPendingTyping,
   unlistenToMessages,
   unlistenToStatusUpdates,
   unlistenToTypingIndicators,
@@ -326,6 +327,9 @@ export function useChat({
 
         // Send via socket
         emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl);
+
+        // Clear pending typing indicator immediately (don't wait 3s)
+        emitClearPendingTyping(conversationId);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
         setError(errorMsg);
