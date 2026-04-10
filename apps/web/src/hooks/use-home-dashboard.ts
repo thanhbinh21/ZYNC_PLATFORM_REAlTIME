@@ -235,20 +235,6 @@ export function useHomeDashboard() {
     fetchData();
   }, []);
 
-  // Fetch messages for selected conversation
-  useEffect(() => {
-    async function loadMessages() {
-      if (!selectedConversationId) return;
-
-      // Use messageHistory hook to fetch initial messages
-      await messageHistory.fetchMessages();
-    }
-
-    loadMessages();
-  }, [selectedConversationId]);
-
-
-
   // Update conversations list when receiving new messages
   useEffect(() => {
     if (messages.length === 0) return;

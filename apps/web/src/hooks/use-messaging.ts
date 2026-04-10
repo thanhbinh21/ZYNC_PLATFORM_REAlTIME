@@ -415,6 +415,7 @@ export function useMessageHistory({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [checkChange, setCheckChange] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch messages with cursor
@@ -451,14 +452,15 @@ export function useMessageHistory({
     setCursor(undefined);
     setHasMore(true);
     setError(null);
+    setCheckChange(prev => !prev);
   }, [conversationId]);
 
   // Auto-fetch initial messages when conversationId changes
   useEffect(() => {
-    if (conversationId && messages.length === 0 && !loading) {
+    if (conversationId && !loading) {
       fetchMessages();
     }
-  }, [conversationId]);
+  }, [checkChange]);
 
   // Load more (fetch with current cursor)
   const loadMore = useCallback(async () => {
