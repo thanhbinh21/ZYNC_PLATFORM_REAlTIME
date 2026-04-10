@@ -150,6 +150,71 @@ html {
 	}
 }
 
+@keyframes revealLeft {
+	from {
+		opacity: 0;
+		transform: translate3d(-28px, 0, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes revealRight {
+	from {
+		opacity: 0;
+		transform: translate3d(28px, 0, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes revealUp {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 26px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+.zync-reveal-left {
+	animation: revealLeft 520ms ease-out both;
+}
+
+.zync-reveal-right {
+	animation: revealRight 520ms ease-out both;
+}
+
+.zync-reveal-up {
+	animation: revealUp 560ms ease-out both;
+}
+
+.zync-reveal-delay-1 {
+	animation-delay: 90ms;
+}
+
+.zync-reveal-delay-2 {
+	animation-delay: 170ms;
+}
+
+.zync-reveal-delay-3 {
+	animation-delay: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.zync-reveal-left,
+	.zync-reveal-right,
+	.zync-reveal-up {
+		animation: none;
+	}
+}
+
 /* ─── Story Ring (conic-gradient needs CSS @property) ─── */
 
 @property --story-ring-angle {

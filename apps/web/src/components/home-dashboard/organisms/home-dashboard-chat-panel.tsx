@@ -95,7 +95,7 @@ function ConversationList({
     : conversations;
 
   return (
-    <aside className="border-r border-[#114538] bg-[linear-gradient(180deg,#06271f_0%,#052019_100%)] p-4 overflow-y-auto">
+    <aside className="h-full min-h-0 overflow-y-auto border-r border-[#114538] bg-[linear-gradient(180deg,#06271f_0%,#052019_100%)] p-4">
       <h2 className="text-2xl font-bold text-[#e6fff5] mb-4">Tin nhắn</h2>
 
       {/* Search */}
@@ -192,7 +192,7 @@ function ChatPanel({
   };
 
   return (
-    <article className="flex flex-col h-full bg-[linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
+    <article className="grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-[linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-[#114538] px-5 py-3 bg-[#06271f]">
         <div className="flex items-center gap-3">
@@ -249,7 +249,7 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="max-h-[calc(100vh-229px)] overflow-y-auto px-5 py-4 space-y-2"
+        className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-2"
       >
         {/* Load More Button */}
         {messages.length > 0 && (
@@ -911,24 +911,25 @@ export function HomeDashboardChatPanel({
 
   return (
     <>
-      <section className="h-full overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
-        <div className={`grid h-full grid-cols-1 gap-0 ${isInfoOpen ? 'xl:grid-cols-[300px_1fr_320px]' : 'xl:grid-cols-[300px_1fr]'}`}>
-        {/* Left: Conversation List */}
-        <ConversationList
-          conversations={conversations}
-          selectedId={selectedConversationId}
-          onSelectConversation={onSelectConversation}
-        />
+      <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
+        <div className="h-full w-[300px] shrink-0 border-r border-[#114538]">
+          <ConversationList
+            conversations={conversations}
+            selectedId={selectedConversationId}
+            onSelectConversation={onSelectConversation}
+          />
+        </div>
 
-        {/* Right: Chat Panel */}
+        <div className="h-full min-w-0 flex-1">
           <ChatPanel
             {...chatPanelProps}
             onLoadMore={onLoadMore}
             onInfoClick={() => setIsInfoOpen((prev) => !prev)}
           />
+        </div>
 
           {isInfoOpen && (
-            <aside className="hidden border-l border-[#114538] bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
+            <aside className="hidden h-full w-[320px] shrink-0 border-l border-[#114538] bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
               <div className="border-b border-[#114538] px-5 py-4">
                 <h3 className="text-xl font-semibold text-[#e2fff4]">{infoTitle}</h3>
               </div>
@@ -1041,7 +1042,6 @@ export function HomeDashboardChatPanel({
               </div>
             </aside>
           )}
-        </div>
       </section>
 
       {isInfoOpen && (

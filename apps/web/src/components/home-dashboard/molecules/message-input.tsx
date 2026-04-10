@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import { MessageType } from '../home-dashboard.types';
 
@@ -31,8 +31,11 @@ return (
   );}
 
 interface UploadedMedia {
-  url: string;
+  previewUrl: string;
+  remoteUrl?: string;
   type: MessageType;
+  isReady: boolean;
+  fileName?: string;
 }
 
 interface MessageInputProps {
@@ -52,6 +55,7 @@ export function MessageInput({
 }: MessageInputProps) {
   const [input, setInput] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -60,6 +64,14 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const QUICK_EMOJIS = ['😀', '😂', '😍', '👍', '❤️', '🔥', '👏', '🎉'];
+
+  useEffect(() => {
+    return () => {
+      if (uploadedMedia?.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedMedia.previewUrl);
+      }
+    };
+  }, [uploadedMedia]);
 
   const handleInputChange = (value: string) => {
     setInput(value);
@@ -104,10 +116,18 @@ export function MessageInput({
 
   const handleSend = () => {
     if ((input.trim() || uploadedMedia) && !isLoading && !disabled && !isSending) {
+      if (uploadedMedia && !uploadedMedia.isReady) {
+        alert('Ảnh hoặc tệp đang tải lên, vui lòng chờ thêm một chút.');
+        return;
+      }
+
       setIsSending(true);
       const messageContent = input.trim();
-      onSend(messageContent, uploadedMedia?.type || 'text', uploadedMedia?.url);
+      onSend(messageContent, uploadedMedia?.type || 'text', uploadedMedia?.remoteUrl);
       setInput('');
+      if (uploadedMedia?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedMedia.previewUrl);
+      }
       setUploadedMedia(null);
       onStopTyping();
       if (typingTimeoutRef.current) {
@@ -132,19 +152,34 @@ export function MessageInput({
 
   // Shared upload logic for both file select and paste
   const handleUploadFile = async (file: File, autoSend = false) => {
+    const messageType: MessageType = file.type.startsWith('image/')
+      ? 'image'
+      : file.type.startsWith('video/')
+        ? 'video'
+        : `file/${file.name}`;
+    const previewUrl = file.type.startsWith('image/') || file.type.startsWith('video/')
+      ? URL.createObjectURL(file)
+      : '';
+
+    setUploadedMedia({
+      previewUrl,
+      remoteUrl: undefined,
+      type: messageType,
+      isReady: false,
+      fileName: file.name,
+    });
+
     setUploading(true);
+    setUploadProgress(0);
     try {
       const uploadType = file.type.startsWith('image/')
         ? 'image'
         : file.type.startsWith('video/')
           ? 'video'
           : 'document';
-      const messageType: MessageType = uploadType === 'document' ? `file/${file.name}` : uploadType;
       
-      // Step 1: Get upload signature from server
       const signatureData = await generateUploadSignature(uploadType);
       
-      // Step 2: Upload file to Cloudinary using FormData
       const formData = new FormData();
       formData.append('file', file);
       formData.append('api_key', signatureData.apiKey);
@@ -152,49 +187,77 @@ export function MessageInput({
       formData.append('timestamp', signatureData.timestamp.toString());
       formData.append('folder', signatureData.folder);
       
-      const uploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${uploadType === 'document' ? 'raw' : uploadType}/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
+      const uploadedData = await new Promise<{ public_id: string; secure_url: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(
+          'POST',
+          `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/${uploadType === 'document' ? 'raw' : uploadType}/upload`,
+        );
 
-      if (!uploadResponse.ok) {
-        let cloudinaryMessage = `Cloudinary upload failed: ${uploadResponse.status}`;
-        try {
-          const failed = await uploadResponse.json() as { error?: { message?: string } };
-          if (failed.error?.message) {
-            cloudinaryMessage = `Cloudinary upload failed: ${failed.error.message}`;
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) {
+            return;
           }
-        } catch {
-          // noop
-        }
-        throw new Error(cloudinaryMessage);
-      }
 
-      const uploadedData = await uploadResponse.json() as { public_id: string; secure_url: string };
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percent);
+        };
 
-      // Step 3: Verify upload with backend
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText) as { public_id: string; secure_url: string });
+            } catch {
+              reject(new Error('Cloudinary upload failed: invalid response'));
+            }
+            return;
+          }
+
+          try {
+            const failed = JSON.parse(xhr.responseText) as { error?: { message?: string } };
+            reject(new Error(`Cloudinary upload failed: ${failed.error?.message ?? xhr.status}`));
+          } catch {
+            reject(new Error(`Cloudinary upload failed: ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error('Cloudinary upload failed: network error'));
+        };
+
+        xhr.send(formData);
+      });
+
       const verifyResult = await verifyUpload(uploadedData.public_id, uploadType);
+      setUploadProgress(100);
 
       const media: UploadedMedia = {
-        url: verifyResult.secureUrl,
+        previewUrl,
+        remoteUrl: verifyResult.secureUrl,
         type: messageType,
+        isReady: true,
+        fileName: file.name,
       };
 
       if (autoSend) {
-        // Auto-send (from button click): send immediately with default message
-        await onSend('', media.type, media.url);
+        await onSend('', media.type, media.remoteUrl);
+        if (previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+        setUploadedMedia(null);
       } else {
-        // From paste: store for user to add text and send
         setUploadedMedia(media);
       }
     } catch (error) {
-      console.error('❌ File upload failed:', error);
+      if (previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      setUploadedMedia(null);
+      console.error('File upload failed:', error);
       alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -228,7 +291,8 @@ export function MessageInput({
     }
   };
 
-  const isButtonDisabled = (!input.trim() && !uploadedMedia) || disabled || isLoading || uploading || isSending;
+  const canSendMedia = uploadedMedia ? uploadedMedia.isReady : false;
+  const isButtonDisabled = (!input.trim() && !canSendMedia) || disabled || isLoading || isSending;
 
   const handleSendEmoji = (emoji: string) => {
     if (disabled || isLoading || uploading || isSending) {
@@ -245,7 +309,7 @@ export function MessageInput({
       <div className="flex items-center gap-3 mb-3">
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isLoading || uploading}
+          disabled={disabled || isLoading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Attachment"
         >
@@ -254,7 +318,7 @@ export function MessageInput({
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isLoading || uploading}
+          disabled={disabled || isLoading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Images/Videos"
         >
@@ -263,7 +327,7 @@ export function MessageInput({
 
         <button
           onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
-          disabled={disabled || isLoading || uploading}
+          disabled={disabled || isLoading}
           className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
           title="Emoji"
         >
@@ -297,12 +361,12 @@ export function MessageInput({
       {/* Input Area */}
       <div className="flex items-end gap-3">
         <textarea
-          value={uploading ? `${input || ''}` : input}
+          value={input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder={uploading ? 'Uploading...' : 'Nhập tin nhắn...'}
-          disabled={disabled || isLoading || uploading}
+          placeholder="Nhập tin nhắn..."
+          disabled={disabled || isLoading}
           rows={1}
           className="flex-1 bg-[#0d2c24] text-[#dffcf2] placeholder:text-[#80ac9d] rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#33deb3] disabled:opacity-50"
           style={{
@@ -323,30 +387,44 @@ export function MessageInput({
       {/* Media Preview */}
       {uploadedMedia && (
         <div className="mt-3 relative">
+          {uploading && !uploadedMedia.isReady && (
+            <div className="mb-2 rounded-lg border border-[#1e5a49] bg-[#12392f] p-2.5">
+              <div className="mb-1 flex items-center justify-between text-xs text-[#9fd6c5]">
+                <span>Đang tải tệp lên nền, bạn vẫn có thể nhập tin nhắn...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[#0d2c24]">
+                <div
+                  className="h-full rounded-full bg-[#33deb3] transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
           {uploadedMedia.type === 'image' ? (
             <img
-              src={uploadedMedia.url}
+              src={uploadedMedia.previewUrl}
               alt="Preview"
               className="max-w-xs rounded-lg"
             />
           ) : uploadedMedia.type === 'video' ? (
             <video
-              src={uploadedMedia.url}
+              src={uploadedMedia.previewUrl}
               controls
               className="max-w-xs rounded-lg"
             />
           ) : (
-            <a
-              href={uploadedMedia.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex max-w-xs items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336]"
-            >
-              Tệp đính kèm sẵn sàng gửi
-            </a>
+            <div className="inline-flex max-w-xs items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec]">
+              {uploadedMedia.fileName || 'Tệp đính kèm'}
+            </div>
           )}
           <button
-            onClick={() => setUploadedMedia(null)}
+            onClick={() => {
+              if (uploadedMedia.previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(uploadedMedia.previewUrl);
+              }
+              setUploadedMedia(null);
+            }}
             className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 w-7 h-7 flex items-center justify-center"
             title="Remove media"
           >

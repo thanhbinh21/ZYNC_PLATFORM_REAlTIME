@@ -33,7 +33,7 @@ function FeatureIcon({ icon }: { icon: HomeFeatureItem['icon'] }) {
 
 export function HomeFeatureCard({ item }: HomeFeatureCardProps) {
   return (
-    <article className="rounded-3xl border border-white/15 bg-white/8 p-5 backdrop-blur-xl">
+    <article className="zync-reveal-up rounded-3xl border border-white/15 bg-white/8 p-5 backdrop-blur-xl">
       <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#53ca9f]/45 bg-[#0f4d3f]/75">
         <FeatureIcon icon={item.icon} />
       </div>

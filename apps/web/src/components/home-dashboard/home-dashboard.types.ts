@@ -18,6 +18,7 @@ export interface DashboardUserSummary {
   displayName: string;
   roleLabel: string;
   initials: string;
+  avatarUrl?: string;
 }
 
 export interface DashboardNavItem {

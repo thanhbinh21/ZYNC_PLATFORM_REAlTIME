@@ -53,7 +53,7 @@ export async function verifyOtpHandler(
       platform,
     });
 
-    // Lưu refresh token vào http-only cookie
+    // Lưu refresh token vào http-only cookie 
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
