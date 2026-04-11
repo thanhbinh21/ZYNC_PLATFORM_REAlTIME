@@ -147,7 +147,7 @@ export function MessageBubble({
         {/* Timestamp + Status */}
         <div className={`flex items-center gap-1 mt-1 text-xs text-[#88b8a7] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           <span>{timeStr}</span>
-          {isOwn && statusIcon}
+          {type !== 'system-recall' && isOwn && statusIcon}
         </div>
       </div>
     </div>

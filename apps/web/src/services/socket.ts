@@ -1,4 +1,4 @@
-import { MessageType } from '@/components/home-dashboard/home-dashboard.types';
+import { MessageType } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
@@ -103,6 +103,7 @@ export function listenToMessages(
     content: string;
     type: string;
     mediaUrl?: string;
+    idempotencyKey: string;
     createdAt: string;
   }) => void,
 ): void {
@@ -270,6 +271,106 @@ export function unlistenToTypingIndicators(): void {
   }
 }
 
+// ─── Delete & Recall Events ───
+
+/**
+ * Delete message for sender only
+ * @param conversationId Conversation ID
+ * @param messageId Message ID to delete
+ */
+export function deleteMessageForMe(
+  conversationId: string,
+  messageId: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('delete_message_for_me', {
+    conversationId,
+    messageId,
+    idempotencyKey,
+  });
+}
+
+/**
+ * Recall message (delete everywhere)
+ * @param conversationId Conversation ID
+ * @param messageId Message ID to recall
+ */
+export function recallMessage(
+  conversationId: string,
+  messageId: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('recall_message', {
+    conversationId,
+    messageId,
+    idempotencyKey,
+  });
+}
+
+/**
+ * Listen to message deletion events (for me only)
+ * @param callback Handler for deletion
+ */
+export function listenToMessageDeletion(
+  callback: (data: {
+    messageId: string;
+    conversationId: string;
+    deletedAt: string;
+  }) => void,
+): void {
+  if (!socket) {
+    throw new Error('Socket not initialized');
+  }
+
+  socket.on('message_deleted_for_me', callback);
+}
+
+/**
+ * Stop listening to message deletion events
+ */
+export function unlistenToMessageDeletion(): void {
+  if (socket) {
+    socket.off('message_deleted_for_me');
+  }
+}
+
+/**
+ * Listen to message recall events (for everyone)
+ * @param callback Handler for recall
+ */
+export function listenToMessageRecall(
+  callback: (data: {
+    messageId: string;
+    idempotencyKey: string;
+    conversationId: string;
+    recalledBy: string;
+    recalledAt: string;
+  }) => void,
+): void {
+  if (!socket) {
+    throw new Error('Socket not initialized');
+  }
+
+  socket.on('message_recalled', callback);
+}
+
+/**
+ * Stop listening to message recall events
+ */
+export function unlistenToMessageRecall(): void {
+  if (socket) {
+    socket.off('message_recalled');
+  }
+}
+
 // ─── Error Events ───
 
 /**
@@ -317,6 +418,12 @@ export const socketService = {
   clearPendingTyping,
   listenToTypingIndicators,
   unlistenToTypingIndicators,
+  deleteMessageForMe,
+  recallMessage,
+  listenToMessageDeletion,
+  unlistenToMessageDeletion,
+  listenToMessageRecall,
+  unlistenToMessageRecall,
   listenToErrors,
   unlistenToErrors,
 };

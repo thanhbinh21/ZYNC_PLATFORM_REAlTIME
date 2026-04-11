@@ -306,6 +306,7 @@ export class MessagesService {
    * Lấy lịch sử tin nhắn của một hội thoại
    * - Cursor-based pagination (dùng createdAt + _id)
    * - Populate status cho current user
+   * - Filters out messages deleted "for me" and shows placeholder for recalled messages
    * - Return { messages (with status), nextCursor, hasMore }
    */
   static async getMessageHistory(
@@ -317,11 +318,11 @@ export class MessagesService {
     try {
       let query: any = { conversationId };
 
-      // Decode cursor nếu có (format: "createdAt_id")
+      // Decode cursor nếu có
       if (cursor) {
         const [createdAtStr, messageId] = Buffer.from(cursor, 'base64').toString().split('_');
         const cursorDate = new Date(parseInt(createdAtStr));
-        
+
         query = {
           ...query,
           $or: [
@@ -343,22 +344,46 @@ export class MessagesService {
 
       if (messages.length > limit) {
         hasMore = true;
-        messages.pop(); // Remove extra item
+        messages.pop();
 
         // Encode next cursor
         const lastMessage = messages[messages.length - 1];
         nextCursor = Buffer.from(
-          `${lastMessage.createdAt.getTime()}_${lastMessage._id}`,
+          `${(lastMessage.createdAt as any).getTime()}_${lastMessage._id}`,
         ).toString('base64');
       }
 
-      // Fetch status for current user for all messages
-      const messageIds = messages.map(m => m._id.toString());
+      // ─── Filter based on deletion ───
+      const filteredMessages = messages
+        .map((msg) => {
+          // If message is recalled: show placeholder
+          if (msg.isDeleted && msg.deleteType === 'recall') {
+            return {
+              ...msg,
+              content: '[Tin nhắn đã được thu hồi]',
+              mediaUrl: undefined,
+              storyRef: undefined,
+              type: 'system-recall' as const,
+              isRecalled: true,
+            };
+          }
+
+          // If deleted for this user only: hide it
+          if (msg.deletedFor?.includes(userId)) {
+            return null;
+          }
+
+          return msg;
+        })
+        .filter(Boolean);
+
+      // ─── Fetch status ───
+      const messageIds = filteredMessages.map((m: any) => m._id.toString());
       const allStatuses = await MessageStatusModel.find({
         messageId: { $in: messageIds },
       }).lean();
 
-      // Group statuses by messageId for aggregation
+      // ─── Aggregate status ───
       const statusByMessageId = new Map<string, Array<{ userId: string; status: string }>>();
       for (const status of allStatuses) {
         const msgId = status.messageId.toString();
@@ -371,12 +396,11 @@ export class MessagesService {
         });
       }
 
-      // Add aggregated status to each message
-      const messagesWithStatus = messages.map(msg => {
+      // Add status to messages
+      const messagesWithStatus = filteredMessages.map((msg: any) => {
         const msgId = msg._id.toString();
         const msgStatuses = statusByMessageId.get(msgId) || [];
 
-        // Aggregate: sender sees best case, others see own
         const status = this.aggregateMessageStatus(
           msgId,
           msg.senderId,
@@ -627,6 +651,227 @@ export class MessagesService {
       return undeliveredIds;
     } catch (error) {
       logger.error('[MessagesService] Error in findUndeliveredForUser:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if message can be recalled (within 5 minute time limit)
+   */
+  private static readonly RECALL_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+  static canRecallMessage(message: IMessage): boolean {
+    if (!message.senderId) return false;
+
+    const now = Date.now();
+    const createdTime = new Date(message.createdAt).getTime();
+
+    // Cannot recall after 5 minutes
+    return now - createdTime <= this.RECALL_TIMEOUT;
+  }
+
+  /**
+   * Delete message for sender only (message still visible to recipients)
+   * @param idempotencyKey Message ID or idempotencyKey to delete (supports both synced and pending messages)
+   * @param userId User ID of sender
+   * @returns Updated message document
+   */
+  static async deleteMessageForMe(
+    idempotencyKey: string,
+    userId: string,
+  ): Promise<IMessage> {
+    const message = await MessageModel.findOne({
+      idempotencyKey: idempotencyKey
+    });
+
+    if (!message) {
+      throw new BadRequestError('Message not found');
+    }
+
+    // Only sender can delete
+    if (message.senderId !== userId) {
+      throw new BadRequestError('Only sender can delete own messages');
+    }
+
+    // Initialize deletedFor array if not exists
+    if (!message.deletedFor) {
+      message.deletedFor = [];
+    }
+
+    // Add userId to deletedFor if not already there
+    if (!message.deletedFor.includes(userId)) {
+      message.deletedFor.push(userId);
+    }
+
+    await message.save();
+    logger.info(`[Delete] Message ${idempotencyKey} deleted for me by user ${userId}`);
+    return message.toObject() as unknown as IMessage;
+  }
+
+  /**
+   * Recall message (delete everywhere with placeholder)
+   * @param idempotencyKey Message ID or idempotencyKey to recall (supports both synced and pending messages)
+   * @param userId User ID of sender
+   * @returns Updated message document
+   */
+  static async recallMessage(
+    idempotencyKey: string,
+    userId: string,
+  ): Promise<IMessage> {
+    const message = await MessageModel.findOne({
+      idempotencyKey: idempotencyKey
+    });
+
+    if (!message) {
+      throw new BadRequestError('Message not found');
+    }
+
+    // Only sender can recall
+    if (message.senderId !== userId) {
+      throw new BadRequestError('Only sender can recall own messages');
+    }
+
+    // Check time limit (max 5 minutes)
+    if (!this.canRecallMessage(message)) {
+      throw new BadRequestError('Message is too old to recall (max 5 minutes)');
+    }
+
+    // Mark as deleted
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+    message.deletedBy = userId;
+    message.deleteType = 'recall';
+    message.content = undefined; // Clear content
+    message.mediaUrl = undefined; // Clear media
+    message.storyRef = undefined; // Clear story ref
+
+    await message.save();
+
+    // Delete associated message status documents (optional cleanup)
+    await MessageStatusModel.deleteMany({ idempotencyKey: message.idempotencyKey }).catch(() => {
+      // Ignore if already deleted
+    });
+
+    logger.info(`[Recall] Message ${idempotencyKey} recalled by user ${userId}`);
+    return message.toObject() as unknown as IMessage;
+  }
+
+  /**
+   * Get messages with proper visibility based on deletion status
+   * Filters out messages deleted "for me" and shows placeholder for recalled messages
+   */
+  static async getMessagesWithVisibility(
+    conversationId: string,
+    requestingUserId: string,
+    cursor?: string,
+    limit: number = 20,
+  ): Promise<PaginatedMessages> {
+    try {
+      let query: any = { conversationId };
+
+      // Decode cursor nếu có
+      if (cursor) {
+        const [createdAtStr, messageId] = Buffer.from(cursor, 'base64').toString().split('_');
+        const cursorDate = new Date(parseInt(createdAtStr));
+
+        query = {
+          ...query,
+          $or: [
+            { createdAt: { $lt: cursorDate } },
+            { createdAt: cursorDate, _id: { $lt: messageId } },
+          ],
+        };
+      }
+
+      // Fetch limit + 1 để check hasMore
+      const messages = await MessageModel
+        .find(query)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limit + 1)
+        .lean();
+
+      let hasMore = false;
+      let nextCursor: string | null = null;
+
+      if (messages.length > limit) {
+        hasMore = true;
+        messages.pop();
+
+        // Encode next cursor
+        const lastMessage = messages[messages.length - 1];
+        nextCursor = Buffer.from(
+          `${(lastMessage.createdAt as any).getTime()}_${lastMessage._id}`,
+        ).toString('base64');
+      }
+
+      // ─── Filter based on deletion ───
+      const filteredMessages = messages
+        .map((msg) => {
+          // If message is recalled: show placeholder
+          if (msg.isDeleted && msg.deleteType === 'recall') {
+            return {
+              ...msg,
+              content: '[Tin nhắn đã được thu hồi]',
+              mediaUrl: undefined,
+              storyRef: undefined,
+              type: 'system-recall' as const,
+              isRecalled: true,
+            };
+          }
+
+          // If deleted for this user only: hide it
+          if (msg.deletedFor?.includes(requestingUserId)) {
+            return null;
+          }
+
+          return msg;
+        })
+        .filter(Boolean);
+
+      // ─── Fetch status ───
+      const messageIds = filteredMessages.map((m: any) => m._id.toString());
+      const allStatuses = await MessageStatusModel.find({
+        messageId: { $in: messageIds },
+      }).lean();
+
+      // ─── Aggregate status ───
+      const statusByMessageId = new Map<string, Array<{ userId: string; status: string }>>();
+      for (const status of allStatuses) {
+        const msgId = status.messageId.toString();
+        if (!statusByMessageId.has(msgId)) {
+          statusByMessageId.set(msgId, []);
+        }
+        statusByMessageId.get(msgId)!.push({
+          userId: status.userId,
+          status: status.status,
+        });
+      }
+
+      // Add status to messages
+      const messagesWithStatus = filteredMessages.map((msg: any) => {
+        const msgId = msg._id.toString();
+        const msgStatuses = statusByMessageId.get(msgId) || [];
+
+        const status = this.aggregateMessageStatus(
+          msgId,
+          msg.senderId,
+          requestingUserId,
+          msgStatuses,
+        );
+
+        return {
+          ...msg,
+          status,
+        };
+      });
+
+      return {
+        messages: messagesWithStatus as unknown as IMessage[],
+        nextCursor,
+        hasMore,
+      };
+    } catch (error) {
+      logger.error('[MessagesService] Error in getMessagesWithVisibility:', error);
       throw error;
     }
   }

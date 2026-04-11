@@ -6,6 +6,7 @@ import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 import { getIO } from '../../socket/gateway';
+import { MessageType } from './message.model';
 
 // ─── POST /api/messages/send ─────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ export const sendMessageHandler = (async (
       conversationId,
       userId,
       content ?? '',
-      type,
+      type as MessageType,
       idempotencyKey,
       mediaUrl ?? undefined,
     );

@@ -10,9 +10,9 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups';
 import { useChat, useMessageHistory } from '@/hooks/use-messaging';
-import type { DashboardHomeMockData, MessageType } from '@/components/home-dashboard/home-dashboard.types';
+import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
-import type { Message } from '@zync/shared-types';
+import type { MessageType } from '@zync/shared-types';
 
 interface DashboardUserPatch {
   displayName?: string;
@@ -66,6 +66,8 @@ export function useHomeDashboard() {
     markAsRead,
     startTyping,
     stopTyping,
+    deleteMessageForMe,
+    recallMessage,
     isLoading: chatLoading,
   } = useChat({
     conversationId: selectedConversationId,
@@ -531,6 +533,8 @@ export function useHomeDashboard() {
     onSendMessage: handleSendMessage,
     onStartTyping: handleStartTyping,
     onStopTyping: handleStopTyping,
+    onDeleteMessageForMe: deleteMessageForMe,
+    onRecallMessage: recallMessage,
     onLoadMore: messageHistory.loadMore,
     onPatchDashboardUser: (payload: DashboardUserPatch) => {
       setData((prev) => {

@@ -47,6 +47,8 @@ export default function HomePage() {
     onStopTyping,
     onLoadMore,
     onPatchDashboardUser,
+    onDeleteMessageForMe,
+    onRecallMessage,
   } = useHomeDashboard();
   const {
     feed,
@@ -225,6 +227,8 @@ export default function HomePage() {
               onSendMessage: onSendMessage,
               onStartTyping: onStartTyping,
               onStopTyping: onStopTyping,
+              onDeleteMessageForMe: onDeleteMessageForMe,
+              onRecallMessage: onRecallMessage,
             }}
           />
         }

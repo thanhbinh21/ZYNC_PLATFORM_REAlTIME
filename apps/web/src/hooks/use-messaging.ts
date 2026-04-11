@@ -20,9 +20,15 @@ import {
   unlistenToMessages,
   unlistenToStatusUpdates,
   unlistenToTypingIndicators,
+  deleteMessageForMe,
+  recallMessage,
+  listenToMessageDeletion,
+  unlistenToMessageDeletion,
+  listenToMessageRecall,
+  unlistenToMessageRecall,
 } from '@/services/socket';
 import { getMessages } from '@/services/chat';
-import { MessageType } from '@/components/home-dashboard/home-dashboard.types';
+import { MessageType } from '@zync/shared-types';
 
 // ─── useChat Hook ───
 
@@ -50,6 +56,8 @@ interface UseChatReturn {
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
+  deleteMessageForMe: (messageId: string, idempotencyKey: string) => Promise<void>;
+  recallMessage: (messageId: string, idempotencyKey: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
 }
@@ -107,6 +115,7 @@ export function useChat({
       content: string;
       type: string;
       mediaUrl?: string;
+      idempotencyKey: string;
       createdAt: string;
     }) => {
       const newMessage: Message = {
@@ -116,10 +125,10 @@ export function useChat({
         content: data.content,
         type: data.type as Message['type'],
         mediaUrl: data.mediaUrl,
-        idempotencyKey: '', // Will be set on send
+        idempotencyKey: data.idempotencyKey, // Will be set on send
         status: 'delivered',
         createdAt: data.createdAt,
-      }; console.log(newMessage)
+      };
       setMessages((prev) => [...prev, newMessage]);
       setMessageStatus((prev) => ({
         ...prev,
@@ -378,6 +387,97 @@ export function useChat({
     }
   }, [conversationId]);
 
+  // ─── Delete Message Listeners Setup (Status Update Only) ───
+  useEffect(() => {
+    if (!token) return;
+
+    const handleMessageDeletedForMe = (data: {
+      messageId: string;
+      conversationId: string;
+      deletedAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Remove from status map
+      setMessageStatus((prev) => {
+        const newStatus = { ...prev };
+        delete newStatus[data.messageId];
+        return newStatus;
+      });
+    };
+
+    const handleMessageRecalled = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      conversationId: string;
+      recalledBy: string;
+      recalledAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Update status
+      setMessageStatus((prev) => ({
+        ...prev,
+        [data.messageId]: 'read',
+      }));
+    };
+
+    try {
+      // Use listener functions instead of direct socket.on
+      listenToMessageDeletion(handleMessageDeletedForMe);
+      listenToMessageRecall(handleMessageRecalled);
+    } catch (err) {
+      console.error('Failed to setup deletion listeners:', err);
+    }
+
+    return () => {
+      try {
+        unlistenToMessageDeletion();
+        unlistenToMessageRecall();
+      } catch (err) {
+        console.error('Failed to cleanup deletion listeners:', err);
+      }
+    };
+  }, [conversationId, token]);
+
+  // Delete for me
+  const handleDeleteForMe = useCallback(
+    async (messageId: string, idempotencyKey: string) => {
+      if (!isConnected()) {
+        setError('Not connected to messaging service');
+        return;
+      }
+
+      try {
+        deleteMessageForMe(conversationId, messageId, idempotencyKey);
+      } catch (err) {
+        console.error('Failed to delete message:', err);
+        setError('Failed to delete message');
+      }
+    },
+    [conversationId]
+  );
+
+  // Recall message
+  const handleRecall = useCallback(
+    async (messageId: string, idempotencyKey: string) => {
+      if (!isConnected()) {
+        setError('Not connected to messaging service');
+        return;
+      }
+
+      try {
+        recallMessage(conversationId, messageId, idempotencyKey);
+      } catch (err) {
+        console.error('Failed to recall message:', err);
+        setError('Failed to recall message');
+      }
+    },
+    [conversationId]
+  );
+
   return {
     messages,
     typingUsers,
@@ -386,6 +486,8 @@ export function useChat({
     markAsRead: handleMarkAsRead,
     startTyping: handleStartTyping,
     stopTyping: handleStopTyping,
+    deleteMessageForMe: handleDeleteForMe,
+    recallMessage: handleRecall,
     isLoading,
     error,
   };
@@ -476,6 +578,64 @@ export function useMessageHistory({
     }
     await fetchMessages();
   }, [fetchMessages, hasMore, loading]);
+
+  // ─── Handle Message Deletion & Recall ───
+  useEffect(() => {
+    const handleMessageDeletedForMe = (data: {
+      messageId: string;
+      conversationId: string;
+      deletedAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Remove from messages state
+      setMessages((prev) =>
+        prev.filter((msg) => msg._id !== data.messageId)
+      );
+    };
+
+    const handleMessageRecalled = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      conversationId: string;
+      recalledBy: string;
+      recalledAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Update message to placeholder
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.idempotencyKey === data.idempotencyKey
+            ? {
+                ...msg,
+                content: '[Tin nhắn đã được thu hồi]',
+                mediaUrl: undefined,
+                type: 'system-recall' as Message['type'],
+              }
+            : msg,
+        ),
+      );
+    };
+
+    try {
+      listenToMessageDeletion(handleMessageDeletedForMe);
+      listenToMessageRecall(handleMessageRecalled);
+    } catch (err) {
+      console.error('Failed to setup deletion listeners:', err);
+    }
+
+    return () => {
+      try {
+        unlistenToMessageDeletion();
+        unlistenToMessageRecall();
+      } catch (err) {
+        console.error('Failed to cleanup deletion listeners:', err);
+      }
+    };
+  }, [conversationId]);
 
   return {
     messages,

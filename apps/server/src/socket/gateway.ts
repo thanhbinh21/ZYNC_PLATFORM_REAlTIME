@@ -237,6 +237,28 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
+    // ─── Delete & Recall Events ───
+
+    // Delete message for sender only
+    socket.on('delete_message_for_me', async (payload: unknown) => {
+      try {
+        await handleDeleteMessageForMe(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('delete_message_for_me error', err);
+        socket.emit('error', { message: 'Failed to delete message' });
+      }
+    });
+
+    // Recall message (delete everywhere)
+    socket.on('recall_message', async (payload: unknown) => {
+      try {
+        await handleRecallMessage(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('recall_message error', err);
+        socket.emit('error', { message: 'Failed to recall message' });
+      }
+    });
+
     // Xử lý ngắt kết nối
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${userId}`);
@@ -338,6 +360,7 @@ async function handleSendMessage(
       content: typeof content === 'string' ? content : '',
       type: normalizedType,
       mediaUrl,
+      idempotencyKey,
       createdAt: message.createdAt,
     });
 
@@ -482,4 +505,88 @@ async function handleMessageDelivered(
     logger.error('Failed to mark messages as delivered', err);
     throw err;
   }
+}
+
+async function handleDeleteMessageForMe(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const userId = socket.userId;
+
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const { messageId, idempotencyKey, conversationId } = payload as {
+    messageId?: string;
+    idempotencyKey?: string;
+    conversationId?: string;
+  };
+
+  if (!messageId || !idempotencyKey || !conversationId) {
+    socket.emit('error', { message: 'Missing messageId or conversationId' });
+    return;
+  }
+
+  // ✅ USE .then() INSTEAD OF await
+  MessagesService.deleteMessageForMe(idempotencyKey, userId)
+    .then((message) => {
+      // Notify only this user (only they see the change)
+      socket.emit('message_deleted_for_me', {
+        messageId: messageId,
+        conversationId,
+        deletedAt: new Date().toISOString(),
+      });
+
+      logger.debug(`Message ${messageId} deleted for me by user ${userId}`);
+    })
+    .catch((err) => {
+      logger.error('handleDeleteMessageForMe error', err);
+      socket.emit('error', { message: (err as Error).message });
+    });
+}
+
+async function handleRecallMessage(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const userId = socket.userId;
+
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const { messageId, idempotencyKey, conversationId } = payload as {
+    messageId?: string;
+    idempotencyKey?: string;
+    conversationId?: string;
+  };
+
+  if (!messageId || !idempotencyKey || !conversationId) {
+    socket.emit('error', { message: 'Missing messageId or conversationId' });
+    return;
+  }
+
+  // ✅ USE .then() INSTEAD OF await
+  MessagesService.recallMessage(idempotencyKey, userId)
+    .then((message) => {
+      // Broadcast to EVERYONE in conversation (sender + all recipients)
+      io.to(`conv:${conversationId}`).emit('message_recalled', {
+        messageId: messageId,
+        idempotencyKey: idempotencyKey,
+        conversationId,
+        recalledBy: userId,
+        recalledAt: new Date().toISOString(),
+      });
+
+      logger.info(`Message ${messageId} recalled by user ${userId}`);
+    })
+    .catch((err) => {
+      logger.error('handleRecallMessage error', err);
+      socket.emit('error', { message: (err as Error).message });
+    });
 }

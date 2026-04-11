@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
+import { MessageItem } from '../molecules/message-item';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
-import { MessageType } from '../home-dashboard.types';
+import { MessageType } from '@zync/shared-types';
 
 // ==================== ICONS ====================
 
@@ -46,6 +47,8 @@ interface ChatPanelProps {
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
   onInfoClick?: () => void;
+  onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
+  onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -170,6 +173,8 @@ function ChatPanel({
   isLoading = false,
   error = null,
   onInfoClick,
+  onDeleteMessageForMe,
+  onRecallMessage,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -189,6 +194,14 @@ function ChatPanel({
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     // If scrolled to bottom (within 100px), enable auto-scroll
     setShouldAutoScroll(scrollHeight - scrollTop - clientHeight < 100);
+  };
+
+  // Check if message can be recalled (within 5 minutes)
+  const canRecallMessage = (createdAt: string): boolean => {
+    const messageTime = new Date(createdAt).getTime();
+    const now = new Date().getTime();
+    const fiveMinutesMs = 5 * 60 * 1000;
+    return (now - messageTime) < fiveMinutesMs;
   };
 
   return (
@@ -272,15 +285,15 @@ function ChatPanel({
         ) : (
           <>
             {messages.map((message) => (
-              <MessageBubble
+              <MessageItem
                 key={message._id}
-                isOwn={message.senderId === currentUserId}
-                content={message.content}
-                type={message.type}
-                mediaUrl={message.mediaUrl}
-                status={(messageStatus?.[message._id] || message.status) as MessageStatus | undefined}
-                timestamp={message.createdAt}
+                message={message}
+                isSender={message.senderId === currentUserId}
+                canRecall={canRecallMessage(message.createdAt)}
                 senderAvatar={participantAvatar}
+                messageStatus={messageStatus}
+                onDeleteForMe={onDeleteMessageForMe}
+                onRecall={onRecallMessage}
               />
             ))}
 

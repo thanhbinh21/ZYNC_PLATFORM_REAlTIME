@@ -1,8 +1,9 @@
 import { Schema, model, type Document } from 'mongoose';
 import { type StoryMediaType } from '../stories/story.model';
 
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}`;
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
+export type DeleteType = 'unsend' | 'recall';
 
 export interface IStoryRef {
   storyId: string;
@@ -19,6 +20,14 @@ export interface IMessage extends Document {
   mediaUrl?: string;
   storyRef?: IStoryRef;
   idempotencyKey: string;
+  
+  // Deletion fields
+  isDeleted: boolean;
+  deletedAt?: Date;
+  deletedBy?: string;
+  deleteType?: DeleteType;
+  deletedFor?: string[];
+  
   createdAt: Date;
 }
 
@@ -48,10 +57,18 @@ const messageSchema = new Schema<IMessage>(
     mediaUrl: { type: String },
     storyRef: { type: storyRefSchema },
     idempotencyKey: { type: String, required: true, unique: true },
+    
+    // Deletion fields
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date },
+    deletedBy: { type: String },
+    deleteType: { type: String, enum: ['unsend', 'recall'] },
+    deletedFor: [{ type: String }],
   },
   { timestamps: true },
 );
 
 messageSchema.index({ conversationId: 1, createdAt: -1 });
+messageSchema.index({ isDeleted: 1 });
 
 export const MessageModel = model<IMessage>('Message', messageSchema);
