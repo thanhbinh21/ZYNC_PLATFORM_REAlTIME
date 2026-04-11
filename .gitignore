@@ -24,6 +24,7 @@ yarn-error.log*
 
 # Editor & OS
 .DS_Store
+AGENTS.md
 Thumbs.db
 .vscode/settings.json
 *.suo
@@ -44,3 +45,7 @@ coverage/
 # Internal project docs (private)
 .github/
 plan/
+agents/
+codex/
+claude/
+gemini/
