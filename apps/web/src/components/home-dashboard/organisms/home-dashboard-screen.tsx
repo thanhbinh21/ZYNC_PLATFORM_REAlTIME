@@ -17,6 +17,7 @@ interface HomeDashboardScreenProps {
   chatSlot?: React.ReactNode;
   profileSlot?: React.ReactNode;
   settingsSlot?: React.ReactNode;
+  notificationSlot?: React.ReactNode;
   activeNavId?: string;
   onNavSelect?: (id: string) => void;
   onViewUserProfile?: (userId: string) => void;
@@ -28,6 +29,7 @@ export function HomeDashboardScreen({
   chatSlot,
   profileSlot,
   settingsSlot,
+  notificationSlot,
   activeNavId,
   onNavSelect,
   onViewUserProfile,
@@ -314,9 +316,11 @@ export function HomeDashboardScreen({
                   )}
                 </div>
 
-                <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128] text-[#cdece0] transition hover:bg-[#14463a]">
-                  <DashboardIcon name="bell" className="h-4 w-4" />
-                </button>
+                {notificationSlot ?? (
+                  <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128] text-[#cdece0] transition hover:bg-[#14463a]">
+                    <DashboardIcon name="bell" className="h-4 w-4" />
+                  </button>
+                )}
                 <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128] text-[#cdece0] transition hover:bg-[#14463a]">
                   <DashboardIcon name="gear" className="h-4 w-4" />
                 </button>

@@ -10,6 +10,7 @@ import {
 } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
 import { UserProfileModal } from '@/components/home-dashboard/molecules/user-profile-modal';
 import { ForwardMessageModal } from '@/components/home-dashboard/molecules/forward-message-modal';
+import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
 import { StoryBar } from '@/components/stories/organisms/StoryBar';
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
@@ -208,6 +209,16 @@ export default function HomePage() {
     <>
       <HomeDashboardScreen
         data={data}
+        notificationSlot={
+          <NotificationHub
+            onNavigate={(n) => {
+              if (n.conversationId) {
+                onSelectConversation(n.conversationId);
+                setActiveNavId('chat');
+              }
+            }}
+          />
+        }
         chatSlot={
           <HomeDashboardChatPanel
             conversations={conversations}
