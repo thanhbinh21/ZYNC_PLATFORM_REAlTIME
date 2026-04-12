@@ -233,43 +233,26 @@ npm run dev:web
 - [x] API `GET /api/users/:userId` trả thêm email/phone masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
 - [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
 - [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
-- [ ] Hiển thị online/offline với bạn bè
-- [ ] "Hoạt động lần cuối" khi offline
-- [ ] Đăng story text/ảnh (TTL 24h với MongoDB TTL index)
-- [ ] Danh sách người đã xem story
+- [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
+- [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
+- [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
+- [ ] Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)
+- [ ] Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance)
+- [ ] Web UI: Story bar trên dashboard (horizontal scroll, ring indicator)
+- [ ] Danh sách người đã xem story (Web UI cho story owner)
 
 ### Phase 7 – Notifications (Module F26)
-- [ ] Push notification khi có tin nhắn mới + user offline
-- [ ] Tích hợp FCM (Android/Web) và APNs (iOS)
-- [ ] Kafka consumer worker xử lý gửi notification
-
-### Phase 8 – Quality & Hardening
-- [x] Chuẩn hóa pipeline QC: sau khi test phải dọn process/service để tránh chiếm port dev (`3000`, `3001`) <!-- done: 05/04/2026 -->
-- [ ] Unit test coverage > 80% (Jest + React Testing Library)
-- [ ] Integration test: API + Socket.IO + Kafka mock
-- [ ] Load test: Artillery/K6 – 1000 user, 500 msg/s
-- [ ] Resilience test: kill Redis/Kafka/MongoDB primary
-- [ ] Security test: OWASP Top 10, penetration testing cơ bản
-- [ ] Swagger/OpenAPI documentation đầy đủ
-
-### Phase 9 – Observability & Production (Web/Server)
-- [ ] Prometheus metrics (prom-client, Kafka exporter, MongoDB exporter)
-- [ ] Grafana dashboard: CCU, throughput, consumer lag, event loop
-- [ ] Log aggregation: Fluentd → Elasticsearch → Kibana
-- [ ] Alert: Slack/PagerDuty khi CPU >80%, error rate >1%
-- [ ] Backup strategy: MongoDB daily + EBS snapshot + restore test
-- [ ] Cấu hình Kubernetes + Helm chart (staging/production)
-- [ ] Blue-green deployment lên production
-
----
-
-## Mobile Roadmap (React Native / Expo)
-
-> **Nguyên tắc:** UI đồng bộ Web • Logic không đổi • Dùng chung backend API/Socket • Code có tính khả thi deploy lên App Store / Google Play.
->
-> **Ưu tiên:** Chức năng lõi → Chức năng nặng không ảnh hưởng lõi → Tối ưu nâng cao → Deploy.
+- [ ] Implement `notification.worker.ts` – Kafka consumer topic `notifications`
+- [ ] Tích hợp FCM (Firebase Admin SDK – `firebase-admin` đã có trong dependencies)
+- [ ] Tích hợp Web Push API cho browser notifications
+- [ ] Push notification khi: tin nhắn mới + user offline, friend request, group invite
+- [ ] Notification preferences: user chọn mute conversation/group
+- [ ] APNs placeholder cho iOS (implement khi có mobile app)
 
 ### Phase M1 – Mobile Foundation & Infrastructure (Lõi)
+
+> **Nguyên tắc:** UI đồng bộ Web • Logic không đổi • Dùng chung backend API/Socket • Code có tính khả thi deploy lên App Store / Google Play.
+
 - [ ] Expo Router setup: Tab navigator (Home/Chat/Friends/Profile) + Stack navigator
 - [ ] Shared services layer: `api.ts` (axios + interceptor), `socket.ts` (Socket.IO client), `auth.ts` (SecureStore + auto-refresh)
 - [ ] Zustand store cho auth state (token, user info)
@@ -310,7 +293,7 @@ npm run dev:web
 - [ ] Real stats (bạn bè count, stories count, joined year)
 - [ ] Friend list in profile, mutual friends, view profile modal
 
-### Phase M6 – Mobile Polish & Deploy (Deploy)
+### Phase M6 – Mobile Polish & Deploy
 - [ ] Deep linking (expo-linking + universal links)
 - [ ] App icon + adaptive icon + splash screen assets
 - [ ] EAS Build configuration (development / preview / production)
@@ -320,6 +303,146 @@ npm run dev:web
 - [ ] Offline mode: cache conversations + queue messages
 - [ ] App Store / Google Play public release
 
+### Phase AI-0 – AI Foundation & Infrastructure (Neon + pgvector + Gemini)
+
+> **Stack AI (toàn bộ free tier, $0 chi phí dev):**
+> - **Vector DB:** Neon PostgreSQL + pgvector (free: 0.5GB storage, 190h compute/tháng)
+> - **LLM:** Google Gemini Pro/Flash (free: 15 RPM, 1M tokens/ngày)
+> - **Embedding:** text-embedding-004 (768 dimensions)
+>
+> **Kiến trúc:** MongoDB (primary DB) ↔ Kafka (async sync) ↔ Neon PostgreSQL (vector-only DB)
+
+- [ ] Cài đặt dependencies: `@google/generative-ai`, `@neondatabase/serverless`, `pgvector`
+- [ ] Tạo `infrastructure/gemini.ts` – Gemini client singleton, config model IDs
+- [ ] Tạo `infrastructure/neon.ts` – Neon PostgreSQL connection + pgvector extension setup
+- [ ] SQL migration: tạo bảng `message_embeddings` với cột `embedding vector(768)` + HNSW index
+- [ ] Tạo `modules/ai/fallback/model-fallback.ts` – Gemini Pro → Flash → cached response chain
+- [ ] Tạo `modules/ai/guards/prompt-guard.ts` – Input sanitization + injection detection (3 layers: regex + system prompt + output validation)
+- [ ] Tạo `modules/ai/guards/rate-limiter.ts` – AI-specific rate limit (10 req/min/user, Redis sliding window)
+- [ ] Tạo `modules/ai/embeddings/embedding.service.ts` – text-embedding-004 wrapper
+- [ ] Tạo `modules/ai/embeddings/neon-vector.service.ts` – pgvector CRUD (insert, cosine search, delete)
+- [ ] Thêm env vars: `GEMINI_API_KEY`, `NEON_DATABASE_URL`, `AI_MODEL_PRIMARY`, `AI_MODEL_FALLBACK`, `AI_RATE_LIMIT_PER_MINUTE`
+- [ ] Unit test cho prompt guard (10+ adversarial cases) + model fallback (timeout, quota exceeded)
+
+### Phase AI-1 – Kiểm Duyệt Nội Dung Tự Động (Content Moderation)
+
+> **Luồng:** `raw-messages` (Kafka) → `moderation.worker.ts` → Gemini Flash classify → safe/flag/block
+> **Fallback:** Khi Gemini unavailable → keyword-based regex filter (VN + EN)
+
+- [ ] Tạo `modules/ai/moderation/moderation.service.ts` – Gemini Flash text classification (safe/warning/blocked, confidence score)
+- [ ] Tạo `modules/ai/moderation/keyword-filter.ts` – Fallback keyword-based regex filter (Vietnamese + English)
+- [ ] Tạo `modules/ai/moderation/moderation.model.ts` – MongoDB collection `moderation_logs`
+- [ ] Tạo `modules/ai/moderation/moderation.worker.ts` – Kafka consumer consume `raw-messages`, run moderation async
+- [ ] Thêm Kafka topic `moderation-actions`
+- [ ] Image moderation via Gemini Pro Vision (khi media upload qua Cloudinary)
+- [ ] Auto-action escalation: score < 0.3 → pass, 0.3-0.7 → flag for admin, > 0.7 → block + notify user
+- [ ] Function Calling: `flag_content({messageId, reason})`, `auto_mute({userId, duration})`
+- [ ] Admin API: `GET /api/admin/moderation` – danh sách nội dung bị flagged/blocked
+- [ ] Socket event `content_blocked` – thông báo user khi tin nhắn bị chặn
+- [ ] Model fallback: Gemini Flash lỗi → keyword filter → pass (fail-open with logging)
+- [ ] Integration test cho moderation pipeline
+
+### Phase AI-2 – Tìm Kiếm Thông Minh (Semantic Search)
+
+> **Kiến trúc:** Hybrid Search = MongoDB `$text` (exact) + Neon pgvector cosine (semantic) + Gemini Flash re-rank
+> **Scoring:** 0.4 × text_score + 0.6 × vector_similarity
+
+- [ ] Tạo `workers/embedding.worker.ts` – Kafka consumer embed messages async → insert Neon pgvector
+- [ ] Backfill script: embed tất cả messages hiện có vào Neon pgvector
+- [ ] Tạo `modules/ai/search/semantic-search.service.ts` – hybrid search logic (text + vector + re-rank)
+- [ ] Tạo `modules/ai/search/search.controller.ts` – `GET /api/search?q=...&type=messages|users|all`
+- [ ] Tạo `modules/ai/search/search.routes.ts` – route definitions
+- [ ] Gemini Flash re-rank top-20 kết quả → trả top-5 relevant nhất
+- [ ] Redis cache cho embedding queries (TTL 30 phút)
+- [ ] Thêm Kafka topic `message-embeddings`
+- [ ] Web UI: nâng cấp search bar với semantic results + grouped results page
+- [ ] Prompt injection guard cho search queries
+- [ ] Performance benchmark: search latency < 500ms p95
+
+### Phase AI-3 – Zync AI Assistant (Chatbot Trợ Lý Thông Minh)
+
+> **Mô tả:** Bot AI trong conversation, hỗ trợ qua chat hoặc `@ZyncAI` mention trong group.
+> **Function Calling:** 5 functions (search_friends, create_group, summarize_chat, translate_message, search_messages)
+> **Context:** 50 recent messages (MongoDB) + top-5 vector similarity (Neon pgvector)
+> **Fallback:** Gemini Pro → Flash → "Hiện tại mình không thể trả lời, thử lại sau nhé"
+
+- [ ] Tạo `modules/ai/ai.service.ts` – Core orchestrator: context building + Gemini chat + function calling loop
+- [ ] Tạo `modules/ai/ai.controller.ts` – REST API: `POST /api/ai/chat`, `GET /api/ai/suggestions`
+- [ ] Tạo `modules/ai/ai.routes.ts` + `ai.schema.ts` (Zod validation)
+- [ ] Implement 5 function handlers trong `modules/ai/functions/`:
+  - [ ] `search_friends.fn.ts` – tìm bạn bè theo tên/mô tả
+  - [ ] `create_group.fn.ts` – tạo nhóm chat mới
+  - [ ] `summarize_chat.fn.ts` – tóm tắt hội thoại theo khoảng thời gian
+  - [ ] `translate_message.fn.ts` – dịch tin nhắn sang ngôn ngữ khác
+  - [ ] `search_messages.fn.ts` – tìm kiếm tin nhắn trong conversation (dùng semantic search)
+- [ ] Socket events: `ai_chat` (client → server) → `ai_response` (server → client, streaming nếu có)
+- [ ] Context builder: 50 recent messages + pgvector semantic context (top-5 similarity)
+- [ ] Model fallback chain: Pro → Flash → cached response
+- [ ] Rate limit: 10 AI requests/phút/user (Redis sliding window)
+- [ ] `@ZyncAI` mention trigger trong group chat
+- [ ] AI suggestion: gợi ý reply nhanh dựa trên context (quick reply buttons)
+- [ ] Web UI: AI chat button + AI chat interface trong conversation panel
+- [ ] Web UI: AI suggestions panel (quick reply buttons bên dưới chat input)
+- [ ] Comprehensive adversarial prompt injection tests (≥ 15 attack vectors)
+
+### System Optimization
+- [ ] O1: MongoDB bulk `$inc` cho unread count (thay vì loop per member)
+- [ ] O2: Redis pipeline cho presence operations (gom HSET/HDEL)
+- [ ] O3: Verify compound index `{conversationId: 1, createdAt: -1, _id: -1}` cho messages
+- [ ] O4: Lazy join conversation rooms khi load list (thay vì khi send)
+- [ ] S1: Helmet CSP strict mode
+- [ ] S2: XSS sanitization cho message content (dùng `xss` package)
+- [ ] S3: Rate limit per-conversation (chống spam vào 1 group)
+- [ ] D1: Swagger/OpenAPI auto-gen từ Zod schemas (`zod-to-openapi` → Swagger UI)
+- [ ] D2: Health check endpoint `GET /health` (MongoDB, Redis, Kafka, Neon, Gemini status)
+- [ ] D3: Error code standardization (AUTH_001, MSG_002, AI_001...)
+
+### Phase 8 – Quality & Hardening
+- [x] Chuẩn hóa pipeline QC: sau khi test phải dọn process/service để tránh chiếm port dev (`3000`, `3001`) <!-- done: 05/04/2026 -->
+- [ ] Unit test coverage > 60% (target 80% iterative) – Jest + React Testing Library
+- [ ] Integration test: API + Socket.IO + Kafka mock + AI module (Gemini mock)
+- [ ] Load test: Artillery/K6 – 500 CCU, 200 msg/s
+- [ ] Resilience test: kill Redis/Kafka/MongoDB primary → verify fallback chains
+- [ ] Security test: OWASP Top 10, penetration testing cơ bản
+- [ ] AI-specific tests: prompt injection (15+ vectors), model fallback, rate limiting, pgvector search accuracy
+- [ ] Swagger/OpenAPI documentation đầy đủ (auto-gen + manual review)
+
+### Phase 9 – Observability & Production (Web/Server)
+- [ ] Prometheus metrics (prom-client đã có, Kafka exporter, MongoDB exporter)
+- [ ] Grafana dashboard: CCU, throughput, consumer lag, AI latency, AI quota usage, event loop
+- [ ] Log aggregation: structured JSON logs (Winston đã có) → Fluentd → Elasticsearch → Kibana
+- [ ] Alert: Slack/PagerDuty khi CPU >80%, error rate >1%, AI quota >80%
+- [ ] Health check expanded: MongoDB, Redis, Kafka, Neon, Gemini API status
+- [ ] Backup strategy: MongoDB daily + Neon point-in-time recovery + restore test
+- [ ] Cấu hình Kubernetes + Helm chart (staging/production)
+- [ ] Blue-green deployment lên production
+
+---
+
+## Chi phí Dev Stack (toàn bộ $0)
+
+| Service | Plan | Chi phí |
+|---------|------|---------|
+| MongoDB Atlas | M0 (free) | $0 |
+| Redis | Docker local (~5MB) | $0 |
+| Kafka/Redpanda | Docker local (~150MB) | $0 |
+| Cloudinary | Free (25 credits/tháng) | $0 |
+| Resend/Gmail SMTP | Free tier | $0 |
+| **Neon PostgreSQL** | **Free (0.5GB, 190h compute/tháng)** | **$0** |
+| **Google Gemini API** | **Free (15 RPM, 1M tokens/ngày)** | **$0** |
+
+---
+
+## AI Architecture Notes
+
+- **Vector DB:** Neon PostgreSQL + pgvector (HNSW index, cosine similarity `<=>` operator)
+- **Embedding:** `text-embedding-004` (768 dimensions), batch via Kafka async worker
+- **LLM:** Gemini 2.5 Pro (primary) → Gemini 2.5 Flash (fallback) → cached response (emergency)
+- **Function Calling:** Gemini Tool Use API, 5 function declarations với JSON Schema
+- **Prompt Injection:** 3 layers – (1) input regex filter, (2) system prompt hardening, (3) output validation
+- **Rate Limit:** 10 AI requests/phút/user (Redis sliding window, shared key `ai_rate:{userId}`)
+- **MongoDB↔Neon sync:** Kafka topic `message-embeddings`, async embed worker, eventually consistent
+
 ---
 
 ## Testing Notes
@@ -328,6 +451,8 @@ npm run dev:web
 - Kafka mock dùng `kafkajs` với in-memory mode.
 - Socket.IO test dùng `socket.io-client` kết nối test server.
 - Load test script lưu tại `tests/load/`.
+- AI test: mock Gemini responses, test pgvector search trên Neon test branch.
+- Prompt injection test: ≥ 15 adversarial attack vectors (role confusion, instruction override, etc.)
 
 ---
 
@@ -337,3 +462,5 @@ npm run dev:web
 - **Cursor pagination:** Dùng `createdAt` + `_id` làm cursor, tránh `skip()`.
 - **Story expiry:** MongoDB TTL index trên `expiresAt`, không cần cronjob riêng.
 - **Presence refresh:** Client WebSocket heartbeat 30 giây để giữ online status trong Redis.
+- **AI context window:** 50 recent messages + top-5 pgvector similarity results.
+- **Moderation fail-open:** Khi AI unavailable → keyword filter → pass with logging (không block user khi AI lỗi).
