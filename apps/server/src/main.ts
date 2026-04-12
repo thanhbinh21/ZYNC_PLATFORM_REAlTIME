@@ -11,6 +11,7 @@ import { connectRedis } from './infrastructure/redis';
 import { connectKafka } from './infrastructure/kafka';
 import { initSocketGateway } from './socket/gateway';
 import { startMessageWorker, stopMessageWorker } from './workers/message.worker';
+import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
 import { logger } from './shared/logger';
 
 const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
@@ -26,6 +27,9 @@ async function bootstrap(): Promise<void> {
     // Task 6.2: Start Kafka consumer worker
     void startMessageWorker().catch((err: unknown) => {
       logger.error('Message worker failed', err);
+    });
+    void startNotificationWorker().catch((err: unknown) => {
+      logger.error('Notification worker failed', err);
     });
   } else {
     logger.warn('Kafka bị tắt (KAFKA_ENABLED != true). Workers sẽ không chạy.');
@@ -50,6 +54,7 @@ async function bootstrap(): Promise<void> {
     // Task 6.2: Stop message worker gracefully
     if (process.env['KAFKA_ENABLED'] === 'true') {
       await stopMessageWorker();
+      await stopNotificationWorker();
     }
     
     httpServer.close(() => {

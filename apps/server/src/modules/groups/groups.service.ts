@@ -5,6 +5,8 @@ import { FriendshipModel } from '../friends/friendship.model';
 import { UserModel } from '../users/user.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
 import { getIO } from '../../socket/gateway';
+import { produceNotificationEvent } from '../notifications/notifications.service';
+import { logger } from '../../shared/logger';
 
 interface GroupUpdatedPayload {
   groupId: string;
@@ -278,6 +280,29 @@ export class GroupsService {
         addedBy: currentUserId,
       },
     });
+
+    // F3.1: Produce notification for newly added members
+    void (async () => {
+      try {
+        const admin = await UserModel.findById(currentUserId).select('displayName').lean();
+        const adminName = (admin?.displayName as string) ?? 'Someone';
+        const groupName = summary.name ?? 'a group';
+
+        for (const addedUserId of toInsert) {
+          await produceNotificationEvent({
+            userId: addedUserId,
+            type: 'group_invite',
+            title: 'Được thêm vào nhóm',
+            body: `${adminName} đã thêm bạn vào nhóm ${groupName}`,
+            conversationId: groupId,
+            fromUserId: currentUserId,
+            data: { conversationId: groupId, action: 'open_chat' },
+          });
+        }
+      } catch (err) {
+        logger.error('Failed to produce group_invite notifications', err);
+      }
+    })();
 
     return summary;
   }

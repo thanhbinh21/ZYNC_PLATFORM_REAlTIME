@@ -11,6 +11,7 @@ import { conversationsRouter } from './modules/conversations/conversations.route
 import { messagesRouter } from './modules/messages/messages.routes';
 import { storiesRouter } from './modules/stories/stories.routes';
 import { uploadRouter } from './modules/upload/upload.routes';
+import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { AppError } from './shared/errors/app-error';
 import { logger } from './shared/logger';
 
@@ -50,6 +51,7 @@ export function createApp(): Application {
   app.use('/api/messages', messagesRouter);
   app.use('/api/stories', storiesRouter);
   app.use('/api/upload', uploadRouter);
+  app.use('/api/notifications', notificationsRouter);
 
   // Xử lý route không tồn tại
   app.use((_req: Request, res: Response) => {

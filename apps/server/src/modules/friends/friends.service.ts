@@ -8,6 +8,8 @@ import {
 } from '../../shared/errors';
 import { FriendshipModel, type IFriendship } from './friendship.model';
 import { UserModel } from '../users/user.model';
+import { produceNotificationEvent } from '../notifications/notifications.service';
+import { logger } from '../../shared/logger';
 
 const FRIENDS_CACHE_TTL_SECONDS = 10 * 60;
 
@@ -128,6 +130,25 @@ export async function sendFriendRequest(
   });
 
   await invalidateFriendsCache([requesterId, toUserId]);
+
+  // F2.1: Produce notification for friend request recipient
+  void (async () => {
+    try {
+      const sender = await UserModel.findById(requesterId).select('displayName').lean();
+      const senderName = (sender?.displayName as string) ?? 'Someone';
+      await produceNotificationEvent({
+        userId: toUserId,
+        type: 'friend_request',
+        title: 'Lời mời kết bạn',
+        body: `${senderName} muốn kết bạn với bạn`,
+        fromUserId: requesterId,
+        data: { action: 'open_friend_requests' },
+      });
+    } catch (err) {
+      logger.error('Failed to produce friend_request notification', err);
+    }
+  })();
+
   return request;
 }
 
@@ -155,6 +176,25 @@ export async function acceptFriendRequest(
   );
 
   await invalidateFriendsCache([currentUserId, request.userId]);
+
+  // F2.2: Produce notification for original requester
+  const requesterId = request.userId;
+  void (async () => {
+    try {
+      const acceptor = await UserModel.findById(currentUserId).select('displayName').lean();
+      const acceptorName = (acceptor?.displayName as string) ?? 'Someone';
+      await produceNotificationEvent({
+        userId: requesterId,
+        type: 'friend_accepted',
+        title: 'Lời mời kết bạn đã được chấp nhận',
+        body: `${acceptorName} đã chấp nhận lời mời kết bạn của bạn`,
+        fromUserId: currentUserId,
+        data: { action: 'open_friend_requests' },
+      });
+    } catch (err) {
+      logger.error('Failed to produce friend_accepted notification', err);
+    }
+  })();
 }
 
 export async function rejectFriendRequest(

@@ -20,6 +20,7 @@ zync-platform/
 │   │   │   │   ├── conversations/# Hội thoại 1-1 và nhóm
 │   │   │   │   ├── messages/     # Tin nhắn, media, idempotency
 │   │   │   │   ├── stories/      # Story 24h
+│   │   │   │   ├── notifications/ # Push notification, preferences
 │   │   │   │   └── upload/       # Cấp pre-signed URL upload media
 │   │   │   ├── socket/           # Socket.IO gateway & event handlers
 │   │   │   │   ├── gateway.ts
@@ -29,7 +30,9 @@ zync-platform/
 │   │   │   ├── infrastructure/   # Kết nối DB, Redis, Kafka
 │   │   │   │   ├── database.ts   # MongoDB connection (Mongoose)
 │   │   │   │   ├── redis.ts      # Redis client
-│   │   │   │   └── kafka.ts      # Kafka producer/consumer setup
+│   │   │   │   ├── kafka.ts      # Kafka producer/consumer setup
+│   │   │   │   ├── fcm.ts        # Firebase Cloud Messaging
+│   │   │   │   └── web-push.ts   # Web Push API (VAPID)
 │   │   │   ├── shared/           # Utilities, constants, types dùng chung
 │   │   │   │   ├── errors/
 │   │   │   │   ├── logger.ts
@@ -78,11 +81,14 @@ zync-platform/
 │   │   │   ├── hooks/
 │   │   │   │   ├── use-friends-dashboard.ts
 │   │   │   │   ├── use-home-dashboard.ts
+│   │   │   │   ├── use-notifications.ts
 │   │   │   │   └── use-login-form.ts
 │   │   │   └── services/
 │   │   │       ├── api.ts
 │   │   │       ├── auth.ts
 │   │   │       ├── friends.ts
+│   │   │       ├── notifications.ts
+│   │   │       ├── web-push.ts
 │   │   │       └── socket.ts
 │   │   ├── next-env.d.ts
 │   │   ├── next.config.mjs
@@ -119,6 +125,7 @@ zync-platform/
 | `conversations` | Danh sách hội thoại, unread count | `conversations`, `conversation_members` |
 | `messages` | Gửi/nhận tin nhắn, media, idempotency | `messages`, `message_status` |
 | `stories` | CRUD story 24h, viewers | `stories` |
+| `notifications` | Push notification, preferences, mute/unmute | `notifications`, `notification_preferences` |
 | `upload` | Cấp pre-signed URL upload media | - (gọi Cloudinary) |
 
 ---
@@ -187,6 +194,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `otp_rl:ip:{ip}` | String | 1 giờ | Rate limit OTP theo IP |
 | `otp_rl:id:{identifier}` | String | 1 giờ | Rate limit OTP theo SĐT/Email |
 | `blacklist:token:{jti}` | String | = token expiry | JWT revocation |
+| `notif_debounce:{userId}:{convId}` | String | 30 giây | Debounce push notification |
 
 ---
 
@@ -257,6 +265,8 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `messages` | `{conversationId, createdAt: -1}`, `idempotencyKey` (unique, TTL 24h) |
 | `message_status` | `{messageId, userId}` (unique), `{messageId, status}` |
 | `stories` | `expiresAt` (TTL index – tự xóa sau 24h), `userId` |
+| `notifications` | `{userId, createdAt: -1}`, `{userId, read}`, `createdAt` (TTL 30 ngày) |
+| `notification_preferences` | `userId` (unique) |
 
 ---
 
