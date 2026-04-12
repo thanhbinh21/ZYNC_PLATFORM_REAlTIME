@@ -6,6 +6,7 @@ import { Button } from '../../src/ui/Button';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import api from '../../src/services/api';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -36,10 +37,14 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <LinearGradient
+      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <View style={styles.formContainer}>
         <Text style={styles.title}>Tạo tài khoản mới</Text>
 
@@ -83,6 +88,7 @@ export default function RegisterScreen() {
         </View>
       </View>
     </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 

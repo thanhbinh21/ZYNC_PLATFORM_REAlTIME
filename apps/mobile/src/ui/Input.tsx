@@ -77,9 +77,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 48,
-    backgroundColor: '#1f293780', // semi-transparent surface
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
     borderRadius: 12,
     paddingHorizontal: 16,
   },

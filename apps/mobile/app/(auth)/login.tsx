@@ -6,6 +6,7 @@ import { Button } from '../../src/ui/Button';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import api from '../../src/services/api';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -37,10 +38,14 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <LinearGradient
+      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <View style={styles.formContainer}>
         <Text style={styles.title}>Đăng nhập vào Zync</Text>
         <Text style={styles.subtitle}>Kết nối và trò chuyện thời gian thực</Text>
@@ -82,13 +87,14 @@ export default function LoginScreen() {
         </View>
       </View>
     </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   formContainer: {
     flex: 1,

@@ -278,10 +278,11 @@ npm run dev:web
 ### Phase M3 – Mobile Home & Chat (Lõi)
 - [x] Home tab: stats cards + recent activity list + story bar <!-- done: 12/04/2026 -->
 - [x] Chat tab: conversation list (FlatList virtualized) <!-- done: 12/04/2026 -->
-- [ ] Chat room: bubble UI, message status (sent/delivered/read ticks)
-- [ ] Real-time messaging via Socket.IO
-- [ ] Typing indicator
-- [ ] Media picker (expo-image-picker) + Cloudinary signed upload
+- [x] Chat room: bubble UI, message status (sent/delivered/read ticks) <!-- done: 12/04/2026 -->
+- [x] Real-time messaging via Socket.IO <!-- done: 12/04/2026 -->
+- [x] Typing indicator <!-- done: 12/04/2026 -->
+- [x] Media picker (expo-image-picker) + Cloudinary signed upload <!-- done: 12/04/2026 -->
+- [x] Đồng bộ chat Web ↔ Mobile: chuẩn hóa contract message/socket, hiển thị media file/image/video, sửa căn lề tin nhắn sender/receiver và fix keyboard che input trên mobile <!-- done: 12/04/2026 -->
 - [ ] Push notification setup (expo-notifications + FCM/APNs)
 
 ### Phase M4 – Mobile Friends & Groups (Lõi)

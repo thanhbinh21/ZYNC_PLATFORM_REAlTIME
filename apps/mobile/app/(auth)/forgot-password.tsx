@@ -6,6 +6,7 @@ import { Button } from '../../src/ui/Button';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import api from '../../src/services/api';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -58,10 +59,14 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <LinearGradient
+      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <View style={styles.formContainer}>
         <Text style={styles.title}>Quên mật khẩu</Text>
 
@@ -94,11 +99,12 @@ export default function ForgotPasswordScreen() {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   formContainer: { flex: 1, justifyContent: 'center', padding: 24 },
   title: { ...typography.h2, color: colors.primary, marginBottom: 32, textAlign: 'center' },
   linkTextBold: { color: colors.primary, fontFamily: 'BeVietnamPro_600SemiBold' },

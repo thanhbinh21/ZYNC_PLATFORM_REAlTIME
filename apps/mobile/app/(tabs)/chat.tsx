@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
@@ -36,28 +37,35 @@ interface LastMessage {
 interface Conversation {
   _id: string;
   name?: string;
-  type: 'private' | 'group';
-  members?: ConversationMember[];
+  type: 'private' | 'group' | 'direct';
+  users?: ConversationMember[];
   lastMessage?: LastMessage;
   unreadCount?: number;
+  unreadCounts?: Record<string, number>;
   updatedAt?: string;
 }
 
 function getConversationName(conv: Conversation, myUserId: string): string {
   if (conv.type === 'group') return conv.name || 'Nhóm chat';
-  const other = conv.members?.find((m) => m._id !== myUserId);
+  const other = conv.users?.find((m) => m._id !== myUserId);
   return other?.displayName || 'Chat';
 }
 
 function getLastMessagePreview(msg?: LastMessage): string {
-  if (!msg) return 'Chưa có tin nhắn';
+  if (!msg) return 'Chua co tin nhan';
+  if (msg.type?.startsWith('file/')) return 'Tep dinh kem';
+
   switch (msg.type) {
-    case 'image': return '📷 Ảnh';
-    case 'video': return '🎥 Video';
-    case 'audio': return '🎵 Âm thanh';
-    case 'file': return '📎 Tệp đính kèm';
-    case 'sticker': return '🎉 Nhãn dán';
-    default: return msg.content || 'Tin nhắn mới';
+    case 'image':
+      return 'Anh';
+    case 'video':
+      return 'Video';
+    case 'audio':
+      return 'Am thanh';
+    case 'sticker':
+      return 'Nhan dan';
+    default:
+      return msg.content || 'Tin nhan moi';
   }
 }
 
@@ -82,33 +90,52 @@ export default function ChatScreen() {
   const router = useRouter();
   const userInfo = useAuthStore((s) => s.userInfo);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const userId = userInfo?._id || userInfo?.id || '';
+  const userId = String(userInfo?._id || userInfo?.id || '');
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const joinAllConversations = useCallback((items: Conversation[]) => {
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    for (const conversation of items) {
+      socket.emit('join_conversation', { conversationId: conversation._id });
+    }
+  }, []);
+
   const loadConversations = useCallback(async () => {
     try {
       const res = await api.get('/conversations');
-      if (res.data?.success && res.data?.conversations) {
-        setConversations(res.data.conversations);
-      }
-    } catch (err) {
-      console.error('Failed to load conversations:', err);
+      const items = Array.isArray(res.data?.data) ? (res.data.data as Conversation[]) : [];
+
+      setConversations(items);
+      joinAllConversations(items);
+    } catch (err: any) {
+      console.error('[ERROR] Failed to load conversations:', err?.response?.data || err?.message || err);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [joinAllConversations]);
 
   // Load conversations on mount + when auth changes
   useEffect(() => {
     if (isAuthenticated) {
-      loadConversations();
+      void loadConversations();
     }
   }, [isAuthenticated, loadConversations]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) {
+        void loadConversations();
+      }
+      return undefined;
+    }, [isAuthenticated, loadConversations]),
+  );
 
   // Listen for real-time updates (new messages = re-sort and update preview)
   useEffect(() => {
@@ -116,19 +143,29 @@ export default function ChatScreen() {
     if (!socket) return;
 
     const handleNewMessage = () => {
-      // Reload conversation list to reflect new messages
-      loadConversations();
+      void loadConversations();
+    };
+
+    const handleSocketReconnect = () => {
+      void loadConversations();
     };
 
     socket.on('receive_message', handleNewMessage);
+    socket.on('message_recalled', handleNewMessage);
+    socket.on('message_deleted_for_me', handleNewMessage);
+    socket.on('connect', handleSocketReconnect);
+
     return () => {
       socket.off('receive_message', handleNewMessage);
+      socket.off('message_recalled', handleNewMessage);
+      socket.off('message_deleted_for_me', handleNewMessage);
+      socket.off('connect', handleSocketReconnect);
     };
   }, [loadConversations]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadConversations();
+    void loadConversations();
   }, [loadConversations]);
 
   const openChatRoom = (conv: Conversation) => {
@@ -202,7 +239,8 @@ export default function ChatScreen() {
             }
             renderItem={({ item }) => {
               const displayName = getConversationName(item, userId);
-              const hasUnread = (item.unreadCount || 0) > 0;
+              const unread = item.unreadCount ?? item.unreadCounts?.[userId] ?? 0;
+              const hasUnread = unread > 0;
 
               return (
                 <TouchableOpacity style={styles.chatItem} onPress={() => openChatRoom(item)}>
@@ -237,7 +275,7 @@ export default function ChatScreen() {
                       {hasUnread && (
                         <View style={styles.unreadBadge}>
                           <Text style={styles.unreadText}>
-                            {(item.unreadCount || 0) > 99 ? '99+' : item.unreadCount}
+                            {unread > 99 ? '99+' : unread}
                           </Text>
                         </View>
                       )}
@@ -439,3 +477,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
