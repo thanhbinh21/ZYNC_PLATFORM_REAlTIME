@@ -925,6 +925,10 @@ export function HomeDashboardChatPanel({
   );
   const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
 
+  const allMessages = chatPanelProps.messages || [];
+  const mediaItems = allMessages.filter((m) => m.type === 'image' || m.type === 'video').slice(0, 8);
+  const fileItems = allMessages.filter((m) => String(m.type).startsWith('file/') || m.type === 'audio').slice(0, 5);
+
   return (
     <>
       <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
@@ -1012,18 +1016,49 @@ export function HomeDashboardChatPanel({
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
                       <div className="grid grid-cols-4 gap-2">
-                        {Array.from({ length: 8 }).map((_, idx) => (
-                          <div key={`direct-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
-                        ))}
+                        {mediaItems.length > 0 ? (
+                          mediaItems.map((media) => (
+                            <a
+                              key={media._id}
+                              href={media.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block h-12 overflow-hidden rounded-lg bg-[#0d3b2f] hover:opacity-80"
+                            >
+                              {media.type === 'image' ? (
+                                <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xs text-[#d6f8ec]">▶</div>
+                              )}
+                            </a>
+                          ))
+                        ) : (
+                          <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
+                        )}
                       </div>
                       <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
                     <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
-                      <p className="text-sm text-[#d6f8ec]">File2_Architecture_OnThi.docx</p>
-                      <p className="text-sm text-[#d6f8ec]">File1_Design_Patterns_OnThi.docx</p>
-                      <p className="text-sm text-[#d6f8ec]">project-thi.zip</p>
-                      <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                      {fileItems.length > 0 ? (
+                        fileItems.map((file) => {
+                          const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                          return (
+                            <a
+                              key={file._id}
+                              href={file.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block truncate text-sm text-[#d6f8ec] hover:text-[#46e6b8] hover:underline"
+                            >
+                              {fileName}
+                            </a>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
+                      )}
+                      <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
                   </>
                 )}
@@ -1047,11 +1082,50 @@ export function HomeDashboardChatPanel({
                     <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
                       <div className="grid grid-cols-4 gap-2">
-                        {Array.from({ length: 8 }).map((_, idx) => (
-                          <div key={`group-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
-                        ))}
+                        {mediaItems.length > 0 ? (
+                          mediaItems.map((media) => (
+                            <a
+                              key={media._id}
+                              href={media.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block h-12 overflow-hidden rounded-lg bg-[#0d3b2f] hover:opacity-80"
+                            >
+                              {media.type === 'image' ? (
+                                <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xs text-[#d6f8ec]">▶</div>
+                              )}
+                            </a>
+                          ))
+                        ) : (
+                          <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
+                        )}
                       </div>
                       <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                    </div>
+                    {/* File section for group */}
+                    <div className="mt-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
+                      {fileItems.length > 0 ? (
+                        fileItems.map((file) => {
+                          const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                          return (
+                            <a
+                              key={file._id}
+                              href={file.mediaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block truncate text-sm text-[#d6f8ec] hover:text-[#46e6b8] hover:underline"
+                            >
+                              {fileName}
+                            </a>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
+                      )}
+                      <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
                   </>
                 )}
@@ -1135,18 +1209,49 @@ export function HomeDashboardChatPanel({
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
                   <div className="grid grid-cols-4 gap-2">
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={`mobile-direct-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
-                    ))}
+                    {mediaItems.length > 0 ? (
+                      mediaItems.map((media) => (
+                        <a
+                          key={media._id}
+                          href={media.mediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block h-12 overflow-hidden rounded-lg bg-[#0d3b2f] hover:opacity-80"
+                        >
+                          {media.type === 'image' ? (
+                            <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs text-[#d6f8ec]">▶</div>
+                          )}
+                        </a>
+                      ))
+                    ) : (
+                      <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
+                    )}
                   </div>
                   <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
                 <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
-                  <p className="text-sm text-[#d6f8ec]">File2_Architecture_OnThi.docx</p>
-                  <p className="text-sm text-[#d6f8ec]">File1_Design_Patterns_OnThi.docx</p>
-                  <p className="text-sm text-[#d6f8ec]">project-thi.zip</p>
-                  <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                  {fileItems.length > 0 ? (
+                    fileItems.map((file) => {
+                      const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                      return (
+                        <a
+                          key={file._id}
+                          href={file.mediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block truncate text-sm text-[#d6f8ec] hover:text-[#46e6b8] hover:underline"
+                        >
+                          {fileName}
+                        </a>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
+                  )}
+                  <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
               </>
             )}
@@ -1170,11 +1275,50 @@ export function HomeDashboardChatPanel({
                 <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
                   <div className="grid grid-cols-4 gap-2">
-                    {Array.from({ length: 8 }).map((_, idx) => (
-                      <div key={`mobile-group-media-${idx}`} className="h-12 rounded-lg bg-[#0d3b2f]" />
-                    ))}
+                    {mediaItems.length > 0 ? (
+                      mediaItems.map((media) => (
+                        <a
+                          key={media._id}
+                          href={media.mediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block h-12 overflow-hidden rounded-lg bg-[#0d3b2f] hover:opacity-80"
+                        >
+                          {media.type === 'image' ? (
+                            <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs text-[#d6f8ec]">▶</div>
+                          )}
+                        </a>
+                      ))
+                    ) : (
+                      <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
+                    )}
                   </div>
                   <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                </div>
+                {/* File section for group (mobile view) */}
+                <div className="mt-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
+                  {fileItems.length > 0 ? (
+                    fileItems.map((file) => {
+                      const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                      return (
+                        <a
+                          key={file._id}
+                          href={file.mediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block truncate text-sm text-[#d6f8ec] hover:text-[#46e6b8] hover:underline"
+                        >
+                          {fileName}
+                        </a>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
+                  )}
+                  <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
               </>
             )}

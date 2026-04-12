@@ -282,8 +282,8 @@ export function MessageInput({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Auto-send when using file picker (button clicks)
-    await handleUploadFile(file, true);
+    // Do NOT auto-send – let user type a message alongside the file
+    await handleUploadFile(file, false);
 
     // Clear file input
     if (fileInputRef.current) {
@@ -386,38 +386,32 @@ export function MessageInput({
 
       {/* Media Preview */}
       {uploadedMedia && (
-        <div className="mt-3 relative">
-          {uploading && !uploadedMedia.isReady && (
-            <div className="mb-2 rounded-lg border border-[#1e5a49] bg-[#12392f] p-2.5">
-              <div className="mb-1 flex items-center justify-between text-xs text-[#9fd6c5]">
-                <span>Đang tải tệp lên nền, bạn vẫn có thể nhập tin nhắn...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-[#0d2c24]">
-                <div
-                  className="h-full rounded-full bg-[#33deb3] transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
+        <div className="mt-3 relative inline-block">
           {uploadedMedia.type === 'image' ? (
             <img
               src={uploadedMedia.previewUrl}
               alt="Preview"
-              className="max-w-xs rounded-lg"
+              className={`max-w-xs rounded-lg ${!uploadedMedia.isReady ? 'opacity-50' : ''}`}
             />
           ) : uploadedMedia.type === 'video' ? (
             <video
               src={uploadedMedia.previewUrl}
-              controls
-              className="max-w-xs rounded-lg"
+              controls={uploadedMedia.isReady}
+              className={`max-w-xs rounded-lg ${!uploadedMedia.isReady ? 'opacity-50' : ''}`}
             />
           ) : (
-            <div className="inline-flex max-w-xs items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec]">
+            <div className={`inline-flex max-w-xs items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] ${!uploadedMedia.isReady ? 'opacity-50' : ''}`}>
               {uploadedMedia.fileName || 'Tệp đính kèm'}
             </div>
           )}
+
+          {/* Spinner overlay during upload */}
+          {uploading && !uploadedMedia.isReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+              <div className="w-10 h-10 border-4 border-[#33deb3] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
           <button
             onClick={() => {
               if (uploadedMedia.previewUrl.startsWith('blob:')) {
