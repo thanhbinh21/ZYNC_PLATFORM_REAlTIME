@@ -387,6 +387,7 @@ export function useLoginForm() {
       setValues((prev) => ({ ...prev, otp: '' }));
       setInfoMessage('Bạn đã đăng xuất khỏi hệ thống.');
       setErrorMessage(null);
+      router.push('/login');
     } catch {
       setErrorMessage('Đăng xuất thất bại. Vui lòng thử lại.');
     } finally {

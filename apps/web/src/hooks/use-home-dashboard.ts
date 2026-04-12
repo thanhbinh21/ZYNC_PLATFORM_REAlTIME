@@ -191,6 +191,7 @@ export function useHomeDashboard() {
 
             activities.push({
               id: `act-${conv._id}-${index}`,
+              conversationId: conv._id,
               title,
               message: messageStr,
               timeLabel: new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),

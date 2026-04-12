@@ -2,15 +2,34 @@ import { MessageType } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
+let currentToken: string | null = null;
 
 /**
  * Task 10.1: Initialize Socket.IO client with JWT auth
  * Auto-reconnect with exponential backoff
+ *
+ * IMPORTANT: Returns existing socket if one already exists (even if still
+ * connecting). Only creates a new socket when there is no instance at all
+ * or when the token has changed (re-login).
  */
 export function getSocket(token: string): Socket {
-  if (socket?.connected) {
+  // Return existing socket if it exists and token hasn't changed
+  if (socket && currentToken === token) {
+    // If disconnected but instance exists, reconnect instead of creating new
+    if (socket.disconnected && !socket.active) {
+      socket.connect();
+    }
     return socket;
   }
+
+  // Token changed (re-login) – disconnect old socket first
+  if (socket && currentToken !== token) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
+
+  currentToken = token;
 
   socket = io(process.env['NEXT_PUBLIC_WS_URL'] ?? 'ws://localhost:3000', {
     auth: { token },
@@ -19,12 +38,16 @@ export function getSocket(token: string): Socket {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
+  });
+
+  socket.on('connect', () => {
+    console.info('[Socket] Connected to server');
   });
 
   // Auto-reconnect on disconnect
-  socket.on('disconnect', () => {
-    console.warn('[Socket] Disconnected from server');
+  socket.on('disconnect', (reason) => {
+    console.warn('[Socket] Disconnected from server:', reason);
   });
 
   socket.on('connect_error', (error) => {
@@ -34,14 +57,24 @@ export function getSocket(token: string): Socket {
   return socket;
 }
 
+/**
+ * Get the raw socket instance if it exists (for listener registration).
+ * Does NOT throw — returns null when socket hasn't been initialised yet.
+ */
+export function getRawSocket(): Socket | null {
+  return socket;
+}
+
 export function isConnected(): boolean {
   return socket?.connected ?? false;
 }
 
 export function disconnectSocket(): void {
   if (socket) {
+    socket.removeAllListeners();
     socket.disconnect();
     socket = null;
+    currentToken = null;
   }
 }
 
@@ -108,9 +141,11 @@ export function listenToMessages(
   }) => void,
 ): void {
   if (!socket) {
-    throw new Error('Socket not initialized');
+    console.warn('[Socket] listenToMessages called before socket init – skipping');
+    return;
   }
 
+  socket.off('receive_message'); // prevent duplicate listeners
   socket.on('receive_message', callback);
 }
 
@@ -172,9 +207,11 @@ export function listenToStatusUpdates(
   }) => void,
 ): void {
   if (!socket) {
-    throw new Error('Socket not initialized');
+    console.warn('[Socket] listenToStatusUpdates called before socket init – skipping');
+    return;
   }
 
+  socket.off('status_update'); // prevent duplicate listeners
   socket.on('status_update', (data) => callback(data));
 }
 
@@ -256,9 +293,11 @@ export function listenToTypingIndicators(
   }) => void,
 ): void {
   if (!socket) {
-    throw new Error('Socket not initialized');
+    console.warn('[Socket] listenToTypingIndicators called before socket init – skipping');
+    return;
   }
 
+  socket.off('typing_indicator'); // prevent duplicate listeners
   socket.on('typing_indicator', callback);
 }
 
@@ -327,9 +366,11 @@ export function listenToMessageDeletion(
   }) => void,
 ): void {
   if (!socket) {
-    throw new Error('Socket not initialized');
+    console.warn('[Socket] listenToMessageDeletion called before socket init – skipping');
+    return;
   }
 
+  socket.off('message_deleted_for_me'); // prevent duplicate listeners
   socket.on('message_deleted_for_me', callback);
 }
 
@@ -356,9 +397,11 @@ export function listenToMessageRecall(
   }) => void,
 ): void {
   if (!socket) {
-    throw new Error('Socket not initialized');
+    console.warn('[Socket] listenToMessageRecall called before socket init – skipping');
+    return;
   }
 
+  socket.off('message_recalled'); // prevent duplicate listeners
   socket.on('message_recalled', callback);
 }
 
@@ -431,9 +474,11 @@ export function unlistenToMessageForwarded(): void {
  */
 export function listenToErrors(callback: (error: { message: string }) => void): void {
   if (!socket) {
-    throw new Error('Socket not initialized');
+    console.warn('[Socket] listenToErrors called before socket init – skipping');
+    return;
   }
 
+  socket.off('error'); // prevent duplicate listeners
   socket.on('error', callback);
 }
 
@@ -454,6 +499,7 @@ export function unlistenToErrors(): void {
  */
 export const socketService = {
   getSocket,
+  getRawSocket,
   isConnected,
   disconnectSocket,
   joinConversation,
