@@ -48,6 +48,13 @@ export function emitStoryReply(
   ioInstance?.to(`user:${targetUserId}`).emit('story_reply', payload);
 }
 
+export function emitNotification(
+  userId: string,
+  notification: Record<string, unknown>,
+): void {
+  ioInstance?.to(`user:${userId}`).emit('new_notification', notification);
+}
+
 export function initSocketGateway(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
     cors: {
