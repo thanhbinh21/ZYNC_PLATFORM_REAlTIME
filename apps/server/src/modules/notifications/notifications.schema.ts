@@ -25,7 +25,6 @@ export const MuteConversationSchema = z.object({
   until: z
     .string()
     .datetime({ message: 'Must be a valid ISO 8601 datetime' })
-    .transform((v) => new Date(v))
     .optional(),
 });
 
