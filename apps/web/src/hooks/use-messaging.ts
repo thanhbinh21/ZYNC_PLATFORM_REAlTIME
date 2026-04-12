@@ -26,6 +26,9 @@ import {
   unlistenToMessageDeletion,
   listenToMessageRecall,
   unlistenToMessageRecall,
+  emitForwardMessage,
+  listenToMessageForwarded,
+  unlistenToMessageForwarded,
 } from '@/services/socket';
 import { getMessages } from '@/services/chat';
 import { MessageType } from '@zync/shared-types';
@@ -620,9 +623,19 @@ export function useMessageHistory({
       );
     };
 
+    const handleMessageForwarded = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      toConversationId: string;
+    }) => {
+      // Just log forward confirmation - message appears in target conversation via receive_message
+      console.debug(`Message forwarded: ${data.idempotencyKey} to ${data.toConversationId}`);
+    };
+
     try {
       listenToMessageDeletion(handleMessageDeletedForMe);
       listenToMessageRecall(handleMessageRecalled);
+      listenToMessageForwarded(handleMessageForwarded);
     } catch (err) {
       console.error('Failed to setup deletion listeners:', err);
     }
@@ -631,6 +644,7 @@ export function useMessageHistory({
       try {
         unlistenToMessageDeletion();
         unlistenToMessageRecall();
+        unlistenToMessageForwarded();
       } catch (err) {
         console.error('Failed to cleanup deletion listeners:', err);
       }

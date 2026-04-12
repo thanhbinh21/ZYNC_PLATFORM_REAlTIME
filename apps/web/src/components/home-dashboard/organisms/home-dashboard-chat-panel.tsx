@@ -49,6 +49,7 @@ interface ChatPanelProps {
   onInfoClick?: () => void;
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
+  onForwardMessage?: (message: Message) => void;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -175,6 +176,7 @@ function ChatPanel({
   onInfoClick,
   onDeleteMessageForMe,
   onRecallMessage,
+  onForwardMessage,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -294,6 +296,7 @@ function ChatPanel({
                 messageStatus={messageStatus}
                 onDeleteForMe={onDeleteMessageForMe}
                 onRecall={onRecallMessage}
+                onForward={onForwardMessage}
               />
             ))}
 

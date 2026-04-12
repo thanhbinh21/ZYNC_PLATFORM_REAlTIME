@@ -35,6 +35,14 @@ function ArrowUturnLeftIcon({ className }: { className: string }) {
   );
 }
 
+function ForwardIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8l4 4m0 0l-4 4m4-4H8m6 0a4 4 0 100-8" />
+    </svg>
+  );
+}
+
 // ─── Types ───
 interface MessageItemProps {
   message: Message;
@@ -44,6 +52,7 @@ interface MessageItemProps {
   messageStatus?: Record<string, MessageStatus | string>;
   onDeleteForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecall?: (messageId: string, idempotencyKey: string) => void;
+  onForward?: (message: Message) => void;
 }
 
 // ─── Main Component ───
@@ -55,6 +64,7 @@ export function MessageItem({
   messageStatus,
   onDeleteForMe,
   onRecall,
+  onForward,
 }: MessageItemProps) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -85,6 +95,11 @@ export function MessageItem({
     onRecall?.(message._id, message.idempotencyKey);
     setShowMenu(false);
   }, [message._id, message.idempotencyKey, onRecall]);
+
+  const handleForwardClick = useCallback(() => {
+    onForward?.(message);
+    setShowMenu(false);
+  }, [message, onForward]);
 
   // Handle click outside when menu is open
   useEffect(() => {
@@ -155,12 +170,21 @@ export function MessageItem({
             {canRecall && (
               <button
                 onClick={handleRecallClick}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
               >
                 <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Thu hồi</span>
               </button>
             )}
+
+            {/* Forward */}
+            <button
+              onClick={handleForwardClick}
+              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+            >
+              <ForwardIcon className="h-4 w-4 flex-shrink-0" />
+              <span>Chuyển tiếp</span>
+            </button>
           </div>
         )}
       </div>

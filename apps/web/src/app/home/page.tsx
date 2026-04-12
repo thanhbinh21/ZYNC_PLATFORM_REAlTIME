@@ -9,6 +9,7 @@ import {
   type DashboardAppearanceSettings,
 } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
 import { UserProfileModal } from '@/components/home-dashboard/molecules/user-profile-modal';
+import { ForwardMessageModal } from '@/components/home-dashboard/molecules/forward-message-modal';
 import { StoryBar } from '@/components/stories/organisms/StoryBar';
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
@@ -49,6 +50,12 @@ export default function HomePage() {
     onPatchDashboardUser,
     onDeleteMessageForMe,
     onRecallMessage,
+    onForwardMessage,
+    forwardModalOpen,
+    forwardingMessage,
+    forwardLoading,
+    onCloseForwardModal,
+    onExecuteForward,
   } = useHomeDashboard();
   const {
     feed,
@@ -229,6 +236,7 @@ export default function HomePage() {
               onStopTyping: onStopTyping,
               onDeleteMessageForMe: onDeleteMessageForMe,
               onRecallMessage: onRecallMessage,
+              onForwardMessage: onForwardMessage,
             }}
           />
         }
@@ -271,6 +279,22 @@ export default function HomePage() {
       <UserProfileModal
         userId={profileViewUserId}
         onClose={() => setProfileViewUserId(null)}
+      />
+
+      <ForwardMessageModal
+        open={forwardModalOpen}
+        message={forwardingMessage}
+        conversations={conversations.map((conv) => ({
+          _id: conv.id,
+          name: conv.name,
+          avatarUrl: conv.avatarUrl,
+          type: conv.isGroup ? 'group' : 'direct',
+          users: conv.members || [],
+        }))}
+        currentConversationId={selectedConversationId}
+        isLoading={forwardLoading}
+        onClose={onCloseForwardModal}
+        onForward={(message, toConversationId) => onExecuteForward(toConversationId)}
       />
 
       {viewerOpen && allFeed.length > 0 && (

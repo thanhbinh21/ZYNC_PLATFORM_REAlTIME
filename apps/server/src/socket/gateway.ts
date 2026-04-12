@@ -259,6 +259,16 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
+    // Forward message to another conversation
+    socket.on('forward_message', async (payload: unknown) => {
+      try {
+        await handleForwardMessage(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('forward_message error', err);
+        socket.emit('error', { message: 'Failed to forward message' });
+      }
+    });
+
     // Xử lý ngắt kết nối
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${userId}`);
@@ -587,6 +597,60 @@ async function handleRecallMessage(
     })
     .catch((err) => {
       logger.error('handleRecallMessage error', err);
+      socket.emit('error', { message: (err as Error).message });
+    });
+}
+
+async function handleForwardMessage(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const userId = socket.userId;
+
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const { originalMessageId, toConversationId, idempotencyKey } = payload as {
+    originalMessageId?: string;
+    toConversationId?: string;
+    idempotencyKey?: string;
+  };
+
+  if (!originalMessageId || !toConversationId || !idempotencyKey) {
+    socket.emit('error', { message: 'Missing required fields' });
+    return;
+  }
+
+  // ✅ USE .then() INSTEAD OF await
+  MessagesService.forwardMessage(originalMessageId, toConversationId, userId, idempotencyKey)
+    .then((newMessage) => {
+      // Broadcast to target conversation
+      io.to(`conv:${toConversationId}`).emit('receive_message', {
+        messageId: newMessage._id,
+        conversationId: toConversationId,
+        senderId: userId,
+        content: newMessage.content,
+        type: newMessage.type,
+        mediaUrl: newMessage.mediaUrl,
+        status: 'sent',
+        createdAt: newMessage.createdAt,
+        idempotencyKey: newMessage.idempotencyKey,
+      });
+
+      // Confirm to sender
+      socket.emit('message_forwarded', {
+        messageId: newMessage._id,
+        idempotencyKey,
+        toConversationId,
+      });
+
+      logger.info(`Message ${originalMessageId} forwarded to ${toConversationId} by user ${userId}`);
+    })
+    .catch((err) => {
+      logger.error('handleForwardMessage error', err);
       socket.emit('error', { message: (err as Error).message });
     });
 }

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { fetchFriends, type FriendUser } from '@/services/friends';
+import { emitForwardMessage } from '@/services/socket';
+import type { Message } from '@zync/shared-types';
 import {
   addGroupMembers,
   createGroup,
@@ -55,6 +57,9 @@ export function useHomeDashboard() {
   const [selectedConversationId, setSelectedConversationId] = useState<string>('');
   const [friendsForGroup, setFriendsForGroup] = useState<FriendUser[]>([]);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
+  const [forwardModalOpen, setForwardModalOpen] = useState(false);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [forwardLoading, setForwardLoading] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize chat hook for real-time messaging
@@ -277,6 +282,36 @@ export function useHomeDashboard() {
       return conv;
     }));
   }, [messages]);
+
+  const updatePreviewConversation = (message: Message) => {
+    setConversations(prev => prev.map(conv => {
+      if (conv._id === message.conversationId) {
+        const messagePreview = message.content && message.content.trim().length > 0
+          ? message.content
+          : message.type === 'image'
+            ? 'Da gui anh'
+            : message.type === 'video'
+              ? 'Da gui video'
+              : message.type?.startsWith('file/')
+                ? 'Da gui tep dinh kem'
+                : message.type === 'audio'
+                  ? 'Da gui am thanh'
+                  : message.type === 'sticker'
+                    ? 'Da gui sticker'
+                    : 'Tin nhan media';
+
+        return {
+          ...conv,
+          lastMessage: {
+            senderId: message.senderId,
+            content: messagePreview,
+            sentAt: message.createdAt,
+          },
+        };
+      }
+      return conv;
+    }));
+  }
 
   const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
     return conversations.map((conv, idx) => ({
@@ -502,6 +537,40 @@ export function useHomeDashboard() {
     stopTyping();
   }, [selectedConversationId, stopTyping]);
 
+  // Forward message
+  const handleForwardMessage = useCallback((message: Message) => {
+    setForwardingMessage(message);
+    setForwardModalOpen(true);
+  }, []);
+
+  const handleExecuteForward = useCallback(async (toConversationId: string) => {
+    if (!forwardingMessage) return;
+
+    try {
+      setForwardLoading(true);
+      
+      const idempotencyKey = forwardingMessage.idempotencyKey || uuidv4();
+
+      // Emit forward message
+      emitForwardMessage(forwardingMessage._id, toConversationId, idempotencyKey);
+
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      updatePreviewConversation({
+        ...forwardingMessage,
+        conversationId: toConversationId,
+        createdAt: new Date().toISOString(),
+      })
+
+      setSelectedConversationId(toConversationId)
+
+      setForwardModalOpen(false);
+      setForwardingMessage(null);
+    } finally {
+      setForwardLoading(false);
+    }
+  }, [forwardingMessage]);
+
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -535,6 +604,16 @@ export function useHomeDashboard() {
     onStopTyping: handleStopTyping,
     onDeleteMessageForMe: deleteMessageForMe,
     onRecallMessage: recallMessage,
+    onForwardMessage: handleForwardMessage,
+    forwardModalOpen,
+    setForwardModalOpen,
+    forwardingMessage,
+    forwardLoading,
+    onCloseForwardModal: () => {
+      setForwardModalOpen(false);
+      setForwardingMessage(null);
+    },
+    onExecuteForward: handleExecuteForward,
     onLoadMore: messageHistory.loadMore,
     onPatchDashboardUser: (payload: DashboardUserPatch) => {
       setData((prev) => {

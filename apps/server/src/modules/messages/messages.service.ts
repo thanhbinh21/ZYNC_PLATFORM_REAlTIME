@@ -7,6 +7,7 @@ import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
 import { getRedis } from '../../infrastructure/redis';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -757,122 +758,55 @@ export class MessagesService {
   }
 
   /**
-   * Get messages with proper visibility based on deletion status
-   * Filters out messages deleted "for me" and shows placeholder for recalled messages
+   * Forward message to another conversation
+   * Copies message content (text, media, type) and creates new message in target conversation
+   * @param originalMessageId Message ID to forward
+   * @param toConversationId Target conversation
+   * @param userId User ID (sender/forwarder)
+   * @param idempotencyKey Unique key for idempotency
+   * @returns Created message
    */
-  static async getMessagesWithVisibility(
-    conversationId: string,
-    requestingUserId: string,
-    cursor?: string,
-    limit: number = 20,
-  ): Promise<PaginatedMessages> {
-    try {
-      let query: any = { conversationId };
+  static async forwardMessage(
+    originalMessageId: string,
+    toConversationId: string,
+    userId: string,
+    idempotencyKey: string,
+  ): Promise<IMessage> {
+    // Step 1: Find original message
+    const originalMessage = await MessageModel.findOne({
+      idempotencyKey: idempotencyKey
+    });
 
-      // Decode cursor nếu có
-      if (cursor) {
-        const [createdAtStr, messageId] = Buffer.from(cursor, 'base64').toString().split('_');
-        const cursorDate = new Date(parseInt(createdAtStr));
-
-        query = {
-          ...query,
-          $or: [
-            { createdAt: { $lt: cursorDate } },
-            { createdAt: cursorDate, _id: { $lt: messageId } },
-          ],
-        };
-      }
-
-      // Fetch limit + 1 để check hasMore
-      const messages = await MessageModel
-        .find(query)
-        .sort({ createdAt: -1, _id: -1 })
-        .limit(limit + 1)
-        .lean();
-
-      let hasMore = false;
-      let nextCursor: string | null = null;
-
-      if (messages.length > limit) {
-        hasMore = true;
-        messages.pop();
-
-        // Encode next cursor
-        const lastMessage = messages[messages.length - 1];
-        nextCursor = Buffer.from(
-          `${(lastMessage.createdAt as any).getTime()}_${lastMessage._id}`,
-        ).toString('base64');
-      }
-
-      // ─── Filter based on deletion ───
-      const filteredMessages = messages
-        .map((msg) => {
-          // If message is recalled: show placeholder
-          if (msg.isDeleted && msg.deleteType === 'recall') {
-            return {
-              ...msg,
-              content: '[Tin nhắn đã được thu hồi]',
-              mediaUrl: undefined,
-              storyRef: undefined,
-              type: 'system-recall' as const,
-              isRecalled: true,
-            };
-          }
-
-          // If deleted for this user only: hide it
-          if (msg.deletedFor?.includes(requestingUserId)) {
-            return null;
-          }
-
-          return msg;
-        })
-        .filter(Boolean);
-
-      // ─── Fetch status ───
-      const messageIds = filteredMessages.map((m: any) => m._id.toString());
-      const allStatuses = await MessageStatusModel.find({
-        messageId: { $in: messageIds },
-      }).lean();
-
-      // ─── Aggregate status ───
-      const statusByMessageId = new Map<string, Array<{ userId: string; status: string }>>();
-      for (const status of allStatuses) {
-        const msgId = status.messageId.toString();
-        if (!statusByMessageId.has(msgId)) {
-          statusByMessageId.set(msgId, []);
-        }
-        statusByMessageId.get(msgId)!.push({
-          userId: status.userId,
-          status: status.status,
-        });
-      }
-
-      // Add status to messages
-      const messagesWithStatus = filteredMessages.map((msg: any) => {
-        const msgId = msg._id.toString();
-        const msgStatuses = statusByMessageId.get(msgId) || [];
-
-        const status = this.aggregateMessageStatus(
-          msgId,
-          msg.senderId,
-          requestingUserId,
-          msgStatuses,
-        );
-
-        return {
-          ...msg,
-          status,
-        };
-      });
-
-      return {
-        messages: messagesWithStatus as unknown as IMessage[],
-        nextCursor,
-        hasMore,
-      };
-    } catch (error) {
-      logger.error('[MessagesService] Error in getMessagesWithVisibility:', error);
-      throw error;
+    if (!originalMessage) {
+      throw new BadRequestError('Original message not found');
     }
+
+    if (originalMessage.isDeleted) {
+      throw new BadRequestError('Cannot forward deleted message');
+    }
+
+    // Step 2: Validate user is member of target conversation
+    const isMember = await ConversationMemberModel.exists({
+      conversationId: toConversationId,
+      userId,
+    });
+
+    if (!isMember) {
+      throw new BadRequestError('You are not a member of target conversation');
+    }
+
+    // Step 3: Copy message data (content, type, mediaUrl)
+    const forwardedMessage = await this.createMessage(
+      toConversationId,
+      userId,
+      originalMessage.content || '',
+      originalMessage.type,
+      uuidv4(),
+      originalMessage.mediaUrl,
+    );
+
+    logger.info(`[Forward] Message ${originalMessageId} forwarded to ${toConversationId} by user ${userId}`);
+    return forwardedMessage;
   }
+
 }

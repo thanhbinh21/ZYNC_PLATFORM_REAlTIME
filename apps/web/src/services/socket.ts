@@ -371,6 +371,58 @@ export function unlistenToMessageRecall(): void {
   }
 }
 
+// ─── Forward Message ───
+
+/**
+ * Emit forward message event
+ * @param originalMessageId Message ID to forward
+ * @param toConversationId Target conversation
+ * @param idempotencyKey Unique key for idempotency
+ */
+export function emitForwardMessage(
+  originalMessageId: string,
+  toConversationId: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    console.error('[Socket] Not connected to emit forward_message');
+    return;
+  }
+
+  socket.emit('forward_message', {
+    originalMessageId,
+    toConversationId,
+    idempotencyKey,
+  });
+}
+
+/**
+ * Listen to message forwarded confirmation
+ * Server emits this after successfully forwarding
+ */
+export function listenToMessageForwarded(
+  callback: (data: {
+    messageId: string;
+    idempotencyKey: string;
+    toConversationId: string;
+  }) => void,
+): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.on('message_forwarded', callback);
+}
+
+/**
+ * Stop listening to message forwarded events
+ */
+export function unlistenToMessageForwarded(): void {
+  if (socket) {
+    socket.off('message_forwarded');
+  }
+}
+
 // ─── Error Events ───
 
 /**
