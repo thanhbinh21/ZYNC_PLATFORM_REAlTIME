@@ -242,11 +242,11 @@ npm run dev:web
 - [ ] Danh sách người đã xem story (Web UI cho story owner)
 
 ### Phase 7 – Notifications (Module F26)
-- [ ] Implement `notification.worker.ts` – Kafka consumer topic `notifications`
-- [ ] Tích hợp FCM (Firebase Admin SDK – `firebase-admin` đã có trong dependencies)
-- [ ] Tích hợp Web Push API cho browser notifications
-- [ ] Push notification khi: tin nhắn mới + user offline, friend request, group invite
-- [ ] Notification preferences: user chọn mute conversation/group
+- [x] Implement `notification.worker.ts` – Kafka consumer topic `notifications` <!-- done: 12/04/2026 -->
+- [x] Tích hợp FCM (Firebase Admin SDK – `firebase-admin` đã có trong dependencies) <!-- done: 12/04/2026 -->
+- [x] Tích hợp Web Push API cho browser notifications <!-- done: 12/04/2026 -->
+- [x] Push notification khi: tin nhắn mới + user offline, friend request, group invite <!-- done: 12/04/2026 -->
+- [x] Notification preferences: user chọn mute conversation/group <!-- done: 12/04/2026 -->
 - [ ] APNs placeholder cho iOS (implement khi có mobile app)
 
 ### Phase M1 – Mobile Foundation & Infrastructure (Lõi)
