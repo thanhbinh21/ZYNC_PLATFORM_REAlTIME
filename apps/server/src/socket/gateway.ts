@@ -10,7 +10,9 @@ import { MessageModel } from '../modules/messages/message.model';
 import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
+import { UserModel } from '../modules/users/user.model';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
+import { produceNotificationEvent } from '../modules/notifications/notifications.service';
 import { MessageType } from '../modules/messages/message.model';
 
 
@@ -396,6 +398,37 @@ async function handleSendMessage(
     });
 
     logger.debug(`Message created: ${message._id} in conversation ${conversationId}`);
+
+    // F1: Produce notification for offline conversation members
+    void (async () => {
+      try {
+        const members = await ConversationMemberModel.find({
+          conversationId: conversationId as string,
+        }).lean();
+
+        const sender = await UserModel.findById(userId).select('displayName').lean();
+        const senderName = (sender?.displayName as string) ?? 'Someone';
+        const preview = typeof content === 'string'
+          ? content.slice(0, 100)
+          : (normalizedType === 'text' ? '' : `[${normalizedType}]`);
+
+        for (const member of members) {
+          if (member.userId === userId) continue;
+
+          await produceNotificationEvent({
+            userId: member.userId,
+            type: 'new_message',
+            title: `Tin nhắn mới từ ${senderName}`,
+            body: preview,
+            conversationId: conversationId as string,
+            fromUserId: userId,
+            data: { conversationId: conversationId as string, action: 'open_chat' },
+          });
+        }
+      } catch (notifErr) {
+        logger.error('Failed to produce message notifications', notifErr);
+      }
+    })();
   } catch (err) {
     logger.error('Failed to create message', err);
     throw err;

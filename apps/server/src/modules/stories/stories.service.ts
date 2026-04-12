@@ -7,6 +7,8 @@ import { MessageModel } from '../messages/message.model';
 import { UserModel } from '../users/user.model';
 import { ForbiddenError, NotFoundError } from '../../shared/errors';
 import { emitStoryReaction, emitStoryReply } from '../../socket/gateway';
+import { produceNotificationEvent } from '../notifications/notifications.service';
+import { logger } from '../../shared/logger';
 import type { CreateStoryDto } from './stories.schema';
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -135,12 +137,24 @@ export async function reactToStory(
 
   if (story.userId !== userId) {
     const reactor = await UserModel.findById(userId).select('displayName').lean();
+    const reactorName = (reactor?.displayName as string) ?? 'Unknown';
+
     emitStoryReaction(story.userId, {
       storyId,
       userId,
       reactionType: type,
-      displayName: (reactor?.displayName as string) ?? 'Unknown',
+      displayName: reactorName,
     });
+
+    // F4.1: Produce notification for story owner
+    void produceNotificationEvent({
+      userId: story.userId,
+      type: 'story_reaction',
+      title: 'Phản hồi story',
+      body: `${reactorName} đã ${type} story của bạn`,
+      fromUserId: userId,
+      data: { action: 'open_story', storyId },
+    }).catch((err) => logger.error('Failed to produce story_reaction notification', err));
   }
 }
 
@@ -283,12 +297,24 @@ export async function replyToStory(
 
   if (story.userId !== userId) {
     const sender = await UserModel.findById(userId).select('displayName').lean();
+    const senderName = (sender?.displayName as string) ?? 'Unknown';
+
     emitStoryReply(story.userId, {
       storyId,
       senderId: userId,
       content,
-      displayName: (sender?.displayName as string) ?? 'Unknown',
+      displayName: senderName,
     });
+
+    // F4.2: Produce notification for story owner
+    void produceNotificationEvent({
+      userId: story.userId,
+      type: 'story_reply',
+      title: 'Trả lời story',
+      body: `${senderName} đã trả lời story của bạn`,
+      fromUserId: userId,
+      data: { action: 'open_story', storyId },
+    }).catch((err) => logger.error('Failed to produce story_reply notification', err));
   }
 
   return {
