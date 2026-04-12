@@ -61,11 +61,18 @@ export async function verifyOtpHandler(
       maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
-    res.json({
+    const responsePayload: any = {
       success: true,
       accessToken: result.accessToken,
       user: result.user,
-    });
+    };
+
+    // Return refreshToken in payload strictly for mobile apps
+    if (platform === 'ios' || platform === 'android') {
+      responsePayload.refreshToken = result.refreshToken;
+    }
+
+    res.json(responsePayload);
   } catch (err) {
     next(err);
   }
@@ -115,11 +122,18 @@ export async function loginPasswordVerifyOtpHandler(
       maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
-    res.json({
+    const responsePayload: any = {
       success: true,
       accessToken: result.accessToken,
       user: result.user,
-    });
+    };
+
+    // Return refreshToken in payload strictly for mobile apps
+    if (platform === 'ios' || platform === 'android') {
+      responsePayload.refreshToken = result.refreshToken;
+    }
+
+    res.json(responsePayload);
   } catch (err) {
     next(err);
   }
@@ -188,11 +202,18 @@ export async function googleLoginHandler(
       maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
-    res.json({
+    const responsePayload: any = {
       success: true,
       accessToken: result.accessToken,
       user: result.user,
-    });
+    };
+
+    // Return refreshToken in payload strictly for mobile apps
+    if (platform === 'ios' || platform === 'android') {
+      responsePayload.refreshToken = result.refreshToken;
+    }
+
+    res.json(responsePayload);
   } catch (err) {
     next(err);
   }
