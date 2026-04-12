@@ -11,9 +11,11 @@ export const SendMessageSchema = z.object({
     .optional()
     .nullable(),
   type: z
-    .enum(['text', 'image', 'video', 'audio', 'file', 'sticker'], {
-      errorMap: () => ({ message: 'Invalid message type. Must be: text, image, video, audio, file, or sticker' }),
-    })
+    .string()
+    .refine(
+      (type) => /^(text|image|video|audio|sticker|file\/.+)$/.test(type),
+      { message: 'Invalid message type. Must be: text, image, video, audio, sticker, or file/<filename>' }
+    )
     .default('text'),
   mediaUrl: z
     .string()

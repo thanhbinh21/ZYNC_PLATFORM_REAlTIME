@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Message } from '@zync/shared-types';
+import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
+import { MessageItem } from '../molecules/message-item';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
+import { MessageType } from '@zync/shared-types';
 
 // ==================== ICONS ====================
 
@@ -38,12 +40,16 @@ interface ChatPanelProps {
   participantAvatar?: string;
   isOnline?: boolean;
   messages?: Message[];
+  messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
-  onSendMessage?: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => Promise<void>;
+  onSendMessage?: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
   onInfoClick?: () => void;
+  onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
+  onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
+  onForwardMessage?: (message: Message) => void;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -159,6 +165,7 @@ function ChatPanel({
   participantAvatar,
   isOnline = true,
   messages = [],
+  messageStatus = {},
   typingUsers = [],
   onSendMessage = async () => {},
   onStartTyping = () => {},
@@ -167,6 +174,9 @@ function ChatPanel({
   isLoading = false,
   error = null,
   onInfoClick,
+  onDeleteMessageForMe,
+  onRecallMessage,
+  onForwardMessage,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -186,6 +196,14 @@ function ChatPanel({
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     // If scrolled to bottom (within 100px), enable auto-scroll
     setShouldAutoScroll(scrollHeight - scrollTop - clientHeight < 100);
+  };
+
+  // Check if message can be recalled (within 5 minutes)
+  const canRecallMessage = (createdAt: string): boolean => {
+    const messageTime = new Date(createdAt).getTime();
+    const now = new Date().getTime();
+    const fiveMinutesMs = 5 * 60 * 1000;
+    return (now - messageTime) < fiveMinutesMs;
   };
 
   return (
@@ -269,15 +287,16 @@ function ChatPanel({
         ) : (
           <>
             {messages.map((message) => (
-              <MessageBubble
+              <MessageItem
                 key={message._id}
-                isOwn={message.senderId === currentUserId}
-                content={message.content}
-                type={message.type}
-                mediaUrl={message.mediaUrl}
-                status={message.status}
-                timestamp={message.createdAt}
+                message={message}
+                isSender={message.senderId === currentUserId}
+                canRecall={canRecallMessage(message.createdAt)}
                 senderAvatar={participantAvatar}
+                messageStatus={messageStatus}
+                onDeleteForMe={onDeleteMessageForMe}
+                onRecall={onRecallMessage}
+                onForward={onForwardMessage}
               />
             ))}
 

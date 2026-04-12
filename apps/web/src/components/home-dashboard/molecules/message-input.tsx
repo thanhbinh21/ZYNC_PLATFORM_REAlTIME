@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
+import { MessageType } from '../home-dashboard.types';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
@@ -32,13 +33,13 @@ return (
 interface UploadedMedia {
   previewUrl: string;
   remoteUrl?: string;
-  type: 'image' | 'video' | 'file';
+  type: MessageType;
   isReady: boolean;
   fileName?: string;
 }
 
 interface MessageInputProps {
-  onSend: (content: string, type: 'text' | 'image' | 'video' | 'file' | 'sticker', mediaUrl?: string) => void;
+  onSend: (content: string, type: MessageType, mediaUrl?: string) => void;
   onStartTyping: () => void;
   onStopTyping: () => void;
   isLoading?: boolean;
@@ -59,6 +60,7 @@ export function MessageInput({
   const [isSending, setIsSending] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const QUICK_EMOJIS = ['😀', '😂', '😍', '👍', '❤️', '🔥', '👏', '🎉'];
@@ -72,23 +74,43 @@ export function MessageInput({
   }, [uploadedMedia]);
 
   const handleInputChange = (value: string) => {
-    const wasEmpty = input.length === 0;
     setInput(value);
 
-    // Emit typing_start if just started typing
-    if (wasEmpty && value.length > 0) {
-      onStartTyping();
-    }
-
-    // Debounce typing_stop event
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
     if (value.length > 0) {
+      // Emit typing_start if interval isn't running (first keystroke or resuming after stop)
+      if (!typingIntervalRef.current) {
+        onStartTyping();
+
+        // Start throttle interval: re-emit every 2s to refresh Redis TTL
+        typingIntervalRef.current = setInterval(() => {
+          onStartTyping();
+        }, 2000);
+      }
+
+      // Reset stop debounce: clears any pending stop, sets new 3s timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
       typingTimeoutRef.current = setTimeout(() => {
         onStopTyping();
+        // Cleanup interval when typing stops
+        if (typingIntervalRef.current) {
+          clearInterval(typingIntervalRef.current);
+          typingIntervalRef.current = null;
+        }
       }, 3000);
+    } else {
+      // User cleared all text: stop immediately
+      onStopTyping();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
     }
   };
 
@@ -110,6 +132,11 @@ export function MessageInput({
       onStopTyping();
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
       }
       // Prevent double-click for 500ms
       setTimeout(() => setIsSending(false), 500);
@@ -125,11 +152,11 @@ export function MessageInput({
 
   // Shared upload logic for both file select and paste
   const handleUploadFile = async (file: File, autoSend = false) => {
-    const messageType = file.type.startsWith('image/')
+    const messageType: MessageType = file.type.startsWith('image/')
       ? 'image'
       : file.type.startsWith('video/')
         ? 'video'
-        : 'file';
+        : `file/${file.name}`;
     const previewUrl = file.type.startsWith('image/') || file.type.startsWith('video/')
       ? URL.createObjectURL(file)
       : '';

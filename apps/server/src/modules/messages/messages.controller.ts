@@ -1,9 +1,12 @@
 import { type Response, type NextFunction, type RequestHandler } from 'express';
 import { MessagesService } from './messages.service';
+import { MessageStatusModel } from './message-status.model';
 import { SendMessageSchema, GetMessageHistorySchema, UpdateMessageStatusSchema, MarkAsReadSchema } from './messages.schema';
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
+import { getIO } from '../../socket/gateway';
+import { MessageType } from './message.model';
 
 // ─── POST /api/messages/send ─────────────────────────────────────────────────
 
@@ -27,7 +30,7 @@ export const sendMessageHandler = (async (
       conversationId,
       userId,
       content ?? '',
-      type,
+      type as MessageType,
       idempotencyKey,
       mediaUrl ?? undefined,
     );
@@ -64,9 +67,57 @@ export const getMessageHistoryHandler = (async (
     }
 
     const { cursor, limit } = validationResult.data;
+    const userId = req.userId;
 
-    // Fetch message history
-    const result = await MessagesService.getMessageHistory(conversationId, cursor, limit);
+    // Fetch message history with status for current user
+    const result = await MessagesService.getMessageHistory(conversationId, userId, cursor, limit);
+
+    // ─── AUTO-MARK UNDELIVERED MESSAGES (ASYNC, NO AWAIT) ───
+    // When user fetches old messages (before they were online), auto-mark them as delivered
+    // Fire-and-forget: Don't block the response while updating DB
+    try {
+      const undeliveredIds = await MessagesService.findUndeliveredForUser(conversationId, userId);
+
+      if (undeliveredIds.length > 0) {
+        // Use bulkWrite with upsert for safe update-or-insert
+        const bulkOps = undeliveredIds.map((u) => ({
+          updateOne: {
+            filter: { messageId: u.id, userId },
+            update: {
+              $set: { 
+                status: 'read' as const, 
+                idempotencyKey: u.idempotencyKey,
+              },
+            },
+            upsert: true,
+          },
+        }));
+
+        MessageStatusModel.bulkWrite(bulkOps as any)
+          .then(() => {
+            // Broadcast status update AFTER DB update completes (to ensure persistence)
+            const io = getIO();
+            if (io) {
+              io.to(`conv:${conversationId}`).emit('status_update', {
+                messageIds: undeliveredIds.map((u) => u.id),
+                idempotencyKeys: undeliveredIds.map((u) => u.idempotencyKey),
+                status: 'read',
+                userId,
+                updatedAt: new Date(),
+              });
+              logger.info(
+                `[Auto-mark] Marked ${undeliveredIds.length} messages as read for user ${userId} in conversation ${conversationId}`,
+              );
+            }
+          })
+          .catch((err: unknown) => {
+            logger.error('[Auto-mark] Failed to bulkWrite message status:', err);
+          });
+      }
+    } catch (err) {
+      // Don't fail the request if auto-mark fails
+      logger.error('[Auto-mark] Error fetching undelivered messages:', err);
+    }
 
     res.json({
       success: true,

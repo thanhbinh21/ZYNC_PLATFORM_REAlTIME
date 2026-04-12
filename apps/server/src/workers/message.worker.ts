@@ -1,6 +1,6 @@
 import type { Consumer, EachMessagePayload } from 'kafkajs';
 import { createConsumer, KAFKA_TOPICS } from '../infrastructure/kafka';
-import { MessageModel } from '../modules/messages/message.model';
+import { MessageModel, MessageType } from '../modules/messages/message.model';
 import { MessagesService } from '../modules/messages/messages.service';
 import { logger } from '../shared/logger';
 
@@ -14,7 +14,7 @@ interface RawMessage {
   conversationId: string;
   senderId: string;
   content: string;
-  type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker';
+  type: MessageType;
   mediaUrl?: string;
   idempotencyKey: string;
   createdAt: string;
@@ -59,6 +59,7 @@ export async function startMessageWorker(): Promise<void> {
 
     // Task 6.2: Batch collection variables
     const batch: Array<{
+      mockId: string;
       conversationId: string;
       senderId: string;
       content: string;
@@ -88,9 +89,10 @@ export async function startMessageWorker(): Promise<void> {
               msg.conversationId,
               msg.senderId,
               msg.content,
-              msg.type as 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+              msg.type as MessageType,
               msg.idempotencyKey,
               msg.mediaUrl,
+              msg.mockId,
             );
             successCount++;
           } catch (err) {
@@ -151,6 +153,7 @@ export async function startMessageWorker(): Promise<void> {
           const rawMessage = JSON.parse(payload.message.value.toString()) as RawMessage;
 
           batch.push({
+            mockId: rawMessage.messageId,
             conversationId: rawMessage.conversationId,
             senderId: rawMessage.senderId,
             content: rawMessage.content,

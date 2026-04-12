@@ -1,3 +1,4 @@
+import { MessageType } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
@@ -52,6 +53,14 @@ export function joinConversation(conversationId: string): void {
   socket.emit('join_conversation', { conversationId });
 }
 
+export function leaveConversation(conversationId: string): void {
+  if (!socket?.connected) {
+    return;
+  }
+
+  socket.emit('leave_conversation', { conversationId });
+}
+
 // ─── Message Events ───
 
 /**
@@ -65,7 +74,7 @@ export function joinConversation(conversationId: string): void {
 export function sendMessage(
   conversationId: string,
   content: string,
-  type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'sticker',
+  type: MessageType,
   idempotencyKey: string,
   mediaUrl?: string,
 ): void {
@@ -94,6 +103,7 @@ export function listenToMessages(
     content: string;
     type: string;
     mediaUrl?: string;
+    idempotencyKey: string;
     createdAt: string;
   }) => void,
 ): void {
@@ -155,6 +165,7 @@ export function listenToStatusUpdates(
   callback: (data: {
     messageIds?: string[];
     messageId?: string;
+    idempotencyKeys?: string[];
     status: 'sent' | 'delivered' | 'read';
     userId: string;
     updatedAt: string;
@@ -164,7 +175,7 @@ export function listenToStatusUpdates(
     throw new Error('Socket not initialized');
   }
 
-  socket.on('status_update', callback);
+  socket.on('status_update', (data) => callback(data));
 }
 
 /**
@@ -214,6 +225,26 @@ export function stopTyping(conversationId: string): void {
 }
 
 /**
+ * Clear pending typing indicator immediately (e.g., when message is sent)
+ * Don't wait for 3s debounce - emit typing_stop right away
+ * @param conversationId Conversation ID
+ */
+export function clearPendingTyping(conversationId: string): void {
+  if (!socket?.connected) {
+    return;
+  }
+
+  // Clear timeout if pending
+  if (typingTimeout) {
+    clearTimeout(typingTimeout);
+    typingTimeout = null;
+  }
+
+  // Emit typing_stop immediately (don't wait 3s)
+  socket.emit('typing_stop', { conversationId });
+}
+
+/**
  * Listen to typing indicators from other users
  * @param callback Handler for typing indicator updates
  */
@@ -237,6 +268,158 @@ export function listenToTypingIndicators(
 export function unlistenToTypingIndicators(): void {
   if (socket) {
     socket.off('typing_indicator');
+  }
+}
+
+// ─── Delete & Recall Events ───
+
+/**
+ * Delete message for sender only
+ * @param conversationId Conversation ID
+ * @param messageId Message ID to delete
+ */
+export function deleteMessageForMe(
+  conversationId: string,
+  messageId: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('delete_message_for_me', {
+    conversationId,
+    messageId,
+    idempotencyKey,
+  });
+}
+
+/**
+ * Recall message (delete everywhere)
+ * @param conversationId Conversation ID
+ * @param messageId Message ID to recall
+ */
+export function recallMessage(
+  conversationId: string,
+  messageId: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('recall_message', {
+    conversationId,
+    messageId,
+    idempotencyKey,
+  });
+}
+
+/**
+ * Listen to message deletion events (for me only)
+ * @param callback Handler for deletion
+ */
+export function listenToMessageDeletion(
+  callback: (data: {
+    messageId: string;
+    conversationId: string;
+    deletedAt: string;
+  }) => void,
+): void {
+  if (!socket) {
+    throw new Error('Socket not initialized');
+  }
+
+  socket.on('message_deleted_for_me', callback);
+}
+
+/**
+ * Stop listening to message deletion events
+ */
+export function unlistenToMessageDeletion(): void {
+  if (socket) {
+    socket.off('message_deleted_for_me');
+  }
+}
+
+/**
+ * Listen to message recall events (for everyone)
+ * @param callback Handler for recall
+ */
+export function listenToMessageRecall(
+  callback: (data: {
+    messageId: string;
+    idempotencyKey: string;
+    conversationId: string;
+    recalledBy: string;
+    recalledAt: string;
+  }) => void,
+): void {
+  if (!socket) {
+    throw new Error('Socket not initialized');
+  }
+
+  socket.on('message_recalled', callback);
+}
+
+/**
+ * Stop listening to message recall events
+ */
+export function unlistenToMessageRecall(): void {
+  if (socket) {
+    socket.off('message_recalled');
+  }
+}
+
+// ─── Forward Message ───
+
+/**
+ * Emit forward message event
+ * @param originalMessageId Message ID to forward
+ * @param toConversationId Target conversation
+ * @param idempotencyKey Unique key for idempotency
+ */
+export function emitForwardMessage(
+  originalMessageId: string,
+  toConversationId: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    console.error('[Socket] Not connected to emit forward_message');
+    return;
+  }
+
+  socket.emit('forward_message', {
+    originalMessageId,
+    toConversationId,
+    idempotencyKey,
+  });
+}
+
+/**
+ * Listen to message forwarded confirmation
+ * Server emits this after successfully forwarding
+ */
+export function listenToMessageForwarded(
+  callback: (data: {
+    messageId: string;
+    idempotencyKey: string;
+    toConversationId: string;
+  }) => void,
+): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.on('message_forwarded', callback);
+}
+
+/**
+ * Stop listening to message forwarded events
+ */
+export function unlistenToMessageForwarded(): void {
+  if (socket) {
+    socket.off('message_forwarded');
   }
 }
 
@@ -274,6 +457,7 @@ export const socketService = {
   isConnected,
   disconnectSocket,
   joinConversation,
+  leaveConversation,
   sendMessage,
   listenToMessages,
   unlistenToMessages,
@@ -283,8 +467,15 @@ export const socketService = {
   unlistenToStatusUpdates,
   startTyping,
   stopTyping,
+  clearPendingTyping,
   listenToTypingIndicators,
   unlistenToTypingIndicators,
+  deleteMessageForMe,
+  recallMessage,
+  listenToMessageDeletion,
+  unlistenToMessageDeletion,
+  listenToMessageRecall,
+  unlistenToMessageRecall,
   listenToErrors,
   unlistenToErrors,
 };

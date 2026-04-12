@@ -6,18 +6,32 @@ import type { Message, MessageStatus } from '@zync/shared-types';
 import {
   getSocket,
   isConnected,
+  joinConversation,
+  leaveConversation,
   listenToMessages,
   listenToStatusUpdates,
   listenToTypingIndicators,
+  markAsDelivered,
   markAsRead,
   sendMessage as emitSendMessage,
   startTyping as emitStartTyping,
   stopTyping as emitStopTyping,
+  clearPendingTyping as emitClearPendingTyping,
   unlistenToMessages,
   unlistenToStatusUpdates,
   unlistenToTypingIndicators,
+  deleteMessageForMe,
+  recallMessage,
+  listenToMessageDeletion,
+  unlistenToMessageDeletion,
+  listenToMessageRecall,
+  unlistenToMessageRecall,
+  emitForwardMessage,
+  listenToMessageForwarded,
+  unlistenToMessageForwarded,
 } from '@/services/socket';
-import { apiClient } from '@/services/api';
+import { getMessages } from '@/services/chat';
+import { MessageType } from '@zync/shared-types';
 
 // ─── useChat Hook ───
 
@@ -25,7 +39,7 @@ interface MessageStatusMap {
   [messageId: string]: MessageStatus;
 }
 
-interface TypingUser {
+export interface TypingUser {
   userId: string;
   displayName: string;
 }
@@ -41,10 +55,12 @@ interface UseChatReturn {
   messages: Message[];
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
-  sendMessage: (content: string, type: 'text' | 'image' | 'video' | 'file', mediaUrl?: string) => Promise<void>;
+  sendMessage: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
+  deleteMessageForMe: (messageId: string, idempotencyKey: string) => Promise<void>;
+  recallMessage: (messageId: string, idempotencyKey: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
 }
@@ -63,9 +79,16 @@ export function useChat({
 
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const previousConversationId = useRef<string>('');
 
-  // Initialize socket on mount
+  // Initialize socket on mount or when token changes
   useEffect(() => {
+    // Only initialize socket if token is available
+    if (!token) {
+      setError('No authentication token available');
+      return;
+    }
+
     try {
       getSocket(token);
     } catch (err) {
@@ -73,6 +96,19 @@ export function useChat({
       setError('Failed to connect to messaging service');
     }
   }, [token]);
+
+  // Join conversation when it changes
+  useEffect(() => {
+    if (conversationId && isConnected()) {
+      // Leave previous conversation if it exists and is different
+      if (previousConversationId.current && previousConversationId.current !== conversationId) {
+        leaveConversation(previousConversationId.current);
+      }
+      // Join new conversation
+      joinConversation(conversationId);
+      previousConversationId.current = conversationId;
+    }
+  }, [conversationId]);
 
   // Setup message listener
   useEffect(() => {
@@ -82,6 +118,7 @@ export function useChat({
       content: string;
       type: string;
       mediaUrl?: string;
+      idempotencyKey: string;
       createdAt: string;
     }) => {
       const newMessage: Message = {
@@ -91,7 +128,7 @@ export function useChat({
         content: data.content,
         type: data.type as Message['type'],
         mediaUrl: data.mediaUrl,
-        idempotencyKey: '', // Will be set on send
+        idempotencyKey: data.idempotencyKey, // Will be set on send
         status: 'delivered',
         createdAt: data.createdAt,
       };
@@ -101,14 +138,45 @@ export function useChat({
         [data.messageId]: 'delivered',
       }));
 
+      // Notify backend that message was delivered
+      markAsDelivered(conversationId, [data.messageId]);
+
       // Auto-mark as read after 500ms
       setTimeout(() => {
         markAsRead(conversationId, [data.messageId]);
       }, 500);
     };
 
+    const handleMessageSent = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      createdAt: string;
+    }) => {
+      // // Replace optimistic message (using idempotencyKey) with real message (using messageId)
+      // setMessages((prev) =>
+      //   prev.map((msg) =>
+      //     msg._id === data.idempotencyKey
+      //       ? { ...msg, _id: data.messageId, createdAt: data.createdAt }
+      //       : msg,
+      //   ),
+      // );
+
+      // Transfer status tracking from idempotencyKey to real messageId (keep status as is)
+      // setMessageStatus((prev) => {
+      //   const newStatus = { ...prev };
+      //   if (prev[data.idempotencyKey]) {
+      //     // Keep the same status, just move it to the real messageId
+      //     newStatus[data.messageId] = prev[data.idempotencyKey];
+      //     delete newStatus[data.idempotencyKey];
+      //   }
+      //   return newStatus;
+      // });
+    };
+
     try {
       listenToMessages(handleReceiveMessage);
+      const socket = getSocket(token);
+      socket.on('message_sent', handleMessageSent);
     } catch (err) {
       console.error('Failed to setup message listener:', err);
     }
@@ -116,27 +184,51 @@ export function useChat({
     return () => {
       try {
         unlistenToMessages();
+        const socket = getSocket(token);
+        socket.off('message_sent', handleMessageSent);
       } catch (err) {
         console.error('Failed to cleanup message listener:', err);
       }
     };
-  }, [conversationId]);
+  }, [conversationId, token]);
 
   // Setup status update listener
   useEffect(() => {
     const handleStatusUpdate = (data: {
       messageId?: string;
       messageIds?: string[];
+      idempotencyKeys?: string[];
       status: MessageStatus;
       userId: string;
       updatedAt: string;
     }) => {
-      const ids = data.messageIds || (data.messageId ? [data.messageId] : []);
+      const ids = data.messageIds || [];
+      const idems = data.idempotencyKeys || [];
+
+      // Single message status update (sent event)
+      if (ids.length === 0 && data.messageId) {
+        const messageId = data.messageId;
+        setMessageStatus((prev) => ({
+          ...prev,
+          [messageId]: data.status,
+        }));
+        return;
+      }
+
+      // Batch status update (auto-mark from getMessageHistory)
+      // Backend sends idempotencyKeys = frontend mockIds (now guaranteed to match)
       setMessageStatus((prev) => {
         const updated = { ...prev };
-        ids.forEach((id) => {
-          updated[id] = data.status;
+        ids.forEach((id, i) => {
+          if (updated[idems[i]]) {
+            updated[idems[i]] = data.status;
+          } else {
+            updated[id] = data.status;
+          }
         });
+        // [...idems, ...ids].forEach((key) => {
+        //   if (key) updated[key] = data.status;
+        // });
         return updated;
       });
     };
@@ -154,7 +246,7 @@ export function useChat({
         console.error('Failed to cleanup status listener:', err);
       }
     };
-  }, []);
+  }, [conversationId, token]);
 
   // Setup typing indicator listener
   useEffect(() => {
@@ -214,7 +306,7 @@ export function useChat({
 
   // Send message
   const handleSendMessage = useCallback(
-    async (content: string, type: 'text' | 'image' | 'video' | 'file', mediaUrl?: string) => {
+    async (content: string, type: MessageType, mediaUrl?: string) => {
       if (!isConnected()) {
         setError('Not connected to messaging service');
         return;
@@ -248,6 +340,9 @@ export function useChat({
 
         // Send via socket
         emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl);
+
+        // Clear pending typing indicator immediately (don't wait 3s)
+        emitClearPendingTyping(conversationId);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
         setError(errorMsg);
@@ -295,6 +390,97 @@ export function useChat({
     }
   }, [conversationId]);
 
+  // ─── Delete Message Listeners Setup (Status Update Only) ───
+  useEffect(() => {
+    if (!token) return;
+
+    const handleMessageDeletedForMe = (data: {
+      messageId: string;
+      conversationId: string;
+      deletedAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Remove from status map
+      setMessageStatus((prev) => {
+        const newStatus = { ...prev };
+        delete newStatus[data.messageId];
+        return newStatus;
+      });
+    };
+
+    const handleMessageRecalled = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      conversationId: string;
+      recalledBy: string;
+      recalledAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Update status
+      setMessageStatus((prev) => ({
+        ...prev,
+        [data.messageId]: 'read',
+      }));
+    };
+
+    try {
+      // Use listener functions instead of direct socket.on
+      listenToMessageDeletion(handleMessageDeletedForMe);
+      listenToMessageRecall(handleMessageRecalled);
+    } catch (err) {
+      console.error('Failed to setup deletion listeners:', err);
+    }
+
+    return () => {
+      try {
+        unlistenToMessageDeletion();
+        unlistenToMessageRecall();
+      } catch (err) {
+        console.error('Failed to cleanup deletion listeners:', err);
+      }
+    };
+  }, [conversationId, token]);
+
+  // Delete for me
+  const handleDeleteForMe = useCallback(
+    async (messageId: string, idempotencyKey: string) => {
+      if (!isConnected()) {
+        setError('Not connected to messaging service');
+        return;
+      }
+
+      try {
+        deleteMessageForMe(conversationId, messageId, idempotencyKey);
+      } catch (err) {
+        console.error('Failed to delete message:', err);
+        setError('Failed to delete message');
+      }
+    },
+    [conversationId]
+  );
+
+  // Recall message
+  const handleRecall = useCallback(
+    async (messageId: string, idempotencyKey: string) => {
+      if (!isConnected()) {
+        setError('Not connected to messaging service');
+        return;
+      }
+
+      try {
+        recallMessage(conversationId, messageId, idempotencyKey);
+      } catch (err) {
+        console.error('Failed to recall message:', err);
+        setError('Failed to recall message');
+      }
+    },
+    [conversationId]
+  );
+
   return {
     messages,
     typingUsers,
@@ -303,6 +489,8 @@ export function useChat({
     markAsRead: handleMarkAsRead,
     startTyping: handleStartTyping,
     stopTyping: handleStopTyping,
+    deleteMessageForMe: handleDeleteForMe,
+    recallMessage: handleRecall,
     isLoading,
     error,
   };
@@ -332,6 +520,7 @@ export function useMessageHistory({
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [checkChange, setCheckChange] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMessages = useCallback(async (overrideCursor?: string) => {
@@ -344,19 +533,14 @@ export function useMessageHistory({
       setLoading(true);
       setError(null);
 
-      const params = {
-        limit: 20,
-        ...(currentCursor && { cursor: currentCursor }),
-      };
-
-      const response = await apiClient.get(`/api/messages/${conversationId}`, { params });
-      const { messages, nextCursor, hasMore: responseHasMore } = response.data;
+      const response = await getMessages(conversationId, cursor, 20);
+      const { messages, nextCursor } = response;
 
       if (messages && Array.isArray(messages)) {
         const reversedMessages = messages.reverse();
         setMessages((prev) => (currentCursor ? [...reversedMessages, ...prev] : reversedMessages));
         setCursor(nextCursor);
-        setHasMore(responseHasMore ?? messages.length === 20);
+        setHasMore(nextCursor ? messages.length === 20 : false);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch messages';
@@ -380,16 +564,92 @@ export function useMessageHistory({
     setCursor(undefined);
     setHasMore(true);
     setError(null);
-
-    void fetchMessages('');
+    setCheckChange(prev => !prev);
   }, [conversationId]);
 
+  // Auto-fetch initial messages when conversationId changes
+  useEffect(() => {
+    if (conversationId && !loading) {
+      fetchMessages('');
+    }
+  }, [checkChange]);
+
+  // Load more (fetch with current cursor)
   const loadMore = useCallback(async () => {
     if (!hasMore || loading) {
       return;
     }
     await fetchMessages();
   }, [fetchMessages, hasMore, loading]);
+
+  // ─── Handle Message Deletion & Recall ───
+  useEffect(() => {
+    const handleMessageDeletedForMe = (data: {
+      messageId: string;
+      conversationId: string;
+      deletedAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Remove from messages state
+      setMessages((prev) =>
+        prev.filter((msg) => msg._id !== data.messageId)
+      );
+    };
+
+    const handleMessageRecalled = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      conversationId: string;
+      recalledBy: string;
+      recalledAt: string;
+    }) => {
+      // Only process if this is the right conversation
+      if (data.conversationId !== conversationId) return;
+
+      // Update message to placeholder
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.idempotencyKey === data.idempotencyKey
+            ? {
+                ...msg,
+                content: '[Tin nhắn đã được thu hồi]',
+                mediaUrl: undefined,
+                type: 'system-recall' as Message['type'],
+              }
+            : msg,
+        ),
+      );
+    };
+
+    const handleMessageForwarded = (data: {
+      messageId: string;
+      idempotencyKey: string;
+      toConversationId: string;
+    }) => {
+      // Just log forward confirmation - message appears in target conversation via receive_message
+      console.debug(`Message forwarded: ${data.idempotencyKey} to ${data.toConversationId}`);
+    };
+
+    try {
+      listenToMessageDeletion(handleMessageDeletedForMe);
+      listenToMessageRecall(handleMessageRecalled);
+      listenToMessageForwarded(handleMessageForwarded);
+    } catch (err) {
+      console.error('Failed to setup deletion listeners:', err);
+    }
+
+    return () => {
+      try {
+        unlistenToMessageDeletion();
+        unlistenToMessageRecall();
+        unlistenToMessageForwarded();
+      } catch (err) {
+        console.error('Failed to cleanup deletion listeners:', err);
+      }
+    };
+  }, [conversationId]);
 
   return {
     messages,

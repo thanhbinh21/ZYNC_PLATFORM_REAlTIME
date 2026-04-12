@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { MessageStatus } from '@zync/shared-types';
+import { GetFileIcon } from './file-type-icons';
 
 function CheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
   return (
@@ -9,6 +10,39 @@ function CheckCircleIcon({ filled, className }: { filled: boolean; className: st
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
       <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function DoubleCheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
+  return (
+    <div className="relative inline-flex">
+      <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className={`${className} absolute`} aria-hidden>
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className={`${className} relative`} style={{ marginLeft: '-6px' }} aria-hidden>
+        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
+
+function FileMessagePreview({ filename, mediaUrl }: { filename: string; mediaUrl?: string }) {
+  const extension = filename.split('.').pop() || '';
+
+  return (
+    <a
+      href={mediaUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-3 rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336] transition-colors"
+    >
+      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+        <GetFileIcon extension={extension} />
+      </div>
+      <span className="truncate max-w-xs">{filename}</span>
+    </a>
   );
 }
 
@@ -43,8 +77,8 @@ export function MessageBubble({
 
   const statusIcon = {
     sent: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
-    delivered: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
-    read: <CheckCircleIcon filled={true} className="w-4 h-4 text-[#88b8a7]" />,
+    delivered: <DoubleCheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
+    read: <DoubleCheckCircleIcon filled={true} className="w-4 h-4 text-[#88b8a7]" />,
   }[status || 'sent'];
 
   return (
@@ -67,10 +101,10 @@ export function MessageBubble({
         </div>
       )}
 
-      {/* Message Content */}
+      {/* Media */}
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-xs lg:max-w-md`}>
         {/* Media */}
-        {mediaUrl && (type === 'image' || type === 'video' || type === 'file') && (
+        {mediaUrl && (type === 'image' || type === 'video' || type?.startsWith('file/')) && (
           <div className="mb-1 rounded-lg overflow-hidden">
             {type === 'image' && (
               <Image
@@ -88,15 +122,11 @@ export function MessageBubble({
                 className="max-w-xs max-h-80"
               />
             )}
-            {type === 'file' && (
-              <a
-                href={mediaUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] hover:bg-[#164336]"
-              >
-                Mở tệp đính kèm
-              </a>
+            {type?.startsWith('file/') && (
+              <FileMessagePreview
+                filename={type.replace('file/', '')}
+                mediaUrl={mediaUrl}
+              />
             )}
           </div>
         )}
@@ -117,7 +147,7 @@ export function MessageBubble({
         {/* Timestamp + Status */}
         <div className={`flex items-center gap-1 mt-1 text-xs text-[#88b8a7] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           <span>{timeStr}</span>
-          {isOwn && statusIcon}
+          {type !== 'system-recall' && isOwn && statusIcon}
         </div>
       </div>
     </div>

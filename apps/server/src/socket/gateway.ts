@@ -6,9 +6,12 @@ import { createRedisDuplicate, getRedis, setTypingIndicator, removeTypingIndicat
 import { logger } from '../shared/logger';
 import type { StoryReactionType } from '../modules/stories/story.model';
 import { MessagesService } from '../modules/messages/messages.service';
+import { MessageModel } from '../modules/messages/message.model';
+import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
+import { MessageType } from '../modules/messages/message.model';
 
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
@@ -125,6 +128,19 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
+    socket.on('leave_conversation', async (payload: { conversationId?: string }) => {
+      const conversationId = payload?.conversationId;
+      if (!conversationId) {
+        return;
+      }
+
+      try {
+        await socket.leave(`conv:${conversationId}`);
+      } catch (err) {
+        logger.error('leave_conversation error', err);
+      }
+    });
+
     // Sự kiện gửi tin nhắn
     socket.on('send_message', async (payload: unknown) => {
       try {
@@ -221,6 +237,38 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
+    // ─── Delete & Recall Events ───
+
+    // Delete message for sender only
+    socket.on('delete_message_for_me', async (payload: unknown) => {
+      try {
+        await handleDeleteMessageForMe(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('delete_message_for_me error', err);
+        socket.emit('error', { message: 'Failed to delete message' });
+      }
+    });
+
+    // Recall message (delete everywhere)
+    socket.on('recall_message', async (payload: unknown) => {
+      try {
+        await handleRecallMessage(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('recall_message error', err);
+        socket.emit('error', { message: 'Failed to recall message' });
+      }
+    });
+
+    // Forward message to another conversation
+    socket.on('forward_message', async (payload: unknown) => {
+      try {
+        await handleForwardMessage(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('forward_message error', err);
+        socket.emit('error', { message: 'Failed to forward message' });
+      }
+    });
+
     // Xử lý ngắt kết nối
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${userId}`);
@@ -278,9 +326,11 @@ async function handleSendMessage(
     return;
   }
 
-  const allowedMessageTypes = new Set(['text', 'image', 'video', 'audio', 'file', 'sticker']);
+  const isValidMessageType = (type: string): boolean => {
+    return ['text', 'image', 'video', 'audio', 'sticker'].includes(type) || type.startsWith('file/');
+  };
   const normalizedType = typeof type === 'string' ? type : 'text';
-  if (!allowedMessageTypes.has(normalizedType)) {
+  if (!isValidMessageType(normalizedType)) {
     socket.emit('error', { message: 'Invalid message type' });
     return;
   }
@@ -304,7 +354,7 @@ async function handleSendMessage(
       conversationId as string,
       userId,
       typeof content === 'string' ? content : '',
-      normalizedType as ('text' | 'image' | 'video' | 'audio' | 'file' | 'sticker'),
+      normalizedType as MessageType,
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
     );
@@ -312,26 +362,26 @@ async function handleSendMessage(
     // Note: createMessage already publishes to Kafka (worker will insert)
     // Message object here is a mock with temporary ID until Kafka worker inserts real DB
 
-    // ─── Emit to Recipients ───
-    // Emit with temporary ID (will be updated with real DB _id once Kafka worker processes)
-    io.to(`conv:${conversationId}`).emit('receive_message', {
+    // ─── Emit to Recipients (NOT to sender - they already have optimistic update) ───
+    socket.to(`conv:${conversationId}`).emit('receive_message', {
       messageId: message._id,
       conversationId,
       senderId: userId,
       content: typeof content === 'string' ? content : '',
       type: normalizedType,
       mediaUrl,
+      idempotencyKey,
       createdAt: message.createdAt,
     });
 
-    // ─── Emit Status Update ───
+    // ─── Emit Status Update to ALL (including sender) ───
     io.to(`conv:${conversationId}`).emit('status_update', {
       messageId: message._id,
       status: 'sent',
       userId,
     });
 
-    // ─── Confirm to Sender ───
+    // ─── Confirm to Sender (replace optimistic message ID) ───
     socket.emit('message_sent', {
       messageId: message._id,
       idempotencyKey,
@@ -389,7 +439,9 @@ async function handleMessageRead(
       await MessagesService.markAsRead(messageId as string, userId);
     }
 
-    // ─── Broadcast Status Update ───
+    // ─── Simply emit read status back to sender ───
+    // Note: We don't query MongoDB for aggregation here because it's async
+    // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
       messageIds,
       status: 'read',
@@ -448,7 +500,9 @@ async function handleMessageDelivered(
       await MessagesService.updateMessageStatus(messageId as string, userId, 'delivered');
     }
 
-    // ─── Broadcast Status Update ───
+    // ─── Simply emit delivered status to conversation group ───
+    // Note: We don't query MongoDB for aggregation here because it's async
+    // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
       messageIds,
       status: 'delivered',
@@ -461,4 +515,142 @@ async function handleMessageDelivered(
     logger.error('Failed to mark messages as delivered', err);
     throw err;
   }
+}
+
+async function handleDeleteMessageForMe(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const userId = socket.userId;
+
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const { messageId, idempotencyKey, conversationId } = payload as {
+    messageId?: string;
+    idempotencyKey?: string;
+    conversationId?: string;
+  };
+
+  if (!messageId || !idempotencyKey || !conversationId) {
+    socket.emit('error', { message: 'Missing messageId or conversationId' });
+    return;
+  }
+
+  // ✅ USE .then() INSTEAD OF await
+  MessagesService.deleteMessageForMe(idempotencyKey, userId)
+    .then((message) => {
+      // Notify only this user (only they see the change)
+      socket.emit('message_deleted_for_me', {
+        messageId: messageId,
+        conversationId,
+        deletedAt: new Date().toISOString(),
+      });
+
+      logger.debug(`Message ${messageId} deleted for me by user ${userId}`);
+    })
+    .catch((err) => {
+      logger.error('handleDeleteMessageForMe error', err);
+      socket.emit('error', { message: (err as Error).message });
+    });
+}
+
+async function handleRecallMessage(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const userId = socket.userId;
+
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const { messageId, idempotencyKey, conversationId } = payload as {
+    messageId?: string;
+    idempotencyKey?: string;
+    conversationId?: string;
+  };
+
+  if (!messageId || !idempotencyKey || !conversationId) {
+    socket.emit('error', { message: 'Missing messageId or conversationId' });
+    return;
+  }
+
+  // ✅ USE .then() INSTEAD OF await
+  MessagesService.recallMessage(idempotencyKey, userId)
+    .then((message) => {
+      // Broadcast to EVERYONE in conversation (sender + all recipients)
+      io.to(`conv:${conversationId}`).emit('message_recalled', {
+        messageId: messageId,
+        idempotencyKey: idempotencyKey,
+        conversationId,
+        recalledBy: userId,
+        recalledAt: new Date().toISOString(),
+      });
+
+      logger.info(`Message ${messageId} recalled by user ${userId}`);
+    })
+    .catch((err) => {
+      logger.error('handleRecallMessage error', err);
+      socket.emit('error', { message: (err as Error).message });
+    });
+}
+
+async function handleForwardMessage(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const userId = socket.userId;
+
+  if (typeof payload !== 'object' || payload === null) {
+    socket.emit('error', { message: 'Invalid payload' });
+    return;
+  }
+
+  const { originalMessageId, toConversationId, idempotencyKey } = payload as {
+    originalMessageId?: string;
+    toConversationId?: string;
+    idempotencyKey?: string;
+  };
+
+  if (!originalMessageId || !toConversationId || !idempotencyKey) {
+    socket.emit('error', { message: 'Missing required fields' });
+    return;
+  }
+
+  // ✅ USE .then() INSTEAD OF await
+  MessagesService.forwardMessage(originalMessageId, toConversationId, userId, idempotencyKey)
+    .then((newMessage) => {
+      // Broadcast to target conversation
+      io.to(`conv:${toConversationId}`).emit('receive_message', {
+        messageId: newMessage._id,
+        conversationId: toConversationId,
+        senderId: userId,
+        content: newMessage.content,
+        type: newMessage.type,
+        mediaUrl: newMessage.mediaUrl,
+        status: 'sent',
+        createdAt: newMessage.createdAt,
+        idempotencyKey: newMessage.idempotencyKey,
+      });
+
+      // Confirm to sender
+      socket.emit('message_forwarded', {
+        messageId: newMessage._id,
+        idempotencyKey,
+        toConversationId,
+      });
+
+      logger.info(`Message ${originalMessageId} forwarded to ${toConversationId} by user ${userId}`);
+    })
+    .catch((err) => {
+      logger.error('handleForwardMessage error', err);
+      socket.emit('error', { message: (err as Error).message });
+    });
 }

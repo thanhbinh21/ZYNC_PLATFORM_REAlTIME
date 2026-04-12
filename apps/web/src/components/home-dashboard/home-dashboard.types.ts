@@ -69,3 +69,4 @@ export interface DashboardHomeMockData {
   activityCtaLabel: string;
   activities: DashboardActivityItem[];
 }
+
