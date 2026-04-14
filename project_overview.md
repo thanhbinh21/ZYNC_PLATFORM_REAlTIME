@@ -178,6 +178,8 @@ npm run dev:web
 - [x] Sau đăng nhập thành công chuyển về trang chủ `/` theo thiết kế trang chủ <!-- done: 19/03/2026 -->
 - [x] Tách vai trò route: `/` là landing giới thiệu, `/home` là trang chính sau đăng nhập thành công <!-- done: 19/03/2026 -->
 - [x] Dựng giao diện `/home` theo mẫu dashboard `docs/designs/login.png` với mock data khi chưa có API <!-- done: 19/03/2026 -->
+- [x] Hoàn thiện luồng Secure Logout (xóa session, dọn dẹp state và chuyển hướng về đăng nhập) <!-- done: 12/04/2026 -->
+- [x] Cấu hình chính xác định tuyến từ Home Dashboard cho recent activities và dọn dẹp UI thừa <!-- done: 12/04/2026 -->
 
 ### Phase 3 – Friends & Contacts (Module F5–F9)
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->
@@ -195,6 +197,7 @@ npm run dev:web
 - [x] Phân quyền admin/member <!-- done: 04/04/2026 -->
 - [x] Xóa nhóm (admin only) <!-- done: 04/04/2026 -->
 - [x] Socket event `group_updated` khi có thay đổi <!-- done: 04/04/2026 -->
+- [x] Chức năng tạo nhóm trực tiếp từ giao diện Chat Info Panel <!-- done: 12/04/2026 -->
 
 ### Phase 5 – Real-time Messaging (Module F17–F21)
 - [x] WebSocket server với Socket.IO + Redis adapter <!-- done: 04/04/2026 -->
@@ -223,6 +226,7 @@ npm run dev:web
 - [x] Bổ sung thanh tiến trình upload theo phần trăm cho avatar profile và media chat để phản hồi trạng thái rõ ràng hơn <!-- done: 05/04/2026 -->
 - [x] Tinh chỉnh mobile dashboard: chuyển sidebar sticky thành drawer để tránh chiếm chiều cao nội dung <!-- done: 05/04/2026 -->
 - [x] Hotfix UI chat: khôi phục danh sách hội thoại và header khung chat sau khi chỉnh layout chiều ngang <!-- done: 05/04/2026 -->
+- [x] Thay thế mock data trong Chat Info Panel bằng dữ liệu thông tin thực (Pin, Mute) <!-- done: 12/04/2026 -->
 
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
@@ -247,39 +251,42 @@ npm run dev:web
 - [x] Tích hợp Web Push API cho browser notifications <!-- done: 12/04/2026 -->
 - [x] Push notification khi: tin nhắn mới + user offline, friend request, group invite <!-- done: 12/04/2026 -->
 - [x] Notification preferences: user chọn mute conversation/group <!-- done: 12/04/2026 -->
+- [x] Đảm bảo thông báo hiển thị toàn cục (global) trên tất cả các tab của Web Dashboard <!-- done: 12/04/2026 -->
 - [ ] APNs placeholder cho iOS (implement khi có mobile app)
 
 ### Phase M1 – Mobile Foundation & Infrastructure (Lõi)
 
 > **Nguyên tắc:** UI đồng bộ Web • Logic không đổi • Dùng chung backend API/Socket • Code có tính khả thi deploy lên App Store / Google Play.
 
-- [ ] Expo Router setup: Tab navigator (Home/Chat/Friends/Profile) + Stack navigator
-- [ ] Shared services layer: `api.ts` (axios + interceptor), `socket.ts` (Socket.IO client), `auth.ts` (SecureStore + auto-refresh)
-- [ ] Zustand store cho auth state (token, user info)
-- [ ] SecureStore cho token persistence (expo-secure-store)
-- [ ] Theming system đồng bộ Web (verdant/dark/light – CSS vars → RN StyleSheet)
-- [ ] Typography: Be Vietnam Pro via expo-font
-- [ ] Shared types: import từ `@zync/shared-types`
+- [x] Expo Router setup: Tab navigator (Home/Chat/Friends/Profile) + Stack navigator
+- [x] Shared services layer: `api.ts` (axios + interceptor), `socket.ts` (Socket.IO client), `auth.ts` (SecureStore + auto-refresh)
+- [x] Zustand store cho auth state (token, user info)
+- [x] SecureStore cho token persistence (expo-secure-store)
+- [x] Theming system đồng bộ Web (verdant/dark/light – CSS vars → RN StyleSheet)
+- [x] Typography: Be Vietnam Pro via expo-font
+- [x] Shared types: import từ `@zync/shared-types`
+
 
 ### Phase M2 – Mobile Authentication (Lõi)
-- [ ] Login screen (email + password)
-- [ ] Register screen (email + OTP verification)
-- [ ] Forgot password flow
+- [x] Login screen (email + password)
+- [x] Register screen (email + OTP verification)
+- [x] Forgot password flow
 - [ ] Google Sign-In (expo-auth-session)
-- [ ] Splash screen + onboarding slides
-- [ ] Auto-login flow (detect saved token → verify → redirect)
+- [x] Splash screen + onboarding slides
+- [x] Auto-login flow (detect saved token → verify → redirect)
 
 ### Phase M3 – Mobile Home & Chat (Lõi)
-- [ ] Home tab: stats cards + recent activity list + story bar
-- [ ] Chat tab: conversation list (FlatList virtualized)
-- [ ] Chat room: bubble UI, message status (sent/delivered/read ticks)
-- [ ] Real-time messaging via Socket.IO
-- [ ] Typing indicator
-- [ ] Media picker (expo-image-picker) + Cloudinary signed upload
+- [x] Home tab: stats cards + recent activity list + story bar <!-- done: 12/04/2026 -->
+- [x] Chat tab: conversation list (FlatList virtualized) <!-- done: 12/04/2026 -->
+- [x] Chat room: bubble UI, message status (sent/delivered/read ticks) <!-- done: 12/04/2026 -->
+- [x] Real-time messaging via Socket.IO <!-- done: 12/04/2026 -->
+- [x] Typing indicator <!-- done: 12/04/2026 -->
+- [x] Media picker (expo-image-picker) + Cloudinary signed upload <!-- done: 12/04/2026 -->
+- [x] Đồng bộ chat Web ↔ Mobile: chuẩn hóa contract message/socket, hiển thị media file/image/video, sửa căn lề tin nhắn sender/receiver và fix keyboard che input trên mobile <!-- done: 12/04/2026 -->
 - [ ] Push notification setup (expo-notifications + FCM/APNs)
 
 ### Phase M4 – Mobile Friends & Groups (Lõi)
-- [ ] Friends tab: search bar, friend requests (incoming/outgoing), friend list
+- [x] Friends tab: search bar, friend requests (incoming/outgoing), friend list <!-- done: 12/04/2026 -->
 - [ ] Quick profile view (RN bottom sheet)
 - [ ] Send/accept/reject friend request
 - [ ] Group management: create, add/remove members, disband
@@ -289,8 +296,8 @@ npm run dev:web
 - [ ] Story bar (horizontal FlatList, ring indicator)
 - [ ] Story viewer (full-screen modal, tap-to-advance, progress bar)
 - [ ] Story creation (text + image + video capture via expo-camera)
-- [ ] Profile screen: edit profile, avatar upload via camera/gallery
-- [ ] Real stats (bạn bè count, stories count, joined year)
+- [x] Profile screen: edit profile, avatar upload via camera/gallery <!-- done: 12/04/2026 -->
+- [x] Real stats (bạn bè count, stories count, joined year) <!-- done: 12/04/2026 -->
 - [ ] Friend list in profile, mutual friends, view profile modal
 
 ### Phase M6 – Mobile Polish & Deploy

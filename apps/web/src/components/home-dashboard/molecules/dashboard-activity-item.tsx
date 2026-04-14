@@ -3,11 +3,15 @@ import { DashboardIcon } from '../atoms/dashboard-icon';
 
 interface DashboardActivityItemProps {
   item: DashboardActivityItem;
+  onClick?: (item: DashboardActivityItem) => void;
 }
 
-export function DashboardActivityItemRow({ item }: DashboardActivityItemProps) {
+export function DashboardActivityItemRow({ item, onClick }: DashboardActivityItemProps) {
   return (
-    <article className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-[#072f26]">
+    <article
+      className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-[#072f26] cursor-pointer"
+      onClick={() => onClick?.(item)}
+    >
       <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${item.toneClass} text-sm font-semibold text-[#e7fff6]`}>
         {item.icon ? <DashboardIcon name={item.icon} className="h-4 w-4" /> : item.initials}
       </span>

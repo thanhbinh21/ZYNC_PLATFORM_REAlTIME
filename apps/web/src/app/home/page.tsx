@@ -18,6 +18,7 @@ import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useStories } from '@/hooks/use-stories';
+import { useLoginForm } from '@/hooks/use-login-form';
 import { fetchMyProfile, type MeUser } from '@/services/users';
 import type { StoryReactionType, StoryFeedGroup } from '@/components/stories/stories.types';
 
@@ -83,6 +84,8 @@ export default function HomePage() {
     selectedConversationId,
     conversations,
   });
+
+  const { onLogout } = useLoginForm();
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerGroupIdx, setViewerGroupIdx] = useState(0);
@@ -222,6 +225,13 @@ export default function HomePage() {
     <>
       <HomeDashboardScreen
         data={data}
+        onActivityClick={(item) => {
+          if (item.conversationId) {
+            onSelectConversation(item.conversationId);
+            setActiveNavId('chat');
+          }
+        }}
+        onLogout={onLogout}
         notificationSlot={
           <NotificationHub
             onNavigate={(n) => {

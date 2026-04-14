@@ -11,6 +11,8 @@ import { DashboardStatCard } from '../molecules/dashboard-stat-card';
 import { DashboardActivityItemRow } from '../molecules/dashboard-activity-item';
 import { searchFriendCandidates, sendFriendRequest, type FriendUser } from '@/services/friends';
 
+import type { DashboardActivityItem } from '../home-dashboard.types';
+
 interface HomeDashboardScreenProps {
   data: DashboardHomeMockData;
   storySlot?: React.ReactNode;
@@ -21,6 +23,8 @@ interface HomeDashboardScreenProps {
   activeNavId?: string;
   onNavSelect?: (id: string) => void;
   onViewUserProfile?: (userId: string) => void;
+  onActivityClick?: (item: DashboardActivityItem) => void;
+  onLogout?: () => void;
 }
 
 export function HomeDashboardScreen({
@@ -33,6 +37,8 @@ export function HomeDashboardScreen({
   activeNavId,
   onNavSelect,
   onViewUserProfile,
+  onActivityClick,
+  onLogout,
 }: HomeDashboardScreenProps) {
   const selectedNavId = activeNavId ?? data.navItems.find((item) => item.active)?.id ?? data.navItems[0]?.id;
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -40,6 +46,10 @@ export function HomeDashboardScreen({
     ? 'flex h-screen min-h-0 flex-col overflow-hidden px-4 py-5 sm:px-6 lg:px-8'
     : 'flex h-screen flex-col overflow-y-auto px-4 py-5 sm:px-6 lg:px-8';
   const handleSelectNav = (id: string) => {
+    if (id === 'logout') {
+      onLogout?.();
+      return;
+    }
     onNavSelect?.(id);
     setIsMobileSidebarOpen(false);
   };
@@ -328,6 +338,13 @@ export function HomeDashboardScreen({
             </header>
           )}
 
+          {/* Notification hub available in ALL tabs */}
+          {selectedNavId !== 'home' && notificationSlot && (
+            <div className="flex justify-end px-2 py-2">
+              {notificationSlot}
+            </div>
+          )}
+
           {selectedNavId === 'chat' ? (
             <div className="mt-1 flex min-h-0 w-full flex-1">{chatSlot}</div>
           ) : selectedNavId === 'settings' ? (
@@ -362,23 +379,20 @@ export function HomeDashboardScreen({
 
                 <div className="space-y-2">
                   {data.activities.map((item) => (
-                    <DashboardActivityItemRow key={item.id} item={item} />
+                    <DashboardActivityItemRow
+                      key={item.id}
+                      item={item}
+                      onClick={onActivityClick}
+                    />
                   ))}
                 </div>
               </section>
             </>
           )}
 
-          {selectedNavId !== 'chat' && (
-            <button
-              type="button"
-              className="fixed bottom-6 right-6 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#30d7ab] text-[#023328] shadow-[0_10px_26px_rgba(22,193,150,0.35)] transition hover:brightness-110"
-            >
-              <DashboardIcon name="edit" className="h-5 w-5" />
-            </button>
-          )}
         </section>
       </div>
     </main>
   );
 }
+

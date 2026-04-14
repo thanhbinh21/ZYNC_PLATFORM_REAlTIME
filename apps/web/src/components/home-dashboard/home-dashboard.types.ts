@@ -53,7 +53,10 @@ export interface DashboardActivityItem {
   toneClass: string;
   isUnread?: boolean;
   icon?: DashboardIconName;
+  conversationId?: string;
 }
+
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | string;
 
 export interface DashboardHomeMockData {
   brand: string;

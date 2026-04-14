@@ -97,18 +97,32 @@ export function useChat({
     }
   }, [token]);
 
-  // Join conversation when it changes
+  // Join conversation when it changes – also handles reconnect
   useEffect(() => {
-    if (conversationId && isConnected()) {
+    if (!conversationId || !token) return;
+
+    const sock = getSocket(token);
+
+    const doJoin = () => {
       // Leave previous conversation if it exists and is different
       if (previousConversationId.current && previousConversationId.current !== conversationId) {
         leaveConversation(previousConversationId.current);
       }
-      // Join new conversation
       joinConversation(conversationId);
       previousConversationId.current = conversationId;
+    };
+
+    if (sock.connected) {
+      doJoin();
     }
-  }, [conversationId]);
+
+    // Re-join on (re)connect so room membership survives reconnects
+    sock.on('connect', doJoin);
+
+    return () => {
+      sock.off('connect', doJoin);
+    };
+  }, [conversationId, token]);
 
   // Setup message listener
   useEffect(() => {
