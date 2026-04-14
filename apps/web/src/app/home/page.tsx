@@ -11,6 +11,8 @@ import {
 import { UserProfileModal } from '@/components/home-dashboard/molecules/user-profile-modal';
 import { ForwardMessageModal } from '@/components/home-dashboard/molecules/forward-message-modal';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
+import { MessagePreviewPopup } from '@/components/home-dashboard/organisms/MessagePreviewPopup';
+import { useMessagePreview } from '@/hooks/use-message-preview';
 import { StoryBar } from '@/components/stories/organisms/StoryBar';
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
@@ -71,6 +73,17 @@ export default function HomePage() {
     onReact,
     onReply,
   } = useStories();
+
+  const {
+    previews,
+    dismissPreview,
+    pauseDismiss,
+    resumeDismiss,
+    quickReply,
+  } = useMessagePreview({
+    selectedConversationId,
+    conversations,
+  });
 
   const { onLogout } = useLoginForm();
 
@@ -230,36 +243,49 @@ export default function HomePage() {
           />
         }
         chatSlot={
-          <HomeDashboardChatPanel
-            conversations={conversations}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={onSelectConversation}
-            friends={friendsForGroup}
-            onCreateGroup={onCreateGroup}
-            onAddGroupMembers={onAddGroupMembers}
-            onUpdateGroupMemberRole={onUpdateGroupMemberRole}
-            onRemoveGroupMember={onRemoveGroupMember}
-            onDisbandGroup={onDisbandGroup}
-            isCreatingGroup={groupActionLoading}
-            onLoadMore={onLoadMore}
-            chatPanelProps={{
-              conversationId: selectedConversationId,
-              currentUserId: userId,
-              participantName: conversationInfo?.participantName,
-              participantAvatar: conversationInfo?.participantAvatar,
-              isOnline: conversationInfo?.isOnline,
-              messages: messages,
-              messageStatus: messageStatus,
-              typingUsers: typingUsers,
-              isLoading: messagesLoading,
-              onSendMessage: onSendMessage,
-              onStartTyping: onStartTyping,
-              onStopTyping: onStopTyping,
-              onDeleteMessageForMe: onDeleteMessageForMe,
-              onRecallMessage: onRecallMessage,
-              onForwardMessage: onForwardMessage,
-            }}
-          />
+          <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1">
+            <HomeDashboardChatPanel
+              conversations={conversations}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={onSelectConversation}
+              friends={friendsForGroup}
+              onCreateGroup={onCreateGroup}
+              onAddGroupMembers={onAddGroupMembers}
+              onUpdateGroupMemberRole={onUpdateGroupMemberRole}
+              onRemoveGroupMember={onRemoveGroupMember}
+              onDisbandGroup={onDisbandGroup}
+              isCreatingGroup={groupActionLoading}
+              onLoadMore={onLoadMore}
+              chatPanelProps={{
+                conversationId: selectedConversationId,
+                currentUserId: userId,
+                participantName: conversationInfo?.participantName,
+                participantAvatar: conversationInfo?.participantAvatar,
+                isOnline: conversationInfo?.isOnline,
+                messages: messages,
+                messageStatus: messageStatus,
+                typingUsers: typingUsers,
+                isLoading: messagesLoading,
+                onSendMessage: onSendMessage,
+                onStartTyping: onStartTyping,
+                onStopTyping: onStopTyping,
+                onDeleteMessageForMe: onDeleteMessageForMe,
+                onRecallMessage: onRecallMessage,
+                onForwardMessage: onForwardMessage,
+              }}
+            />
+            <MessagePreviewPopup
+              previews={previews}
+              onDismiss={dismissPreview}
+              onPauseDismiss={pauseDismiss}
+              onResumeDismiss={resumeDismiss}
+              onQuickReply={quickReply}
+              onNavigate={(conversationId) => {
+                onSelectConversation(conversationId);
+                setActiveNavId('chat');
+              }}
+            />
+          </div>
         }
         settingsSlot={
           <HomeDashboardSettingsPanel
