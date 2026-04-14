@@ -34,6 +34,9 @@ module.exports = {
         'story-progress-glow': 'story-progress-glow 2s ease-in-out infinite',
         'story-fade-up': 'story-fade-up 0.4s cubic-bezier(0.22,1,0.36,1) both',
         'story-shimmer': 'story-shimmer 2.5s ease-in-out infinite',
+        'preview-slide-in': 'preview-slide-in 0.4s cubic-bezier(0.22,1,0.36,1) both',
+        'preview-slide-out': 'preview-slide-out 0.3s cubic-bezier(0.55,0,1,0.45) both',
+        'preview-progress': 'preview-progress 8s linear both',
       },
       keyframes: {
         'story-ring-spin': {
@@ -83,6 +86,18 @@ module.exports = {
         'story-shimmer': {
           from: { transform: 'translateX(-100%)' },
           to: { transform: 'translateX(100%)' },
+        },
+        'preview-slide-in': {
+          from: { opacity: '0', transform: 'translateY(24px) scale(0.95)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'preview-slide-out': {
+          from: { opacity: '1', transform: 'translateY(0) scale(1)' },
+          to: { opacity: '0', transform: 'translateY(24px) scale(0.95)' },
+        },
+        'preview-progress': {
+          from: { width: '100%' },
+          to: { width: '0%' },
         },
       },
       backdropBlur: {
