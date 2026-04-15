@@ -336,18 +336,18 @@ npm run dev:web
 > **Luồng:** `raw-messages` (Kafka) → `moderation.worker.ts` → Gemini Flash classify → safe/flag/block
 > **Fallback:** Khi Gemini unavailable → keyword-based regex filter (VN + EN)
 
-- [ ] Tạo `modules/ai/moderation/moderation.service.ts` – Gemini Flash text classification (safe/warning/blocked, confidence score)
-- [ ] Tạo `modules/ai/moderation/keyword-filter.ts` – Fallback keyword-based regex filter (Vietnamese + English)
-- [ ] Tạo `modules/ai/moderation/moderation.model.ts` – MongoDB collection `moderation_logs`
-- [ ] Tạo `modules/ai/moderation/moderation.worker.ts` – Kafka consumer consume `raw-messages`, run moderation async
-- [ ] Thêm Kafka topic `moderation-actions`
-- [ ] Image moderation via Gemini Pro Vision (khi media upload qua Cloudinary)
-- [ ] Auto-action escalation: score < 0.3 → pass, 0.3-0.7 → flag for admin, > 0.7 → block + notify user
-- [ ] Function Calling: `flag_content({messageId, reason})`, `auto_mute({userId, duration})`
-- [ ] Admin API: `GET /api/admin/moderation` – danh sách nội dung bị flagged/blocked
-- [ ] Socket event `content_blocked` – thông báo user khi tin nhắn bị chặn
-- [ ] Model fallback: Gemini Flash lỗi → keyword filter → pass (fail-open with logging)
-- [ ] Integration test cho moderation pipeline
+- [x] Tạo `modules/ai/moderation/moderation.service.ts` – Gemini Flash text classification (safe/warning/blocked, confidence score) <!-- done: 16/04/2026 -->
+- [x] Tạo `modules/ai/moderation/keyword-filter.ts` – Fallback keyword-based regex filter (Vietnamese + English) <!-- done: 16/04/2026 -->
+- [x] Tạo `modules/ai/moderation/moderation.model.ts` – MongoDB collection `moderation_logs` <!-- done: 16/04/2026 -->
+- [x] Tạo `modules/ai/moderation/moderation.worker.ts` – Kafka consumer consume `raw-messages`, run moderation async <!-- done: 16/04/2026 -->
+- [x] Thêm Kafka topic `moderation-actions` <!-- done: 15/04/2026 -->
+- [x] Image moderation via Gemini Pro Vision (khi media upload qua Cloudinary) <!-- done: 16/04/2026 -->
+- [x] Auto-action escalation: score < 0.3 → pass, 0.3-0.7 → flag for admin, > 0.7 → block + notify user <!-- done: 16/04/2026 -->
+- [x] Function Calling: Classification/JSON structured output thay cho command (ổn định hơn) <!-- done: 16/04/2026 -->
+- [x] Admin API: `GET /api/admin/moderation` – danh sách nội dung bị flagged/blocked <!-- done: 16/04/2026 -->
+- [x] Socket event `content_blocked` – thông báo user khi tin nhắn bị chặn <!-- done: 16/04/2026 -->
+- [x] Model fallback: Gemini Flash lỗi → keyword filter → pass (fail-open with logging) <!-- done: 16/04/2026 -->
+- [x] Integration test cho moderation pipeline <!-- done: 16/04/2026 -->
 
 ### Phase AI-2 – Tìm Kiếm Thông Minh (Semantic Search)
 
