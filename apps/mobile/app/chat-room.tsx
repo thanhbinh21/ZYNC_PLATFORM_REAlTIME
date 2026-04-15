@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
 import api from '../src/services/api';
@@ -162,7 +163,6 @@ function MessageStatusTicks({ status }: { status?: string }) {
       break;
     case 'read':
       iconName = 'checkmark-done';
-      color = '#10b981';
       break;
     default:
       break;
@@ -214,6 +214,66 @@ function TypingIndicator({ typingUsers }: { typingUsers: string[] }) {
       <Text style={typingStyles.text}>
         {typingUsers.length === 1 ? 'dang nhap...' : `${typingUsers.length} nguoi dang nhap...`}
       </Text>
+    </View>
+  );
+}
+
+function VideoMessage({
+  mediaUrl,
+  isMe,
+  onOpenMedia,
+}: {
+  mediaUrl?: string;
+  isMe: boolean;
+  onOpenMedia: (url?: string) => Promise<void>;
+}) {
+  const [started, setStarted] = useState(false);
+  const player = useVideoPlayer(mediaUrl || null, (current) => {
+    current.pause();
+  });
+
+  if (!mediaUrl) {
+    return (
+      <View style={[bubbleStyles.fileCard, isMe && bubbleStyles.fileCardMe]}>
+        <Ionicons name="videocam-outline" size={22} color={isMe ? '#0f172a' : '#94a3b8'} />
+        <View style={bubbleStyles.fileMeta}>
+          <Text style={[bubbleStyles.fileTitle, isMe && bubbleStyles.fileTitleMe]}>Video</Text>
+          <Text style={[bubbleStyles.fileAction, isMe && bubbleStyles.fileActionMe]}>Khong co lien ket</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={bubbleStyles.videoContainer}>
+      <VideoView
+        style={bubbleStyles.mediaVideo}
+        player={player}
+        nativeControls
+        contentFit="cover"
+        fullscreenOptions={{ enable: true }}
+        allowsPictureInPicture
+      />
+      {!started && (
+        <Pressable
+          onPress={() => {
+            player.play();
+            setStarted(true);
+          }}
+          style={bubbleStyles.videoOverlay}
+        >
+          <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.96)" />
+        </Pressable>
+      )}
+      <TouchableOpacity
+        onPress={() => {
+          void onOpenMedia(mediaUrl);
+        }}
+        style={[bubbleStyles.videoOpenBtn, isMe && bubbleStyles.videoOpenBtnMe]}
+      >
+        <Ionicons name="open-outline" size={14} color={isMe ? '#0f172a' : '#a5f3fc'} />
+        <Text style={[bubbleStyles.videoOpenText, isMe && bubbleStyles.videoOpenTextMe]}>Mo toan man hinh</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -655,10 +715,7 @@ export default function ChatRoomScreen() {
     if (!url) return;
 
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      }
+      await Linking.openURL(url);
     } catch (err) {
       console.error('Cannot open media url', err);
     }
@@ -696,8 +753,13 @@ export default function ChatRoomScreen() {
           )}
 
           <TouchableOpacity
-            onLongPress={() => !isRecalled && setShowOptionsId(message._id || message.idempotencyKey || null)}
-            activeOpacity={0.85}
+            onLongPress={() => {
+              if (!isRecalled && message.type !== 'video') {
+                setShowOptionsId(message._id || message.idempotencyKey || null);
+              }
+            }}
+            activeOpacity={message.type === 'video' ? 1 : 0.85}
+            disabled={message.type === 'video'}
             style={bubbleStyles.messagePressable}
           >
             {!isMe && isGroupChat && (
@@ -725,18 +787,7 @@ export default function ChatRoomScreen() {
                   </View>
                 )
               ) : message.type === 'video' ? (
-                <Pressable
-                  onPress={() => void handleOpenMedia(message.mediaUrl)}
-                  style={[bubbleStyles.fileCard, isMe && bubbleStyles.fileCardMe]}
-                >
-                  <Ionicons name="videocam-outline" size={22} color={isMe ? '#0f172a' : '#94a3b8'} />
-                  <View style={bubbleStyles.fileMeta}>
-                    <Text style={[bubbleStyles.fileTitle, isMe && bubbleStyles.fileTitleMe]}>Video</Text>
-                    <Text style={[bubbleStyles.fileAction, isMe && bubbleStyles.fileActionMe]}>
-                      {message.mediaUrl ? 'Mo video' : 'Khong co lien ket'}
-                    </Text>
-                  </View>
-                </Pressable>
+                <VideoMessage mediaUrl={message.mediaUrl} isMe={isMe} onOpenMedia={handleOpenMedia} />
               ) : isFileType(message.type) ? (
                 <Pressable
                   onPress={() => void handleOpenMedia(message.mediaUrl)}
@@ -994,6 +1045,49 @@ const bubbleStyles = StyleSheet.create({
     height: 160,
     borderRadius: 12,
     backgroundColor: '#0f172a',
+  },
+  mediaVideo: {
+    width: 220,
+    height: 160,
+    borderRadius: 12,
+    backgroundColor: '#020617',
+  },
+  videoContainer: {
+    width: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.25)',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(2,6,23,0.24)',
+  },
+  videoOpenBtn: {
+    height: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15,23,42,0.75)',
+  },
+  videoOpenBtnMe: {
+    backgroundColor: 'rgba(15,23,42,0.18)',
+  },
+  videoOpenText: {
+    color: '#a5f3fc',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_500Medium',
+  },
+  videoOpenTextMe: {
+    color: '#0f172a',
   },
   fileCard: {
     flexDirection: 'row',
