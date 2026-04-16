@@ -30,6 +30,12 @@ import {
   unlistenToMessageForwarded,
   listenToContentBlocked,
   unlistenToContentBlocked,
+  listenToContentWarning,
+  unlistenToContentWarning,
+  listenToMessageReacted,
+  unlistenToMessageReacted,
+  listenToUserPenaltyUpdated,
+  unlistenToUserPenaltyUpdated,
 } from '@/services/socket';
 import { getMessages } from '@/services/chat';
 import { MessageType } from '@zync/shared-types';
@@ -64,6 +70,8 @@ interface UseChatReturn {
   recallMessage: (messageId: string, idempotencyKey: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
+  userPenaltyScore: number;
+  userMutedUntil: Date | null;
 }
 
 export function useChat({
@@ -77,6 +85,8 @@ export function useChat({
   const [messageStatus, setMessageStatus] = useState<MessageStatusMap>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userPenaltyScore, setUserPenaltyScore] = useState<number>(0);
+  const [userMutedUntil, setUserMutedUntil] = useState<Date | null>(null);
 
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -133,6 +143,7 @@ export function useChat({
       content: string;
       type: string;
       mediaUrl?: string;
+      moderationWarning?: boolean;
       idempotencyKey: string;
       createdAt: string;
     }) => {
@@ -143,6 +154,7 @@ export function useChat({
         content: data.content,
         type: data.type as Message['type'],
         mediaUrl: data.mediaUrl,
+        moderationWarning: data.moderationWarning,
         idempotencyKey: data.idempotencyKey, // Will be set on send
         status: 'delivered',
         createdAt: data.createdAt,
@@ -195,14 +207,67 @@ export function useChat({
       confidence: number;
     }) => {
       if (data.conversationId !== conversationId) return;
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === data.messageId || msg.idempotencyKey === data.messageId
+            ? {
+                ...msg,
+                content: '[Bị chặn bởi AI Moderator]',
+                mediaUrl: undefined,
+                type: 'system-recall' as Message['type'],
+              }
+            : msg,
+        ),
+      );
+
+      setMessageStatus((prev) => ({
+        ...prev,
+        [data.messageId]: 'read',
+      }));
+
       setError(`Tin nhắn không thể gửi - Vi phạm cộng đồng (Confidence: ${Math.round(data.confidence * 100)}%)`);
-      // We do NOT modify the messages array here to avoid duplication.
-      // The worker also emits 'message_recalled' which will correctly map the UI for everyone via useMessageHistory hook.
+    };
+
+    const handleContentWarning = (data: {
+      conversationId: string;
+      messageId?: string;
+      message?: string;
+    }) => {
+      if (data.conversationId !== conversationId) return;
+
+      if (data.messageId) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === data.messageId || msg.idempotencyKey === data.messageId
+              ? { ...msg, moderationWarning: true }
+              : msg,
+          ),
+        );
+      }
+
+      setError(data.message ?? 'Tin nhắn có dấu hiệu vi phạm. Hệ thống đã ghi nhận cảnh báo.');
+    };
+
+    const handleMessageReacted = (data: any) => {
+      if (data.conversationId !== conversationId) return;
+      setMessages((prev) => 
+        prev.map((msg) => msg._id === data.messageId ? { ...msg, reactions: data.reactions } : msg)
+      );
+    };
+
+    const handleUserPenaltyUpdated = (data: any) => {
+      if (data.conversationId !== conversationId) return;
+      setUserPenaltyScore(data.penaltyScore);
+      setUserMutedUntil(data.mutedUntil ? new Date(data.mutedUntil) : null);
     };
 
     try {
       listenToMessages(handleReceiveMessage);
       listenToContentBlocked(handleContentBlocked);
+      listenToContentWarning(handleContentWarning);
+      listenToMessageReacted(handleMessageReacted);
+      listenToUserPenaltyUpdated(handleUserPenaltyUpdated);
       const socket = getSocket(token);
       socket.on('message_sent', handleMessageSent);
     } catch (err) {
@@ -213,6 +278,9 @@ export function useChat({
       try {
         unlistenToMessages();
         unlistenToContentBlocked();
+        unlistenToContentWarning();
+        unlistenToMessageReacted();
+        unlistenToUserPenaltyUpdated();
         const socket = getSocket(token);
         socket.off('message_sent', handleMessageSent);
       } catch (err) {
@@ -522,6 +590,8 @@ export function useChat({
     recallMessage: handleRecall,
     isLoading,
     error,
+    userPenaltyScore,
+    userMutedUntil,
   };
 }
 

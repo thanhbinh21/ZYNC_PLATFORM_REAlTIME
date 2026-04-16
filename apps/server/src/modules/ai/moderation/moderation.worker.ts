@@ -1,9 +1,9 @@
 /**
- * Moderation Worker – AI-1 (Kafka Consumer)
+ * Moderation Worker - AI-1 (Kafka Consumer)
  *
  * Consumes topic: `raw-messages`
  * Runs moderation async AFTER socket gateway has already broadcast the message.
- * If blocked → emits `content_blocked` socket event + publishes to `moderation-actions` topic.
+ * If blocked -> emits `content_blocked` + `message_recalled` and publishes to `moderation-actions`.
  *
  * This worker is PASSIVE: it does NOT block message delivery (fail-open design).
  */
@@ -19,16 +19,15 @@ const MODERATION_WORKER_GROUP_ID = 'moderation-worker-group';
 
 interface RawMessagePayload {
   messageId: string;
+  idempotencyKey?: string;
   conversationId: string;
   senderId: string;
   content?: string;
-  type: string;        // text | image | video | audio | file | sticker
+  type: string; // text | image | video | audio | file | sticker
   mediaUrl?: string;
 }
 
 let moderationConsumer: Consumer | null = null;
-
-// ─── Start ────────────────────────────────────────────────────────────────────
 
 export async function startModerationWorker(): Promise<void> {
   try {
@@ -59,91 +58,97 @@ export async function startModerationWorker(): Promise<void> {
         if (!isModeratableType) return;
 
         try {
+          const messageReference = raw.idempotencyKey ?? raw.messageId;
           const result = await moderateMessage({
-            messageId:      raw.messageId,
+            messageId: messageReference,
             conversationId: raw.conversationId,
-            senderId:       raw.senderId,
-            contentType:    raw.type as 'text' | 'image' | 'video' | 'audio' | 'file',
-            content:        raw.content,
-            mediaUrl:       raw.mediaUrl,
+            senderId: raw.senderId,
+            contentType: raw.type as 'text' | 'image' | 'video' | 'audio' | 'file',
+            content: raw.content,
+            mediaUrl: raw.mediaUrl,
           });
 
-          // ── Handle blocked content ────────────────────────────────────────
+          // Handle blocked content
           if (result.action === 'block') {
             logger.warn('[ModerationWorker] Message blocked', {
-              messageId: raw.messageId,
+              messageId: messageReference,
               confidence: result.confidence,
               reason: result.reason,
             });
 
-            // 1. Emit socket event `content_blocked` to the sender only
             const io = getIO();
+
+            // 1) Notify sender that their content was blocked
             if (io) {
               io.to(`user:${raw.senderId}`).emit('content_blocked', {
-                messageId:      raw.messageId,
+                messageId: messageReference,
                 conversationId: raw.conversationId,
-                reason:         'Tin nhắn của bạn vi phạm tiêu chuẩn cộng đồng và đã bị ẩn.',
-                confidence:     result.confidence,
+                reason: 'Tin nh\u1eafn c\u1ee7a b\u1ea1n vi ph\u1ea1m ti\u00eau chu\u1ea9n c\u1ed9ng \u0111\u1ed3ng v\u00e0 \u0111\u00e3 b\u1ecb \u1ea9n.',
+                confidence: result.confidence,
+              });
+
+              // 2) Realtime hide for all clients immediately (no DB wait)
+              io.to(`conv:${raw.conversationId}`).emit('message_recalled', {
+                messageId: messageReference,
+                idempotencyKey: messageReference,
+                conversationId: raw.conversationId,
+                recalledBy: 'system',
+                recalledAt: new Date().toISOString(),
               });
             }
 
-            // 2. Publish moderation action to Kafka for downstream consumers (audit, mute, etc.)
-            await produceMessage(KAFKA_TOPICS.MODERATION_ACTIONS, raw.messageId, {
-              messageId:      raw.messageId,
+            // 3) Publish moderation action for downstream consumers
+            await produceMessage(KAFKA_TOPICS.MODERATION_ACTIONS, messageReference, {
+              messageId: messageReference,
               conversationId: raw.conversationId,
-              senderId:       raw.senderId,
-              action:         'block',
-              label:          result.label,
-              confidence:     result.confidence,
-              reason:         result.reason,
-              source:         result.source,
-              timestamp:      new Date().toISOString(),
+              senderId: raw.senderId,
+              action: 'block',
+              label: result.label,
+              confidence: result.confidence,
+              reason: result.reason,
+              source: result.source,
+              timestamp: new Date().toISOString(),
             }).catch((err) =>
               logger.error('[ModerationWorker] Failed to produce moderation action', err),
             );
 
-            // 3. Immediately recall the message so it disappears from other users' screens
+            // 4) Persist recall to DB with retry (handles race with message.worker insert)
             try {
-              await MessagesService.recallMessage(raw.messageId, raw.senderId);
-              if (io) {
-                // Broadcast to everyone so they see the [Tin nhắn đã được thu hồi] placeholder
-                io.to(`conv:${raw.conversationId}`).emit('message_recalled', {
-                  messageId: raw.messageId,
-                  idempotencyKey: raw.messageId,
-                  conversationId: raw.conversationId,
-                  recalledBy: 'system',
-                  recalledAt: new Date().toISOString()
-                });
-              }
-              logger.info('[ModerationWorker] Cleaned up blocked message from conversation', { messageId: raw.messageId });
+              await MessagesService.recallMessageWithRetry(messageReference, 'system', true);
+              logger.info('[ModerationWorker] Cleaned up blocked message from conversation', {
+                messageId: messageReference,
+              });
             } catch (recallErr) {
-              logger.error('[ModerationWorker] Failed to recall blocked message:', recallErr);
+              logger.error('[ModerationWorker] Failed to recall blocked message', {
+                messageId: messageReference,
+                err: String(recallErr),
+              });
             }
           }
 
-          // ── Handle flagged (warning) content ──────────────────────────────
+          // Handle flagged (warning) content
           if (result.action === 'flag') {
             logger.info('[ModerationWorker] Message flagged for admin review', {
-              messageId: raw.messageId,
+              messageId: messageReference,
               confidence: result.confidence,
             });
 
-            await produceMessage(KAFKA_TOPICS.MODERATION_ACTIONS, raw.messageId, {
-              messageId:      raw.messageId,
+            await produceMessage(KAFKA_TOPICS.MODERATION_ACTIONS, messageReference, {
+              messageId: messageReference,
               conversationId: raw.conversationId,
-              senderId:       raw.senderId,
-              action:         'flag',
-              label:          result.label,
-              confidence:     result.confidence,
-              reason:         result.reason,
-              source:         result.source,
-              timestamp:      new Date().toISOString(),
+              senderId: raw.senderId,
+              action: 'flag',
+              label: result.label,
+              confidence: result.confidence,
+              reason: result.reason,
+              source: result.source,
+              timestamp: new Date().toISOString(),
             }).catch((err) =>
               logger.error('[ModerationWorker] Failed to produce flag event', err),
             );
           }
         } catch (err) {
-          // Fail-open: log error but don't crash the worker
+          // Fail-open: log error but do not crash worker
           logger.error('[ModerationWorker] Moderation failed (fail-open)', {
             messageId: raw.messageId,
             err: String(err),
@@ -152,21 +157,19 @@ export async function startModerationWorker(): Promise<void> {
       },
     });
 
-    logger.info('✓ [ModerationWorker] Started — consuming raw-messages topic');
+    logger.info('[ModerationWorker] Started - consuming raw-messages topic');
   } catch (err) {
     logger.error('[ModerationWorker] Failed to start', err);
     throw err;
   }
 }
 
-// ─── Stop ─────────────────────────────────────────────────────────────────────
-
 export async function stopModerationWorker(): Promise<void> {
   if (!moderationConsumer) return;
   try {
-    logger.info('[ModerationWorker] Stopping…');
+    logger.info('[ModerationWorker] Stopping...');
     await moderationConsumer.disconnect();
-    logger.info('✓ [ModerationWorker] Stopped');
+    logger.info('[ModerationWorker] Stopped');
   } catch (err) {
     logger.error('[ModerationWorker] Error on stop', err);
   }

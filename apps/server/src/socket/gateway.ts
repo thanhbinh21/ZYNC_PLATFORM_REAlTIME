@@ -14,6 +14,13 @@ import { UserModel } from '../modules/users/user.model';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
 import { produceNotificationEvent } from '../modules/notifications/notifications.service';
 import { MessageType } from '../modules/messages/message.model';
+import { runKeywordFilter } from '../modules/ai/moderation/keyword-filter';
+import {
+  PENALTY_BLOCK_PERCENT,
+  PENALTY_WARNING_PERCENT,
+  applyPenaltyScore,
+  refreshPenaltyWindow,
+} from '../modules/ai/moderation/penalty-policy';
 
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
@@ -121,17 +128,27 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
 
       try {
-        const member = await ConversationMemberModel.exists({
+        const member = await ConversationMemberModel.findOne({
           conversationId,
           userId,
-        });
+        }).select('penaltyScore mutedUntil penaltyWindowStartedAt');
 
         if (!member) {
           socket.emit('error', { message: 'Not allowed to join this conversation' });
           return;
         }
 
+        if (refreshPenaltyWindow(member)) {
+          await member.save();
+        }
+
         await socket.join(`conv:${conversationId}`);
+
+        socket.emit('user_penalty_updated', {
+          conversationId,
+          penaltyScore: member.penaltyScore ?? 0,
+          mutedUntil: member.mutedUntil ?? null,
+        });
       } catch (err) {
         logger.error('join_conversation error', err);
       }
@@ -344,18 +361,111 @@ async function handleSendMessage(
     return;
   }
 
-  const membership = await ConversationMemberModel.exists({
+  const membership = await ConversationMemberModel.findOne({
     conversationId: conversationId as string,
     userId,
-  });
+  }).select('penaltyScore mutedUntil penaltyWindowStartedAt');
 
   if (!membership) {
     socket.emit('error', { message: 'Not allowed to send message in this conversation' });
     return;
   }
 
+  if (refreshPenaltyWindow(membership)) {
+    await membership.save();
+  }
+
+  if (membership.mutedUntil && membership.mutedUntil > new Date()) {
+    socket.emit('error', {
+      message: `Bạn đang bị tạm khóa gửi tin đến ${membership.mutedUntil.toLocaleTimeString('vi-VN')}`,
+    });
+    socket.emit('user_penalty_updated', {
+      conversationId: conversationId as string,
+      penaltyScore: membership.penaltyScore ?? 0,
+      mutedUntil: membership.mutedUntil,
+    });
+    return;
+  }
+
   // Ensure sender has joined this conversation room for self-receive status events.
   await socket.join(`conv:${conversationId as string}`);
+
+  let moderationWarning = false;
+
+  // ─── Fast moderation gate (sync) ───
+  // Blocks obvious text violations before publishing to Kafka/socket recipients.
+  // Deeper moderation remains async in moderation.worker.
+  if (normalizedType === 'text' && typeof content === 'string' && content.trim().length > 0) {
+    const quickModeration = runKeywordFilter(content);
+    if (quickModeration.label === 'blocked') {
+      await applyRealtimeKeywordPenalty(
+        conversationId as string,
+        userId,
+        PENALTY_BLOCK_PERCENT,
+      );
+
+      socket.emit('content_warning', {
+        conversationId: conversationId as string,
+        message: `Tin nhan vi pham keyword va da duoc tinh +${PENALTY_BLOCK_PERCENT}% vi pham.`,
+      });
+
+      socket.emit('content_blocked', {
+        messageId: idempotencyKey as string,
+        conversationId: conversationId as string,
+        reason: 'Tin nhan cua ban vi pham tieu chuan cong dong va da bi chan.',
+        confidence: quickModeration.confidence,
+      });
+
+      io.to(`conv:${conversationId as string}`).emit('message_recalled', {
+        messageId: idempotencyKey as string,
+        idempotencyKey: idempotencyKey as string,
+        conversationId: conversationId as string,
+        recalledBy: 'system',
+        recalledAt: new Date().toISOString(),
+      });
+
+      await produceModerationNotification(
+        userId,
+        conversationId as string,
+        `Tin nhan cua ban da bi thu hoi do vi pham tieu chuan cong dong (+${PENALTY_BLOCK_PERCENT}%).`,
+      );
+
+      logger.warn('[Gateway] Blocked message before publish (keyword pre-check)', {
+        conversationId,
+        senderId: userId,
+        idempotencyKey,
+        label: quickModeration.label,
+        confidence: quickModeration.confidence,
+        reason: quickModeration.reason,
+      });
+      return;
+    }
+
+    if (quickModeration.label === 'warning') {
+      moderationWarning = true;
+
+      await applyRealtimeKeywordPenalty(
+        conversationId as string,
+        userId,
+        PENALTY_WARNING_PERCENT,
+      );
+
+      socket.emit('content_warning', {
+        conversationId: conversationId as string,
+        messageId: idempotencyKey as string,
+        message: `Tin nhan cua ban co noi dung nhay cam. He thong da cong +${PENALTY_WARNING_PERCENT}% vi pham.`,
+      });
+
+      logger.warn('[Gateway] Warning keyword detected before publish', {
+        conversationId,
+        senderId: userId,
+        idempotencyKey,
+        label: quickModeration.label,
+        confidence: quickModeration.confidence,
+        reason: quickModeration.reason,
+      });
+    }
+  }
 
   // ─── Create Message via Service ───
   try {
@@ -366,6 +476,7 @@ async function handleSendMessage(
       normalizedType as MessageType,
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
+      moderationWarning,
     );
 
     // Note: createMessage already publishes to Kafka (worker will insert)
@@ -379,6 +490,7 @@ async function handleSendMessage(
       content: typeof content === 'string' ? content : '',
       type: normalizedType,
       mediaUrl,
+      moderationWarning,
       idempotencyKey,
       createdAt: message.createdAt,
     });
@@ -432,6 +544,71 @@ async function handleSendMessage(
   } catch (err) {
     logger.error('Failed to create message', err);
     throw err;
+  }
+}
+
+async function produceModerationNotification(
+  userId: string,
+  conversationId: string,
+  body: string,
+): Promise<void> {
+  await produceNotificationEvent({
+    userId,
+    type: 'new_message',
+    title: 'Thong bao kiem duyet',
+    body,
+    conversationId,
+    fromUserId: userId,
+    data: {
+      conversationId,
+      action: 'moderation_notice',
+    },
+  });
+}
+
+async function applyRealtimeKeywordPenalty(
+  conversationId: string,
+  userId: string,
+  amount: number,
+): Promise<void> {
+  try {
+    const member = await ConversationMemberModel.findOne({ conversationId, userId });
+    if (!member) {
+      return;
+    }
+
+    const { mutedUntil, becameMuted } = applyPenaltyScore(member, amount);
+
+    if (becameMuted) {
+      await UserModel.findByIdAndUpdate(userId, { $inc: { globalViolationCount: 1 } });
+    }
+
+    await member.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`user:${userId}`).emit('user_penalty_updated', {
+        conversationId,
+        penaltyScore: member.penaltyScore,
+        mutedUntil: member.mutedUntil ?? null,
+      });
+    }
+
+    if (becameMuted && mutedUntil) {
+      await produceModerationNotification(
+        userId,
+        conversationId,
+        `Ban da dat 100% vi pham va bi khoa chat 5 phut den ${mutedUntil.toLocaleTimeString('vi-VN')}.`,
+      );
+
+      logger.warn('[Gateway] User muted after keyword overflow', {
+        conversationId,
+        userId,
+        mutedUntil: mutedUntil.toISOString(),
+      });
+    }
+  } catch (err) {
+    logger.error('[Gateway] Failed to apply realtime keyword penalty', err);
   }
 }
 

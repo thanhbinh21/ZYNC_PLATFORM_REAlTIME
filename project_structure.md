@@ -239,6 +239,10 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `user_online` | `{userId, online, lastSeen}` | Trạng thái online |
 | `friend_request` | `{requestId, fromUserId, createdAt}` | Lời mời kết bạn mới |
 | `group_updated` | `{groupId, type, data}` | Cập nhật nhóm |
+| `content_blocked` | `{messageId, conversationId, reason, confidence}` | Báo tin nhắn bị chặn bởi moderation |
+| `content_warning` | `{conversationId, messageId?, message}` | Nhắc nhở nội dung nhạy cảm và cảnh báo vi phạm |
+| `message_reacted` | `{messageId, conversationId, reactionType, userId, actionType, reactions[]}` | Cập nhật reaction realtime |
+| `user_penalty_updated` | `{conversationId, penaltyScore, mutedUntil}` | Đồng bộ điểm vi phạm/mute của user theo conversation |
 
 ---
 
@@ -261,7 +265,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `device_tokens` | `deviceToken` (unique), `userId` |
 | `friendships` | `{userId, friendId}` (unique), `status` |
 | `conversations` | `unreadCounts.userId` (multikey), `lastMessage.sentAt`, `updatedAt` |
-| `conversation_members` | `{conversationId, userId}` (unique), `userId` |
+| `conversation_members` | `{conversationId, userId}` (unique), `userId`, fields moderation: `penaltyScore`, `penaltyWindowStartedAt`, `mutedUntil` |
 | `messages` | `{conversationId, createdAt: -1}`, `idempotencyKey` (unique, TTL 24h) |
 | `message_status` | `{messageId, userId}` (unique), `{messageId, status}` |
 | `stories` | `expiresAt` (TTL index – tự xóa sau 24h), `userId` |
