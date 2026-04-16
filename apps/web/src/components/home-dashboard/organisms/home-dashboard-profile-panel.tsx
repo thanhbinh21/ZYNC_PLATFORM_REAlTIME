@@ -423,6 +423,59 @@ export function HomeDashboardProfilePanel({
                 <p className="font-ui-content mt-1 text-xs text-[#7eac9d]">Tính năng đang được phát triển.</p>
               </div>
             </section>
+
+            {/* Reputation card */}
+            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+              <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
+                Danh tiếng
+              </h3>
+
+              {/* Trust score bar */}
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-[#7cb3a1] mb-1">
+                  <span>Điểm tin cậy</span>
+                  <span className="font-semibold text-[#2fe0b4]">
+                    {profile.trustScore ?? 100}%
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-[#0b2f25] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${profile.trustScore ?? 100}%`,
+                      background: (profile.trustScore ?? 100) >= 70
+                        ? 'linear-gradient(90deg, #2fe0b4, #4cf0bf)'
+                        : (profile.trustScore ?? 100) >= 40
+                        ? '#f59e0b'
+                        : '#ef4444',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Violation count */}
+              <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#0b2f25] px-3 py-2">
+                <span className="font-ui-content text-sm text-[#c5e8dd]">Lần vi phạm toàn hệ thống</span>
+                <span className={`font-ui-title text-sm font-bold ${
+                  (profile.globalViolationCount ?? 0) === 0
+                    ? 'text-[#2fe0b4]'
+                    : (profile.globalViolationCount ?? 0) < 3
+                    ? 'text-yellow-400'
+                    : 'text-red-400'
+                }`}>
+                  {profile.globalViolationCount ?? 0}
+                </span>
+              </div>
+
+              {/* Warning */}
+              {(profile.globalViolationCount ?? 0) >= 3 && (
+                <div className="mt-3 rounded-2xl border border-red-800/50 bg-red-900/20 px-3 py-2">
+                  <p className="font-ui-content text-xs text-red-300">
+                    ⚠️ Tài khoản có nguy cơ bị hạn chế do nhiều lần vi phạm. Hãy tuân thủ cộng đồng.
+                  </p>
+                </div>
+              )}
+            </section>
           </div>
 
           {/* Right column */}

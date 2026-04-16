@@ -6,6 +6,10 @@ import {
   updateMessageStatusHandler,
   markAsReadHandler,
   markMultipleAsReadHandler,
+  getMessageReactionSummaryHandler,
+  getMessageReactionDetailsHandler,
+  reportMessageHandler,
+  reactMessageHandler,
 } from './messages.controller';
 
 export const messagesRouter = Router();
@@ -16,6 +20,14 @@ messagesRouter.use(authenticate);
 // ─── POST /api/messages/send ───────── Send a new message
 
 messagesRouter.post('/send', sendMessageHandler);
+
+// ─── GET /api/messages/:messageRef/reactions/summary ──── Get reaction summary
+
+messagesRouter.get('/:messageRef/reactions/summary', getMessageReactionSummaryHandler);
+
+// ─── GET /api/messages/:messageRef/reactions/details ──── Get reaction details for modal
+
+messagesRouter.get('/:messageRef/reactions/details', getMessageReactionDetailsHandler);
 
 // ─── GET /api/messages/:conversationId ──── Get message history (paginated)
 
@@ -32,3 +44,11 @@ messagesRouter.post('/:messageId/read', markAsReadHandler);
 // ─── POST /api/messages/batch/read ──── Batch mark multiple messages as read
 
 messagesRouter.post('/batch/read', markMultipleAsReadHandler);
+
+// ─── POST /api/messages/:messageId/report ──── Report a message for AI moderation
+
+messagesRouter.post('/:messageId/report', reportMessageHandler);
+
+// ─── POST /api/messages/:messageId/react ──── Add a reaction
+
+messagesRouter.post('/:messageId/react', reactMessageHandler);

@@ -14,6 +14,16 @@ import { UserModel } from '../modules/users/user.model';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
 import { produceNotificationEvent } from '../modules/notifications/notifications.service';
 import { MessageType } from '../modules/messages/message.model';
+import { MessageReactionsService } from '../modules/messages/message-reaction.service';
+import { REACTION_CONTRACT_VERSION } from '../modules/messages/message-reaction.types';
+import { BadRequestError } from '../shared/errors';
+import { runKeywordFilter } from '../modules/ai/moderation/keyword-filter';
+import {
+  PENALTY_BLOCK_PERCENT,
+  PENALTY_WARNING_PERCENT,
+  applyPenaltyScore,
+  refreshPenaltyWindow,
+} from '../modules/ai/moderation/penalty-policy';
 
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
@@ -23,6 +33,23 @@ let kafkaFailureMode = false; // Track if Kafka batch insert is failing
 
 interface AuthSocket extends Socket {
   userId: string;
+}
+
+interface ReactionUpsertPayload {
+  requestId: string;
+  conversationId: string;
+  messageRef: string;
+  emoji: string;
+  delta: number;
+  actionSource: 'picker-select' | 'trigger-click';
+  idempotencyKey: string;
+}
+
+interface ReactionRemoveAllMinePayload {
+  requestId: string;
+  conversationId: string;
+  messageRef: string;
+  idempotencyKey: string;
 }
 
 export function getIO(): Server | null {
@@ -67,6 +94,10 @@ export function initSocketGateway(httpServer: HttpServer): Server {
   });
 
   ioInstance = io;
+
+  MessageReactionsService.setReactionUpdatedBroadcaster((conversationId, payload) => {
+    io.to(`conv:${conversationId}`).emit('reaction_updated', payload);
+  });
 
   // Setup fallback callback for Kafka worker failures
   setKafkaInsertFailureCallback(async (failedMessages) => {
@@ -121,17 +152,27 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
 
       try {
-        const member = await ConversationMemberModel.exists({
+        const member = await ConversationMemberModel.findOne({
           conversationId,
           userId,
-        });
+        }).select('penaltyScore mutedUntil penaltyWindowStartedAt');
 
         if (!member) {
           socket.emit('error', { message: 'Not allowed to join this conversation' });
           return;
         }
 
+        if (refreshPenaltyWindow(member)) {
+          await member.save();
+        }
+
         await socket.join(`conv:${conversationId}`);
+
+        socket.emit('user_penalty_updated', {
+          conversationId,
+          penaltyScore: member.penaltyScore ?? 0,
+          mutedUntil: member.mutedUntil ?? null,
+        });
       } catch (err) {
         logger.error('join_conversation error', err);
       }
@@ -246,6 +287,36 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
+    socket.on('reaction_upsert', async (payload: unknown) => {
+      try {
+        await handleReactionUpsert(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('reaction_upsert error', err);
+        const reactionError = resolveReactionError(err, 'REACTION_UPSERT_FAILED', 'Failed to upsert reaction');
+        emitReactionError(
+          socket,
+          extractReactionContext(payload),
+          reactionError.code,
+          reactionError.message,
+        );
+      }
+    });
+
+    socket.on('reaction_remove_all_mine', async (payload: unknown) => {
+      try {
+        await handleReactionRemoveAllMine(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('reaction_remove_all_mine error', err);
+        const reactionError = resolveReactionError(err, 'REACTION_REMOVE_FAILED', 'Failed to remove reactions');
+        emitReactionError(
+          socket,
+          extractReactionContext(payload),
+          reactionError.code,
+          reactionError.message,
+        );
+      }
+    });
+
     // ─── Delete & Recall Events ───
 
     // Delete message for sender only
@@ -344,18 +415,111 @@ async function handleSendMessage(
     return;
   }
 
-  const membership = await ConversationMemberModel.exists({
+  const membership = await ConversationMemberModel.findOne({
     conversationId: conversationId as string,
     userId,
-  });
+  }).select('penaltyScore mutedUntil penaltyWindowStartedAt');
 
   if (!membership) {
     socket.emit('error', { message: 'Not allowed to send message in this conversation' });
     return;
   }
 
+  if (refreshPenaltyWindow(membership)) {
+    await membership.save();
+  }
+
+  if (membership.mutedUntil && membership.mutedUntil > new Date()) {
+    socket.emit('error', {
+      message: `Bạn đang bị tạm khóa gửi tin đến ${membership.mutedUntil.toLocaleTimeString('vi-VN')}`,
+    });
+    socket.emit('user_penalty_updated', {
+      conversationId: conversationId as string,
+      penaltyScore: membership.penaltyScore ?? 0,
+      mutedUntil: membership.mutedUntil,
+    });
+    return;
+  }
+
   // Ensure sender has joined this conversation room for self-receive status events.
   await socket.join(`conv:${conversationId as string}`);
+
+  let moderationWarning = false;
+
+  // ─── Fast moderation gate (sync) ───
+  // Blocks obvious text violations before publishing to Kafka/socket recipients.
+  // Deeper moderation remains async in moderation.worker.
+  if (normalizedType === 'text' && typeof content === 'string' && content.trim().length > 0) {
+    const quickModeration = runKeywordFilter(content);
+    if (quickModeration.label === 'blocked') {
+      await applyRealtimeKeywordPenalty(
+        conversationId as string,
+        userId,
+        PENALTY_BLOCK_PERCENT,
+      );
+
+      socket.emit('content_warning', {
+        conversationId: conversationId as string,
+        message: `Tin nhan vi pham keyword va da duoc tinh +${PENALTY_BLOCK_PERCENT}% vi pham.`,
+      });
+
+      socket.emit('content_blocked', {
+        messageId: idempotencyKey as string,
+        conversationId: conversationId as string,
+        reason: 'Tin nhan cua ban vi pham tieu chuan cong dong va da bi chan.',
+        confidence: quickModeration.confidence,
+      });
+
+      io.to(`conv:${conversationId as string}`).emit('message_recalled', {
+        messageId: idempotencyKey as string,
+        idempotencyKey: idempotencyKey as string,
+        conversationId: conversationId as string,
+        recalledBy: 'system',
+        recalledAt: new Date().toISOString(),
+      });
+
+      await produceModerationNotification(
+        userId,
+        conversationId as string,
+        `Tin nhan cua ban da bi thu hoi do vi pham tieu chuan cong dong (+${PENALTY_BLOCK_PERCENT}%).`,
+      );
+
+      logger.warn('[Gateway] Blocked message before publish (keyword pre-check)', {
+        conversationId,
+        senderId: userId,
+        idempotencyKey,
+        label: quickModeration.label,
+        confidence: quickModeration.confidence,
+        reason: quickModeration.reason,
+      });
+      return;
+    }
+
+    if (quickModeration.label === 'warning') {
+      moderationWarning = true;
+
+      await applyRealtimeKeywordPenalty(
+        conversationId as string,
+        userId,
+        PENALTY_WARNING_PERCENT,
+      );
+
+      socket.emit('content_warning', {
+        conversationId: conversationId as string,
+        messageId: idempotencyKey as string,
+        message: `Tin nhan cua ban co noi dung nhay cam. He thong da cong +${PENALTY_WARNING_PERCENT}% vi pham.`,
+      });
+
+      logger.warn('[Gateway] Warning keyword detected before publish', {
+        conversationId,
+        senderId: userId,
+        idempotencyKey,
+        label: quickModeration.label,
+        confidence: quickModeration.confidence,
+        reason: quickModeration.reason,
+      });
+    }
+  }
 
   // ─── Create Message via Service ───
   try {
@@ -366,6 +530,7 @@ async function handleSendMessage(
       normalizedType as MessageType,
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
+      moderationWarning,
     );
 
     // Note: createMessage already publishes to Kafka (worker will insert)
@@ -379,6 +544,7 @@ async function handleSendMessage(
       content: typeof content === 'string' ? content : '',
       type: normalizedType,
       mediaUrl,
+      moderationWarning,
       idempotencyKey,
       createdAt: message.createdAt,
     });
@@ -432,6 +598,71 @@ async function handleSendMessage(
   } catch (err) {
     logger.error('Failed to create message', err);
     throw err;
+  }
+}
+
+async function produceModerationNotification(
+  userId: string,
+  conversationId: string,
+  body: string,
+): Promise<void> {
+  await produceNotificationEvent({
+    userId,
+    type: 'new_message',
+    title: 'Thong bao kiem duyet',
+    body,
+    conversationId,
+    fromUserId: userId,
+    data: {
+      conversationId,
+      action: 'moderation_notice',
+    },
+  });
+}
+
+async function applyRealtimeKeywordPenalty(
+  conversationId: string,
+  userId: string,
+  amount: number,
+): Promise<void> {
+  try {
+    const member = await ConversationMemberModel.findOne({ conversationId, userId });
+    if (!member) {
+      return;
+    }
+
+    const { mutedUntil, becameMuted } = applyPenaltyScore(member, amount);
+
+    if (becameMuted) {
+      await UserModel.findByIdAndUpdate(userId, { $inc: { globalViolationCount: 1 } });
+    }
+
+    await member.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`user:${userId}`).emit('user_penalty_updated', {
+        conversationId,
+        penaltyScore: member.penaltyScore,
+        mutedUntil: member.mutedUntil ?? null,
+      });
+    }
+
+    if (becameMuted && mutedUntil) {
+      await produceModerationNotification(
+        userId,
+        conversationId,
+        `Ban da dat 100% vi pham va bi khoa chat 5 phut den ${mutedUntil.toLocaleTimeString('vi-VN')}.`,
+      );
+
+      logger.warn('[Gateway] User muted after keyword overflow', {
+        conversationId,
+        userId,
+        mutedUntil: mutedUntil.toISOString(),
+      });
+    }
+  } catch (err) {
+    logger.error('[Gateway] Failed to apply realtime keyword penalty', err);
   }
 }
 
@@ -693,4 +924,376 @@ async function handleForwardMessage(
       logger.error('handleForwardMessage error', err);
       socket.emit('error', { message: (err as Error).message });
     });
+}
+
+async function handleReactionUpsert(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const { userId } = socket;
+  const input = parseReactionUpsertPayload(payload);
+
+  const membership = await ConversationMemberModel.exists({
+    conversationId: input.conversationId,
+    userId,
+  });
+
+  if (!membership) {
+    emitReactionError(socket, input, 'FORBIDDEN', 'Not allowed to react in this conversation');
+    return;
+  }
+
+  const withinRateLimit = await MessageReactionsService.checkReactionRateLimit(userId, input.messageRef);
+  if (!withinRateLimit) {
+    emitReactionError(socket, input, 'RATE_LIMITED', 'Too many reaction updates. Please try again shortly.');
+    return;
+  }
+
+  await socket.join(`conv:${input.conversationId}`);
+
+  const resolvedMessage = await MessageReactionsService.resolveMessageByRef(input.messageRef);
+  if (resolvedMessage && resolvedMessage.conversationId !== input.conversationId) {
+    emitReactionError(socket, input, 'MESSAGE_NOT_FOUND', 'Message does not belong to this conversation');
+    return;
+  }
+
+  socket.emit('reaction_ack', buildReactionAckPayload({
+    requestId: input.requestId,
+    conversationId: input.conversationId,
+    messageRef: input.messageRef,
+    messageId: resolvedMessage?._id?.toString() ?? null,
+    userId,
+    action: 'upsert',
+  }));
+
+  void (async () => {
+    try {
+      const cached = await MessageReactionsService.getCachedReactionUpdate(input.idempotencyKey);
+      if (cached) {
+        io.to(`conv:${input.conversationId}`).emit('reaction_updated', cached);
+        return;
+      }
+
+      const targetMessage = resolvedMessage ?? await MessageReactionsService.resolveMessageByRef(input.messageRef);
+      if (!targetMessage) {
+        await MessageReactionsService.enqueuePendingReaction({
+          requestId: input.requestId,
+          userId,
+          conversationId: input.conversationId,
+          messageRef: input.messageRef,
+          action: 'upsert',
+          actionSource: input.actionSource,
+          emoji: input.emoji,
+          delta: input.delta,
+          idempotencyKey: input.idempotencyKey,
+          createdAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (targetMessage.conversationId !== input.conversationId) {
+        emitReactionError(socket, input, 'MESSAGE_NOT_FOUND', 'Message does not belong to this conversation');
+        return;
+      }
+
+      const result = await MessageReactionsService.applyUpsertReaction({
+        messageId: targetMessage._id.toString(),
+        conversationId: input.conversationId,
+        userId,
+        emoji: input.emoji,
+        delta: input.delta,
+      });
+
+      const updatedPayload = MessageReactionsService.buildReactionUpdatedPayload({
+        requestId: input.requestId,
+        conversationId: input.conversationId,
+        messageRef: input.messageRef,
+        messageId: targetMessage._id.toString(),
+        actor: {
+          userId,
+          action: 'upsert',
+          actionSource: input.actionSource,
+          emoji: input.emoji,
+          delta: input.delta,
+        },
+        summary: result.summary,
+        userState: result.userState,
+        updatedAt: result.updatedAt,
+      });
+
+      await MessageReactionsService.cacheReactionUpdate(input.idempotencyKey, updatedPayload);
+      io.to(`conv:${input.conversationId}`).emit('reaction_updated', updatedPayload);
+    } catch (error) {
+      logger.error('reaction_upsert async flow error', error);
+      emitReactionError(socket, input, 'REACTION_UPSERT_FAILED', 'Failed to update reaction');
+    }
+  })();
+}
+
+async function handleReactionRemoveAllMine(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const { userId } = socket;
+  const input = parseReactionRemoveAllMinePayload(payload);
+
+  const membership = await ConversationMemberModel.exists({
+    conversationId: input.conversationId,
+    userId,
+  });
+
+  if (!membership) {
+    emitReactionError(socket, input, 'FORBIDDEN', 'Not allowed to react in this conversation');
+    return;
+  }
+
+  const withinRateLimit = await MessageReactionsService.checkReactionRateLimit(userId, input.messageRef);
+  if (!withinRateLimit) {
+    emitReactionError(socket, input, 'RATE_LIMITED', 'Too many reaction updates. Please try again shortly.');
+    return;
+  }
+
+  await socket.join(`conv:${input.conversationId}`);
+
+  const resolvedMessage = await MessageReactionsService.resolveMessageByRef(input.messageRef);
+  if (resolvedMessage && resolvedMessage.conversationId !== input.conversationId) {
+    emitReactionError(socket, input, 'MESSAGE_NOT_FOUND', 'Message does not belong to this conversation');
+    return;
+  }
+
+  socket.emit('reaction_ack', buildReactionAckPayload({
+    requestId: input.requestId,
+    conversationId: input.conversationId,
+    messageRef: input.messageRef,
+    messageId: resolvedMessage?._id?.toString() ?? null,
+    userId,
+    action: 'remove_all_mine',
+  }));
+
+  void (async () => {
+    try {
+      const cached = await MessageReactionsService.getCachedReactionUpdate(input.idempotencyKey);
+      if (cached) {
+        io.to(`conv:${input.conversationId}`).emit('reaction_updated', cached);
+        return;
+      }
+
+      const targetMessage = resolvedMessage ?? await MessageReactionsService.resolveMessageByRef(input.messageRef);
+      if (!targetMessage) {
+        await MessageReactionsService.enqueuePendingReaction({
+          requestId: input.requestId,
+          userId,
+          conversationId: input.conversationId,
+          messageRef: input.messageRef,
+          action: 'remove_all_mine',
+          actionSource: 'picker-select',
+          idempotencyKey: input.idempotencyKey,
+          createdAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (targetMessage.conversationId !== input.conversationId) {
+        emitReactionError(socket, input, 'MESSAGE_NOT_FOUND', 'Message does not belong to this conversation');
+        return;
+      }
+
+      const result = await MessageReactionsService.applyRemoveAllMine({
+        messageId: targetMessage._id.toString(),
+        conversationId: input.conversationId,
+        userId,
+      });
+
+      const updatedPayload = MessageReactionsService.buildReactionUpdatedPayload({
+        requestId: input.requestId,
+        conversationId: input.conversationId,
+        messageRef: input.messageRef,
+        messageId: targetMessage._id.toString(),
+        actor: {
+          userId,
+          action: 'remove_all_mine',
+          actionSource: 'picker-select',
+        },
+        summary: result.summary,
+        userState: result.userState,
+        updatedAt: result.updatedAt,
+      });
+
+      await MessageReactionsService.cacheReactionUpdate(input.idempotencyKey, updatedPayload);
+      io.to(`conv:${input.conversationId}`).emit('reaction_updated', updatedPayload);
+    } catch (error) {
+      logger.error('reaction_remove_all_mine async flow error', error);
+      emitReactionError(socket, input, 'REACTION_REMOVE_FAILED', 'Failed to remove reactions');
+    }
+  })();
+}
+
+function parseReactionUpsertPayload(payload: unknown): ReactionUpsertPayload {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new BadRequestError('Invalid reaction_upsert payload', 'VALIDATION_ERROR');
+  }
+
+  const data = payload as Record<string, unknown>;
+  const requestId = data['requestId'];
+  const conversationId = data['conversationId'];
+  const messageRef = data['messageRef'];
+  const emoji = data['emoji'];
+  const delta = data['delta'];
+  const actionSource = data['actionSource'];
+  const idempotencyKey = data['idempotencyKey'];
+
+  if (typeof requestId !== 'string' || requestId.length === 0) {
+    throw new BadRequestError('requestId is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof conversationId !== 'string' || conversationId.length === 0) {
+    throw new BadRequestError('conversationId is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof messageRef !== 'string' || messageRef.length === 0) {
+    throw new BadRequestError('messageRef is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof emoji !== 'string' || emoji.length === 0) {
+    throw new BadRequestError('emoji is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof delta !== 'number' || !Number.isFinite(delta)) {
+    throw new BadRequestError('delta must be a number', 'VALIDATION_ERROR');
+  }
+
+  if (typeof idempotencyKey !== 'string' || idempotencyKey.length === 0) {
+    throw new BadRequestError('idempotencyKey is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof actionSource !== 'string') {
+    throw new BadRequestError('actionSource is required', 'VALIDATION_ERROR');
+  }
+
+  return {
+    requestId,
+    conversationId,
+    messageRef,
+    emoji,
+    delta,
+    actionSource: MessageReactionsService.ensureReactionActionSource(actionSource),
+    idempotencyKey,
+  };
+}
+
+function parseReactionRemoveAllMinePayload(payload: unknown): ReactionRemoveAllMinePayload {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new BadRequestError('Invalid reaction_remove_all_mine payload', 'VALIDATION_ERROR');
+  }
+
+  const data = payload as Record<string, unknown>;
+  const requestId = data['requestId'];
+  const conversationId = data['conversationId'];
+  const messageRef = data['messageRef'];
+  const idempotencyKey = data['idempotencyKey'];
+
+  if (typeof requestId !== 'string' || requestId.length === 0) {
+    throw new BadRequestError('requestId is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof conversationId !== 'string' || conversationId.length === 0) {
+    throw new BadRequestError('conversationId is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof messageRef !== 'string' || messageRef.length === 0) {
+    throw new BadRequestError('messageRef is required', 'VALIDATION_ERROR');
+  }
+
+  if (typeof idempotencyKey !== 'string' || idempotencyKey.length === 0) {
+    throw new BadRequestError('idempotencyKey is required', 'VALIDATION_ERROR');
+  }
+
+  return {
+    requestId,
+    conversationId,
+    messageRef,
+    idempotencyKey,
+  };
+}
+
+function buildReactionAckPayload(input: {
+  requestId: string;
+  conversationId: string;
+  messageRef: string;
+  messageId: string | null;
+  userId: string;
+  action: 'upsert' | 'remove_all_mine';
+}): Record<string, unknown> {
+  return {
+    requestId: input.requestId,
+    accepted: true,
+    conversationId: input.conversationId,
+    messageRef: input.messageRef,
+    messageId: input.messageId,
+    userId: input.userId,
+    action: input.action,
+    optimistic: true,
+    serverTs: new Date().toISOString(),
+    contractVersion: REACTION_CONTRACT_VERSION,
+  };
+}
+
+function emitReactionError(
+  socket: Socket,
+  context: { requestId?: string; conversationId?: string; messageRef?: string },
+  code: string,
+  message: string,
+): void {
+  socket.emit('reaction_error', {
+    requestId: context.requestId ?? '',
+    conversationId: context.conversationId ?? '',
+    messageRef: context.messageRef ?? '',
+    code,
+    message,
+    contractVersion: REACTION_CONTRACT_VERSION,
+  });
+}
+
+function extractReactionContext(payload: unknown): {
+  requestId?: string;
+  conversationId?: string;
+  messageRef?: string;
+} {
+  if (typeof payload !== 'object' || payload === null) {
+    return {};
+  }
+
+  const record = payload as Record<string, unknown>;
+  return {
+    requestId: typeof record['requestId'] === 'string' ? record['requestId'] : undefined,
+    conversationId: typeof record['conversationId'] === 'string' ? record['conversationId'] : undefined,
+    messageRef: typeof record['messageRef'] === 'string' ? record['messageRef'] : undefined,
+  };
+}
+
+function resolveReactionError(
+  err: unknown,
+  fallbackCode: string,
+  fallbackMessage: string,
+): { code: string; message: string } {
+  if (err instanceof BadRequestError) {
+    return {
+      code: err.code ?? 'VALIDATION_ERROR',
+      message: err.message,
+    };
+  }
+
+  if (err instanceof Error) {
+    return {
+      code: fallbackCode,
+      message: err.message || fallbackMessage,
+    };
+  }
+
+  return {
+    code: fallbackCode,
+    message: fallbackMessage,
+  };
 }

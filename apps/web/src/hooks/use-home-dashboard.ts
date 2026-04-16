@@ -2,8 +2,19 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { fetchFriends, type FriendUser } from '@/services/friends';
-import { emitForwardMessage } from '@/services/socket';
-import type { Message } from '@zync/shared-types';
+import {
+  emitForwardMessage,
+  emitReactionRemoveAllMine,
+  emitReactionUpsert,
+  listenToReactionAck,
+  listenToReactionError,
+  listenToReactionUpdated,
+  unlistenToReactionAck,
+  unlistenToReactionError,
+  unlistenToReactionUpdated,
+} from '@/services/socket';
+import { getMessageReactionDetails, type ReactionDetailsResponse } from '@/services/chat';
+import type { Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
 import {
   addGroupMembers,
   createGroup,
@@ -56,6 +67,17 @@ interface ConversationListItem {
   active?: boolean;
 }
 
+const REACTION_ACK_TIMEOUT_MS = 8000;
+
+interface PendingReactionRequest {
+  requestId: string;
+  messageId: string;
+  messageRef: string;
+  previousSummary: MessageReactionSummary;
+  previousUserState: MessageReactionUserState;
+  ackTimeout: NodeJS.Timeout | null;
+}
+
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
@@ -67,7 +89,10 @@ export function useHomeDashboard() {
   const [forwardModalOpen, setForwardModalOpen] = useState(false);
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [forwardLoading, setForwardLoading] = useState(false);
+  const [reactionUserStateByMessage, setReactionUserStateByMessage] = useState<Record<string, MessageReactionUserState>>({});
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingReactionRequestsRef = useRef<Map<string, PendingReactionRequest>>(new Map());
+  const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
 
   // Initialize chat hook for real-time messaging
   const {
@@ -81,6 +106,8 @@ export function useHomeDashboard() {
     deleteMessageForMe,
     recallMessage,
     isLoading: chatLoading,
+    userPenaltyScore,
+    userMutedUntil,
   } = useChat({
     conversationId: selectedConversationId,
     userId,
@@ -110,32 +137,337 @@ export function useHomeDashboard() {
     setCombinedMessageStatus(statusMap);
   }, [messageHistory.messages, messageStatus]);
 
+  const resolveMessageRef = useCallback((message: Message): string => {
+    return message.idempotencyKey || message._id;
+  }, []);
+
+  const applyReactionSummaryToMessage = useCallback(
+    (
+      target: { messageId?: string; messageRef?: string },
+      summary: MessageReactionSummary,
+      userState?: MessageReactionUserState,
+    ) => {
+      messageHistory.setMessages((prev) =>
+        prev.map((msg) => {
+          const msgId = String(msg._id);
+          const msgRef = String(msg.idempotencyKey || '');
+          const targetMessageId = String(target.messageId || '');
+          const targetMessageRef = String(target.messageRef || '');
+
+          const isTarget =
+            msgId === targetMessageId
+            || msgId === targetMessageRef
+            || msgRef === targetMessageId
+            || msgRef === targetMessageRef;
+
+          if (!isTarget) {
+            return msg;
+          }
+
+          return {
+            ...msg,
+            reactionSummary: summary,
+            reactionUserState: userState ?? msg.reactionUserState,
+          };
+        }),
+      );
+    },
+    [messageHistory.setMessages],
+  );
+
+  const updateReactionUserStateCache = useCallback(
+    (messageId: string, messageRef: string, nextUserState: MessageReactionUserState) => {
+      setReactionUserStateByMessage((prev) => ({
+        ...prev,
+        [messageId]: nextUserState,
+        [messageRef]: nextUserState,
+      }));
+    },
+    [],
+  );
+
+  const completePendingReaction = useCallback((requestId?: string) => {
+    if (!requestId) {
+      return;
+    }
+
+    const pending = pendingReactionRequestsRef.current.get(requestId);
+    if (!pending) {
+      return;
+    }
+
+    if (pending.ackTimeout) {
+      clearTimeout(pending.ackTimeout);
+    }
+
+    pendingReactionRequestsRef.current.delete(requestId);
+  }, []);
+
+  const rollbackPendingReaction = useCallback(
+    (requestId: string, reason: string) => {
+      const pending = pendingReactionRequestsRef.current.get(requestId);
+      if (!pending) {
+        return;
+      }
+
+      if (pending.ackTimeout) {
+        clearTimeout(pending.ackTimeout);
+      }
+
+      applyReactionSummaryToMessage(
+        { messageId: pending.messageId, messageRef: pending.messageRef },
+        pending.previousSummary,
+        pending.previousUserState,
+      );
+      updateReactionUserStateCache(pending.messageId, pending.messageRef, pending.previousUserState);
+
+      pendingReactionRequestsRef.current.delete(requestId);
+      console.warn(`[Reaction] Rolled back request ${requestId}: ${reason}`);
+    },
+    [applyReactionSummaryToMessage, updateReactionUserStateCache],
+  );
+
+  const registerPendingReaction = useCallback(
+    (params: {
+      requestId: string;
+      messageId: string;
+      messageRef: string;
+      previousSummary: MessageReactionSummary;
+      previousUserState: MessageReactionUserState;
+    }) => {
+      const previous = pendingReactionRequestsRef.current.get(params.requestId);
+      if (previous?.ackTimeout) {
+        clearTimeout(previous.ackTimeout);
+      }
+
+      const ackTimeout = setTimeout(() => {
+        rollbackPendingReaction(params.requestId, 'ACK timeout');
+      }, REACTION_ACK_TIMEOUT_MS);
+
+      pendingReactionRequestsRef.current.set(params.requestId, {
+        ...params,
+        ackTimeout,
+      });
+    },
+    [rollbackPendingReaction],
+  );
+
   // Subscribe to new messages from useChat and add them to messageHistory
   useEffect(() => {
     if (messages.length > 0) {
       const latestMessage = messages[messages.length - 1];
 
-      // // Check by idempotencyKey first (to replace optimistic), then by _id
-      // const existingIndex = messageHistory.messages.findIndex(m =>
-      //   m.idempotencyKey === latestMessage.idempotencyKey ||
-      //   m._id === latestMessage._id
-      // );
-
-      // if (existingIndex === -1) {
-      //   // New message, add it
-      //   messageHistory.setMessages([...messageHistory.messages, latestMessage]);
-      // } else {
-      //   // Replace existing (to transition from optimistic to real ID)
-      //   const updated = [...messageHistory.messages];
-      //   updated[existingIndex] = latestMessage;
-      //   messageHistory.setMessages(updated);
-      // }
-      const exists = messageHistory.messages.some((message) => message._id === latestMessage._id);
-      if (!exists) {
-        messageHistory.setMessages([...messageHistory.messages, latestMessage]);
-      }
+      messageHistory.setMessages((prev) => {
+        const exists = prev.some(
+          (msg) => msg._id === latestMessage._id || msg.idempotencyKey === latestMessage.idempotencyKey,
+        );
+        if (exists) {
+          return prev;
+        }
+        return [...prev, latestMessage];
+      });
     }
-  }, [messages, messageHistory.messages]);
+  }, [messages, messageHistory.setMessages]);
+
+  useEffect(() => {
+    hydratedReactionStateRefsRef.current.clear();
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId || !userId || messageHistory.messages.length === 0) {
+      return;
+    }
+
+    const candidates = messageHistory.messages.filter((msg) => {
+      const totalCount = msg.reactionSummary?.totalCount || 0;
+      if (totalCount <= 0) {
+        return false;
+      }
+
+      const messageRef = resolveMessageRef(msg);
+      if (hydratedReactionStateRefsRef.current.has(messageRef)) {
+        return false;
+      }
+
+      return !reactionUserStateByMessage[msg._id] && !reactionUserStateByMessage[messageRef];
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    candidates.forEach((msg) => hydratedReactionStateRefsRef.current.add(resolveMessageRef(msg)));
+
+    let cancelled = false;
+
+    void (async () => {
+      const updates: Array<{
+        messageId: string;
+        messageRef: string;
+        userState: MessageReactionUserState;
+      }> = [];
+
+      await Promise.allSettled(
+        candidates.map(async (msg) => {
+          try {
+            const messageRef = resolveMessageRef(msg);
+            const details = await getMessageReactionDetails(messageRef);
+            const me = details.rows.find((row) => row.userId === userId && row.totalCount > 0);
+            if (!me) {
+              return;
+            }
+
+            updates.push({
+              messageId: details.messageId || msg._id,
+              messageRef,
+              userState: {
+                lastEmoji: me.lastEmoji,
+                totalCount: me.totalCount,
+                emojiCounts: me.emojiCounts,
+              },
+            });
+          } catch {
+            // Ignore one-off hydrate failures; realtime updates will still reconcile.
+          }
+        }),
+      );
+
+      if (cancelled || updates.length === 0) {
+        return;
+      }
+
+      setReactionUserStateByMessage((prev) => {
+        const next = { ...prev };
+        updates.forEach((item) => {
+          next[item.messageId] = item.userState;
+          next[item.messageRef] = item.userState;
+        });
+        return next;
+      });
+
+      messageHistory.setMessages((prev) =>
+        prev.map((msg) => {
+          const msgId = String(msg._id);
+          const msgRef = String(msg.idempotencyKey || '');
+          const found = updates.find(
+            (item) =>
+              msgId === String(item.messageId)
+              || msgId === String(item.messageRef)
+              || msgRef === String(item.messageId)
+              || msgRef === String(item.messageRef),
+          );
+
+          if (!found) {
+            return msg;
+          }
+
+          return {
+            ...msg,
+            reactionUserState: found.userState,
+          };
+        }),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    messageHistory.messages,
+    messageHistory.setMessages,
+    reactionUserStateByMessage,
+    resolveMessageRef,
+    selectedConversationId,
+    userId,
+  ]);
+
+  useEffect(() => {
+    const handleReactionAck = (payload: {
+      requestId: string;
+      accepted: boolean;
+      conversationId: string;
+    }) => {
+      if (payload.conversationId !== selectedConversationId) {
+        return;
+      }
+
+      const pending = pendingReactionRequestsRef.current.get(payload.requestId);
+      if (!pending) {
+        return;
+      }
+
+      if (!payload.accepted) {
+        rollbackPendingReaction(payload.requestId, 'Server rejected request');
+        return;
+      }
+
+      if (pending.ackTimeout) {
+        clearTimeout(pending.ackTimeout);
+      }
+
+      pendingReactionRequestsRef.current.set(payload.requestId, {
+        ...pending,
+        ackTimeout: null,
+      });
+    };
+
+    const handleReactionUpdated = (payload: {
+      requestId?: string;
+      messageId: string;
+      messageRef: string;
+      conversationId: string;
+      actor: {
+        userId: string;
+      };
+      summary: MessageReactionSummary;
+      userState?: MessageReactionUserState;
+    }) => {
+      if (payload.conversationId !== selectedConversationId) {
+        return;
+      }
+
+      applyReactionSummaryToMessage(
+        { messageId: payload.messageId, messageRef: payload.messageRef },
+        payload.summary,
+        payload.actor.userId === userId ? payload.userState : undefined,
+      );
+
+      if (payload.actor.userId === userId && payload.userState) {
+        const nextUserState = payload.userState;
+        updateReactionUserStateCache(payload.messageId, payload.messageRef, nextUserState);
+      }
+
+      if (payload.actor.userId === userId && payload.requestId) {
+        completePendingReaction(payload.requestId);
+      }
+    };
+
+    const handleReactionError = (payload: { requestId?: string; message: string }) => {
+      if (payload.requestId) {
+        rollbackPendingReaction(payload.requestId, payload.message);
+        return;
+      }
+
+      console.error('[Reaction] Socket error:', payload.message);
+    };
+
+    listenToReactionAck(handleReactionAck);
+    listenToReactionUpdated(handleReactionUpdated);
+    listenToReactionError(handleReactionError);
+
+    return () => {
+      unlistenToReactionAck();
+      unlistenToReactionUpdated();
+      unlistenToReactionError();
+    };
+  }, [
+    applyReactionSummaryToMessage,
+    completePendingReaction,
+    rollbackPendingReaction,
+    selectedConversationId,
+    updateReactionUserStateCache,
+    userId,
+  ]);
 
   // Fetch initial data
   useEffect(() => {
@@ -744,6 +1076,176 @@ export function useHomeDashboard() {
     setForwardModalOpen(true);
   }, []);
 
+  const handleReactionUpsert = useCallback(
+    (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => {
+      if (!selectedConversationId) {
+        return;
+      }
+
+      const messageRef = resolveMessageRef(message);
+      const requestId = uuidv4();
+      const idempotencyKey = uuidv4();
+
+      const prevUserState = reactionUserStateByMessage[message._id] || message.reactionUserState;
+      const prevSummary = message.reactionSummary || { totalCount: 0, emojiCounts: {} };
+      const previousSummary: MessageReactionSummary = {
+        totalCount: prevSummary.totalCount,
+        emojiCounts: { ...(prevSummary.emojiCounts || {}) },
+      };
+      const previousUserState: MessageReactionUserState = prevUserState
+        ? {
+          lastEmoji: prevUserState.lastEmoji,
+          totalCount: prevUserState.totalCount,
+          emojiCounts: { ...(prevUserState.emojiCounts || {}) },
+        }
+        : {
+          lastEmoji: null,
+          totalCount: 0,
+          emojiCounts: {},
+        };
+
+      const nextEmojiCounts = { ...(prevSummary.emojiCounts || {}) };
+      nextEmojiCounts[emoji] = (nextEmojiCounts[emoji] || 0) + delta;
+
+      const nextSummary: MessageReactionSummary = {
+        totalCount: prevSummary.totalCount + delta,
+        emojiCounts: nextEmojiCounts,
+      };
+
+      const nextUserEmojiCounts = { ...(prevUserState?.emojiCounts || {}) };
+      nextUserEmojiCounts[emoji] = (nextUserEmojiCounts[emoji] || 0) + delta;
+
+      const nextUserState: MessageReactionUserState = {
+        lastEmoji: emoji,
+        totalCount: (prevUserState?.totalCount || 0) + delta,
+        emojiCounts: nextUserEmojiCounts,
+      };
+
+      registerPendingReaction({
+        requestId,
+        messageId: message._id,
+        messageRef,
+        previousSummary,
+        previousUserState,
+      });
+
+      applyReactionSummaryToMessage({ messageId: message._id, messageRef }, nextSummary, nextUserState);
+      updateReactionUserStateCache(message._id, messageRef, nextUserState);
+
+      try {
+        emitReactionUpsert(
+          selectedConversationId,
+          messageRef,
+          emoji,
+          delta,
+          idempotencyKey,
+          actionSource,
+          requestId,
+        );
+      } catch (error) {
+        console.error('Failed to emit reaction_upsert', error);
+        rollbackPendingReaction(requestId, 'Failed to emit reaction_upsert');
+      }
+    },
+    [
+      applyReactionSummaryToMessage,
+      reactionUserStateByMessage,
+      registerPendingReaction,
+      resolveMessageRef,
+      rollbackPendingReaction,
+      selectedConversationId,
+      updateReactionUserStateCache,
+    ],
+  );
+
+  const handleReactionRemoveAllMine = useCallback(
+    (message: Message) => {
+      if (!selectedConversationId) {
+        return;
+      }
+
+      const messageRef = resolveMessageRef(message);
+      const requestId = uuidv4();
+      const idempotencyKey = uuidv4();
+      const myState = reactionUserStateByMessage[message._id] || message.reactionUserState;
+
+      if (!myState || myState.totalCount <= 0) {
+        return;
+      }
+
+      const summary = message.reactionSummary || { totalCount: 0, emojiCounts: {} };
+      const previousSummary: MessageReactionSummary = {
+        totalCount: summary.totalCount,
+        emojiCounts: { ...(summary.emojiCounts || {}) },
+      };
+      const previousUserState: MessageReactionUserState = myState
+        ? {
+          lastEmoji: myState.lastEmoji,
+          totalCount: myState.totalCount,
+          emojiCounts: { ...(myState.emojiCounts || {}) },
+        }
+        : {
+          lastEmoji: null,
+          totalCount: 0,
+          emojiCounts: {},
+        };
+      const nextEmojiCounts: Record<string, number> = { ...(summary.emojiCounts || {}) };
+
+      Object.entries(myState.emojiCounts).forEach(([emoji, count]) => {
+        nextEmojiCounts[emoji] = Math.max(0, (nextEmojiCounts[emoji] || 0) - count);
+        if (nextEmojiCounts[emoji] === 0) {
+          delete nextEmojiCounts[emoji];
+        }
+      });
+
+      const nextSummary: MessageReactionSummary = {
+        totalCount: Math.max(0, summary.totalCount - myState.totalCount),
+        emojiCounts: nextEmojiCounts,
+      };
+
+      const clearedUserState: MessageReactionUserState = {
+        lastEmoji: null,
+        totalCount: 0,
+        emojiCounts: {},
+      };
+
+      registerPendingReaction({
+        requestId,
+        messageId: message._id,
+        messageRef,
+        previousSummary,
+        previousUserState,
+      });
+
+      applyReactionSummaryToMessage({ messageId: message._id, messageRef }, nextSummary, clearedUserState);
+      updateReactionUserStateCache(message._id, messageRef, clearedUserState);
+
+      try {
+        emitReactionRemoveAllMine(selectedConversationId, messageRef, idempotencyKey, requestId);
+      } catch (error) {
+        console.error('Failed to emit reaction_remove_all_mine', error);
+        rollbackPendingReaction(requestId, 'Failed to emit reaction_remove_all_mine');
+      }
+    },
+    [
+      applyReactionSummaryToMessage,
+      reactionUserStateByMessage,
+      registerPendingReaction,
+      resolveMessageRef,
+      rollbackPendingReaction,
+      selectedConversationId,
+      updateReactionUserStateCache,
+    ],
+  );
+
+  const handleFetchReactionDetails = useCallback(
+    async (message: Message): Promise<ReactionDetailsResponse> => {
+      const messageRef = resolveMessageRef(message);
+      return getMessageReactionDetails(messageRef);
+    },
+    [resolveMessageRef],
+  );
+
   const handleExecuteForward = useCallback(async (toConversationId: string) => {
     if (!forwardingMessage) return;
 
@@ -778,6 +1280,13 @@ export function useHomeDashboard() {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+
+      pendingReactionRequestsRef.current.forEach((pending) => {
+        if (pending.ackTimeout) {
+          clearTimeout(pending.ackTimeout);
+        }
+      });
+      pendingReactionRequestsRef.current.clear();
     };
   }, []);
 
@@ -808,6 +1317,12 @@ export function useHomeDashboard() {
     onDeleteMessageForMe: deleteMessageForMe,
     onRecallMessage: recallMessage,
     onForwardMessage: handleForwardMessage,
+    onReactionUpsert: handleReactionUpsert,
+    onReactionRemoveAllMine: handleReactionRemoveAllMine,
+    onFetchReactionDetails: handleFetchReactionDetails,
+    reactionUserStateByMessage,
+    userPenaltyScore,
+    userMutedUntil,
     forwardModalOpen,
     setForwardModalOpen,
     forwardingMessage,

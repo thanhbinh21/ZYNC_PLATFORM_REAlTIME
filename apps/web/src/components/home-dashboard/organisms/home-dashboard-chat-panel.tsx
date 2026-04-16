@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent,useCallback, useEffect, useRef, useState } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
@@ -8,6 +8,8 @@ import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
+import type { ReactionDetailsResponse } from '@/services/chat';
+import { reportMessage, reactMessage } from '@/services/chat';
 
 // ==================== ICONS ====================
 
@@ -57,8 +59,18 @@ interface ChatPanelProps {
   onNameClick?: () => void;
   inputDisabled?: boolean;
   inputDisabledReason?: string;
+  onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
+  onReactionRemoveAllMine?: (message: Message) => void;
+  onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
+  reactionUserStateByMessage?: Record<string, {
+    lastEmoji: string | null;
+    totalCount: number;
+    emojiCounts: Record<string, number>;
+  }>;
   isLoading?: boolean;
   error?: string | null;
+  userPenaltyScore?: number;
+  userMutedUntil?: Date | null;
 }
 
 interface ConversationItem {
@@ -192,6 +204,12 @@ function ChatPanel({
   onNameClick,
   inputDisabled = false,
   inputDisabledReason,
+  onReactionUpsert,
+  onReactionRemoveAllMine,
+  onFetchReactionDetails,
+  reactionUserStateByMessage = {},
+  userPenaltyScore = 0,
+  userMutedUntil = null,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -223,9 +241,30 @@ function ChatPanel({
 
   const isRemovedFromGroup = inputDisabled && inputDisabledReason?.toLowerCase().includes('bị xóa khỏi nhóm');
   const hasRemovedNoticeInMessages = messages.some((message) => message.content.toLowerCase().includes('bị xóa khỏi nhóm'));
+  // Report message
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const handleReportMessage = useCallback(async (messageId: string) => {
+    try {
+      const res = await reportMessage(messageId);
+      setReportStatus(res.result === 'block' ? '🚫 Tin nhắn đã bị xóa do vi phạm.' : '✅ Đã gửi báo cáo. Không phát hiện vi phạm.');
+    } catch {
+      setReportStatus('❌ Không thể gửi báo cáo. Vui lòng thử lại.');
+    } finally {
+      setTimeout(() => setReportStatus(null), 4000);
+    }
+  }, []);
+
+  // React to message
+  const handleReactMessage = useCallback(async (messageId: string, reactionType: string) => {
+    try {
+      await reactMessage(messageId, reactionType);
+    } catch {
+      console.error('Failed to react to message');
+    }
+  }, []);
 
   return (
-    <article className="grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-[linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
+    <article className="grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-[#114538] px-5 py-3 bg-[#06271f]">
         <div className="flex items-center gap-3">
@@ -286,6 +325,14 @@ function ChatPanel({
           </button>
         </div>
       </header>
+      
+      {/* Report Notification Toast */}
+      {reportStatus && (
+        <div className="bg-[#0d3a2e] border-b border-[#2a6057] px-5 py-2 text-sm text-[#aefcd6] flex items-center justify-between">
+          <span>{reportStatus}</span>
+          <button onClick={() => setReportStatus(null)} className="text-[#6bbda0] hover:text-white">✕</button>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -304,7 +351,7 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-2"
+        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-5 py-4 space-y-2"
       >
         {/* Load More Button */}
         {messages.length > 0 && (
@@ -335,13 +382,19 @@ function ChatPanel({
               <MessageItem
                 key={message._id}
                 message={message}
-                isSender={message.senderId === currentUserId}
+                isSender={String(message.senderId) === String(currentUserId)}
                 canRecall={canRecallMessage(message.createdAt)}
                 senderAvatar={participantAvatar}
                 messageStatus={messageStatus}
                 onDeleteForMe={onDeleteMessageForMe}
                 onRecall={onRecallMessage}
                 onForward={onForwardMessage}
+                reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
+                onReactionUpsert={onReactionUpsert}
+                onReactionRemoveAllMine={onReactionRemoveAllMine}
+                onFetchReactionDetails={onFetchReactionDetails}
+                onReport={handleReportMessage}
+                onReact={handleReactMessage}
               />
             ))}
 
@@ -357,16 +410,41 @@ function ChatPanel({
         )}
       </div>
 
+      {/* Moderation Penalty Bar */}
+      <div className="border-t border-[#114538] bg-[#12392f] px-4 py-1.5">
+        <div className="mb-1 flex items-center justify-between text-[11px] text-[#8cc4b0]">
+          <span>Mức độ vi phạm tiêu chuẩn cộng đồng</span>
+          <span className={userPenaltyScore >= 80 ? 'font-semibold text-red-400' : ''}>
+            {userPenaltyScore}%
+          </span>
+        </div>
+        <div className="h-1 w-full overflow-hidden rounded-full bg-[#06271f]">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              userPenaltyScore >= 80 ? 'bg-red-500' :
+              userPenaltyScore >= 50 ? 'bg-orange-500' :
+              userPenaltyScore > 0 ? 'bg-yellow-500' : 'bg-[#2f6657]'
+            }`}
+            style={{ width: `${Math.min(Math.max(userPenaltyScore, 0), 100)}%` }}
+          />
+        </div>
+        {userMutedUntil && new Date(userMutedUntil) > new Date() && (
+          <p className="mt-1 text-[11px] font-medium text-red-400">
+            Bạn đang bị cấm chat đến {new Date(userMutedUntil).toLocaleTimeString('vi-VN')}
+          </p>
+        )}
+      </div>
+
       {/* Input Area */}
-      {!inputDisabled && (
-        <MessageInput
-          onSend={onSendMessage}
-          onStartTyping={onStartTyping}
-          onStopTyping={onStopTyping}
-          isLoading={isLoading}
-          disabled={false}
-        />
-      )}
+      <MessageInput
+        onSend={(content, type, mediaUrl) => {
+          void onSendMessage(content, type as MessageType, mediaUrl);
+        }}
+        onStartTyping={onStartTyping}
+        onStopTyping={onStopTyping}
+        isLoading={isLoading}
+        disabled={!!userMutedUntil && new Date(userMutedUntil) > new Date()}
+      />
     </article>
   );
 }

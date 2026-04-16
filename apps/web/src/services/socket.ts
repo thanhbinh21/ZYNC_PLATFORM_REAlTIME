@@ -310,6 +310,22 @@ export function unlistenToTypingIndicators(): void {
   }
 }
 
+export const listenToContentBlocked = (callback: (data: any) => void) => {
+  if (socket) socket.on('content_blocked', callback);
+};
+
+export const unlistenToContentBlocked = () => {
+  if (socket) socket.off('content_blocked');
+};
+
+export const listenToContentWarning = (callback: (data: any) => void) => {
+  if (socket) socket.on('content_warning', callback);
+};
+
+export const unlistenToContentWarning = () => {
+  if (socket) socket.off('content_warning');
+};
+
 // ─── Delete & Recall Events ───
 
 /**
@@ -414,6 +430,24 @@ export function unlistenToMessageRecall(): void {
   }
 }
 
+// ─── Reactions & Moderation ───
+
+export function listenToMessageReacted(callback: (data: any) => void): void {
+  if (socket) socket.on('message_reacted', callback);
+}
+
+export function unlistenToMessageReacted(): void {
+  if (socket) socket.off('message_reacted');
+}
+
+export function listenToUserPenaltyUpdated(callback: (data: any) => void): void {
+  if (socket) socket.on('user_penalty_updated', callback);
+}
+
+export function unlistenToUserPenaltyUpdated(): void {
+  if (socket) socket.off('user_penalty_updated');
+}
+
 // ─── Forward Message ───
 
 /**
@@ -463,6 +497,145 @@ export function listenToMessageForwarded(
 export function unlistenToMessageForwarded(): void {
   if (socket) {
     socket.off('message_forwarded');
+  }
+}
+
+// ─── Message Reactions ───
+
+export interface ReactionUpdatedPayload {
+  requestId?: string;
+  messageId: string;
+  messageRef: string;
+  conversationId: string;
+  actor: {
+    userId: string;
+    action: 'upsert' | 'remove_all_mine';
+    emoji?: string;
+    delta?: 1 | 2 | 3;
+  };
+  summary: {
+    totalCount: number;
+    emojiCounts: Record<string, number>;
+  };
+  userState?: {
+    userId: string;
+    totalCount: number;
+    emojiCounts: Record<string, number>;
+    lastEmoji: string | null;
+  };
+  updatedAt: string;
+}
+
+export interface ReactionAckPayload {
+  requestId: string;
+  accepted: boolean;
+  conversationId: string;
+  messageRef: string;
+  messageId: string | null;
+  userId: string;
+  action: 'upsert' | 'remove_all_mine';
+  optimistic: boolean;
+  serverTs: string;
+  contractVersion: string;
+}
+
+export function emitReactionUpsert(
+  conversationId: string,
+  messageRef: string,
+  emoji: string,
+  delta: 1 | 2 | 3,
+  idempotencyKey: string,
+  actionSource: string,
+  requestId?: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('reaction_upsert', {
+    requestId: requestId ?? idempotencyKey,
+    conversationId,
+    messageRef,
+    emoji,
+    delta,
+    idempotencyKey,
+    actionSource,
+  });
+}
+
+export function emitReactionRemoveAllMine(
+  conversationId: string,
+  messageRef: string,
+  idempotencyKey: string,
+  requestId?: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('reaction_remove_all_mine', {
+    requestId: requestId ?? idempotencyKey,
+    conversationId,
+    messageRef,
+    idempotencyKey,
+  });
+}
+
+export function listenToReactionUpdated(
+  callback: (data: ReactionUpdatedPayload) => void,
+): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('reaction_updated');
+  socket.on('reaction_updated', callback);
+}
+
+export function unlistenToReactionUpdated(): void {
+  if (socket) {
+    socket.off('reaction_updated');
+  }
+}
+
+export function listenToReactionAck(
+  callback: (data: ReactionAckPayload) => void,
+): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('reaction_ack');
+  socket.on('reaction_ack', callback);
+}
+
+export function unlistenToReactionAck(): void {
+  if (socket) {
+    socket.off('reaction_ack');
+  }
+}
+
+export function listenToReactionError(
+  callback: (data: {
+    requestId?: string;
+    conversationId?: string;
+    messageRef?: string;
+    code: string;
+    message: string;
+    contractVersion?: string;
+  }) => void,
+): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('reaction_error');
+  socket.on('reaction_error', callback);
+}
+
+export function unlistenToReactionError(): void {
+  if (socket) {
+    socket.off('reaction_error');
   }
 }
 
@@ -541,9 +714,25 @@ export const socketService = {
   unlistenToMessageDeletion,
   listenToMessageRecall,
   unlistenToMessageRecall,
+  emitReactionUpsert,
+  emitReactionRemoveAllMine,
+  listenToReactionUpdated,
+  unlistenToReactionUpdated,
+  listenToReactionAck,
+  unlistenToReactionAck,
+  listenToReactionError,
+  unlistenToReactionError,
   sendQuickReply,
   listenToErrors,
   unlistenToErrors,
+  listenToContentBlocked,
+  unlistenToContentBlocked,
+  listenToContentWarning,
+  unlistenToContentWarning,
+  listenToMessageReacted,
+  unlistenToMessageReacted,
+  listenToUserPenaltyUpdated,
+  unlistenToUserPenaltyUpdated,
 };
 
 export default socketService;

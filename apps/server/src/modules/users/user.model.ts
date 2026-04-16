@@ -7,6 +7,8 @@ export interface IUser extends Document {
   avatarUrl?: string;
   bio?: string;
   passwordHash?: string;
+  globalViolationCount: number;
+  trustScore: number;
 }
 
 const userSchema = new Schema<IUser>(
@@ -17,6 +19,8 @@ const userSchema = new Schema<IUser>(
     avatarUrl: { type: String },
     bio: { type: String, maxlength: 200 },
     passwordHash: { type: String, select: false },
+    globalViolationCount: { type: Number, default: 0 },
+    trustScore: { type: Number, default: 100 }, // 0 to 100
   },
   { timestamps: true },
 );

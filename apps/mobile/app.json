@@ -1,6 +1,10 @@
 {
-  "plugins": [
-    "expo-head",
-    "expo-video"
-  ]
+  "expo": {
+    "name": "Zync Mobile",
+    "slug": "zync-mobile",
+    "plugins": [
+      "expo-head",
+      "expo-video"
+    ]
+  }
 }

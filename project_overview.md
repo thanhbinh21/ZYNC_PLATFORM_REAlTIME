@@ -227,6 +227,7 @@ npm run dev:web
 - [x] Tinh chỉnh mobile dashboard: chuyển sidebar sticky thành drawer để tránh chiếm chiều cao nội dung <!-- done: 05/04/2026 -->
 - [x] Hotfix UI chat: khôi phục danh sách hội thoại và header khung chat sau khi chỉnh layout chiều ngang <!-- done: 05/04/2026 -->
 - [x] Thay thế mock data trong Chat Info Panel bằng dữ liệu thông tin thực (Pin, Mute) <!-- done: 12/04/2026 -->
+- [x] Hotfix căn lề bubble chat: tin nhắn gửi bên phải, nhận bên trái trên Web dashboard <!-- done: 16/04/2026 -->
 
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
@@ -333,21 +334,24 @@ npm run dev:web
 
 ### Phase AI-1 – Kiểm Duyệt Nội Dung Tự Động (Content Moderation)
 
-> **Luồng:** `raw-messages` (Kafka) → `moderation.worker.ts` → Gemini Flash classify → safe/flag/block
-> **Fallback:** Khi Gemini unavailable → keyword-based regex filter (VN + EN)
+> **Luồng hiện tại:** Keyword filter realtime tại Socket Gateway là lớp kiểm duyệt chính.
+> - `blocked` keyword: chặn gửi ngay + cộng 5% vi phạm + thông báo nhắc nhở
+> - `warning` keyword: cho phép gửi, cộng 2% vi phạm, gắn icon cảnh báo cạnh tin nhắn
+> - `penaltyScore >= 100%`: khóa chat 5 phút; reset sau 12 giờ kể từ lần vi phạm đầu tiên
+>
+> **Gemini chỉ dùng khi report:** người nhận báo cáo tin nhắn → Gemini review → nếu `block` thì thu hồi + cộng phạt theo chuẩn blocked.
 
-- [ ] Tạo `modules/ai/moderation/moderation.service.ts` – Gemini Flash text classification (safe/warning/blocked, confidence score)
-- [ ] Tạo `modules/ai/moderation/keyword-filter.ts` – Fallback keyword-based regex filter (Vietnamese + English)
-- [ ] Tạo `modules/ai/moderation/moderation.model.ts` – MongoDB collection `moderation_logs`
-- [ ] Tạo `modules/ai/moderation/moderation.worker.ts` – Kafka consumer consume `raw-messages`, run moderation async
-- [ ] Thêm Kafka topic `moderation-actions`
-- [ ] Image moderation via Gemini Pro Vision (khi media upload qua Cloudinary)
-- [ ] Auto-action escalation: score < 0.3 → pass, 0.3-0.7 → flag for admin, > 0.7 → block + notify user
-- [ ] Function Calling: `flag_content({messageId, reason})`, `auto_mute({userId, duration})`
-- [ ] Admin API: `GET /api/admin/moderation` – danh sách nội dung bị flagged/blocked
-- [ ] Socket event `content_blocked` – thông báo user khi tin nhắn bị chặn
-- [ ] Model fallback: Gemini Flash lỗi → keyword filter → pass (fail-open with logging)
-- [ ] Integration test cho moderation pipeline
+- [x] Tạo `modules/ai/moderation/keyword-filter.ts` – Bộ lọc keyword VN/EN dùng cho kiểm duyệt realtime <!-- done: 16/04/2026 -->
+- [x] Tạo `modules/ai/moderation/moderation.model.ts` – MongoDB collection `moderation_logs` <!-- done: 16/04/2026 -->
+- [x] Tạo `modules/ai/moderation/moderation.service.ts` – Luồng report review bằng Gemini (report-only) <!-- done: 16/04/2026 -->
+- [x] Tạo `modules/ai/moderation/moderation.worker.ts` – Logging/monitoring moderation async <!-- done: 16/04/2026 -->
+- [x] Socket events moderation: `content_blocked`, `content_warning`, `user_penalty_updated` <!-- done: 16/04/2026 -->
+- [x] Realtime rule: blocked cộng 5%, warning cộng 1%, warning hiển thị icon cảnh báo cạnh tin nhắn <!-- done: 16/04/2026 -->
+- [x] Cơ chế khóa chat: đạt 100% vi phạm → mute 5 phút; reset theo cửa sổ 12 giờ kể từ lần vi phạm đầu <!-- done: 16/04/2026 -->
+- [x] Report flow ổn định cho message mới gửi: ưu tiên `idempotencyKey`, retry lookup, fallback Redis cache <!-- done: 16/04/2026 -->
+- [x] Hotfix UI moderation: khôi phục action menu xóa/thu hồi/report và dời thanh vi phạm xuống gần ô nhập <!-- done: 16/04/2026 -->
+- [x] Hotfix AI-1 consistency: neo dấu ba chấm sát bubble, bỏ ngưỡng confidence để warning/block đều cộng đúng mức vi phạm cấu hình <!-- done: 16/04/2026 -->
+- [x] Chuẩn hóa AI-1 policy: warning +2%, blocked +5%, block thu hồi ngay, đạt 100% khóa chat 5 phút, reset theo cửa sổ 12 giờ và gửi thông báo moderation qua pipeline notification hiện có <!-- done: 16/04/2026 -->
 
 ### Phase AI-2 – Tìm Kiếm Thông Minh (Semantic Search)
 

@@ -23,6 +23,31 @@ export interface VerifyUploadResponse {
   size: number;
 }
 
+export interface ReactionSummaryResponse {
+  success: boolean;
+  messageId: string;
+  conversationId: string;
+  summary: {
+    totalCount: number;
+    emojiCounts: Record<string, number>;
+  };
+}
+
+export interface ReactionDetailsResponse {
+  success: boolean;
+  messageId: string;
+  conversationId: string;
+  tabs: Array<{ emoji: string; count: number }>;
+  rows: Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+    lastEmoji: string | null;
+    totalCount: number;
+    emojiCounts: Record<string, number>;
+  }>;
+}
+
 // ==================== MESSAGE ENDPOINTS ====================
 
 /**
@@ -72,6 +97,36 @@ export async function markMessagesAsDelivered(
   );
 
   return { success: true };
+}
+
+export async function getMessageReactionSummary(messageRef: string): Promise<ReactionSummaryResponse> {
+  const { data } = await apiClient.get<ReactionSummaryResponse>(
+    `/api/messages/${messageRef}/reactions/summary`,
+  );
+  return data;
+}
+
+export async function getMessageReactionDetails(messageRef: string): Promise<ReactionDetailsResponse> {
+  const { data } = await apiClient.get<ReactionDetailsResponse>(
+    `/api/messages/${messageRef}/reactions/details`,
+  );
+  return data;
+}
+
+/**
+ * Report a message for AI moderation
+ */
+export async function reportMessage(messageId: string): Promise<{ success: boolean; result: string }> {
+  const { data } = await apiClient.post(`/api/messages/${messageId}/report`);
+  return data;
+}
+
+/**
+ * React to a message
+ */
+export async function reactMessage(messageId: string, reactionType: string): Promise<{ success: boolean; action: string }> {
+  const { data } = await apiClient.post(`/api/messages/${messageId}/react`, { reactionType });
+  return data;
 }
 
 // ==================== UPLOAD ENDPOINTS ====================

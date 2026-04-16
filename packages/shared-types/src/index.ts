@@ -45,6 +45,17 @@ export interface Conversation {
 export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
+export interface MessageReactionSummary {
+  totalCount: number;
+  emojiCounts: Record<string, number>;
+}
+
+export interface MessageReactionUserState {
+  lastEmoji: string | null;
+  totalCount: number;
+  emojiCounts: Record<string, number>;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -52,9 +63,12 @@ export interface Message {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  moderationWarning?: boolean;
   idempotencyKey: string;
   status: MessageStatus;
   createdAt: string;
+  reactionSummary?: MessageReactionSummary;
+  reactionUserState?: MessageReactionUserState;
 }
 
 // Kiểu dữ liệu Story
@@ -98,6 +112,7 @@ export interface ReceiveMessagePayload {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  moderationWarning?: boolean;
   createdAt: string;
 }
 

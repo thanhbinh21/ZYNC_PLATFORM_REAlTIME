@@ -8,6 +8,8 @@ export interface MeUser {
   avatarUrl?: string;
   bio?: string;
   createdAt?: string;
+  globalViolationCount?: number;
+  trustScore?: number;
 }
 
 export interface PublicUserProfile {

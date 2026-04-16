@@ -114,10 +114,24 @@ State theo messageId:
 }
 - details rows
 
+State them o cap conversation:
+- reactionBaselineReady: boolean
+- baselineTs: string | null
+
 Rule hien thi:
 - Trigger + Summary chi hien khi totalCount > 0 hoac user da tung react.
 
 ## 4) Luong thao tac UI + Socket
+
+### 4.0 Vao phong lan dau / reconnect (baseline hydration)
+
+B1. Load message history.
+B2. Hydrate reaction baseline cho cac message dang hien thi:
+- uu tien data reaction di kem history neu backend co,
+- hoac goi API summary/details,
+- hoac nhan `reaction_snapshot` neu backend phat event nay.
+B3. Dat `reactionBaselineReady = true` roi moi coi `reaction_updated` la delta chinh.
+B4. Neu reconnect/missed-event nghi ngo: refetch baseline cho visible messages.
 
 ### 4.1 Lan react dau tien (long press message)
 
@@ -131,6 +145,9 @@ B3. Optimistic update:
 - hien trigger + summary.
 B4. Emit `reaction_upsert`.
 B5. Reconcile bang `reaction_updated`.
+
+Note:
+- Neu baseline chua ready, van cho optimistic nhe nhung bat buoc reconcile lai sau hydration.
 
 ### 4.2 React tiep (long press message/trigger)
 
@@ -187,6 +204,10 @@ Event `reaction_updated` nen co:
 - actor { userId, action, emoji, delta }
 - updatedAt
 
+Luu y:
+- `reaction_updated` la event delta, khong thay cho baseline.
+- Co the them `reaction_snapshot` cho hydration nhanh khi join/reconnect.
+
 ## 7) Edge cases
 
 1. Long press conflict voi cac action khac (reply/forward/menu).
@@ -194,6 +215,7 @@ Event `reaction_updated` nen co:
 3. Picker overlap voi keyboard/navigation bar.
 4. Reconnect socket va out-of-order event.
 5. Message bi recall/delete trong luc mo picker.
+6. Late-join khong duoc hien 0 cung neu baseline chua load xong.
 
 ## 8) Performance
 
@@ -224,6 +246,11 @@ Event `reaction_updated` nen co:
 - [ ] Mobile A react -> Mobile/Web B cap nhat ngay.
 - [ ] Mobile A quick-add -> tong count doi dung.
 - [ ] Mobile A remove-all -> B cap nhat dung.
+
+### 9.5 Baseline hydration
+- [ ] User vao phong sau van thay dung reaction cu cua cac message.
+- [ ] Reconnect sau mat mang khong bi lech tong count.
+- [ ] Khi baseline chua xong, UI khong giat/nhap nhay sai trang thai pill.
 
 ## 10) Task checklist mobile
 
