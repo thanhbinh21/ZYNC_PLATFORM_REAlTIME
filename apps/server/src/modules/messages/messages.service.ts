@@ -514,7 +514,7 @@ export class MessagesService {
         }
       }
 
-      logger.info(`[MessageStatus] Marked ${messageIds.length} messages as read for user ${userId}`);
+      logger.debug(`[MessageStatus] Marked ${messageIds.length} messages as read for user ${userId}`);
     } catch (error) {
       logger.error('[MessagesService] Error in markMultipleAsRead:', error);
       throw error;

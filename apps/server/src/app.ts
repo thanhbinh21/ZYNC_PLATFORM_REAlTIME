@@ -36,6 +36,7 @@ export function createApp(): Application {
   if (process.env['NODE_ENV'] !== 'test') {
     app.use(morgan('combined', {
       stream: { write: (msg: string) => logger.http(msg.trim()) },
+      skip: (req, res) => res.statusCode < 400 && req.url !== '/health', // Only log errors/warnings (>= 400) to keep console clean
     }));
   }
 
