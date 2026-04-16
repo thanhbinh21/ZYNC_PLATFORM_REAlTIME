@@ -51,6 +51,7 @@ interface MessageBubbleProps {
   content: string;
   type: string;
   mediaUrl?: string;
+  moderationWarning?: boolean;
   status?: MessageStatus;
   timestamp: string;
   senderAvatar?: string;
@@ -61,6 +62,7 @@ export function MessageBubble({
   content,
   type,
   mediaUrl,
+  moderationWarning = false,
   status,
   timestamp,
   senderAvatar,
@@ -147,6 +149,11 @@ export function MessageBubble({
         {/* Timestamp + Status */}
         <div className={`flex items-center gap-1 mt-1 text-xs text-[#88b8a7] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           <span>{timeStr}</span>
+          {moderationWarning && type !== 'system-recall' && (
+            <span className="inline-flex items-center text-[11px] text-yellow-400" title="Tin nhắn cảnh báo nội dung">
+              ⚠
+            </span>
+          )}
           {type !== 'system-recall' && isOwn && statusIcon}
         </div>
       </div>

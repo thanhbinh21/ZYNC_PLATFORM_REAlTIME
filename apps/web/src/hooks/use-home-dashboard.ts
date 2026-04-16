@@ -74,6 +74,8 @@ export function useHomeDashboard() {
     deleteMessageForMe,
     recallMessage,
     isLoading: chatLoading,
+    userPenaltyScore,
+    userMutedUntil,
   } = useChat({
     conversationId: selectedConversationId,
     userId,
@@ -606,6 +608,8 @@ export function useHomeDashboard() {
     onDeleteMessageForMe: deleteMessageForMe,
     onRecallMessage: recallMessage,
     onForwardMessage: handleForwardMessage,
+    userPenaltyScore,
+    userMutedUntil,
     forwardModalOpen,
     setForwardModalOpen,
     forwardingMessage,

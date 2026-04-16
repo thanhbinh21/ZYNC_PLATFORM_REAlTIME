@@ -4,6 +4,8 @@ import { logger } from '../shared/logger';
 export const KAFKA_TOPICS = {
   RAW_MESSAGES: 'raw-messages',
   NOTIFICATIONS: 'notifications',
+  MODERATION_ACTIONS: 'moderation-actions',   // AI-1: content moderation results
+  MESSAGE_EMBEDDINGS: 'message-embeddings',    // AI-2: async embed worker
 } as const;
 
 let kafka: Kafka | null = null;
@@ -31,6 +33,8 @@ export async function connectKafka(): Promise<void> {
     topics: [
       { topic: KAFKA_TOPICS.RAW_MESSAGES, numPartitions: 3, replicationFactor: 1 },
       { topic: KAFKA_TOPICS.NOTIFICATIONS, numPartitions: 3, replicationFactor: 1 },
+      { topic: KAFKA_TOPICS.MODERATION_ACTIONS, numPartitions: 1, replicationFactor: 1 },
+      { topic: KAFKA_TOPICS.MESSAGE_EMBEDDINGS, numPartitions: 3, replicationFactor: 1 },
     ],
     waitForLeaders: true,
   });

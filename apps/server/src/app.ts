@@ -12,6 +12,8 @@ import { messagesRouter } from './modules/messages/messages.routes';
 import { storiesRouter } from './modules/stories/stories.routes';
 import { uploadRouter } from './modules/upload/upload.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
+import { aiRouter } from './modules/ai/ai.routes';
+import { moderationAdminRouter } from './modules/ai/moderation/moderation.controller';
 import { AppError } from './shared/errors/app-error';
 import { logger } from './shared/logger';
 
@@ -34,6 +36,7 @@ export function createApp(): Application {
   if (process.env['NODE_ENV'] !== 'test') {
     app.use(morgan('combined', {
       stream: { write: (msg: string) => logger.http(msg.trim()) },
+      skip: (req, res) => res.statusCode < 400 && req.url !== '/health', // Only log errors/warnings (>= 400) to keep console clean
     }));
   }
 
@@ -52,6 +55,8 @@ export function createApp(): Application {
   app.use('/api/stories', storiesRouter);
   app.use('/api/upload', uploadRouter);
   app.use('/api/notifications', notificationsRouter);
+  app.use('/api/ai', aiRouter);
+  app.use('/api/admin/moderation', moderationAdminRouter);
 
   // Xử lý route không tồn tại
   app.use((_req: Request, res: Response) => {

@@ -21,15 +21,27 @@ export interface IMessage extends Document {
   storyRef?: IStoryRef;
   idempotencyKey: string;
   
-  // Deletion fields
+    // Deletion fields
   isDeleted: boolean;
   deletedAt?: Date;
   deletedBy?: string;
   deleteType?: DeleteType;
   deletedFor?: string[];
   
+  // Chat Reactions
+  reactions?: Array<{ type: string; userId: string }>;
+  moderationWarning?: boolean;
+
   createdAt: Date;
 }
+
+const reactionSchema = new Schema(
+  {
+    type: { type: String, required: true },
+    userId: { type: String, required: true },
+  },
+  { _id: false },
+);
 
 const storyRefSchema = new Schema<IStoryRef>(
   {
@@ -57,6 +69,10 @@ const messageSchema = new Schema<IMessage>(
     mediaUrl: { type: String },
     storyRef: { type: storyRefSchema },
     idempotencyKey: { type: String, required: true, unique: true },
+    
+    // Chat Reactions
+    reactions: { type: [reactionSchema], default: [] },
+    moderationWarning: { type: Boolean, default: false },
     
     // Deletion fields
     isDeleted: { type: Boolean, default: false },

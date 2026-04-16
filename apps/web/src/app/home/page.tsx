@@ -60,6 +60,8 @@ export default function HomePage() {
     forwardLoading,
     onCloseForwardModal,
     onExecuteForward,
+    userPenaltyScore,
+    userMutedUntil,
   } = useHomeDashboard();
   const {
     feed,
@@ -272,6 +274,8 @@ export default function HomePage() {
                 onDeleteMessageForMe: onDeleteMessageForMe,
                 onRecallMessage: onRecallMessage,
                 onForwardMessage: onForwardMessage,
+                userPenaltyScore: userPenaltyScore,
+                userMutedUntil: userMutedUntil,
               }}
             />
             <MessagePreviewPopup

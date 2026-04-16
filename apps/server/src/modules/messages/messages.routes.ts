@@ -6,6 +6,8 @@ import {
   updateMessageStatusHandler,
   markAsReadHandler,
   markMultipleAsReadHandler,
+  reportMessageHandler,
+  reactMessageHandler,
 } from './messages.controller';
 
 export const messagesRouter = Router();
@@ -32,3 +34,11 @@ messagesRouter.post('/:messageId/read', markAsReadHandler);
 // ─── POST /api/messages/batch/read ──── Batch mark multiple messages as read
 
 messagesRouter.post('/batch/read', markMultipleAsReadHandler);
+
+// ─── POST /api/messages/:messageId/report ──── Report a message for AI moderation
+
+messagesRouter.post('/:messageId/report', reportMessageHandler);
+
+// ─── POST /api/messages/:messageId/react ──── Add a reaction
+
+messagesRouter.post('/:messageId/react', reactMessageHandler);
