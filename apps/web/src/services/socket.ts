@@ -474,6 +474,25 @@ export function unlistenToMessageForwarded(): void {
   }
 }
 
+// ─── Quick Reply (cross-conversation send without joining room) ───
+
+export function sendQuickReply(
+  conversationId: string,
+  content: string,
+  idempotencyKey: string,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('send_message', {
+    conversationId,
+    content,
+    type: 'text',
+    idempotencyKey,
+  });
+}
+
 // ─── Error Events ───
 
 /**
@@ -530,6 +549,7 @@ export const socketService = {
   unlistenToMessageDeletion,
   listenToMessageRecall,
   unlistenToMessageRecall,
+  sendQuickReply,
   listenToErrors,
   unlistenToErrors,
 };
