@@ -338,13 +338,6 @@ export function HomeDashboardScreen({
             </header>
           )}
 
-          {/* Notification hub available in ALL tabs */}
-          {selectedNavId !== 'home' && notificationSlot && (
-            <div className="flex justify-end px-2 py-2">
-              {notificationSlot}
-            </div>
-          )}
-
           {selectedNavId === 'chat' ? (
             <div className="mt-1 flex min-h-0 w-full flex-1">{chatSlot}</div>
           ) : selectedNavId === 'settings' ? (
