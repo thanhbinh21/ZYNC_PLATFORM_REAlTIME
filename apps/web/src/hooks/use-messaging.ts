@@ -139,6 +139,7 @@ export function useChat({
   useEffect(() => {
     const handleReceiveMessage = (data: {
       messageId: string;
+      conversationId?: string;
       senderId: string;
       content: string;
       type: string;
@@ -147,9 +148,13 @@ export function useChat({
       idempotencyKey: string;
       createdAt: string;
     }) => {
+      if (!data.conversationId || data.conversationId !== conversationId) {
+        return;
+      }
+
       const newMessage: Message = {
         _id: data.messageId,
-        conversationId,
+        conversationId: data.conversationId,
         senderId: data.senderId,
         content: data.content,
         type: data.type as Message['type'],
@@ -166,11 +171,11 @@ export function useChat({
       }));
 
       // Notify backend that message was delivered
-      markAsDelivered(conversationId, [data.messageId]);
+      markAsDelivered(data.conversationId, [data.messageId]);
 
       // Auto-mark as read after 500ms
       setTimeout(() => {
-        markAsRead(conversationId, [data.messageId]);
+        markAsRead(data.conversationId as string, [data.messageId]);
       }, 500);
     };
 

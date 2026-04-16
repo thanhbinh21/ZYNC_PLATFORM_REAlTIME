@@ -157,6 +157,41 @@ function ReactionDetailsModal({
   );
 }
 
+function isGroupLifecycleNotice(message: Message): boolean {
+  const normalized = message.content.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return normalized.includes('đã rời khỏi nhóm')
+    || normalized.includes('được bạn thêm vào nhóm')
+    || normalized.includes('được thêm vào nhóm')
+    || normalized.includes('đã bị xóa khỏi nhóm')
+    || normalized.includes('đã bị xoá khỏi nhóm');
+}
+
+function initialsFromNotice(content: string): string {
+  const rawName = content
+    .replace(/đã rời khỏi nhóm.*/i, '')
+    .replace(/được bạn thêm vào nhóm.*/i, '')
+    .replace(/được thêm vào nhóm.*/i, '')
+    .replace(/đã bị xóa khỏi nhóm.*/i, '')
+    .replace(/đã bị xoá khỏi nhóm.*/i, '')
+    .trim();
+
+  if (!rawName) {
+    return 'HT';
+  }
+
+  const parts = rawName.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0]!.slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0]![0]}${parts[parts.length - 1]![0]}`.toUpperCase();
+}
+
+// ─── Main Component ───
 export function MessageItem({
   message,
   isSender,
@@ -183,6 +218,7 @@ export function MessageItem({
   const pickerHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
+  const isLifecycleNotice = isGroupLifecycleNotice(message);
   const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
 
   const summary = message.reactionSummary;
@@ -318,6 +354,25 @@ export function MessageItem({
       }
     };
   }, []);
+
+  if (isLifecycleNotice) {
+    const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    return (
+      <div className="my-3 flex flex-col items-center gap-1.5">
+        <div className="inline-flex max-w-[90%] items-center gap-2 rounded-full border border-[#2a6252] bg-[#12392f] px-3 py-1.5 text-sm text-[#d6f8ec]">
+          <span className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#1d4b3d] text-[10px] font-semibold text-[#a6e3cf]">
+            {initialsFromNotice(message.content)}
+          </span>
+          <span className="truncate">{message.content}</span>
+        </div>
+        <span className="rounded-full bg-[#17483a] px-2 py-0.5 text-[11px] text-[#9fd8c4]">{timeStr}</span>
+      </div>
+    );
+  }
 
   return (
     <div

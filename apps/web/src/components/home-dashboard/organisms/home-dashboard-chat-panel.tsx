@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent,useCallback, useEffect, useRef, useState } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
+import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { ReactionDetailsResponse } from '@/services/chat';
 import { reportMessage, reactMessage } from '@/services/chat';
 
@@ -40,6 +41,8 @@ interface ChatPanelProps {
   currentUserId?: string;
   participantName?: string;
   participantAvatar?: string;
+  participantAvatarUrl?: string;
+  isGroupConversation?: boolean;
   isOnline?: boolean;
   messages?: Message[];
   messageStatus?: Record<string, string>;
@@ -52,6 +55,10 @@ interface ChatPanelProps {
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
   onForwardMessage?: (message: Message) => void;
+  onAvatarClick?: () => void;
+  onNameClick?: () => void;
+  inputDisabled?: boolean;
+  inputDisabledReason?: string;
   onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
   onReactionRemoveAllMine?: (message: Message) => void;
   onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
@@ -76,6 +83,8 @@ interface ConversationItem {
   isGroup?: boolean;
   createdBy?: string;
   adminIds?: string[];
+  memberApprovalEnabled?: boolean;
+  removedFromGroup?: boolean;
   memberCount?: number;
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
@@ -175,6 +184,8 @@ function ChatPanel({
   currentUserId = 'user123',
   participantName = 'Demo User',
   participantAvatar,
+  participantAvatarUrl,
+  isGroupConversation = false,
   isOnline = true,
   messages = [],
   messageStatus = {},
@@ -189,6 +200,10 @@ function ChatPanel({
   onDeleteMessageForMe,
   onRecallMessage,
   onForwardMessage,
+  onAvatarClick,
+  onNameClick,
+  inputDisabled = false,
+  inputDisabledReason,
   onReactionUpsert,
   onReactionRemoveAllMine,
   onFetchReactionDetails,
@@ -224,6 +239,8 @@ function ChatPanel({
     return (now - messageTime) < fiveMinutesMs;
   };
 
+  const isRemovedFromGroup = inputDisabled && inputDisabledReason?.toLowerCase().includes('bị xóa khỏi nhóm');
+  const hasRemovedNoticeInMessages = messages.some((message) => message.content.toLowerCase().includes('bị xóa khỏi nhóm'));
   // Report message
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const handleReportMessage = useCallback(async (messageId: string) => {
@@ -251,16 +268,32 @@ function ChatPanel({
       {/* Header */}
       <header className="flex items-center justify-between border-b border-[#114538] px-5 py-3 bg-[#06271f]">
         <div className="flex items-center gap-3">
-          <div className="relative h-11 w-11 rounded-full bg-[#376f5f]">
-            <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-[#e6fff5]">
-              {participantAvatar ? participantAvatar[0] : participantName[0]}
-            </span>
+          <button
+            type="button"
+            className={`relative h-11 w-11 overflow-hidden rounded-full bg-[#376f5f] ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
+            onClick={isGroupConversation ? onAvatarClick : undefined}
+            title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
+          >
+            {participantAvatarUrl ? (
+              <img src={participantAvatarUrl} alt={participantName} className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-[#e6fff5]">
+                {participantAvatar ? participantAvatar[0] : participantName[0]}
+              </span>
+            )}
             {isOnline && (
               <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-[#33e2b3]" />
             )}
-          </div>
+          </button>
           <div>
-            <p className="text-base font-semibold text-[#e4fff4]">{participantName}</p>
+            <button
+              type="button"
+              className={`text-left text-base font-semibold text-[#e4fff4] ${isGroupConversation ? 'cursor-pointer hover:text-[#bff8e6]' : 'cursor-default'}`}
+              onClick={isGroupConversation ? onNameClick : undefined}
+              title={isGroupConversation ? 'Đổi tên nhóm' : undefined}
+            >
+              {participantName}
+            </button>
             <p className="text-xs text-[#53e1b5]">
               {isOnline ? 'đang hoạt động' : 'ngoại tuyến'}
             </p>
@@ -308,6 +341,12 @@ function ChatPanel({
         </div>
       )}
 
+      {inputDisabled && (
+        <div className="border-b border-[#8a3f3f] bg-[#4a2222] px-6 py-2 text-sm text-[#ffd9d9]">
+          {inputDisabledReason ?? 'Bạn không thể nhắn tin trong hội thoại này.'}
+        </div>
+      )}
+
       {/* Messages Area */}
       <div
         ref={messagesContainerRef}
@@ -334,6 +373,11 @@ function ChatPanel({
           </div>
         ) : (
           <>
+            {isRemovedFromGroup && !hasRemovedNoticeInMessages && (
+              <div className="my-3 flex flex-col items-center gap-1.5">
+              </div>
+            )}
+
             {messages.map((message) => (
               <MessageItem
                 key={message._id}
@@ -413,8 +457,10 @@ interface HomeDashboardChatPanelProps {
   onSelectConversation?: (id: string) => void;
   friends?: GroupFriendOption[];
   onCreateGroup?: (name: string, memberIds: string[]) => Promise<{ _id: string }>;
+  onUpdateGroup?: (groupId: string, payload: { name?: string; avatarUrl?: string | null }) => Promise<void>;
   onAddGroupMembers?: (groupId: string, memberIds: string[]) => Promise<void>;
   onUpdateGroupMemberRole?: (groupId: string, targetUserId: string, role: 'admin' | 'member') => Promise<void>;
+  onUpdateGroupMemberApproval?: (groupId: string, memberApprovalEnabled: boolean) => Promise<void>;
   onRemoveGroupMember?: (groupId: string, targetUserId: string) => Promise<void>;
   onDisbandGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
@@ -859,8 +905,10 @@ export function HomeDashboardChatPanel({
   onSelectConversation = () => {},
   friends = [],
   onCreateGroup,
+  onUpdateGroup,
   onAddGroupMembers,
   onUpdateGroupMemberRole,
+  onUpdateGroupMemberApproval,
   onRemoveGroupMember,
   onDisbandGroup,
   isCreatingGroup = false,
@@ -877,6 +925,9 @@ export function HomeDashboardChatPanel({
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [selectedAddMemberIds, setSelectedAddMemberIds] = useState<string[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+  const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
+
+  const groupAvatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setIsManageGroupOpen(false);
@@ -884,6 +935,101 @@ export function HomeDashboardChatPanel({
   }, [selectedConversationId]);
 
   const selectedConversation = (conversations ?? []).find((item) => item.id === selectedConversationId);
+
+  const uploadGroupAvatar = async (file: File): Promise<string> => {
+    const signatureData = await generateUploadSignature('image');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('api_key', signatureData.apiKey);
+    formData.append('signature', signatureData.signature);
+    formData.append('timestamp', signatureData.timestamp.toString());
+    formData.append('folder', signatureData.folder);
+
+    const uploadedData = await new Promise<{ public_id: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${signatureData.cloudName}/image/upload`);
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText) as { public_id: string });
+          } catch {
+            reject(new Error('Cloudinary upload failed: invalid response'));
+          }
+          return;
+        }
+
+        reject(new Error('Cloudinary upload failed'));
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Cloudinary upload failed: network error'));
+      };
+
+      xhr.send(formData);
+    });
+
+    const verifyResult = await verifyUpload(uploadedData.public_id, 'image');
+    return verifyResult.secureUrl;
+  };
+
+  const handleOpenGroupAvatarPicker = () => {
+    if (!isGroupConversation || !selectedConversationId || !onUpdateGroup || isCreatingGroup) {
+      return;
+    }
+
+    groupAvatarInputRef.current?.click();
+  };
+
+  const handleGroupAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = '';
+
+    if (!file || !selectedConversationId || !onUpdateGroup) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      setIsUploadingGroupAvatar(true);
+      const secureUrl = await uploadGroupAvatar(file);
+      await onUpdateGroup(selectedConversationId, { avatarUrl: secureUrl });
+    } catch {
+      setGroupManageError('Không thể cập nhật ảnh nhóm. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingGroupAvatar(false);
+    }
+  };
+
+  const handleChangeGroupName = async () => {
+    if (!isGroupConversation || !selectedConversationId || !onUpdateGroup || isCreatingGroup) {
+      return;
+    }
+
+    const suggestedName = selectedConversation?.name ?? 'Nhóm';
+    const nextName = globalThis.prompt('Nhập tên nhóm mới', suggestedName);
+    if (nextName === null) {
+      return;
+    }
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      setGroupManageError('Tên nhóm không được để trống.');
+      return;
+    }
+
+    if (trimmedName === suggestedName) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onUpdateGroup(selectedConversationId, { name: trimmedName });
+    } catch {
+      setGroupManageError('Không thể cập nhật tên nhóm. Vui lòng thử lại.');
+    }
+  };
 
   const toggleFriendSelection = (friendId: string) => {
     setSelectedFriendIds((prev) => {
@@ -938,8 +1084,28 @@ export function HomeDashboardChatPanel({
       return;
     }
 
-    await onAddGroupMembers(selectedConversationId, selectedAddMemberIds);
-    setIsAddMembersOpen(false);
+    try {
+      setGroupManageError(null);
+      await onAddGroupMembers(selectedConversationId, selectedAddMemberIds);
+      setIsAddMembersOpen(false);
+    } catch {
+      setGroupManageError(memberApprovalEnabled
+        ? 'Nhóm đang bật duyệt thành viên. Chỉ chủ nhóm mới có thể duyệt và thêm thành viên.'
+        : 'Không thể thêm thành viên. Vui lòng thử lại.');
+    }
+  };
+
+  const handleToggleMemberApproval = async () => {
+    if (!onUpdateGroupMemberApproval || !selectedConversationId || !isCurrentUserGroupCreator) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onUpdateGroupMemberApproval(selectedConversationId, !memberApprovalEnabled);
+    } catch {
+      setGroupManageError('Không thể cập nhật chế độ duyệt thành viên. Vui lòng thử lại.');
+    }
   };
 
   const handleAssignMemberRole = async (memberId: string, role: 'admin' | 'member') => {
@@ -997,13 +1163,21 @@ export function HomeDashboardChatPanel({
   const groupAdminIds = selectedConversation?.adminIds ?? [];
   const existingMemberIds = groupMemberPreview.map((member) => member._id);
   const isGroupConversation = Boolean(selectedConversation?.isGroup);
+  const isRemovedFromGroup = Boolean(isGroupConversation && selectedConversation?.removedFromGroup);
+  const memberApprovalEnabled = Boolean(selectedConversation?.memberApprovalEnabled);
   const groupCreatorId = selectedConversation?.createdBy ?? selectedConversation?.adminIds?.[0];
+  const isCurrentUserGroupAdmin = Boolean(
+    isGroupConversation
+      && chatPanelProps.currentUserId
+      && groupAdminIds.includes(chatPanelProps.currentUserId),
+  );
   const isCurrentUserGroupCreator = Boolean(
     isGroupConversation
       && chatPanelProps.currentUserId
       && groupCreatorId
       && chatPanelProps.currentUserId === groupCreatorId,
   );
+  const canManageGroup = isCurrentUserGroupCreator || isCurrentUserGroupAdmin;
   const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
 
   const allMessages = chatPanelProps.messages || [];
@@ -1012,6 +1186,16 @@ export function HomeDashboardChatPanel({
 
   return (
     <>
+      <input
+        ref={groupAvatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          void handleGroupAvatarFileChange(e);
+        }}
+      />
+
       <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
         <div className="h-full w-[300px] shrink-0 border-r border-[#114538]">
           <ConversationList
@@ -1024,8 +1208,15 @@ export function HomeDashboardChatPanel({
         <div className="h-full min-w-0 flex-1">
           <ChatPanel
             {...chatPanelProps}
+            isGroupConversation={isGroupConversation}
             onLoadMore={onLoadMore}
+            inputDisabled={isRemovedFromGroup}
+            inputDisabledReason={isRemovedFromGroup ? 'Bạn đã bị xóa khỏi nhóm' : undefined}
             onInfoClick={() => setIsInfoOpen((prev) => !prev)}
+            onAvatarClick={handleOpenGroupAvatarPicker}
+            onNameClick={() => {
+              void handleChangeGroupName();
+            }}
           />
         </div>
 
@@ -1037,10 +1228,28 @@ export function HomeDashboardChatPanel({
 
               <div className="flex-1 overflow-y-auto px-5 py-5">
                 <div className="mb-6 flex flex-col items-center text-center">
-                  <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#245948] text-lg font-bold text-[#d6fbee]">
-                    {selectedConversation?.avatar ?? 'N'}
-                  </div>
-                  <p className="text-xl font-semibold text-[#e2fff4]">{selectedConversation?.name ?? 'Hội thoại'}</p>
+                  <button
+                    type="button"
+                    className={`mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#245948] text-lg font-bold text-[#d6fbee] ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
+                    onClick={isGroupConversation ? handleOpenGroupAvatarPicker : undefined}
+                    disabled={!isGroupConversation || isUploadingGroupAvatar || isCreatingGroup}
+                    title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
+                  >
+                    {selectedConversation?.avatarUrl ? (
+                      <img src={selectedConversation.avatarUrl} alt={selectedConversation?.name ?? 'Nhóm'} className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{selectedConversation?.avatar ?? 'N'}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={`text-xl font-semibold text-[#e2fff4] ${isGroupConversation ? 'cursor-pointer hover:text-[#bff8e6]' : 'cursor-default'}`}
+                    onClick={isGroupConversation ? () => { void handleChangeGroupName(); } : undefined}
+                    disabled={!isGroupConversation || isCreatingGroup}
+                    title={isGroupConversation ? 'Đổi tên nhóm' : undefined}
+                  >
+                    {selectedConversation?.name ?? 'Hội thoại'}
+                  </button>
                   <p className="text-sm text-[#8abfab]">
                     {selectedConversation?.isGroup
                       ? `${selectedConversation.memberCount ?? 0} thành viên`
@@ -1053,26 +1262,24 @@ export function HomeDashboardChatPanel({
                   <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
                   {isGroupConversation ? (
                     <>
-                      {isCurrentUserGroupCreator ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={openAddMembersModal}
-                            className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
-                          >
-                            Thêm thành viên
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsManageGroupOpen(true)}
-                            className="col-span-3 rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5] hover:bg-[#1a664f]"
-                          >
-                            Quản lý nhóm
-                          </button>
-                        </>
+                      <button
+                        type="button"
+                        onClick={openAddMembersModal}
+                        className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
+                      >
+                        Thêm thành viên
+                      </button>
+                      {canManageGroup ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsManageGroupOpen(true)}
+                          className="col-span-3 rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5] hover:bg-[#1a664f]"
+                        >
+                          Quản lý nhóm
+                        </button>
                       ) : (
                         <p className="col-span-3 rounded-xl bg-[#0d3b2f] px-3 py-2 text-xs text-[#9bcbb9]">
-                          Chỉ người tạo nhóm có thể thêm thành viên, gán quyền, xóa thành viên hoặc giải tán nhóm.
+                          Bạn có thể đề xuất thêm thành viên. Khi bật duyệt, chỉ chủ nhóm mới có thể duyệt thêm thành viên.
                         </p>
                       )}
                     </>
@@ -1146,6 +1353,27 @@ export function HomeDashboardChatPanel({
 
                 {isGroupConversation && (
                   <>
+                    <div className="mb-4 space-y-3 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Duyệt thành viên</p>
+                      <div className="flex items-center justify-between gap-3">
+                        {isCurrentUserGroupCreator && (
+                          <button
+                            type="button"
+                            disabled={isCreatingGroup}
+                            onClick={handleToggleMemberApproval}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${memberApprovalEnabled
+                              ? 'bg-[#1f7a60] text-[#e6fff5] hover:bg-[#1a664f]'
+                              : 'bg-[#0f4335] text-[#a6e3cf] hover:bg-[#145845]'} disabled:opacity-60`}
+                          >
+                            {memberApprovalEnabled ? 'Tắt duyệt' : 'Bật duyệt'}
+                          </button>
+                        )}
+                      </div>
+                      {!isCurrentUserGroupCreator && (
+                        <p className="text-xs text-[#8cc4b0]">Chỉ chủ nhóm có thể bật/tắt duyệt thành viên.</p>
+                      )}
+                    </div>
+
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
                       <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
@@ -1230,10 +1458,28 @@ export function HomeDashboardChatPanel({
             </div>
 
             <div className="mb-5 flex flex-col items-center text-center">
-              <div className="mb-3 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#245948] text-lg font-bold text-[#d6fbee]">
-                {selectedConversation?.avatar ?? 'N'}
-              </div>
-              <p className="text-lg font-semibold text-[#e2fff4]">{selectedConversation?.name ?? 'Hội thoại'}</p>
+              <button
+                type="button"
+                className={`mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#245948] text-lg font-bold text-[#d6fbee] ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
+                onClick={isGroupConversation ? handleOpenGroupAvatarPicker : undefined}
+                disabled={!isGroupConversation || isUploadingGroupAvatar || isCreatingGroup}
+                title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
+              >
+                {selectedConversation?.avatarUrl ? (
+                  <img src={selectedConversation.avatarUrl} alt={selectedConversation?.name ?? 'Nhóm'} className="h-full w-full object-cover" />
+                ) : (
+                  <span>{selectedConversation?.avatar ?? 'N'}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`text-lg font-semibold text-[#e2fff4] ${isGroupConversation ? 'cursor-pointer hover:text-[#bff8e6]' : 'cursor-default'}`}
+                onClick={isGroupConversation ? () => { void handleChangeGroupName(); } : undefined}
+                disabled={!isGroupConversation || isCreatingGroup}
+                title={isGroupConversation ? 'Đổi tên nhóm' : undefined}
+              >
+                {selectedConversation?.name ?? 'Hội thoại'}
+              </button>
               <p className="text-sm text-[#8abfab]">
                 {selectedConversation?.isGroup
                   ? `${selectedConversation.memberCount ?? 0} thành viên`
@@ -1246,26 +1492,24 @@ export function HomeDashboardChatPanel({
               <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
               {isGroupConversation ? (
                 <>
-                  {isCurrentUserGroupCreator ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={openAddMembersModal}
-                        className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
-                      >
-                        Thêm thành viên
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsManageGroupOpen(true)}
-                        className="col-span-3 rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5]"
-                      >
-                        Quản lý nhóm
-                      </button>
-                    </>
+                  <button
+                    type="button"
+                    onClick={openAddMembersModal}
+                    className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]"
+                  >
+                    Thêm thành viên
+                  </button>
+                  {canManageGroup ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsManageGroupOpen(true)}
+                      className="col-span-3 rounded-xl bg-[#1f7a60] px-2 py-2 text-xs font-semibold text-[#e6fff5]"
+                    >
+                      Quản lý nhóm
+                    </button>
                   ) : (
                     <p className="col-span-3 rounded-xl bg-[#0d3b2f] px-3 py-2 text-xs text-[#9bcbb9]">
-                      Chỉ người tạo nhóm được quyền quản lý nhóm.
+                      Bạn có thể đề xuất thêm thành viên. Khi bật duyệt, chỉ chủ nhóm mới có thể duyệt thêm thành viên.
                     </p>
                   )}
                 </>
@@ -1339,6 +1583,27 @@ export function HomeDashboardChatPanel({
 
             {isGroupConversation && (
               <>
+                <div className="mb-4 space-y-3 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Duyệt thành viên</p>
+                  <p className="text-sm text-[#d6f8ec]">
+                    Trạng thái: {memberApprovalEnabled ? 'ON - cần chủ nhóm duyệt' : 'OFF - thêm thẳng vào nhóm'}
+                  </p>
+                  {isCurrentUserGroupCreator ? (
+                    <button
+                      type="button"
+                      disabled={isCreatingGroup}
+                      onClick={handleToggleMemberApproval}
+                      className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${memberApprovalEnabled
+                        ? 'bg-[#1f7a60] text-[#e6fff5]'
+                        : 'bg-[#0f4335] text-[#a6e3cf]'} disabled:opacity-60`}
+                    >
+                      {memberApprovalEnabled ? 'Tắt duyệt' : 'Bật duyệt'}
+                    </button>
+                  ) : (
+                    <p className="text-xs text-[#8cc4b0]">Chỉ chủ nhóm có thể bật/tắt duyệt thành viên.</p>
+                  )}
+                </div>
+
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
                   <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>

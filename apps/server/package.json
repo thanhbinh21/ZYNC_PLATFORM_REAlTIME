@@ -40,7 +40,7 @@
     "pgvector": "^0.2.1",
     "prom-client": "^15.1.2",
     "rate-limit-redis": "^4.2.0",
-    "resend": "^4.0.1",
+    "resend": "^4.8.0",
     "socket.io": "^4.7.5",
     "twilio": "^5.1.0",
     "uuid": "^9.0.1",

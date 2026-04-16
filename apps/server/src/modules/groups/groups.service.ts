@@ -7,10 +7,11 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/err
 import { getIO } from '../../socket/gateway';
 import { produceNotificationEvent } from '../notifications/notifications.service';
 import { logger } from '../../shared/logger';
+import { MessagesService } from '../messages/messages.service';
 
 interface GroupUpdatedPayload {
   groupId: string;
-  type: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'disbanded';
+  type: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'member_approval_changed' | 'disbanded';
   data: Record<string, unknown>;
 }
 
@@ -21,6 +22,7 @@ interface GroupSummary {
   avatarUrl?: string;
   createdBy: string;
   adminIds: string[];
+  memberApprovalEnabled: boolean;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   updatedAt: Date;
 }
@@ -63,6 +65,14 @@ function ensureGroupCreator(group: IConversation, userId: string): void {
   const creatorId = getGroupCreatorId(group);
   if (!creatorId || creatorId !== userId) {
     throw new ForbiddenError('Only group creator can perform this action');
+  }
+}
+
+function ensureGroupAdmin(group: IConversation, userId: string): void {
+  const creatorId = getGroupCreatorId(group);
+  const isAdmin = group.adminIds.includes(userId);
+  if (creatorId !== userId && !isAdmin) {
+    throw new ForbiddenError('Only group admin can perform this action');
   }
 }
 
@@ -117,6 +127,7 @@ async function buildGroupSummary(groupId: string): Promise<GroupSummary> {
     avatarUrl: group.avatarUrl,
     createdBy: getGroupCreatorId(group),
     adminIds: group.adminIds,
+    memberApprovalEnabled: Boolean(group.memberApprovalEnabled),
     users: normalizedUsers,
     updatedAt: group.updatedAt,
   };
@@ -137,6 +148,49 @@ function emitGroupUpdated(memberUserIds: string[], payload: GroupUpdatedPayload)
 async function getGroupMemberIds(groupId: string): Promise<string[]> {
   const members = await ConversationMemberModel.find({ conversationId: groupId }).lean();
   return members.map((m) => m.userId);
+}
+
+async function createAndEmitGroupSystemMessage(
+  groupId: string,
+  senderId: string,
+  content: string,
+  recipientUserIds: string[],
+): Promise<void> {
+  try {
+    const idempotencyKey = `group-system-${new Types.ObjectId().toString()}`;
+    const message = await MessagesService.insertMessageWithMetadata(
+      groupId,
+      senderId,
+      content,
+      'text',
+      idempotencyKey,
+    );
+
+    const io = getIO();
+    if (!io) {
+      return;
+    }
+
+    const messageId = message._id.toString();
+    const createdAt = message.createdAt instanceof Date
+      ? message.createdAt.toISOString()
+      : new Date(message.createdAt).toISOString();
+
+    const uniqueRecipientIds = Array.from(new Set(recipientUserIds));
+    for (const recipientUserId of uniqueRecipientIds) {
+      io.to(`user:${recipientUserId}`).emit('receive_message', {
+        messageId,
+        conversationId: groupId,
+        senderId,
+        content,
+        type: 'text',
+        idempotencyKey,
+        createdAt,
+      });
+    }
+  } catch (err) {
+    logger.error('Failed to create or emit group system message', err);
+  }
 }
 
 export class GroupsService {
@@ -163,6 +217,7 @@ export class GroupsService {
       avatarUrl: input.avatarUrl,
       createdBy: creatorId,
       adminIds: [creatorId],
+      memberApprovalEnabled: false,
       unreadCounts: new Map<string, number>(),
     });
 
@@ -192,7 +247,6 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupCreator(group, currentUserId);
 
     const changedFields: Array<'name_changed' | 'avatar_changed'> = [];
 
@@ -236,7 +290,16 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupCreator(group, currentUserId);
+
+    const creatorId = getGroupCreatorId(group);
+    const isAdmin = group.adminIds.includes(currentUserId);
+    if (Boolean(group.memberApprovalEnabled) && currentUserId !== creatorId) {
+      throw new ForbiddenError('Nhóm đang bật duyệt thành viên. Chỉ chủ nhóm mới có thể duyệt và thêm thành viên.');
+    }
+
+    if (!Boolean(group.memberApprovalEnabled) && !isAdmin && currentUserId !== creatorId) {
+      await ensureGroupMember(groupId, currentUserId);
+    }
 
     const uniqueMembers = Array.from(new Set(memberIds.filter((id) => id !== currentUserId)));
     if (uniqueMembers.length === 0) {
@@ -272,6 +335,19 @@ export class GroupsService {
     );
 
     const summary = await buildGroupSummary(groupId);
+    const addedUsers = await UserModel.find({ _id: { $in: toInsert } }, 'displayName').lean();
+    const addedUserNameById = new Map(addedUsers.map((user) => [user._id.toString(), user.displayName as string]));
+
+    for (const addedUserId of toInsert) {
+      const displayName = addedUserNameById.get(addedUserId) ?? 'Thành viên';
+      await createAndEmitGroupSystemMessage(
+        groupId,
+        currentUserId,
+        `${displayName} được thêm vào nhóm`,
+        summary.users.map((user) => user._id),
+      );
+    }
+
     emitGroupUpdated(summary.users.map((u) => u._id), {
       groupId,
       type: 'member_added',
@@ -314,7 +390,11 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupCreator(group, currentUserId);
+    ensureGroupAdmin(group, currentUserId);
+
+    if (targetUserId === getGroupCreatorId(group)) {
+      throw new BadRequestError('Cannot remove group creator');
+    }
 
     if (targetUserId === currentUserId) {
       throw new BadRequestError('Use leave endpoint to leave group');
@@ -335,6 +415,16 @@ export class GroupsService {
     await group.save();
 
     const memberIds = await getGroupMemberIds(groupId);
+    const targetUser = await UserModel.findById(targetUserId).select('displayName').lean();
+    const targetDisplayName = (targetUser?.displayName as string) ?? 'Thành viên';
+
+    await createAndEmitGroupSystemMessage(
+      groupId,
+      currentUserId,
+      `${targetDisplayName} đã bị xóa khỏi nhóm`,
+      [...memberIds, targetUserId],
+    );
+
     emitGroupUpdated([...memberIds, targetUserId], {
       groupId,
       type: 'member_removed',
@@ -389,6 +479,16 @@ export class GroupsService {
     await group.save();
 
     const remainingIds = remainingMembers.map((m) => m.userId);
+    const currentUser = await UserModel.findById(currentUserId).select('displayName').lean();
+    const currentUserName = (currentUser?.displayName as string) ?? 'Thành viên';
+
+    await createAndEmitGroupSystemMessage(
+      groupId,
+      currentUserId,
+      `${currentUserName} đã rời khỏi nhóm`,
+      [...remainingIds, currentUserId],
+    );
+
     emitGroupUpdated([...remainingIds, currentUserId], {
       groupId,
       type: 'member_removed',
@@ -410,7 +510,11 @@ export class GroupsService {
   ): Promise<GroupSummary> {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
-    ensureGroupCreator(group, currentUserId);
+    ensureGroupAdmin(group, currentUserId);
+
+    if (targetUserId === getGroupCreatorId(group) && role !== 'admin') {
+      throw new BadRequestError('Cannot change creator role');
+    }
 
     const targetMember = await ConversationMemberModel.findOne({
       conversationId: groupId,
@@ -445,6 +549,31 @@ export class GroupsService {
       data: {
         userId: targetUserId,
         role,
+        updatedBy: currentUserId,
+      },
+    });
+
+    return summary;
+  }
+
+  static async updateMemberApproval(
+    currentUserId: string,
+    groupId: string,
+    memberApprovalEnabled: boolean,
+  ): Promise<GroupSummary> {
+    const group = await getGroupOrThrow(groupId);
+    await ensureGroupMember(groupId, currentUserId);
+    ensureGroupCreator(group, currentUserId);
+
+    group.memberApprovalEnabled = memberApprovalEnabled;
+    await group.save();
+
+    const summary = await buildGroupSummary(groupId);
+    emitGroupUpdated(summary.users.map((u) => u._id), {
+      groupId,
+      type: 'member_approval_changed',
+      data: {
+        memberApprovalEnabled,
         updatedBy: currentUserId,
       },
     });

@@ -20,8 +20,11 @@ import {
   createGroup,
   disbandGroup,
   removeGroupMember,
+  updateGroup,
+  updateGroupMemberApproval,
   updateGroupMemberRole,
 } from '@/services/groups';
+import { getSocket } from '@/services/socket';
 import { useChat, useMessageHistory } from '@/hooks/use-messaging';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
@@ -39,6 +42,8 @@ interface Conversation {
   type: 'direct' | 'group';
   createdBy?: string;
   adminIds?: string[];
+  memberApprovalEnabled?: boolean;
+  removedFromGroup?: boolean;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   lastMessage?: { senderId: string; content: string; sentAt: string };
   unreadCounts?: Record<string, number>;
@@ -54,6 +59,8 @@ interface ConversationListItem {
   isGroup?: boolean;
   createdBy?: string;
   adminIds?: string[];
+  memberApprovalEnabled?: boolean;
+  removedFromGroup?: boolean;
   memberCount?: number;
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
@@ -668,6 +675,8 @@ export function useHomeDashboard() {
       isGroup: conv.type === 'group',
       createdBy: conv.createdBy,
       adminIds: conv.adminIds,
+      memberApprovalEnabled: conv.memberApprovalEnabled,
+      removedFromGroup: conv.removedFromGroup,
       memberCount: conv.users.length,
       members: conv.users,
       online: true,
@@ -688,6 +697,8 @@ export function useHomeDashboard() {
           avatarUrl: createdGroup.avatarUrl,
           createdBy: createdGroup.createdBy,
           adminIds: createdGroup.adminIds,
+          memberApprovalEnabled: createdGroup.memberApprovalEnabled,
+          removedFromGroup: false,
           users: createdGroup.users,
           unreadCounts: {},
         };
@@ -724,6 +735,8 @@ export function useHomeDashboard() {
             avatarUrl: updatedGroup.avatarUrl,
             createdBy: updatedGroup.createdBy,
             adminIds: updatedGroup.adminIds,
+            memberApprovalEnabled: updatedGroup.memberApprovalEnabled,
+            removedFromGroup: false,
             users: updatedGroup.users,
           };
         }));
@@ -751,6 +764,8 @@ export function useHomeDashboard() {
             avatarUrl: updatedGroup.avatarUrl,
             createdBy: updatedGroup.createdBy,
             adminIds: updatedGroup.adminIds,
+            memberApprovalEnabled: updatedGroup.memberApprovalEnabled,
+            removedFromGroup: false,
             users: updatedGroup.users,
           };
         }));
@@ -778,6 +793,8 @@ export function useHomeDashboard() {
             avatarUrl: updatedGroup.avatarUrl,
             createdBy: updatedGroup.createdBy,
             adminIds: updatedGroup.adminIds,
+            memberApprovalEnabled: updatedGroup.memberApprovalEnabled,
+            removedFromGroup: false,
             users: updatedGroup.users,
           };
         }));
@@ -787,6 +804,155 @@ export function useHomeDashboard() {
     },
     [],
   );
+
+  const updateGroupMemberApprovalConversation = useCallback(
+    async (groupId: string, memberApprovalEnabled: boolean) => {
+      setGroupActionLoading(true);
+      try {
+        const updatedGroup = await updateGroupMemberApproval(groupId, { memberApprovalEnabled });
+
+        setConversations((prev) => prev.map((conversation) => {
+          if (conversation._id !== groupId) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            name: updatedGroup.name,
+            avatarUrl: updatedGroup.avatarUrl,
+            createdBy: updatedGroup.createdBy,
+            adminIds: updatedGroup.adminIds,
+            memberApprovalEnabled: updatedGroup.memberApprovalEnabled,
+            removedFromGroup: false,
+            users: updatedGroup.users,
+          };
+        }));
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [],
+  );
+
+  const ensureConversationAvailable = useCallback(
+    async (groupId: string) => {
+      try {
+        const convosRes = await apiClient.get('/api/conversations');
+        const convos: Conversation[] = convosRes.data.data || [];
+        const matched = convos.find((conversation) => conversation._id === groupId);
+        if (!matched) {
+          return;
+        }
+
+        setConversations((prev) => {
+          const exists = prev.some((conversation) => conversation._id === groupId);
+          if (exists) {
+            return prev;
+          }
+          return [matched, ...prev];
+        });
+      } catch (error) {
+        console.error('Failed to sync newly added group conversation', error);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
+    if (!token || !userId) {
+      return;
+    }
+
+    const socket = getSocket(token);
+    type GroupUpdatedEvent = {
+      groupId: string;
+      type: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'member_approval_changed' | 'disbanded';
+      data: Record<string, unknown>;
+    };
+
+    const handleGroupUpdated = (payload: GroupUpdatedEvent) => {
+      if (payload.type === 'member_added') {
+        const addedMemberIds = (payload.data['memberIds'] as string[] | undefined) ?? [];
+        if (addedMemberIds.includes(userId)) {
+          void ensureConversationAvailable(payload.groupId);
+        }
+      }
+
+      setConversations((prev) => {
+        const index = prev.findIndex((conversation) => conversation._id === payload.groupId);
+
+        if (payload.type === 'disbanded') {
+          if (index === -1) {
+            return prev;
+          }
+          return prev.filter((conversation) => conversation._id !== payload.groupId);
+        }
+
+        if (payload.type === 'created') {
+          const group = payload.data['group'] as Conversation | undefined;
+          if (!group) {
+            return prev;
+          }
+          const normalized = {
+            ...group,
+            memberApprovalEnabled: group.memberApprovalEnabled ?? false,
+            removedFromGroup: false,
+          };
+          if (index === -1) {
+            return [normalized, ...prev];
+          }
+          const updated = [...prev];
+          updated[index] = { ...updated[index], ...normalized };
+          return updated;
+        }
+
+        if (index === -1) {
+          return prev;
+        }
+
+        const updated = [...prev];
+        const current = updated[index] as Conversation;
+
+        if (payload.type === 'name_changed') {
+          current.name = payload.data['name'] as string | undefined;
+        }
+
+        if (payload.type === 'avatar_changed') {
+          current.avatarUrl = payload.data['avatarUrl'] as string | undefined;
+        }
+
+        if (payload.type === 'member_approval_changed') {
+          current.memberApprovalEnabled = Boolean(payload.data['memberApprovalEnabled']);
+        }
+
+        if (payload.type === 'member_removed') {
+          const removedUserId = payload.data['userId'] as string | undefined;
+          if (removedUserId === userId) {
+            const filtered = prev.filter((conversation) => conversation._id !== payload.groupId);
+            if (selectedConversationId === payload.groupId) {
+              setSelectedConversationId(filtered[0]?._id ?? '');
+            }
+            return filtered;
+          }
+
+          if (removedUserId) {
+            current.users = current.users.filter((member) => member._id !== removedUserId);
+            current.adminIds = (current.adminIds ?? []).filter((id) => id !== removedUserId);
+          }
+        }
+
+        updated[index] = { ...current };
+        return updated;
+      });
+    };
+
+    socket.on('group_updated', handleGroupUpdated);
+
+    return () => {
+      socket.off('group_updated', handleGroupUpdated);
+    };
+  }, [ensureConversationAvailable, selectedConversationId, userId]);
 
   const disbandGroupConversation = useCallback(
     async (groupId: string) => {
@@ -816,6 +982,7 @@ export function useHomeDashboard() {
       return {
         participantName: conv.name || 'Nhóm',
         participantAvatar: conv.name?.substring(0, 2).toUpperCase() || 'GR',
+        participantAvatarUrl: conv.avatarUrl,
         isOnline: true,
       };
     }
@@ -824,9 +991,39 @@ export function useHomeDashboard() {
     return {
       participantName: otherUser?.displayName || 'Người dùng',
       participantAvatar: otherUser?.displayName?.substring(0, 2).toUpperCase(),
+      participantAvatarUrl: otherUser?.avatarUrl,
       isOnline: true,
     };
   }, [conversations, selectedConversationId, userId]);
+
+  const updateGroupConversation = useCallback(
+    async (groupId: string, payload: { name?: string; avatarUrl?: string | null }) => {
+      setGroupActionLoading(true);
+      try {
+        const updatedGroup = await updateGroup(groupId, payload);
+
+        setConversations((prev) => prev.map((conversation) => {
+          if (conversation._id !== groupId) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            name: updatedGroup.name,
+            avatarUrl: updatedGroup.avatarUrl,
+            createdBy: updatedGroup.createdBy,
+            adminIds: updatedGroup.adminIds,
+            memberApprovalEnabled: updatedGroup.memberApprovalEnabled,
+            removedFromGroup: false,
+            users: updatedGroup.users,
+          };
+        }));
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [],
+  );
 
   // Send message handler
   const handleSendMessage = useCallback(
@@ -1108,8 +1305,10 @@ export function useHomeDashboard() {
     friendsForGroup,
     groupActionLoading,
     onCreateGroup: createGroupConversation,
+    onUpdateGroup: updateGroupConversation,
     onAddGroupMembers: addMembersToGroupConversation,
     onUpdateGroupMemberRole: updateGroupMemberRoleConversation,
+    onUpdateGroupMemberApproval: updateGroupMemberApprovalConversation,
     onRemoveGroupMember: removeGroupMemberConversation,
     onDisbandGroup: disbandGroupConversation,
     onSendMessage: handleSendMessage,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
-import { MessageType } from '@zync/shared-types';
+import type { MessageType } from '@zync/shared-types';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;

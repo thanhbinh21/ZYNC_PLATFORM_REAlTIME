@@ -8,6 +8,7 @@ export interface IConversation extends Document {
   avatarUrl?: string;
   createdBy?: string;
   adminIds: string[];
+  memberApprovalEnabled?: boolean;
   lastMessage?: {
     content: string;
     senderId: string;
@@ -24,6 +25,7 @@ const conversationSchema = new Schema<IConversation>(
     avatarUrl: { type: String },
     createdBy: { type: String },
     adminIds: [{ type: String }],
+    memberApprovalEnabled: { type: Boolean, default: false },
     lastMessage: {
       content: { type: String },
       senderId: { type: String },
