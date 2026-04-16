@@ -8,7 +8,8 @@ import {
   TextInput,
   StatusBar,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -51,6 +52,15 @@ interface IncomingMessageEvent {
   content?: string;
   type?: string;
   createdAt?: string;
+}
+
+interface GroupUpdatedEvent {
+  groupId?: string;
+  type?: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'member_approval_changed' | 'disbanded';
+  data?: {
+    name?: string;
+    avatarUrl?: string;
+  };
 }
 
 function normalizeSenderId(senderId?: IncomingMessageEvent['senderId']): string {
@@ -198,15 +208,34 @@ export default function ChatScreen() {
       void loadConversations();
     };
 
+    const handleGroupUpdated = (payload: GroupUpdatedEvent) => {
+      if (!payload?.groupId) return;
+      if (payload.type !== 'name_changed' && payload.type !== 'avatar_changed') return;
+
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== payload.groupId) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          name: payload.data?.name ?? conversation.name,
+          avatarUrl: payload.data?.avatarUrl ?? conversation.avatarUrl,
+        };
+      }));
+    };
+
     socket.on('receive_message', handleNewMessage);
     socket.on('message_recalled', handleNewMessage);
     socket.on('message_deleted_for_me', handleNewMessage);
+    socket.on('group_updated', handleGroupUpdated);
     socket.on('connect', handleSocketReconnect);
 
     return () => {
       socket.off('receive_message', handleNewMessage);
       socket.off('message_recalled', handleNewMessage);
       socket.off('message_deleted_for_me', handleNewMessage);
+      socket.off('group_updated', handleGroupUpdated);
       socket.off('connect', handleSocketReconnect);
     };
   }, [loadConversations, userId]);
@@ -222,6 +251,7 @@ export default function ChatScreen() {
       params: {
         conversationId: conv._id,
         name: getConversationName(conv, userId),
+        avatarUrl: conv.avatarUrl || '',
         isGroup: conv.type === 'group' ? 'true' : 'false',
       },
     });
@@ -294,9 +324,13 @@ export default function ChatScreen() {
                 <TouchableOpacity style={styles.chatItem} onPress={() => openChatRoom(item)}>
                   <View style={styles.avatarContainer}>
                     <View style={[styles.avatar, item.type === 'group' && styles.groupAvatar]}>
-                      <Text style={styles.avatarText}>
-                        {displayName.charAt(0).toUpperCase()}
-                      </Text>
+                      {item.avatarUrl ? (
+                        <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                      ) : (
+                        <Text style={styles.avatarText}>
+                          {displayName.charAt(0).toUpperCase()}
+                        </Text>
+                      )}
                       {item.type === 'group' && (
                         <View style={styles.groupBadge}>
                           <Ionicons name="people" size={10} color="#fff" />
@@ -352,6 +386,11 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 29,
   },
   container: {
     flex: 1,

@@ -21,7 +21,12 @@ export const UpdateGroupMemberRoleSchema = z.object({
   role: z.enum(['admin', 'member']),
 });
 
+export const UpdateGroupMemberApprovalSchema = z.object({
+  memberApprovalEnabled: z.boolean(),
+});
+
 export type CreateGroupDto = z.infer<typeof CreateGroupSchema>;
 export type UpdateGroupDto = z.infer<typeof UpdateGroupSchema>;
 export type AddGroupMembersDto = z.infer<typeof AddGroupMembersSchema>;
 export type UpdateGroupMemberRoleDto = z.infer<typeof UpdateGroupMemberRoleSchema>;
+export type UpdateGroupMemberApprovalDto = z.infer<typeof UpdateGroupMemberApprovalSchema>;

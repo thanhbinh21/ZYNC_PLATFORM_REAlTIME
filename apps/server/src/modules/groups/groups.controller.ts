@@ -4,6 +4,7 @@ import { GroupsService } from './groups.service';
 import type {
   AddGroupMembersDto,
   CreateGroupDto,
+  UpdateGroupMemberApprovalDto,
   UpdateGroupDto,
   UpdateGroupMemberRoleDto,
 } from './groups.schema';
@@ -65,6 +66,25 @@ export async function updateGroupMemberRoleHandler(
       req.params['groupId'] as string,
       req.params['userId'] as string,
       body.role,
+    );
+    res.json({ success: true, data: group });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateGroupMemberApprovalHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const body = req.body as UpdateGroupMemberApprovalDto;
+    const group = await GroupsService.updateMemberApproval(
+      userId,
+      req.params['groupId'] as string,
+      body.memberApprovalEnabled,
     );
     res.json({ success: true, data: group });
   } catch (err) {

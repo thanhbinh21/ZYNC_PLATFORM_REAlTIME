@@ -13,6 +13,7 @@ export interface GroupConversation {
   avatarUrl?: string;
   createdBy: string;
   adminIds: string[];
+  memberApprovalEnabled: boolean;
   users: GroupMemberUser[];
   updatedAt: string;
 }
@@ -31,6 +32,15 @@ export interface UpdateGroupMemberRolePayload {
   role: 'admin' | 'member';
 }
 
+export interface UpdateGroupPayload {
+  name?: string;
+  avatarUrl?: string | null;
+}
+
+export interface UpdateGroupMemberApprovalPayload {
+  memberApprovalEnabled: boolean;
+}
+
 export async function createGroup(payload: CreateGroupPayload): Promise<GroupConversation> {
   const { data } = await apiClient.post<{ success: boolean; data: GroupConversation }>('/api/groups', payload);
   return data.data;
@@ -38,6 +48,11 @@ export async function createGroup(payload: CreateGroupPayload): Promise<GroupCon
 
 export async function addGroupMembers(groupId: string, payload: AddGroupMembersPayload): Promise<GroupConversation> {
   const { data } = await apiClient.post<{ success: boolean; data: GroupConversation }>(`/api/groups/${groupId}/members`, payload);
+  return data.data;
+}
+
+export async function updateGroup(groupId: string, payload: UpdateGroupPayload): Promise<GroupConversation> {
+  const { data } = await apiClient.patch<{ success: boolean; data: GroupConversation }>(`/api/groups/${groupId}`, payload);
   return data.data;
 }
 
@@ -56,6 +71,17 @@ export async function updateGroupMemberRole(
 export async function removeGroupMember(groupId: string, userId: string): Promise<GroupConversation> {
   const { data } = await apiClient.delete<{ success: boolean; data: GroupConversation }>(
     `/api/groups/${groupId}/members/${userId}`,
+  );
+  return data.data;
+}
+
+export async function updateGroupMemberApproval(
+  groupId: string,
+  payload: UpdateGroupMemberApprovalPayload,
+): Promise<GroupConversation> {
+  const { data } = await apiClient.patch<{ success: boolean; data: GroupConversation }>(
+    `/api/groups/${groupId}/member-approval`,
+    payload,
   );
   return data.data;
 }

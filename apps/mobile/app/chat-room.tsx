@@ -17,6 +17,8 @@ import {
   Animated,
   Linking,
   Image,
+  Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -42,6 +44,22 @@ interface Message {
   status?: 'sent' | 'delivered' | 'read';
   createdAt: string;
   idempotencyKey?: string;
+}
+
+interface ConversationMeta {
+  _id: string;
+  name?: string;
+  avatarUrl?: string;
+  type?: 'group' | 'private' | 'direct';
+}
+
+interface GroupUpdatedEvent {
+  groupId?: string;
+  type?: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'member_approval_changed' | 'disbanded';
+  data?: {
+    name?: string;
+    avatarUrl?: string;
+  };
 }
 
 const FILE_PREFIX = 'file/';
@@ -310,9 +328,10 @@ const typingStyles = StyleSheet.create({
 export default function ChatRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { conversationId, name, isGroup } = useLocalSearchParams<{
+  const { conversationId, name, avatarUrl, isGroup } = useLocalSearchParams<{
     conversationId: string;
     name: string;
+    avatarUrl?: string;
     isGroup?: string;
   }>();
 
@@ -329,6 +348,17 @@ export default function ChatRoomScreen() {
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [conversationName, setConversationName] = useState(name || 'Chat');
+  const [conversationAvatarUrl, setConversationAvatarUrl] = useState<string | undefined>(
+    avatarUrl && avatarUrl.length > 0 ? avatarUrl : undefined,
+  );
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+  const [groupNameDraft, setGroupNameDraft] = useState('');
+  const [groupAvatarDraft, setGroupAvatarDraft] = useState<string | undefined>(undefined);
+  const [isSavingGroupInfo, setIsSavingGroupInfo] = useState(false);
+  const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
+
+  const isGroupChat = isGroup === 'true';
 
   const {
     previews,
@@ -364,6 +394,191 @@ export default function ChatRoomScreen() {
       hideSub.remove();
     };
   }, []);
+
+  useEffect(() => {
+    setConversationName(name || 'Chat');
+    setConversationAvatarUrl(avatarUrl && avatarUrl.length > 0 ? avatarUrl : undefined);
+  }, [name, avatarUrl, conversationId]);
+
+  const loadConversationMeta = useCallback(async () => {
+    if (!conversationId) return;
+
+    try {
+      const response = await api.get('/conversations');
+      const conversations = Array.isArray(response.data?.data)
+        ? (response.data.data as ConversationMeta[])
+        : [];
+      const currentConversation = conversations.find((item) => item._id === conversationId);
+
+      if (!currentConversation) return;
+
+      if (typeof currentConversation.name === 'string' && currentConversation.name.trim().length > 0) {
+        setConversationName(currentConversation.name.trim());
+      }
+
+      if (typeof currentConversation.avatarUrl === 'string' && currentConversation.avatarUrl.trim().length > 0) {
+        setConversationAvatarUrl(currentConversation.avatarUrl);
+      }
+    } catch (err: any) {
+      console.error('[ERROR] Failed to load conversation meta:', err?.response?.data || err?.message || err);
+    }
+  }, [conversationId]);
+
+  const uploadAssetToCloudinary = useCallback(async (
+    asset: ImagePicker.ImagePickerAsset,
+    uploadType: 'image' | 'video',
+  ): Promise<string | null> => {
+    const signRes = await api.post('/upload/generate-signature', { type: uploadType });
+    const { signature, timestamp, apiKey, cloudName, folder } = signRes.data;
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: asset.uri,
+      type: asset.mimeType || (uploadType === 'video' ? 'video/mp4' : 'image/jpeg'),
+      name: asset.fileName || (uploadType === 'video' ? `video-${Date.now()}.mp4` : `image-${Date.now()}.jpg`),
+    } as any);
+    formData.append('api_key', apiKey);
+    formData.append('timestamp', String(timestamp));
+    formData.append('signature', signature);
+    formData.append('folder', folder);
+
+    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${uploadType}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const cloudData = await cloudRes.json();
+    if (!cloudData?.public_id) {
+      return null;
+    }
+
+    const verifyRes = await api.post('/upload/verify', {
+      publicId: cloudData.public_id,
+      type: uploadType,
+    });
+
+    return typeof verifyRes.data?.secureUrl === 'string' ? verifyRes.data.secureUrl : null;
+  }, []);
+
+  const openGroupInfoEditor = useCallback(() => {
+    setGroupNameDraft(conversationName);
+    setGroupAvatarDraft(conversationAvatarUrl);
+    setIsGroupInfoOpen(true);
+  }, [conversationName, conversationAvatarUrl]);
+
+  const handlePickGroupAvatar = useCallback(async () => {
+    try {
+      setIsUploadingGroupAvatar(true);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+      const secureUrl = await uploadAssetToCloudinary(result.assets[0], 'image');
+
+      if (secureUrl) {
+        setGroupAvatarDraft(secureUrl);
+      }
+    } catch (err) {
+      console.error('Upload group avatar failed:', err);
+      Alert.alert('Thong bao', 'Khong the tai len anh nhom. Vui long thu lai.');
+    } finally {
+      setIsUploadingGroupAvatar(false);
+    }
+  }, [uploadAssetToCloudinary]);
+
+  const handleHeaderAvatarPress = useCallback(async () => {
+    if (!conversationId || !isGroupChat) {
+      return;
+    }
+
+    try {
+      setIsUploadingGroupAvatar(true);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      const secureUrl = await uploadAssetToCloudinary(result.assets[0], 'image');
+      if (!secureUrl) {
+        return;
+      }
+
+      const response = await api.patch(`/groups/${conversationId}`, { avatarUrl: secureUrl });
+      const updatedAvatar = typeof response.data?.data?.avatarUrl === 'string'
+        ? response.data.data.avatarUrl
+        : secureUrl;
+
+      setConversationAvatarUrl(updatedAvatar);
+      router.setParams({ avatarUrl: updatedAvatar });
+    } catch (err: any) {
+      const message = err?.response?.data?.message;
+      Alert.alert('Khong the cap nhat anh nhom', typeof message === 'string' ? message : 'Vui long thu lai.');
+    } finally {
+      setIsUploadingGroupAvatar(false);
+    }
+  }, [conversationId, isGroupChat, router, uploadAssetToCloudinary]);
+
+  const handleSaveGroupInfo = useCallback(async () => {
+    if (!conversationId || !isGroupChat) return;
+
+    const trimmedName = groupNameDraft.trim();
+    const normalizedName = trimmedName.length > 0 ? trimmedName : conversationName;
+    const normalizedAvatar = groupAvatarDraft;
+
+    const hasNameChange = normalizedName !== conversationName;
+    const hasAvatarChange = normalizedAvatar !== conversationAvatarUrl;
+
+    if (!hasNameChange && !hasAvatarChange) {
+      setIsGroupInfoOpen(false);
+      return;
+    }
+
+    try {
+      setIsSavingGroupInfo(true);
+
+      const payload: { name?: string; avatarUrl?: string } = {};
+      if (hasNameChange) {
+        payload.name = normalizedName;
+      }
+      if (hasAvatarChange && normalizedAvatar) {
+        payload.avatarUrl = normalizedAvatar;
+      }
+
+      const response = await api.patch(`/groups/${conversationId}`, payload);
+      const updatedGroup = response.data?.data as { name?: string; avatarUrl?: string } | undefined;
+
+      const nextName = typeof updatedGroup?.name === 'string' ? updatedGroup.name : normalizedName;
+      const nextAvatar = typeof updatedGroup?.avatarUrl === 'string' ? updatedGroup.avatarUrl : normalizedAvatar;
+
+      setConversationName(nextName);
+      setConversationAvatarUrl(nextAvatar);
+      setIsGroupInfoOpen(false);
+      router.setParams({ name: nextName, avatarUrl: nextAvatar || '' });
+    } catch (err: any) {
+      const message = err?.response?.data?.message;
+      Alert.alert('Khong the cap nhat nhom', typeof message === 'string' ? message : 'Vui long thu lai.');
+    } finally {
+      setIsSavingGroupInfo(false);
+    }
+  }, [
+    conversationAvatarUrl,
+    conversationId,
+    conversationName,
+    groupAvatarDraft,
+    groupNameDraft,
+    isGroupChat,
+    router,
+  ]);
 
   const loadMessages = useCallback(async (cursor?: string | null) => {
     if (!conversationId) return;
@@ -408,11 +623,12 @@ export default function ChatRoomScreen() {
       setHasMore(true);
       setShowOptionsId(null);
       void loadMessages();
+      void loadConversationMeta();
 
       return () => {
         setShowOptionsId(null);
       };
-    }, [loadMessages]),
+    }, [loadConversationMeta, loadMessages]),
   );
 
   const handleLoadMore = useCallback(() => {
@@ -552,6 +768,23 @@ export default function ChatRoomScreen() {
       setMessages((prev) => prev.filter((message) => message._id !== payload.messageId));
     };
 
+    const handleGroupUpdated = (payload: GroupUpdatedEvent) => {
+      if (!payload?.groupId || payload.groupId !== conversationId) {
+        return;
+      }
+
+      if (payload.type === 'name_changed' && typeof payload.data?.name === 'string') {
+        setConversationName(payload.data.name);
+        router.setParams({ name: payload.data.name });
+      }
+
+      if (payload.type === 'avatar_changed') {
+        const nextAvatar = typeof payload.data?.avatarUrl === 'string' ? payload.data.avatarUrl : '';
+        setConversationAvatarUrl(nextAvatar || undefined);
+        router.setParams({ avatarUrl: nextAvatar });
+      }
+    };
+
     socket.on('connect', joinConversationRoom);
     socket.on('receive_message', handleReceiveMessage);
     socket.on('status_update', handleStatusUpdate);
@@ -559,6 +792,7 @@ export default function ChatRoomScreen() {
     socket.on('typing_indicator', handleTypingIndicator);
     socket.on('message_recalled', handleRecallMessage);
     socket.on('message_deleted_for_me', handleDeleteMessageForMe);
+    socket.on('group_updated', handleGroupUpdated);
 
     return () => {
       socket.emit('leave_conversation', { conversationId });
@@ -569,8 +803,9 @@ export default function ChatRoomScreen() {
       socket.off('typing_indicator', handleTypingIndicator);
       socket.off('message_recalled', handleRecallMessage);
       socket.off('message_deleted_for_me', handleDeleteMessageForMe);
+      socket.off('group_updated', handleGroupUpdated);
     };
-  }, [conversationId, userId, scrollToBottom]);
+  }, [conversationId, router, scrollToBottom, userId]);
 
   useEffect(() => {
     if (!conversationId || messages.length === 0) return;
@@ -641,35 +876,9 @@ export default function ChatRoomScreen() {
       const isVideo = asset.type === 'video' || Boolean(asset.mimeType?.startsWith('video/'));
       const uploadType = isVideo ? 'video' : 'image';
 
-      const signRes = await api.post('/upload/generate-signature', { type: uploadType });
-      const { signature, timestamp, apiKey, cloudName, folder } = signRes.data;
-
-      const formData = new FormData();
-      formData.append('file', {
-        uri: asset.uri,
-        type: asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
-        name: asset.fileName || (isVideo ? `video-${Date.now()}.mp4` : `image-${Date.now()}.jpg`),
-      } as any);
-      formData.append('api_key', apiKey);
-      formData.append('timestamp', String(timestamp));
-      formData.append('signature', signature);
-      formData.append('folder', folder);
-
-      const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${uploadType}/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      const cloudData = await cloudRes.json();
-
-      if (cloudData.public_id) {
-        const verifyRes = await api.post('/upload/verify', {
-          publicId: cloudData.public_id,
-          type: uploadType,
-        });
-
-        if (verifyRes.data?.secureUrl) {
-          handleSend('', isVideo ? 'video' : 'image', verifyRes.data.secureUrl);
-        }
+      const secureUrl = await uploadAssetToCloudinary(asset, uploadType);
+      if (secureUrl) {
+        handleSend('', isVideo ? 'video' : 'image', secureUrl);
       }
     } catch (err) {
       console.error('Upload failed:', err);
@@ -734,7 +943,6 @@ export default function ChatRoomScreen() {
   const renderMessage = useCallback(
     ({ item: message }: { item: Message }) => {
       const isMe = getSenderId(message) === userId;
-      const isGroupChat = isGroup === 'true';
       const isSelected = showOptionsId === (message._id || message.idempotencyKey);
       const isRecalled = message.type === 'system-recall';
       const fileName = getFileName(message.type, message.content);
@@ -828,7 +1036,7 @@ export default function ChatRoomScreen() {
         </View>
       );
     },
-    [handleDeleteForMe, handleOpenMedia, handleRecall, isGroup, showOptionsId, userId],
+    [handleDeleteForMe, handleOpenMedia, handleRecall, isGroupChat, showOptionsId, userId],
   );
 
   const androidKeyboardOffset = Platform.OS === 'android'
@@ -853,15 +1061,30 @@ export default function ChatRoomScreen() {
               <Ionicons name="chevron-back" size={24} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              <View style={styles.headerAvatar}>
-                <Text style={styles.headerAvatarText}>
-                  {(name || 'C').charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <TouchableOpacity
+                style={styles.headerAvatar}
+                onPress={() => {
+                  void handleHeaderAvatarPress();
+                }}
+                disabled={!isGroupChat || isSavingGroupInfo || isUploadingGroupAvatar}
+              >
+                {conversationAvatarUrl ? (
+                  <Image source={{ uri: conversationAvatarUrl }} style={styles.headerAvatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.headerAvatarText}>
+                    {(conversationName || 'C').charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </TouchableOpacity>
               <View>
-                <Text style={styles.headerName} numberOfLines={1}>
-                  {name || 'Chat'}
-                </Text>
+                <TouchableOpacity
+                  onPress={isGroupChat ? openGroupInfoEditor : undefined}
+                  disabled={!isGroupChat || isSavingGroupInfo}
+                >
+                  <Text style={styles.headerName} numberOfLines={1}>
+                    {conversationName || 'Chat'}
+                  </Text>
+                </TouchableOpacity>
                 {typingUsers.length > 0 ? (
                   <Text style={styles.headerStatus}>dang nhap...</Text>
                 ) : (
@@ -876,7 +1099,11 @@ export default function ChatRoomScreen() {
               <TouchableOpacity style={styles.actionIcon}>
                 <Ionicons name="videocam-outline" size={22} color="#10b981" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionIcon}>
+              <TouchableOpacity
+                style={styles.actionIcon}
+                onPress={isGroupChat ? openGroupInfoEditor : undefined}
+                disabled={!isGroupChat}
+              >
                 <Ionicons name="information-circle-outline" size={22} color="#10b981" />
               </TouchableOpacity>
             </View>
@@ -912,6 +1139,75 @@ export default function ChatRoomScreen() {
               }
             />
           )}
+
+          <Modal
+            visible={isGroupInfoOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setIsGroupInfoOpen(false)}
+          >
+            <View style={styles.groupModalOverlay}>
+              <View style={styles.groupModalCard}>
+                <Text style={styles.groupModalTitle}>Cap nhat nhom</Text>
+
+                <TouchableOpacity
+                  style={styles.groupAvatarPicker}
+                  onPress={() => {
+                    void handlePickGroupAvatar();
+                  }}
+                  disabled={isUploadingGroupAvatar || isSavingGroupInfo}
+                >
+                  {groupAvatarDraft ? (
+                    <Image source={{ uri: groupAvatarDraft }} style={styles.groupAvatarPreview} resizeMode="cover" />
+                  ) : (
+                    <Text style={styles.groupAvatarPlaceholder}>
+                      {(groupNameDraft || conversationName || 'N').charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                  <View style={styles.groupAvatarCameraBadge}>
+                    {isUploadingGroupAvatar ? (
+                      <ActivityIndicator size="small" color="#0f172a" />
+                    ) : (
+                      <Ionicons name="camera-outline" size={14} color="#0f172a" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                <TextInput
+                  style={styles.groupNameInput}
+                  value={groupNameDraft}
+                  onChangeText={setGroupNameDraft}
+                  placeholder="Nhap ten nhom"
+                  placeholderTextColor="#6b7280"
+                  maxLength={100}
+                  editable={!isSavingGroupInfo}
+                />
+
+                <View style={styles.groupModalActions}>
+                  <TouchableOpacity
+                    style={[styles.groupModalButton, styles.groupModalCancelButton]}
+                    onPress={() => setIsGroupInfoOpen(false)}
+                    disabled={isSavingGroupInfo}
+                  >
+                    <Text style={styles.groupModalCancelText}>Huy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.groupModalButton, styles.groupModalSaveButton, isSavingGroupInfo && { opacity: 0.7 }]}
+                    onPress={() => {
+                      void handleSaveGroupInfo();
+                    }}
+                    disabled={isSavingGroupInfo || isUploadingGroupAvatar}
+                  >
+                    {isSavingGroupInfo ? (
+                      <ActivityIndicator size="small" color="#0f172a" />
+                    ) : (
+                      <Text style={styles.groupModalSaveText}>Luu</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           <MessagePreviewOverlay
             previews={previews}
@@ -1237,6 +1533,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
+  headerAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
+  },
   headerAvatarText: {
     color: '#94a3b8',
     fontSize: 16,
@@ -1361,5 +1662,98 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 0,
+  },
+  groupModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  groupModalCard: {
+    width: '100%',
+    borderRadius: 18,
+    backgroundColor: '#0b1726',
+    borderWidth: 1,
+    borderColor: '#1f3347',
+    padding: 18,
+    alignItems: 'center',
+  },
+  groupModalTitle: {
+    color: '#e2e8f0',
+    fontSize: 18,
+    fontFamily: 'BeVietnamPro_700Bold',
+    marginBottom: 16,
+  },
+  groupAvatarPicker: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#24364b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  groupAvatarPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  groupAvatarPlaceholder: {
+    color: '#e2e8f0',
+    fontSize: 34,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  groupAvatarCameraBadge: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#34d399',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  groupNameInput: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    color: '#e2e8f0',
+    fontSize: 15,
+    fontFamily: 'BeVietnamPro_500Medium',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    backgroundColor: '#111c2b',
+  },
+  groupModalActions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  groupModalButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupModalCancelButton: {
+    backgroundColor: '#1f2937',
+  },
+  groupModalSaveButton: {
+    backgroundColor: '#34d399',
+  },
+  groupModalCancelText: {
+    color: '#cbd5e1',
+    fontSize: 14,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  groupModalSaveText: {
+    color: '#0f172a',
+    fontSize: 14,
+    fontFamily: 'BeVietnamPro_700Bold',
   },
 });

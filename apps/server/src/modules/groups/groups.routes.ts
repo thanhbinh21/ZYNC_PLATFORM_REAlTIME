@@ -8,11 +8,13 @@ import {
   leaveGroupHandler,
   removeGroupMemberHandler,
   updateGroupHandler,
+  updateGroupMemberApprovalHandler,
   updateGroupMemberRoleHandler,
 } from './groups.controller';
 import {
   AddGroupMembersSchema,
   CreateGroupSchema,
+  UpdateGroupMemberApprovalSchema,
   UpdateGroupMemberRoleSchema,
   UpdateGroupSchema,
 } from './groups.schema';
@@ -38,6 +40,13 @@ groupsRouter.patch(
   '/:groupId/members/:userId/role',
   validateBody(UpdateGroupMemberRoleSchema),
   updateGroupMemberRoleHandler,
+);
+
+// PATCH /api/groups/:groupId/member-approval – toggle member approval setting (creator only)
+groupsRouter.patch(
+  '/:groupId/member-approval',
+  validateBody(UpdateGroupMemberApprovalSchema),
+  updateGroupMemberApprovalHandler,
 );
 
 // DELETE /api/groups/:groupId/members/:userId – remove member

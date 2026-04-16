@@ -43,8 +43,10 @@ export default function HomePage() {
     friendsForGroup,
     groupActionLoading,
     onCreateGroup,
+    onUpdateGroup,
     onAddGroupMembers,
     onUpdateGroupMemberRole,
+    onUpdateGroupMemberApproval,
     onRemoveGroupMember,
     onDisbandGroup,
     onSendMessage,
@@ -250,8 +252,10 @@ export default function HomePage() {
               onSelectConversation={onSelectConversation}
               friends={friendsForGroup}
               onCreateGroup={onCreateGroup}
+              onUpdateGroup={onUpdateGroup}
               onAddGroupMembers={onAddGroupMembers}
               onUpdateGroupMemberRole={onUpdateGroupMemberRole}
+              onUpdateGroupMemberApproval={onUpdateGroupMemberApproval}
               onRemoveGroupMember={onRemoveGroupMember}
               onDisbandGroup={onDisbandGroup}
               isCreatingGroup={groupActionLoading}
@@ -261,6 +265,7 @@ export default function HomePage() {
                 currentUserId: userId,
                 participantName: conversationInfo?.participantName,
                 participantAvatar: conversationInfo?.participantAvatar,
+                participantAvatarUrl: conversationInfo?.participantAvatarUrl,
                 isOnline: conversationInfo?.isOnline,
                 messages: messages,
                 messageStatus: messageStatus,
