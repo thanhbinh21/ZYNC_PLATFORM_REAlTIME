@@ -9,9 +9,10 @@
  */
 
 import type { Consumer, EachMessagePayload } from 'kafkajs';
-import { createConsumer, produceMessage, KAFKA_TOPICS } from '../../../infrastructure/kafka';
+import { KAFKA_TOPICS, createConsumer, produceMessage } from '../../../infrastructure/kafka';
 import { moderateMessage } from './moderation.service';
 import { getIO } from '../../../socket/gateway';
+import { MessagesService } from '../../messages/messages.service';
 import { logger } from '../../../shared/logger';
 
 const MODERATION_WORKER_GROUP_ID = 'moderation-worker-group';
@@ -100,6 +101,24 @@ export async function startModerationWorker(): Promise<void> {
             }).catch((err) =>
               logger.error('[ModerationWorker] Failed to produce moderation action', err),
             );
+
+            // 3. Immediately recall the message so it disappears from other users' screens
+            try {
+              await MessagesService.recallMessage(raw.messageId, raw.senderId);
+              if (io) {
+                // Broadcast to everyone so they see the [Tin nhắn đã được thu hồi] placeholder
+                io.to(`conv:${raw.conversationId}`).emit('message_recalled', {
+                  messageId: raw.messageId,
+                  idempotencyKey: raw.messageId,
+                  conversationId: raw.conversationId,
+                  recalledBy: 'system',
+                  recalledAt: new Date().toISOString()
+                });
+              }
+              logger.info('[ModerationWorker] Cleaned up blocked message from conversation', { messageId: raw.messageId });
+            } catch (recallErr) {
+              logger.error('[ModerationWorker] Failed to recall blocked message:', recallErr);
+            }
           }
 
           // ── Handle flagged (warning) content ──────────────────────────────

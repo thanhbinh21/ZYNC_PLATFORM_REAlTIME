@@ -26,9 +26,10 @@ import {
   unlistenToMessageDeletion,
   listenToMessageRecall,
   unlistenToMessageRecall,
-  emitForwardMessage,
   listenToMessageForwarded,
   unlistenToMessageForwarded,
+  listenToContentBlocked,
+  unlistenToContentBlocked,
 } from '@/services/socket';
 import { getMessages } from '@/services/chat';
 import { MessageType } from '@zync/shared-types';
@@ -187,8 +188,32 @@ export function useChat({
       // });
     };
 
+    const handleContentBlocked = (data: {
+      messageId: string;
+      conversationId: string;
+      reason: string;
+      confidence: number;
+    }) => {
+      if (data.conversationId !== conversationId) return;
+      setError(`Tin nhắn không thể gửi - Vi phạm cộng đồng (Confidence: ${Math.round(data.confidence * 100)}%)`);
+      
+      setMessages((prev) => 
+        prev.map(msg => 
+          (msg._id === data.messageId || msg.idempotencyKey === data.messageId) 
+          ? { 
+              ...msg, 
+              content: '[Bị chặn bởi AI Moderator]', 
+              mediaUrl: undefined,
+              type: 'system-recall' as Message['type']
+            } 
+          : msg
+        )
+      );
+    };
+
     try {
       listenToMessages(handleReceiveMessage);
+      listenToContentBlocked(handleContentBlocked);
       const socket = getSocket(token);
       socket.on('message_sent', handleMessageSent);
     } catch (err) {
@@ -198,6 +223,7 @@ export function useChat({
     return () => {
       try {
         unlistenToMessages();
+        unlistenToContentBlocked();
         const socket = getSocket(token);
         socket.off('message_sent', handleMessageSent);
       } catch (err) {

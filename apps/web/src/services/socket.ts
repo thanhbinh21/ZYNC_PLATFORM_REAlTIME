@@ -310,6 +310,14 @@ export function unlistenToTypingIndicators(): void {
   }
 }
 
+export const listenToContentBlocked = (callback: (data: any) => void) => {
+  if (socket) socket.on('content_blocked', callback);
+};
+
+export const unlistenToContentBlocked = () => {
+  if (socket) socket.off('content_blocked');
+};
+
 // ─── Delete & Recall Events ───
 
 /**
