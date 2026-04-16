@@ -154,8 +154,22 @@ export async function moderateMessage(input: ModerationInput): Promise<Moderatio
   let reason = 'No content to analyze';
   let source: ModerationResult['source'] = 'keyword_filter';
 
-  // ── Primary: Gemini AI classification ──────────────────────────────────────
-  if (isAIEnabled()) {
+  // ── 1. Fast Path: Keyword filter (Regex First) ─────────────────────────────
+  // Prioritize simple regex. If it blatantly violates rules, block it now and save AI Quota.
+  if (content && contentType === 'text') {
+    const kwResult = runKeywordFilter(content);
+    label = kwResult.label;
+    confidence = kwResult.confidence;
+    reason = kwResult.reason;
+    source = 'keyword_filter';
+
+    if (label === 'blocked') {
+      logger.debug('[Moderation] Blocked early by keyword filter', { messageId, confidence });
+    }
+  }
+
+  // ── 2. Deep Path: Gemini AI Classification (If not already blocked) ──────────
+  if (label !== 'blocked' && isAIEnabled()) {
     try {
       if (contentType === 'text' && content) {
         const result = await classifyTextWithGemini(content);
@@ -173,19 +187,9 @@ export async function moderateMessage(input: ModerationInput): Promise<Moderatio
         logger.debug('[Moderation] Gemini image classification', { messageId, label, confidence });
       }
     } catch (err) {
-      logger.warn('[Moderation] Gemini failed, falling back to keyword filter', { messageId, err: String(err) });
-      // Fall through to keyword filter
+      logger.debug('[Moderation] Gemini failed, using previous keyword filter result', { messageId, err: String(err) });
+      // Fall through; it will keep the label/confidence computed by keyword filter in Step 1
     }
-  }
-
-  // ── Fallback: Keyword filter ───────────────────────────────────────────────
-  if (source === 'keyword_filter' && content && contentType === 'text') {
-    const kwResult = runKeywordFilter(content);
-    label = kwResult.label;
-    confidence = kwResult.confidence;
-    reason = kwResult.reason;
-    source = 'keyword_filter';
-    logger.debug('[Moderation] Keyword filter result', { messageId, label, confidence });
   }
 
   const action = labelToAction(label, confidence);

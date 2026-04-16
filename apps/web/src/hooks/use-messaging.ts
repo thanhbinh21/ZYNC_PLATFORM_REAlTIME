@@ -196,19 +196,8 @@ export function useChat({
     }) => {
       if (data.conversationId !== conversationId) return;
       setError(`Tin nhắn không thể gửi - Vi phạm cộng đồng (Confidence: ${Math.round(data.confidence * 100)}%)`);
-      
-      setMessages((prev) => 
-        prev.map(msg => 
-          (msg._id === data.messageId || msg.idempotencyKey === data.messageId) 
-          ? { 
-              ...msg, 
-              content: '[Bị chặn bởi AI Moderator]', 
-              mediaUrl: undefined,
-              type: 'system-recall' as Message['type']
-            } 
-          : msg
-        )
-      );
+      // We do NOT modify the messages array here to avoid duplication.
+      // The worker also emits 'message_recalled' which will correctly map the UI for everyone via useMessageHistory hook.
     };
 
     try {
@@ -654,7 +643,7 @@ export function useMessageHistory({
           msg.idempotencyKey === data.idempotencyKey
             ? {
                 ...msg,
-                content: '[Tin nhắn đã được thu hồi]',
+                content: data.recalledBy === 'system' ? '[Bị chặn bởi AI Moderator]' : '[Tin nhắn đã được thu hồi]',
                 mediaUrl: undefined,
                 type: 'system-recall' as Message['type'],
               }

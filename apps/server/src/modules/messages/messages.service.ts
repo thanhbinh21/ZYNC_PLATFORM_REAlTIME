@@ -87,7 +87,7 @@ export class MessagesService {
     // Step 1: Check idempotency cache
     const cachedMessage = await checkIdempotencyKey(idempotencyKey);
     if (cachedMessage) {
-      logger.info(`[Idempotency] Found cached message for key: ${idempotencyKey}`);
+      logger.debug(`[Idempotency] Found cached message for key: ${idempotencyKey}`);
       return {
         _id: cachedMessage.messageId,
         conversationId,
@@ -179,7 +179,7 @@ export class MessagesService {
     });
 
     const savedMessage = await message.save();
-    logger.info(`[InsertMetadata] Created message: ${savedMessage._id}`);
+    logger.debug(`[InsertMetadata] Created message: ${savedMessage._id}`);
 
     // Step 3: Create MessageStatus (sent for sender)
     // Store exact idempotencyKey from frontend for proper ID mapping
@@ -191,7 +191,7 @@ export class MessagesService {
     });
 
     await messageStatus.save();
-    logger.info(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id} (mockId: ${mockId})`);
+    logger.debug(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id} (mockId: ${mockId})`);
 
     // Step 3.5: Apply pending status updates from Redis queue
     // During Kafka processing time, frontend may have called updateMessageStatus()
@@ -205,7 +205,7 @@ export class MessagesService {
         const pendingUpdates = await redis.hgetall(pendingKey);
 
         if (pendingUpdates && Object.keys(pendingUpdates).length > 0) {
-          logger.info(`[ApplyPending] Found ${Object.keys(pendingUpdates).length} pending updates for ${mockId}`);
+          logger.debug(`[ApplyPending] Found ${Object.keys(pendingUpdates).length} pending updates for ${mockId}`);
 
           for (const [userId, status] of Object.entries(pendingUpdates)) {
             // Skip sender (already created above)
@@ -219,7 +219,7 @@ export class MessagesService {
                 status,
               });
               await pendingStatus.save();
-              logger.info(`[ApplyPending] Applied pending status: ${userId}=${status} for message ${savedMessage._id}`);
+              logger.debug(`[ApplyPending] Applied pending status: ${userId}=${status} for message ${savedMessage._id}`);
             } catch (err) {
               // Ignore duplicate key errors (already created elsewhere)
               if ((err as any).code === 11000) {
@@ -232,7 +232,7 @@ export class MessagesService {
 
           // Clean up Redis queue
           await redis.del(pendingKey);
-          logger.info(`[ApplyPending] Cleaned up Redis queue: ${pendingKey}`);
+          logger.debug(`[ApplyPending] Cleaned up Redis queue: ${pendingKey}`);
         }
       } catch (err) {
         logger.warn('[InsertMetadata] Failed to apply pending status updates', err);
