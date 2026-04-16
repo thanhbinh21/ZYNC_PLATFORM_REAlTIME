@@ -45,4 +45,15 @@ export const socketService = {
   },
 
   getSocket: () => socket,
+
+  sendQuickReply: (conversationId: string, content: string, idempotencyKey: string) => {
+    if (!socket?.connected) return false;
+    socket.emit('send_message', {
+      conversationId,
+      content,
+      type: 'text',
+      idempotencyKey,
+    });
+    return true;
+  },
 };

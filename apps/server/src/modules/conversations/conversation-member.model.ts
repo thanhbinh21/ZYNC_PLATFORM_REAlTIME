@@ -5,6 +5,9 @@ export interface IConversationMember extends Document {
   userId: string;
   role: 'admin' | 'member';
   joinedAt: Date;
+  penaltyScore: number;
+  penaltyWindowStartedAt?: Date;
+  mutedUntil?: Date;
 }
 
 const memberSchema = new Schema<IConversationMember>({
@@ -12,6 +15,9 @@ const memberSchema = new Schema<IConversationMember>({
   userId: { type: String, required: true },
   role: { type: String, enum: ['admin', 'member'], default: 'member' },
   joinedAt: { type: Date, default: Date.now },
+  penaltyScore: { type: Number, default: 0, min: 0, max: 100 },
+  penaltyWindowStartedAt: { type: Date },
+  mutedUntil: { type: Date },
 });
 
 memberSchema.index({ conversationId: 1, userId: 1 }, { unique: true });

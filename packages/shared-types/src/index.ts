@@ -63,6 +63,7 @@ export interface Message {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  moderationWarning?: boolean;
   idempotencyKey: string;
   status: MessageStatus;
   createdAt: string;
@@ -111,6 +112,7 @@ export interface ReceiveMessagePayload {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  moderationWarning?: boolean;
   createdAt: string;
 }
 

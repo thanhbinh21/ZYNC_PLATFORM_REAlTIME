@@ -310,6 +310,22 @@ export function unlistenToTypingIndicators(): void {
   }
 }
 
+export const listenToContentBlocked = (callback: (data: any) => void) => {
+  if (socket) socket.on('content_blocked', callback);
+};
+
+export const unlistenToContentBlocked = () => {
+  if (socket) socket.off('content_blocked');
+};
+
+export const listenToContentWarning = (callback: (data: any) => void) => {
+  if (socket) socket.on('content_warning', callback);
+};
+
+export const unlistenToContentWarning = () => {
+  if (socket) socket.off('content_warning');
+};
+
 // ─── Delete & Recall Events ───
 
 /**
@@ -412,6 +428,24 @@ export function unlistenToMessageRecall(): void {
   if (socket) {
     socket.off('message_recalled');
   }
+}
+
+// ─── Reactions & Moderation ───
+
+export function listenToMessageReacted(callback: (data: any) => void): void {
+  if (socket) socket.on('message_reacted', callback);
+}
+
+export function unlistenToMessageReacted(): void {
+  if (socket) socket.off('message_reacted');
+}
+
+export function listenToUserPenaltyUpdated(callback: (data: any) => void): void {
+  if (socket) socket.on('user_penalty_updated', callback);
+}
+
+export function unlistenToUserPenaltyUpdated(): void {
+  if (socket) socket.off('user_penalty_updated');
 }
 
 // ─── Forward Message ───
@@ -691,6 +725,14 @@ export const socketService = {
   sendQuickReply,
   listenToErrors,
   unlistenToErrors,
+  listenToContentBlocked,
+  unlistenToContentBlocked,
+  listenToContentWarning,
+  unlistenToContentWarning,
+  listenToMessageReacted,
+  unlistenToMessageReacted,
+  listenToUserPenaltyUpdated,
+  unlistenToUserPenaltyUpdated,
 };
 
 export default socketService;

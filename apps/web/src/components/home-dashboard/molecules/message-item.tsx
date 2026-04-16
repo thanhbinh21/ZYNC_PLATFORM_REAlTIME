@@ -5,7 +5,6 @@ import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import type { ReactionDetailsResponse } from '@/services/chat';
 
-// ─── Icons ───
 function EllipsisVerticalIcon({ className }: { className: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -53,7 +52,19 @@ function EmptyLikeIcon({ className }: { className: string }) {
   );
 }
 
-// ─── Types ───
+function FlagIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
+const QUICK_REACTIONS = ['👍', '❤️', '🤣', '😳', '😭', '😡'];
+const DEFAULT_MENU_REACTIONS = ['❤️', '👍', '😆', '😢', '😡'];
+const PICKER_HIDE_DELAY_MS = 700;
+
 interface MessageItemProps {
   message: Message;
   isSender: boolean;
@@ -71,10 +82,9 @@ interface MessageItemProps {
   onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
   onReactionRemoveAllMine?: (message: Message) => void;
   onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
+  onReport?: (messageId: string) => void;
+  onReact?: (messageId: string, reactionType: string) => void;
 }
-
-const QUICK_REACTIONS = ['👍', '❤️', '🤣', '😳', '😭', '😡'];
-const PICKER_HIDE_DELAY_MS = 700;
 
 function ReactionDetailsModal({
   open,
@@ -100,20 +110,20 @@ function ReactionDetailsModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h4 className="text-base font-semibold text-[#dffef2]">Chi tiết cảm xúc</h4>
+          <h4 className="text-base font-semibold text-[#dffef2]">Chi tiet cam xuc</h4>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf] hover:bg-[#145845]"
           >
-            Đóng
+            Dong
           </button>
         </div>
 
         {loading ? (
-          <p className="py-6 text-center text-sm text-[#8cc4b0]">Đang tải...</p>
+          <p className="py-6 text-center text-sm text-[#8cc4b0]">Dang tai...</p>
         ) : !details || visibleRows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-[#8cc4b0]">Chưa có cảm xúc cho tin nhắn này.</p>
+          <p className="py-6 text-center text-sm text-[#8cc4b0]">Chua co cam xuc cho tin nhan nay.</p>
         ) : (
           <>
             <div className="mb-3 flex flex-wrap gap-2">
@@ -128,7 +138,7 @@ function ReactionDetailsModal({
                 <div key={row.userId} className="rounded-lg border border-[#175443] bg-[#072d24] px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <p className="truncate text-sm font-medium text-[#d6f8ec]">{row.displayName}</p>
-                    <p className="text-xs text-[#8cc4b0]">{row.totalCount} lần</p>
+                    <p className="text-xs text-[#8cc4b0]">{row.totalCount} lan</p>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {Object.entries(row.emojiCounts).map(([emoji, count]) => (
@@ -147,7 +157,6 @@ function ReactionDetailsModal({
   );
 }
 
-// ─── Main Component ───
 export function MessageItem({
   message,
   isSender,
@@ -161,6 +170,8 @@ export function MessageItem({
   onReactionUpsert,
   onReactionRemoveAllMine,
   onFetchReactionDetails,
+  onReport,
+  onReact,
 }: MessageItemProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -169,24 +180,50 @@ export function MessageItem({
   const [reactionDetails, setReactionDetails] = useState<ReactionDetailsResponse | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
-  const pickerHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pickerHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
+  const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
 
-  // Close menu when clicking outside
-  const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+  const summary = message.reactionSummary;
+  const summaryEntries = Object.entries(summary?.emojiCounts || {}).sort((a, b) => b[1] - a[1]);
+  const hasSummary = (summary?.totalCount || 0) > 0;
+  const canClearMine = (reactionUserState?.totalCount || 0) > 0;
+
+  const legacyReactionEntries = Array.isArray((message as any).reactions)
+    ? Object.entries(
+      ((message as any).reactions as Array<{ type: string }>).reduce<Record<string, number>>((acc, reaction) => {
+        if (!reaction?.type) {
+          return acc;
+        }
+        acc[reaction.type] = (acc[reaction.type] || 0) + 1;
+        return acc;
+      }, {}),
+    )
+    : [];
+
+  const menuReactions = summaryEntries.length > 0
+    ? summaryEntries.slice(0, 5).map(([emoji]) => emoji)
+    : DEFAULT_MENU_REACTIONS;
+
+  const isRecalled = message.type === 'system-recall' && message.content === '[Tin nhan da duoc thu hoi]';
+
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
       setShowMenu(false);
+    }
+    if (messageRef.current && !messageRef.current.contains(event.target as Node)) {
+      setShowReactionPicker(false);
     }
   }, []);
 
-  // Handle context menu (right-click)
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setShowMenu(!showMenu);
-  }, [showMenu]);
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    if (!isRecalled) {
+      setShowMenu((prev) => !prev);
+    }
+  }, [isRecalled]);
 
-  // Close menu on item click
   const handleDeleteForMeClick = useCallback(() => {
     onDeleteForMe?.(message._id, message.idempotencyKey);
     setShowMenu(false);
@@ -202,23 +239,22 @@ export function MessageItem({
     setShowMenu(false);
   }, [message, onForward]);
 
-  const handleReactionClick = useCallback(
-    (emoji: string) => {
-      onReactionUpsert?.(message, emoji, 1, 'picker-select');
-      setShowReactionPicker(false);
-    },
-    [message, onReactionUpsert],
-  );
-
-  const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
+  const handleReactionClick = useCallback((emoji: string, source = 'menu') => {
+    if (onReactionUpsert) {
+      onReactionUpsert(message, emoji, 1, source);
+    } else {
+      onReact?.(message._id, emoji);
+    }
+    setShowReactionPicker(false);
+    setShowMenu(false);
+  }, [message, onReactionUpsert, onReact]);
 
   const handleTriggerClick = useCallback(() => {
     if (!lastSelectedEmoji) {
       return;
     }
-
-    onReactionUpsert?.(message, lastSelectedEmoji, 1, 'trigger-click');
-  }, [lastSelectedEmoji, message, onReactionUpsert]);
+    handleReactionClick(lastSelectedEmoji, 'trigger-click');
+  }, [handleReactionClick, lastSelectedEmoji]);
 
   const handleOpenReactionDetails = useCallback(async () => {
     if (!onFetchReactionDetails) {
@@ -263,13 +299,17 @@ export function MessageItem({
     }, PICKER_HIDE_DELAY_MS);
   }, []);
 
-  // Handle click outside when menu is open
+  const handleReportClick = useCallback(() => {
+    onReport?.(message.idempotencyKey || message._id);
+    setShowMenu(false);
+  }, [message.idempotencyKey, message._id, onReport]);
+
   useEffect(() => {
-    if (showMenu) {
+    if (showMenu || showReactionPicker) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [showMenu, handleClickOutside]);
+  }, [showMenu, showReactionPicker, handleClickOutside]);
 
   useEffect(() => {
     return () => {
@@ -279,33 +319,34 @@ export function MessageItem({
     };
   }, []);
 
-  // Check if message is recalled
-  const isRecalled = message.type === 'system-recall' && message.content === '[Tin nhắn đã được thu hồi]';
-  const summary = message.reactionSummary;
-  const summaryEntries = Object.entries(summary?.emojiCounts || {}).sort((a, b) => b[1] - a[1]);
-  const hasSummary = (summary?.totalCount || 0) > 0;
-  const canClearMine = (reactionUserState?.totalCount || 0) > 0;
-
   return (
     <div
       ref={messageRef}
-      className={`group relative flex gap-3 ${isSender ? 'flex-row-reverse' : ''}`}
+      className={`group relative flex gap-3 ${isSender ? 'justify-end' : 'justify-start'}`}
       onContextMenu={handleContextMenu}
     >
-      {/* Message Bubble with Action Button */}
-      <div className="flex-1 min-w-0 relative">
-        <ReactionDetailsModal
-          open={showReactionDetails}
-          details={reactionDetails}
-          loading={reactionDetailsLoading}
-          onClose={() => setShowReactionDetails(false)}
-        />
+      <ReactionDetailsModal
+        open={showReactionDetails}
+        details={reactionDetails}
+        loading={reactionDetailsLoading}
+        onClose={() => setShowReactionDetails(false)}
+      />
 
-        {/* Action Menu Button (inside bubble) */}
-        {!isRecalled && (
-          <div className={`absolute -top-2 z-30 flex items-center gap-1 ${isSender ? '-right-1' : 'left-10'}`}>
+      <div className="relative mb-2 max-w-full min-w-0 flex-1">
+        <div className={`relative max-w-full ${isSender ? 'ml-auto w-fit' : 'w-fit'}`}>
+          {!isRecalled && (
+            <button
+              onClick={() => setShowMenu((prev) => !prev)}
+              className={`absolute top-1 ${isSender ? '-left-7' : '-right-7'} inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1a4a3e]/90 hover:bg-[#1f5946] transition-colors z-30`}
+              title="Them tuy chon"
+            >
+              <EllipsisVerticalIcon className="h-3.5 w-3.5 text-[#88b8a7]" />
+            </button>
+          )}
+
+          {!isRecalled && (
             <div
-              className="relative"
+              className={`absolute -top-2 z-30 flex items-center gap-1 ${isSender ? '-right-1' : 'left-10'}`}
               onMouseEnter={showReactionPickerNow}
               onMouseLeave={hideReactionPickerDelayed}
             >
@@ -313,7 +354,7 @@ export function MessageItem({
                 type="button"
                 onClick={handleTriggerClick}
                 className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#2f6657] bg-[#0f4335] text-xs text-[#b9e7d8] hover:bg-[#1a4a3e]"
-                title="Thả cảm xúc"
+                title="Tha cam xuc"
               >
                 {lastSelectedEmoji ? (
                   <span className="text-sm leading-none">{lastSelectedEmoji}</span>
@@ -322,7 +363,7 @@ export function MessageItem({
                 )}
               </button>
 
-              {showReactionPicker && !isRecalled && (
+              {showReactionPicker && (
                 <div
                   onMouseEnter={showReactionPickerNow}
                   onMouseLeave={hideReactionPickerDelayed}
@@ -332,7 +373,7 @@ export function MessageItem({
                     <button
                       key={emoji}
                       type="button"
-                      onClick={() => handleReactionClick(emoji)}
+                      onClick={() => handleReactionClick(emoji, 'picker-select')}
                       className="rounded-full px-1.5 py-0.5 text-base hover:bg-[#1a4a3e]"
                     >
                       {emoji}
@@ -344,37 +385,92 @@ export function MessageItem({
                       onClick={handleRemoveMineReactions}
                       className="rounded-full px-2 py-0.5 text-xs text-[#ffd2d2] hover:bg-[#5a2b2b]"
                     >
-                      Xóa
+                      Xoa
                     </button>
                   )}
                 </div>
               )}
             </div>
+          )}
 
-            {isSender && (
+          <MessageBubble
+            isOwn={isSender}
+            content={message.content}
+            type={message.type}
+            mediaUrl={message.mediaUrl}
+            moderationWarning={Boolean((message as any).moderationWarning)}
+            status={status}
+            timestamp={message.createdAt}
+            senderAvatar={senderAvatar}
+          />
+
+          {isSender && !isRecalled && showMenu && (
+            <div
+              ref={menuRef}
+              className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-[#2f6657] bg-[#0e3329] shadow-xl"
+              style={{ minWidth: '160px' }}
+            >
               <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="hidden h-6 w-6 items-center justify-center rounded-full bg-[#1a4a3e] hover:bg-[#1f5946] transition-colors group-hover:flex"
-                title="Thêm tùy chọn"
+                onClick={handleDeleteForMeClick}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
               >
-                <EllipsisVerticalIcon className="h-3.5 w-3.5 text-[#88b8a7]" />
+                <TrashIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Xoa cho toi</span>
               </button>
-            )}
-          </div>
-        )}
 
-        <MessageBubble
-          isOwn={isSender}
-          content={message.content}
-          type={message.type}
-          mediaUrl={message.mediaUrl}
-          status={status}
-          timestamp={message.createdAt}
-          senderAvatar={senderAvatar}
-        />
+              {canRecall && (
+                <button
+                  onClick={handleRecallClick}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
+                >
+                  <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+                  <span>Thu hoi</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleForwardClick}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+              >
+                <ForwardIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Chuyen tiep</span>
+              </button>
+            </div>
+          )}
+
+          {!isSender && !isRecalled && showMenu && (
+            <div
+              ref={menuRef}
+              className="absolute left-0 top-full mt-1 z-50 rounded-xl border border-[#2f6657] bg-[#0e3329] shadow-xl"
+              style={{ minWidth: '220px' }}
+            >
+              <div className="flex items-center gap-1 px-3 py-2 border-b border-[#234a3f]">
+                {menuReactions.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleReactionClick(emoji, 'receiver-menu')}
+                    className="text-xl hover:scale-125 transition-transform p-0.5"
+                    title={`React ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleReportClick}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-orange-300 hover:bg-[#1a4a3e] transition-colors"
+              >
+                <FlagIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Bao cao vi pham</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         {isRecalled && (
-          <p className="text-xs text-[#99c2b3] italic mt-1">
-            {isSender ? 'Bạn đã thu hồi tin nhắn này' : 'Tin nhắn đã được thu hồi'}
+          <p className="mt-1 text-xs italic text-[#99c2b3]">
+            {isSender ? 'Ban da thu hoi tin nhan nay' : 'Tin nhan da duoc thu hoi'}
           </p>
         )}
 
@@ -383,7 +479,8 @@ export function MessageItem({
             type="button"
             onClick={handleOpenReactionDetails}
             className={`mt-1 inline-flex items-center gap-1 rounded-full border border-[#255447] bg-[#0d342a] px-2.5 py-1 text-xs text-[#a8d8c7] hover:bg-[#16473a] ${isSender ? 'float-right' : ''}`}
-            title="Xem chi tiết cảm xúc"
+            title="Xem chi tiet cam xuc"
+            disabled={!onFetchReactionDetails}
           >
             <span className="inline-flex items-center gap-1">
               {summaryEntries.slice(0, 3).map(([emoji]) => (
@@ -394,45 +491,18 @@ export function MessageItem({
           </button>
         )}
 
-        {/* Context Menu */}
-        {isSender && !isRecalled && (
-          <div
-            ref={menuRef}
-            className={`absolute ${isSender ? 'right-0' : 'left-0'} -top-2 z-50 rounded-lg border border-[#2f6657] bg-[#12392f] shadow-lg transition-opacity ${
-              showMenu ? 'opacity-100' : 'fixed opacity-0 pointer-events-none'
-            }`}
-            style={{
-              minWidth: '160px',
-            }}
-          >
-            {/* Delete for me */}
-            <button
-              onClick={handleDeleteForMeClick}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
-            >
-              <TrashIcon className="h-4 w-4 flex-shrink-0" />
-              <span>Xóa cho tôi</span>
-            </button>
-
-            {/* Recall */}
-            {canRecall && (
+        {!isRecalled && !hasSummary && legacyReactionEntries.length > 0 && (
+          <div className={`mt-1 flex flex-wrap gap-1 ${isSender ? 'justify-end' : 'justify-start'}`}>
+            {legacyReactionEntries.map(([emoji, count]) => (
               <button
-                onClick={handleRecallClick}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
+                key={`${message._id}-${emoji}`}
+                onClick={() => handleReactionClick(emoji, 'legacy-pill')}
+                className="inline-flex items-center gap-1 rounded-full border border-[#2a6057] bg-[#0d3228] px-2 py-0.5 text-xs text-[#9dd8c5] hover:bg-[#123e32] transition-colors"
               >
-                <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                <span>Thu hồi</span>
+                <span>{emoji}</span>
+                {count > 1 && <span>{count}</span>}
               </button>
-            )}
-
-            {/* Forward */}
-            <button
-              onClick={handleForwardClick}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
-            >
-              <ForwardIcon className="h-4 w-4 flex-shrink-0" />
-              <span>Chuyển tiếp</span>
-            </button>
+            ))}
           </div>
         )}
       </div>

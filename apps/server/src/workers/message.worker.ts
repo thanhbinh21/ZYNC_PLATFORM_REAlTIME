@@ -16,6 +16,7 @@ interface RawMessage {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  moderationWarning?: boolean;
   idempotencyKey: string;
   createdAt: string;
 }
@@ -65,6 +66,7 @@ export async function startMessageWorker(): Promise<void> {
       content: string;
       type: string;
       mediaUrl?: string;
+      moderationWarning?: boolean;
       idempotencyKey: string;
       createdAt: Date;
     }> = [];
@@ -93,6 +95,7 @@ export async function startMessageWorker(): Promise<void> {
               msg.idempotencyKey,
               msg.mediaUrl,
               msg.mockId,
+              Boolean(msg.moderationWarning),
             );
             successCount++;
           } catch (err) {
@@ -159,6 +162,7 @@ export async function startMessageWorker(): Promise<void> {
             content: rawMessage.content,
             type: rawMessage.type,
             mediaUrl: rawMessage.mediaUrl,
+            moderationWarning: rawMessage.moderationWarning,
             idempotencyKey: rawMessage.idempotencyKey,
             createdAt: new Date(rawMessage.createdAt),
           });

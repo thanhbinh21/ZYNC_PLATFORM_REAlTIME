@@ -31,6 +31,8 @@ import api from '../src/services/api';
 import { colors } from '../src/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { useMessagePreview } from '../src/hooks/useMessagePreview';
+import { MessagePreviewOverlay } from '../src/components/MessagePreviewOverlay';
 
 interface Message {
   _id: string;
@@ -410,6 +412,14 @@ export default function ChatRoomScreen() {
   const [reactionSheetLoading, setReactionSheetLoading] = useState(false);
   const [reactionSheetData, setReactionSheetData] = useState<ReactionDetailsResponse | null>(null);
   const [reactionSheetTab, setReactionSheetTab] = useState('ALL');
+
+  const {
+    previews,
+    dismissPreview,
+    pauseDismiss,
+    resumeDismiss,
+    quickReply,
+  } = useMessagePreview(conversationId ?? null);
 
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1299,6 +1309,7 @@ export default function ChatRoomScreen() {
   const androidKeyboardOffset = Platform.OS === 'android'
     ? Math.max(0, keyboardHeight - insets.bottom)
     : 0;
+  const previewTopOffset = insets.top - 50;
 
   const targetMessageReactionState = targetMessage ? getReactionUserStateForMessage(targetMessage) : undefined;
   const canClearTargetReaction = Boolean(targetMessageReactionState && targetMessageReactionState.totalCount > 0);
@@ -1391,6 +1402,25 @@ export default function ChatRoomScreen() {
               }
             />
           )}
+
+          <MessagePreviewOverlay
+            previews={previews}
+            onDismiss={dismissPreview}
+            onPauseDismiss={pauseDismiss}
+            onResumeDismiss={resumeDismiss}
+            onQuickReply={quickReply}
+            topOffset={previewTopOffset}
+            onNavigate={(targetConversationId) => {
+              router.replace({
+                pathname: '/chat-room',
+                params: {
+                  conversationId: targetConversationId,
+                  name: 'Chat',
+                  isGroup: 'false',
+                },
+              });
+            }}
+          />
 
           <View style={[styles.composerContainer, { marginBottom: androidKeyboardOffset }]}>
             <TypingIndicator typingUsers={typingUsers} />

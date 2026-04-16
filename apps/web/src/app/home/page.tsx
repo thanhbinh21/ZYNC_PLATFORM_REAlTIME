@@ -64,6 +64,8 @@ export default function HomePage() {
     forwardLoading,
     onCloseForwardModal,
     onExecuteForward,
+    userPenaltyScore,
+    userMutedUntil,
   } = useHomeDashboard();
   const {
     feed,
@@ -280,6 +282,8 @@ export default function HomePage() {
                 onReactionRemoveAllMine: onReactionRemoveAllMine,
                 onFetchReactionDetails: onFetchReactionDetails,
                 reactionUserStateByMessage: reactionUserStateByMessage,
+                userPenaltyScore: userPenaltyScore,
+                userMutedUntil: userMutedUntil,
               }}
             />
             <MessagePreviewPopup

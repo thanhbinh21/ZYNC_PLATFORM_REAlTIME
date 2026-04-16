@@ -84,11 +84,12 @@ export class MessagesService {
     type: MessageType,
     idempotencyKey: string,
     mediaUrl?: string,
+    moderationWarning: boolean = false,
   ): Promise<IMessage> {
     // Step 1: Check idempotency cache
     const cachedMessage = await checkIdempotencyKey(idempotencyKey);
     if (cachedMessage) {
-      logger.info(`[Idempotency] Found cached message for key: ${idempotencyKey}`);
+      logger.debug(`[Idempotency] Found cached message for key: ${idempotencyKey}`);
       return {
         _id: cachedMessage.messageId,
         conversationId,
@@ -96,6 +97,7 @@ export class MessagesService {
         content: cachedMessage.content,
         type: cachedMessage.type,
         mediaUrl: cachedMessage.mediaUrl,
+        moderationWarning: Boolean(cachedMessage.moderationWarning),
         idempotencyKey,
         createdAt: new Date(cachedMessage.createdAt as number),
       } as unknown as IMessage;
@@ -111,6 +113,7 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
+      moderationWarning,
       createdAt: now,
     });
 
@@ -123,6 +126,7 @@ export class MessagesService {
         content,
         type,
         mediaUrl,
+        moderationWarning,
         idempotencyKey,
         createdAt: now,
       });
@@ -140,6 +144,7 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
+      moderationWarning,
       idempotencyKey,
       createdAt: now,
     } as unknown as IMessage;
@@ -160,6 +165,7 @@ export class MessagesService {
     idempotencyKey: string,
     mediaUrl?: string,
     mockId?: string,
+    moderationWarning: boolean = false,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
     const existing = await MessageModel.findOne({ idempotencyKey }).lean();
@@ -175,12 +181,13 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
+      moderationWarning,
       idempotencyKey,
       createdAt: new Date(),
     });
 
     const savedMessage = await message.save();
-    logger.info(`[InsertMetadata] Created message: ${savedMessage._id}`);
+    logger.debug(`[InsertMetadata] Created message: ${savedMessage._id}`);
 
     // Step 3: Create MessageStatus (sent for sender)
     // Store exact idempotencyKey from frontend for proper ID mapping
@@ -192,7 +199,7 @@ export class MessagesService {
     });
 
     await messageStatus.save();
-    logger.info(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id} (mockId: ${mockId})`);
+    logger.debug(`[InsertMetadata] Created MessageStatus for: ${savedMessage._id} (mockId: ${mockId})`);
 
     // Step 3.5: Apply pending status updates from Redis queue
     // During Kafka processing time, frontend may have called updateMessageStatus()
@@ -206,7 +213,7 @@ export class MessagesService {
         const pendingUpdates = await redis.hgetall(pendingKey);
 
         if (pendingUpdates && Object.keys(pendingUpdates).length > 0) {
-          logger.info(`[ApplyPending] Found ${Object.keys(pendingUpdates).length} pending updates for ${mockId}`);
+          logger.debug(`[ApplyPending] Found ${Object.keys(pendingUpdates).length} pending updates for ${mockId}`);
 
           for (const [userId, status] of Object.entries(pendingUpdates)) {
             // Skip sender (already created above)
@@ -220,7 +227,7 @@ export class MessagesService {
                 status,
               });
               await pendingStatus.save();
-              logger.info(`[ApplyPending] Applied pending status: ${userId}=${status} for message ${savedMessage._id}`);
+              logger.debug(`[ApplyPending] Applied pending status: ${userId}=${status} for message ${savedMessage._id}`);
             } catch (err) {
               // Ignore duplicate key errors (already created elsewhere)
               if ((err as any).code === 11000) {
@@ -233,7 +240,7 @@ export class MessagesService {
 
           // Clean up Redis queue
           await redis.del(pendingKey);
-          logger.info(`[ApplyPending] Cleaned up Redis queue: ${pendingKey}`);
+          logger.debug(`[ApplyPending] Cleaned up Redis queue: ${pendingKey}`);
         }
       } catch (err) {
         logger.warn('[InsertMetadata] Failed to apply pending status updates', err);
@@ -542,7 +549,7 @@ export class MessagesService {
         }
       }
 
-      logger.info(`[MessageStatus] Marked ${messageIds.length} messages as read for user ${userId}`);
+      logger.debug(`[MessageStatus] Marked ${messageIds.length} messages as read for user ${userId}`);
     } catch (error) {
       logger.error('[MessagesService] Error in markMultipleAsRead:', error);
       throw error;
@@ -554,10 +561,24 @@ export class MessagesService {
    */
   static async findMessageById(messageId: string): Promise<IMessage | null> {
     try {
-      const message = await MessageModel.findById(messageId).lean();
+      const message = await MessageModel.findById(messageId);
       return message as IMessage | null;
     } catch (error) {
       logger.error('[MessagesService] Error in findMessageById:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find message by either Mongo _id or idempotencyKey (UUID).
+   * Needed for realtime flows where the client may only know temporary key.
+   */
+  static async findMessageByReference(messageReference: string): Promise<IMessage | null> {
+    try {
+      const message = await MessageModel.findOne(this.getMessageLookupQuery(messageReference));
+      return message as IMessage | null;
+    } catch (error) {
+      logger.error('[MessagesService] Error in findMessageByReference:', error);
       throw error;
     }
   }
@@ -688,6 +709,29 @@ export class MessagesService {
    * Check if message can be recalled (within 5 minute time limit)
    */
   private static readonly RECALL_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  private static readonly RECALL_RETRY_MAX_ATTEMPTS = 6;
+  private static readonly RECALL_RETRY_BASE_DELAY_MS = 150;
+
+  private static isMessageNotFoundError(error: unknown): boolean {
+    return error instanceof BadRequestError && error.message === 'Message not found';
+  }
+
+  private static getMessageLookupQuery(messageReference: string): Record<string, unknown> {
+    if (/^[a-fA-F0-9]{24}$/.test(messageReference)) {
+      return {
+        $or: [
+          { idempotencyKey: messageReference },
+          { _id: messageReference },
+        ],
+      };
+    }
+
+    return { idempotencyKey: messageReference };
+  }
+
+  private static delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
   static canRecallMessage(message: IMessage): boolean {
     if (!message.senderId) return false;
@@ -739,30 +783,30 @@ export class MessagesService {
 
   /**
    * Recall message (delete everywhere with placeholder)
-   * @param idempotencyKey Message ID or idempotencyKey to recall (supports both synced and pending messages)
+   * @param messageReference Message ID or idempotencyKey to recall (supports both synced and pending messages)
    * @param userId User ID of sender
    * @returns Updated message document
    */
   static async recallMessage(
-    idempotencyKey: string,
+    messageReference: string,
     userId: string,
+    force: boolean = false
   ): Promise<IMessage> {
-    const message = await MessageModel.findOne({
-      idempotencyKey: idempotencyKey
-    });
+    const message = await MessageModel.findOne(this.getMessageLookupQuery(messageReference));
 
     if (!message) {
       throw new BadRequestError('Message not found');
     }
 
-    // Only sender can recall
-    if (message.senderId !== userId) {
-      throw new BadRequestError('Only sender can recall own messages');
-    }
+    // Check sender and time limit if not forced
+    if (!force) {
+      if (message.senderId !== userId) {
+        throw new BadRequestError('Only sender can recall own messages');
+      }
 
-    // Check time limit (max 5 minutes)
-    if (!this.canRecallMessage(message)) {
-      throw new BadRequestError('Message is too old to recall (max 5 minutes)');
+      if (!this.canRecallMessage(message)) {
+        throw new BadRequestError('Message is too old to recall (max 5 minutes)');
+      }
     }
 
     // Mark as deleted
@@ -781,8 +825,42 @@ export class MessagesService {
       // Ignore if already deleted
     });
 
-    logger.info(`[Recall] Message ${idempotencyKey} recalled by user ${userId}`);
+    logger.info(`[Recall] Message ${messageReference} recalled by user ${userId}`);
     return message.toObject() as unknown as IMessage;
+  }
+
+  /**
+   * Retry recall when message insert is still pending (race between workers).
+   * Only retries on "Message not found" to avoid masking real permission/business errors.
+   */
+  static async recallMessageWithRetry(
+    messageReference: string,
+    userId: string,
+    force: boolean = false,
+    maxAttempts: number = this.RECALL_RETRY_MAX_ATTEMPTS,
+  ): Promise<IMessage> {
+    const attempts = Math.max(1, maxAttempts);
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await this.recallMessage(messageReference, userId, force);
+      } catch (error) {
+        lastError = error;
+        const canRetry = this.isMessageNotFoundError(error) && attempt < attempts;
+        if (!canRetry) {
+          throw error;
+        }
+
+        const waitMs = this.RECALL_RETRY_BASE_DELAY_MS * attempt;
+        logger.warn(
+          `[Recall] Message ${messageReference} not found (attempt ${attempt}/${attempts}), retrying in ${waitMs}ms`,
+        );
+        await this.delay(waitMs);
+      }
+    }
+
+    throw (lastError ?? new BadRequestError('Message not found'));
   }
 
   /**

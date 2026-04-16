@@ -2,14 +2,17 @@ import { type Response, type NextFunction, type RequestHandler } from 'express';
 import { MessagesService } from './messages.service';
 import { MessageStatusModel } from './message-status.model';
 import { SendMessageSchema, GetMessageHistorySchema, UpdateMessageStatusSchema, MarkAsReadSchema } from './messages.schema';
-import { BadRequestError } from '../../shared/errors';
+import { BadRequestError, ForbiddenError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 import { getIO } from '../../socket/gateway';
 import { MessageType } from './message.model';
 import { ConversationsService } from '../conversations/conversations.service';
+import { reportAndReviewMessage } from '../ai/moderation/moderation.service';
+import { ConversationMemberModel } from '../conversations/conversation-member.model';
+import { refreshPenaltyWindow } from '../ai/moderation/penalty-policy';
 
-// ─── POST /api/messages/send ─────────────────────────────────────────────────
+// â”€â”€â”€ POST /api/messages/send â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const sendMessageHandler = (async (
   req: AuthRequest,
@@ -25,6 +28,27 @@ export const sendMessageHandler = (async (
 
     const { conversationId, content, type, mediaUrl, idempotencyKey } = validationResult.data;
     const userId = req.userId;
+
+    const membership = await ConversationMemberModel.findOne({
+      conversationId,
+      userId,
+    }).select('penaltyScore mutedUntil penaltyWindowStartedAt');
+
+    if (!membership) {
+      return next(new ForbiddenError('Not allowed to send message in this conversation'));
+    }
+
+    if (refreshPenaltyWindow(membership)) {
+      await membership.save();
+    }
+
+    if (membership.mutedUntil && membership.mutedUntil > new Date()) {
+      return next(
+        new ForbiddenError(
+          `Bạn đang bị tạm khóa gửi tin đến ${membership.mutedUntil.toLocaleTimeString('vi-VN')}`,
+        ),
+      );
+    }
 
     // Create message
     const message = await MessagesService.createMessage(
@@ -48,7 +72,7 @@ export const sendMessageHandler = (async (
   }
 }) as unknown as RequestHandler;
 
-// ─── GET /api/messages/:conversationId ───────────────────────────────────────
+// â”€â”€â”€ GET /api/messages/:conversationId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const getMessageHistoryHandler = (async (
   req: AuthRequest,
@@ -80,7 +104,7 @@ export const getMessageHistoryHandler = (async (
       logger.error('[UnreadCount] Failed to clear unread count on history fetch:', err);
     }
 
-    // ─── AUTO-MARK UNDELIVERED MESSAGES (ASYNC, NO AWAIT) ───
+    // â”€â”€â”€ AUTO-MARK UNDELIVERED MESSAGES (ASYNC, NO AWAIT) â”€â”€â”€
     // When user fetches old messages (before they were online), auto-mark them as delivered
     // Fire-and-forget: Don't block the response while updating DB
     try {
@@ -136,7 +160,7 @@ export const getMessageHistoryHandler = (async (
   }
 }) as unknown as RequestHandler;
 
-// ─── PUT /api/messages/:messageId/status ─────────────────────────────────────
+// â”€â”€â”€ PUT /api/messages/:messageId/status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const updateMessageStatusHandler = (async (
   req: AuthRequest,
@@ -151,8 +175,8 @@ export const updateMessageStatusHandler = (async (
       return next(new BadRequestError(`Validation error: ${validationResult.error.message}`));
     }
 
-    if (!messageId || !/^[0-9a-fA-F]{24}$/.test(messageId)) {
-      return next(new BadRequestError('Invalid message ID format'));
+    if (!messageId || messageId.trim().length === 0) {
+      return next(new BadRequestError('messageId is required'));
     }
 
     const { status } = validationResult.data;
@@ -179,7 +203,7 @@ export const updateMessageStatusHandler = (async (
   }
 }) as unknown as RequestHandler;
 
-// ─── POST /api/messages/:messageId/read ──────────────────────────────────────
+// â”€â”€â”€ POST /api/messages/:messageId/read â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const markAsReadHandler = (async (
   req: AuthRequest,
@@ -189,8 +213,8 @@ export const markAsReadHandler = (async (
   try {
     const { messageId } = req.params;
 
-    if (!messageId || !/^[0-9a-fA-F]{24}$/.test(messageId)) {
-      return next(new BadRequestError('Invalid message ID format'));
+    if (!messageId || messageId.trim().length === 0) {
+      return next(new BadRequestError('messageId is required'));
     }
 
     const userId = req.userId;
@@ -212,7 +236,7 @@ export const markAsReadHandler = (async (
   }
 }) as unknown as RequestHandler;
 
-// ─── POST /api/messages/batch/read ──────────────────────────────────────────
+// â”€â”€â”€ POST /api/messages/batch/read â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const markMultipleAsReadHandler = (async (
   req: AuthRequest,
@@ -289,6 +313,94 @@ export const getMessageReactionDetailsHandler = (async (
       conversationId: data.conversationId,
       tabs: data.tabs,
       rows: data.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+}) as unknown as RequestHandler;
+
+// ─── POST /api/messages/:messageId/report ──────────────────────────────────
+
+export const reportMessageHandler = (async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { messageId } = req.params;
+
+    if (!messageId || messageId.trim().length === 0) {
+      return next(new BadRequestError('messageId is required'));
+    }
+
+    const userId = req.userId!;
+    const action = await reportAndReviewMessage(messageId, userId);
+
+    res.json({
+      success: true,
+      messageId,
+      reportedBy: userId,
+      result: action,
+    });
+  } catch (err) {
+    next(err);
+  }
+}) as unknown as RequestHandler;
+
+// ─── POST /api/messages/:messageId/react ───────────────────────────────────
+
+export const reactMessageHandler = (async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { messageId } = req.params;
+    const { reactionType } = req.body;
+
+    if (!messageId || messageId.trim().length === 0) {
+      return next(new BadRequestError('messageId is required'));
+    }
+    if (!reactionType) {
+      return next(new BadRequestError('reactionType is required'));
+    }
+
+    const userId = req.userId!;
+    const message = await MessagesService.findMessageByReference(messageId);
+    if (!message) {
+      return next(new BadRequestError('Message not found'));
+    }
+
+    const existingIndex = message.reactions?.findIndex((r: any) => r.userId === userId && r.type === reactionType) ?? -1;
+    let actionType = 'added';
+
+    if (existingIndex > -1) {
+      message.reactions?.splice(existingIndex, 1);
+      actionType = 'removed';
+    } else {
+      if (!message.reactions) message.reactions = [];
+      message.reactions.push({ type: reactionType, userId });
+    }
+
+    await message.save();
+
+    const io = getIO();
+    if (io) {
+      io.to(`conv:${message.conversationId}`).emit('message_reacted', {
+        messageId,
+        conversationId: message.conversationId,
+        reactionType,
+        userId,
+        actionType,
+        reactions: message.reactions,
+      });
+    }
+
+    res.json({
+      success: true,
+      messageId,
+      action: actionType,
+      reactions: message.reactions,
     });
   } catch (err) {
     next(err);
