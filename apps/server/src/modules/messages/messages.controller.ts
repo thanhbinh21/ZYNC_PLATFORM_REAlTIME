@@ -7,6 +7,7 @@ import { logger } from '../../shared/logger';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 import { getIO } from '../../socket/gateway';
 import { MessageType } from './message.model';
+import { ConversationsService } from '../conversations/conversations.service';
 
 // ─── POST /api/messages/send ─────────────────────────────────────────────────
 
@@ -71,6 +72,13 @@ export const getMessageHistoryHandler = (async (
 
     // Fetch message history with status for current user
     const result = await MessagesService.getMessageHistory(conversationId, userId, cursor, limit);
+
+    // Clear unread badge for this conversation as soon as the user opens message history.
+    try {
+      await ConversationsService.clearUnreadCount(conversationId, userId);
+    } catch (err) {
+      logger.error('[UnreadCount] Failed to clear unread count on history fetch:', err);
+    }
 
     // ─── AUTO-MARK UNDELIVERED MESSAGES (ASYNC, NO AWAIT) ───
     // When user fetches old messages (before they were online), auto-mark them as delivered
