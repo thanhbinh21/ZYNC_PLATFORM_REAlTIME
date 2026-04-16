@@ -28,6 +28,21 @@ Backend phai resolve message theo thu tu:
 1. findById(messageRef) neu hop le
 2. findOne({ idempotencyKey: messageRef })
 
+### 2.3 Baseline va delta realtime (bat buoc)
+
+Phai tach ro 2 giai doan:
+- Baseline hydration: lay trang thai reaction hien tai cho cac message dang hien thi.
+- Delta realtime: nhan thay doi moi qua `reaction_updated`.
+
+Rule bat buoc:
+1. `reaction_updated` KHONG du de khoi tao trang thai cho user vao sau.
+2. Client phai hydrate baseline truoc khi tin vao delta realtime.
+3. Sau reconnect hoac nghi ngo missed-event, client phai refetch baseline cho visible messages.
+
+Nguon baseline cho phep (chon 1 hoac ket hop):
+- Cach A: API history/reaction summary.
+- Cach B: socket snapshot event khi join conversation.
+
 ## 3) Client -> Server (socket emit)
 
 ### 3.1 Event: reaction_upsert
@@ -129,6 +144,29 @@ Meaning:
 Notes:
 - `userState` la state cua actor vua thao tac.
 - Client khac update theo `summary` + `actor`.
+- Event nay la DELTA event (incremental update), khong thay the baseline hydration.
+
+### 4.4 Event (optional): reaction_snapshot
+
+Su dung cho baseline hydration khi user vao room/reconnect.
+
+```json
+{
+  "conversationId": "string",
+  "items": [
+    {
+      "messageId": "string",
+      "messageRef": "string",
+      "summary": {
+        "totalCount": 12,
+        "emojiCounts": { "👍": 3, "❤️": 4 }
+      }
+    }
+  ],
+  "snapshotTs": "ISO-8601",
+  "contractVersion": "reaction-v1"
+}
+```
 
 ### 4.3 Event: reaction_error (gui rieng cho sender)
 
@@ -142,9 +180,9 @@ Notes:
 }
 ```
 
-## 5) API fallback (optional)
+## 5) API fallback (recommended)
 
-Dung khi socket reconnect/late-join:
+Dung khi socket reconnect/late-join hoac can re-hydrate baseline:
 
 ### 5.1 GET /api/messages/:messageRef/reactions/summary
 
@@ -207,6 +245,10 @@ Response:
 
 ## 7) Optimistic update rules
 
+Prerequisite:
+- Chi optimistic day du sau khi baseline hydration da co.
+- Neu baseline chua xong, co the cho optimistic tam thoi nhung bat buoc reconcile bang snapshot/API + `reaction_updated`.
+
 ### 7.1 upsert (picker-select / trigger-click)
 
 Client sender update ngay:
@@ -256,3 +298,5 @@ Neu chua can, co the de optional cho phase 1.
 - [ ] messageRef la idempotencyKey hoat dong
 - [ ] reaction_updated co actor.actionSource
 - [ ] remove_all_mine lam lastEmoji -> null
+- [ ] late-join client hydrate baseline dung truoc khi nhan delta
+- [ ] reconnect client refetch baseline va khong bi sai tong count

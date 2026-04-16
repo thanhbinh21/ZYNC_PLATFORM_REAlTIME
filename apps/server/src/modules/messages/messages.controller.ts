@@ -266,7 +266,60 @@ export const markMultipleAsReadHandler = (async (
   }
 }) as unknown as RequestHandler;
 
-// â”€â”€â”€ POST /api/messages/:messageId/report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── GET /api/messages/:messageRef/reactions/summary ───────────────────────
+
+export const getMessageReactionSummaryHandler = (async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const messageRef = req.params['messageRef'];
+    if (!messageRef) {
+      return next(new BadRequestError('messageRef is required', 'VALIDATION_ERROR'));
+    }
+
+    const data = await MessagesService.getReactionSummary(messageRef, req.userId);
+
+    res.json({
+      success: true,
+      messageId: data.messageId,
+      conversationId: data.conversationId,
+      summary: data.summary,
+    });
+  } catch (err) {
+    next(err);
+  }
+}) as unknown as RequestHandler;
+
+// ─── GET /api/messages/:messageRef/reactions/details ───────────────────────
+
+export const getMessageReactionDetailsHandler = (async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const messageRef = req.params['messageRef'];
+    if (!messageRef) {
+      return next(new BadRequestError('messageRef is required', 'VALIDATION_ERROR'));
+    }
+
+    const data = await MessagesService.getReactionDetails(messageRef, req.userId);
+
+    res.json({
+      success: true,
+      messageId: data.messageId,
+      conversationId: data.conversationId,
+      tabs: data.tabs,
+      rows: data.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+}) as unknown as RequestHandler;
+
+// ─── POST /api/messages/:messageId/report ──────────────────────────────────
 
 export const reportMessageHandler = (async (
   req: AuthRequest,
@@ -281,22 +334,20 @@ export const reportMessageHandler = (async (
     }
 
     const userId = req.userId!;
-
-    // Call Moderation Service to evaluate with Gemini
     const action = await reportAndReviewMessage(messageId, userId);
 
     res.json({
       success: true,
       messageId,
       reportedBy: userId,
-      result: action, // pass or block
+      result: action,
     });
   } catch (err) {
     next(err);
   }
 }) as unknown as RequestHandler;
 
-// â”€â”€â”€ POST /api/messages/:messageId/react â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── POST /api/messages/:messageId/react ───────────────────────────────────
 
 export const reactMessageHandler = (async (
   req: AuthRequest,
@@ -322,7 +373,7 @@ export const reactMessageHandler = (async (
 
     const existingIndex = message.reactions?.findIndex((r: any) => r.userId === userId && r.type === reactionType) ?? -1;
     let actionType = 'added';
-    
+
     if (existingIndex > -1) {
       message.reactions?.splice(existingIndex, 1);
       actionType = 'removed';

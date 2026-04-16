@@ -6,6 +6,8 @@ import {
   updateMessageStatusHandler,
   markAsReadHandler,
   markMultipleAsReadHandler,
+  getMessageReactionSummaryHandler,
+  getMessageReactionDetailsHandler,
   reportMessageHandler,
   reactMessageHandler,
 } from './messages.controller';
@@ -18,6 +20,14 @@ messagesRouter.use(authenticate);
 // ─── POST /api/messages/send ───────── Send a new message
 
 messagesRouter.post('/send', sendMessageHandler);
+
+// ─── GET /api/messages/:messageRef/reactions/summary ──── Get reaction summary
+
+messagesRouter.get('/:messageRef/reactions/summary', getMessageReactionSummaryHandler);
+
+// ─── GET /api/messages/:messageRef/reactions/details ──── Get reaction details for modal
+
+messagesRouter.get('/:messageRef/reactions/details', getMessageReactionDetailsHandler);
 
 // ─── GET /api/messages/:conversationId ──── Get message history (paginated)
 
