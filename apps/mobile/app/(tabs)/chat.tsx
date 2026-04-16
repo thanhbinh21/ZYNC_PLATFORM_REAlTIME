@@ -45,6 +45,21 @@ interface Conversation {
   updatedAt?: string;
 }
 
+interface IncomingMessageEvent {
+  conversationId?: string;
+  senderId?: string | { _id?: string };
+  content?: string;
+  type?: string;
+  createdAt?: string;
+}
+
+function normalizeSenderId(senderId?: IncomingMessageEvent['senderId']): string {
+  if (!senderId) return '';
+  if (typeof senderId === 'string') return senderId;
+  if (typeof senderId === 'object' && senderId._id) return String(senderId._id);
+  return '';
+}
+
 function getConversationName(conv: Conversation, myUserId: string): string {
   if (conv.type === 'group') return conv.name || 'Nhóm chat';
   const other = conv.users?.find((m) => m._id !== myUserId);
@@ -142,8 +157,41 @@ export default function ChatScreen() {
     const socket = socketService.getSocket();
     if (!socket) return;
 
-    const handleNewMessage = () => {
-      void loadConversations();
+    const handleNewMessage = (payload: IncomingMessageEvent) => {
+      const conversationId = payload?.conversationId;
+      if (typeof conversationId === 'string' && conversationId) {
+        const senderId = normalizeSenderId(payload.senderId);
+        const sentAt = payload.createdAt || new Date().toISOString();
+
+        setConversations((prev) => {
+          const idx = prev.findIndex((conv) => conv._id === conversationId);
+          if (idx < 0) return prev;
+
+          const current = prev[idx];
+          const isFromOtherUser = Boolean(senderId) && senderId !== userId;
+          const currentUnread = current.unreadCount ?? current.unreadCounts?.[userId] ?? 0;
+          const nextUnread = isFromOtherUser ? currentUnread + 1 : currentUnread;
+
+          const updatedConversation: Conversation = {
+            ...current,
+            unreadCount: nextUnread,
+            unreadCounts: {
+              ...(current.unreadCounts || {}),
+              [userId]: nextUnread,
+            },
+            lastMessage: {
+              content: payload.content,
+              type: payload.type,
+              senderId,
+              sentAt,
+            },
+            updatedAt: sentAt,
+          };
+
+          const withoutCurrent = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+          return [updatedConversation, ...withoutCurrent];
+        });
+      }
     };
 
     const handleSocketReconnect = () => {
@@ -161,7 +209,7 @@ export default function ChatScreen() {
       socket.off('message_deleted_for_me', handleNewMessage);
       socket.off('connect', handleSocketReconnect);
     };
-  }, [loadConversations]);
+  }, [loadConversations, userId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
