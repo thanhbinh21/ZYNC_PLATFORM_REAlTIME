@@ -8,6 +8,7 @@ import { logger } from '../../shared/logger';
 import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
 import { getRedis } from '../../infrastructure/redis';
 import { v4 as uuidv4 } from 'uuid';
+import { MessageReactionsService } from './message-reaction.service';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -264,6 +265,20 @@ export class MessagesService {
       logger.warn('[InsertMetadata] Failed to increment unread counts', err);
     }
 
+    // Step 6: Apply any pending reactions queued before this message reached MongoDB
+    try {
+      const messageRefs = [savedMessage._id.toString(), idempotencyKey, mockId]
+        .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+      await MessageReactionsService.applyPendingReactionsForMessage({
+        messageId: savedMessage._id.toString(),
+        conversationId,
+        messageRefs,
+      });
+    } catch (err) {
+      logger.warn('[InsertMetadata] Failed to apply pending reactions', err);
+    }
+
     return savedMessage.toObject() as unknown as IMessage;
   }
 
@@ -415,8 +430,21 @@ export class MessagesService {
         };
       });
 
+      const reactionSummaries = await MessageReactionsService.getSummariesByMessageIds(messageIds);
+
+      const messagesWithStatusAndReactions = messagesWithStatus.map((msg: any) => {
+        const msgId = msg._id.toString();
+        return {
+          ...msg,
+          reactionSummary: reactionSummaries[msgId] ?? {
+            totalCount: 0,
+            emojiCounts: {},
+          },
+        };
+      });
+
       return {
-        messages: messagesWithStatus as unknown as IMessage[],
+        messages: messagesWithStatusAndReactions as unknown as IMessage[],
         nextCursor,
         hasMore,
       };
@@ -807,6 +835,64 @@ export class MessagesService {
 
     logger.info(`[Forward] Message ${originalMessageId} forwarded to ${toConversationId} by user ${userId}`);
     return forwardedMessage;
+  }
+
+  static async getReactionSummary(
+    messageRef: string,
+    userId: string,
+  ): Promise<{
+    messageId: string;
+    conversationId: string;
+    summary: { totalCount: number; emojiCounts: Record<string, number> };
+  }> {
+    const summary = await MessageReactionsService.getSummaryByMessageRef(messageRef);
+    if (!summary) {
+      throw new BadRequestError('Message not found', 'MESSAGE_NOT_FOUND');
+    }
+
+    const isMember = await ConversationMemberModel.exists({
+      conversationId: summary.conversationId,
+      userId,
+    });
+
+    if (!isMember) {
+      throw new BadRequestError('Not allowed to view reactions for this conversation', 'FORBIDDEN');
+    }
+
+    return summary;
+  }
+
+  static async getReactionDetails(
+    messageRef: string,
+    userId: string,
+  ): Promise<{
+    messageId: string;
+    conversationId: string;
+    tabs: Array<{ emoji: string; count: number }>;
+    rows: Array<{
+      userId: string;
+      displayName: string;
+      avatarUrl?: string;
+      lastEmoji: string | null;
+      totalCount: number;
+      emojiCounts: Record<string, number>;
+    }>;
+  }> {
+    const details = await MessageReactionsService.getDetailsByMessageRef(messageRef);
+    if (!details) {
+      throw new BadRequestError('Message not found', 'MESSAGE_NOT_FOUND');
+    }
+
+    const isMember = await ConversationMemberModel.exists({
+      conversationId: details.conversationId,
+      userId,
+    });
+
+    if (!isMember) {
+      throw new BadRequestError('Not allowed to view reactions for this conversation', 'FORBIDDEN');
+    }
+
+    return details;
   }
 
 }

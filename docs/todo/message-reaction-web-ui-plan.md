@@ -109,10 +109,24 @@ State theo messageId:
   - rowsByAll
   - rowsByEmoji
 
+State cap conversation:
+- reactionBaselineReady: boolean
+- baselineTs: string | null
+
 Store de xuat:
 - `reactionStateByMessageId` trong store message/chat panel.
 
 ## 4) Luong thao tac UI + Socket
+
+### 4.0 Join chat / reconnect (baseline hydration)
+
+B1. Load message history.
+B2. Hydrate reaction baseline cho visible messages:
+- tu data reaction di kem history (neu co),
+- hoac API summary/details,
+- hoac `reaction_snapshot` neu backend phat event nay.
+B3. Dat `reactionBaselineReady = true` roi moi xu ly `reaction_updated` nhu delta stream.
+B4. Khi reconnect/missed-event: refetch baseline cho visible range.
 
 ### 4.1 Chon emoji (upsert)
 
@@ -126,6 +140,9 @@ B3. Client optimistic update ngay:
 B4. Emit socket `reaction_upsert` voi payload:
 - requestId, conversationId, messageRef, emoji, delta, idempotencyKey.
 B5. Nhan `reaction_updated` tu server -> reconcile state.
+
+Note:
+- Neu baseline chua ready, optimistic update van co the hien tam, nhung phai reconcile lai sau hydration.
 
 ### 4.2 Xoa het reaction cua toi (nut X)
 
@@ -188,6 +205,10 @@ Event `reaction_updated` nen tra:
   - myLastEmoji
 - updatedAt
 
+Luu y:
+- `reaction_updated` la delta event, khong thay cho initial snapshot.
+- Web can co luong baseline hydration de user vao sau thay dung state.
+
 Neu khong tra userState day du:
 - frontend can tu tinh tu local state + summary.
 
@@ -199,6 +220,7 @@ Neu khong tra userState day du:
 4. Message bi recall/delete trong luc dang react.
 5. Out-of-order event (dung updatedAt/version de reconcile).
 6. User click trigger lastEmoji lien tuc nhanh (coalesce delta + idempotency).
+7. Virtualized list: message moi mount phai co du lieu baseline truoc khi render summary on-screen.
 
 ## 8) Performance
 
@@ -231,6 +253,11 @@ Neu khong tra userState day du:
 - [ ] Client A react -> Client B update ngay.
 - [ ] Client A remove all mine -> Client B cap nhat dung.
 - [ ] Client A quick-add bang trigger -> Client B thay doi tong count dung.
+
+### 9.5 Baseline hydration
+- [ ] User vao sau van thay dung reaction cu (khong can doi user khac react).
+- [ ] Reconnect xong state reaction duoc reconcile dung.
+- [ ] Virtualized message range moi render khong hien sai 0 khi baseline chua ve.
 
 ## 10) Task checklist web
 

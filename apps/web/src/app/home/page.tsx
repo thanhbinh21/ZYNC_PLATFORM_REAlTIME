@@ -55,6 +55,10 @@ export default function HomePage() {
     onDeleteMessageForMe,
     onRecallMessage,
     onForwardMessage,
+    onReactionUpsert,
+    onReactionRemoveAllMine,
+    onFetchReactionDetails,
+    reactionUserStateByMessage,
     forwardModalOpen,
     forwardingMessage,
     forwardLoading,
@@ -272,6 +276,10 @@ export default function HomePage() {
                 onDeleteMessageForMe: onDeleteMessageForMe,
                 onRecallMessage: onRecallMessage,
                 onForwardMessage: onForwardMessage,
+                onReactionUpsert: onReactionUpsert,
+                onReactionRemoveAllMine: onReactionRemoveAllMine,
+                onFetchReactionDetails: onFetchReactionDetails,
+                reactionUserStateByMessage: reactionUserStateByMessage,
               }}
             />
             <MessagePreviewPopup

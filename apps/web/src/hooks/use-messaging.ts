@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import {
@@ -524,7 +524,7 @@ interface UseMessageHistoryReturn {
   error: string | null;
   fetchMessages: () => Promise<void>;
   loadMore: () => Promise<void>;
-  setMessages: (messages: Message[]) => void;
+  setMessages: Dispatch<SetStateAction<Message[]>>;
 }
 
 export function useMessageHistory({

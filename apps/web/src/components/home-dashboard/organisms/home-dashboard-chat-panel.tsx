@@ -7,6 +7,7 @@ import { MessageItem } from '../molecules/message-item';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
+import type { ReactionDetailsResponse } from '@/services/chat';
 
 // ==================== ICONS ====================
 
@@ -50,6 +51,14 @@ interface ChatPanelProps {
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
   onForwardMessage?: (message: Message) => void;
+  onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
+  onReactionRemoveAllMine?: (message: Message) => void;
+  onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
+  reactionUserStateByMessage?: Record<string, {
+    lastEmoji: string | null;
+    totalCount: number;
+    emojiCounts: Record<string, number>;
+  }>;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -177,6 +186,10 @@ function ChatPanel({
   onDeleteMessageForMe,
   onRecallMessage,
   onForwardMessage,
+  onReactionUpsert,
+  onReactionRemoveAllMine,
+  onFetchReactionDetails,
+  reactionUserStateByMessage = {},
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -297,6 +310,10 @@ function ChatPanel({
                 onDeleteForMe={onDeleteMessageForMe}
                 onRecall={onRecallMessage}
                 onForward={onForwardMessage}
+                reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
+                onReactionUpsert={onReactionUpsert}
+                onReactionRemoveAllMine={onReactionRemoveAllMine}
+                onFetchReactionDetails={onFetchReactionDetails}
               />
             ))}
 
@@ -314,7 +331,9 @@ function ChatPanel({
 
       {/* Input Area */}
       <MessageInput
-        onSend={onSendMessage}
+        onSend={(content, type, mediaUrl) => {
+          void onSendMessage(content, type as MessageType, mediaUrl);
+        }}
         onStartTyping={onStartTyping}
         onStopTyping={onStopTyping}
         isLoading={isLoading}

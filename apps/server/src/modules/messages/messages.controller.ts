@@ -241,3 +241,56 @@ export const markMultipleAsReadHandler = (async (
     next(err);
   }
 }) as unknown as RequestHandler;
+
+// ─── GET /api/messages/:messageRef/reactions/summary ───────────────────────
+
+export const getMessageReactionSummaryHandler = (async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const messageRef = req.params['messageRef'];
+    if (!messageRef) {
+      return next(new BadRequestError('messageRef is required', 'VALIDATION_ERROR'));
+    }
+
+    const data = await MessagesService.getReactionSummary(messageRef, req.userId);
+
+    res.json({
+      success: true,
+      messageId: data.messageId,
+      conversationId: data.conversationId,
+      summary: data.summary,
+    });
+  } catch (err) {
+    next(err);
+  }
+}) as unknown as RequestHandler;
+
+// ─── GET /api/messages/:messageRef/reactions/details ───────────────────────
+
+export const getMessageReactionDetailsHandler = (async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const messageRef = req.params['messageRef'];
+    if (!messageRef) {
+      return next(new BadRequestError('messageRef is required', 'VALIDATION_ERROR'));
+    }
+
+    const data = await MessagesService.getReactionDetails(messageRef, req.userId);
+
+    res.json({
+      success: true,
+      messageId: data.messageId,
+      conversationId: data.conversationId,
+      tabs: data.tabs,
+      rows: data.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+}) as unknown as RequestHandler;
