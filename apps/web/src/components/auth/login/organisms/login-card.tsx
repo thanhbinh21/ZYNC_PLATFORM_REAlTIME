@@ -17,6 +17,7 @@ interface LoginCardProps extends Pick<
   | 'onStartRecovery'
   | 'onCancelRecovery'
   | 'onIdentifierChange'
+  | 'onUsernameChange'
   | 'onDisplayNameChange'
   | 'onPasswordChange'
   | 'onOtpChange'
@@ -52,6 +53,7 @@ export function LoginCard({
   onStartRecovery,
   onCancelRecovery,
   onIdentifierChange,
+  onUsernameChange,
   onDisplayNameChange,
   onPasswordChange,
   onOtpChange,
@@ -92,16 +94,16 @@ export function LoginCard({
   };
 
   return (
-    <section className="relative z-10 w-full max-w-[332px] rounded-[28px] border border-[#16513f] bg-[linear-gradient(160deg,rgba(12,68,54,0.92),rgba(8,52,42,0.92))] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:max-w-[430px] sm:p-9">
+    <section className="zync-glass-panel zync-glass-panel-strong zync-glass-floating relative z-10 w-full max-w-[332px] rounded-[28px] p-8 sm:max-w-[430px] sm:p-9">
       <h2 className="font-ui-title max-w-[12ch] text-balance text-[clamp(2.6rem,4.2vw,4.1rem)] font-semibold leading-[1.03] tracking-[-0.008em] text-[#d6eee6]">{title}</h2>
-      <p className="font-ui-content mt-3 max-w-[32ch] text-balance text-[clamp(0.95rem,1.35vw,1.25rem)] leading-[1.35] text-[#9ec0b5]">{subtitle}</p>
+      <p className="font-ui-content mt-3 max-w-[32ch] text-balance text-[clamp(0.95rem,1.35vw,1.25rem)] leading-[1.35] text-[#c6e6dc]">{subtitle}</p>
 
-      <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl border border-[#185343] bg-[#08362d] p-1">
+      <div className="zync-glass-subtle mt-6 grid grid-cols-2 gap-2 rounded-xl border-[#87f7ce]/24 bg-[#0b3f33]/58 p-1">
         <button
           type="button"
           onClick={() => onModeChange('login')}
           className={`font-ui-title h-9 rounded-lg text-sm font-semibold transition ${
-            mode === 'login' ? 'bg-[#2dc99b] text-[#063026]' : 'text-[#9cc1b5] hover:bg-[#0d4a3c]'
+            mode === 'login' ? 'bg-[#7effd5] text-[#04362a]' : 'text-[#d3efe4] hover:bg-[#17604b]/62'
           }`}
         >
           {loginTabLabel}
@@ -110,7 +112,7 @@ export function LoginCard({
           type="button"
           onClick={() => onModeChange('register')}
           className={`font-ui-title h-9 rounded-lg text-sm font-semibold transition ${
-            mode === 'register' ? 'bg-[#2dc99b] text-[#063026]' : 'text-[#9cc1b5] hover:bg-[#0d4a3c]'
+            mode === 'register' ? 'bg-[#7effd5] text-[#04362a]' : 'text-[#d3efe4] hover:bg-[#17604b]/62'
           }`}
         >
           {registerTabLabel}
@@ -125,13 +127,23 @@ export function LoginCard({
         }}
       >
         <FormField
-          label={isRegister ? 'Số điện thoại hoặc email' : 'Email đăng nhập'}
+          label="Email đăng nhập"
           type="text"
-          placeholder={isRegister ? 'Nhập số điện thoại hoặc email' : 'Nhập email đã đăng ký'}
+          placeholder="Nhập email đã đăng ký"
           value={values.identifier}
           disabled={isVerifyStep}
           onChange={onIdentifierChange}
         />
+
+        {isRegister && !isVerifyStep ? (
+          <FormField
+            label="@Username"
+            type="text"
+            placeholder="Ví dụ: zync.user"
+            value={values.username}
+            onChange={onUsernameChange}
+          />
+        ) : null}
 
         {(isRegister || isPasswordOtpLogin || isRecoveryFlow) ? (
           <FormField
@@ -183,24 +195,24 @@ export function LoginCard({
         ) : null}
 
         {infoMessage ? (
-          <p className="font-ui-content rounded-lg border border-[#3a876d] bg-[#154335]/60 px-3 py-2 text-sm text-[#c8f3e2]">{infoMessage}</p>
+          <p className="font-ui-content rounded-lg border border-[#8dfad3]/30 bg-[#1a5a48]/52 px-3 py-2 text-sm text-[#e7fff6]">{infoMessage}</p>
         ) : null}
 
         {errorMessage ? (
-          <p className="font-ui-content rounded-lg border border-[#b75662] bg-[#601e29]/55 px-3 py-2 text-sm text-[#ffcccf]">{errorMessage}</p>
+          <p className="font-ui-content rounded-lg border border-[#ff8f9c]/34 bg-[#6d2834]/58 px-3 py-2 text-sm text-[#ffe4e7]">{errorMessage}</p>
         ) : null}
 
         <PrimaryButton isSubmitting={isSubmitting} label={submitLabel} />
 
         {currentUserName ? (
-          <div className="space-y-3 rounded-lg border border-[#2f745f] bg-[#0d3d31]/70 p-3">
-            <p className="font-ui-content text-sm text-[#c0ebde]">Đang đăng nhập với tài khoản: <span className="font-ui-title font-semibold">{currentUserName}</span></p>
+          <div className="zync-glass-subtle space-y-3 rounded-lg border-[#7ff4ca]/25 bg-[#0d3d31]/58 p-3">
+            <p className="font-ui-content text-sm text-[#e7fff7]">Đang đăng nhập với tài khoản: <span className="font-ui-title font-semibold">{currentUserName}</span></p>
             <button
               type="button"
               onClick={() => {
                 void onLogout();
               }}
-              className="font-ui-title h-9 w-full rounded-lg border border-[#2f8f73] text-sm font-semibold text-[#a7dccc] transition hover:bg-[#125141]"
+              className="font-ui-title h-9 w-full rounded-lg border border-[#97ffdb]/35 text-sm font-semibold text-[#d6fff1] transition hover:bg-[#125141]/72"
             >
               Đăng xuất
             </button>
@@ -208,10 +220,10 @@ export function LoginCard({
         ) : null}
       </form>
 
-      <div className="font-ui-meta my-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6f988b]">
-        <span className="h-px flex-1 bg-[#205647]" />
+      <div className="font-ui-meta my-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#b0d4c8]">
+        <span className="h-px flex-1 bg-[#77f7cf]/30" />
         <span>{socialTitle}</span>
-        <span className="h-px flex-1 bg-[#205647]" />
+        <span className="h-px flex-1 bg-[#77f7cf]/30" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -223,12 +235,12 @@ export function LoginCard({
         <SocialButton label="Apple" disabled />
       </div>
 
-      <p className="font-ui-content mt-8 text-center text-sm text-[#8fb6aa]">
+      <p className="font-ui-content mt-8 text-center text-sm text-[#d0ebe1]">
         {isRegister ? loginHint : registerHint}{' '}
         <button
           type="button"
           onClick={() => onModeChange(isRegister ? 'login' : 'register')}
-          className="font-ui-title font-semibold text-[#57d9ad] transition hover:text-[#b6ffdf]"
+          className="font-ui-title font-semibold text-[#91ffda] transition hover:text-[#d8fff0]"
         >
           {isRegister ? loginHintAction : registerHintAction}
         </button>

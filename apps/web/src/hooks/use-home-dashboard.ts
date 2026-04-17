@@ -25,7 +25,7 @@ import {
   updateGroupMemberRole,
 } from '@/services/groups';
 import { getSocket } from '@/services/socket';
-import { useChat, useMessageHistory } from '@/hooks/use-messaging';
+import { useChat, useMessageHistory, type SendMessageOptions } from '@/hooks/use-messaging';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import type { MessageType } from '@zync/shared-types';
@@ -100,6 +100,7 @@ export function useHomeDashboard() {
     typingUsers,
     messageStatus,
     sendMessage,
+    cancelPendingMessage,
     markAsRead,
     startTyping,
     stopTyping,
@@ -254,19 +255,40 @@ export function useHomeDashboard() {
 
   // Subscribe to new messages from useChat and add them to messageHistory
   useEffect(() => {
-    if (messages.length > 0) {
-      const latestMessage = messages[messages.length - 1];
-
-      messageHistory.setMessages((prev) => {
-        const exists = prev.some(
-          (msg) => msg._id === latestMessage._id || msg.idempotencyKey === latestMessage.idempotencyKey,
-        );
-        if (exists) {
-          return prev;
-        }
-        return [...prev, latestMessage];
-      });
+    if (messages.length === 0) {
+      return;
     }
+
+    messageHistory.setMessages((prev) => {
+      const merged = new Map<string, Message>();
+
+      prev.forEach((msg) => {
+        const key = String(msg.idempotencyKey || msg._id);
+        merged.set(key, msg);
+      });
+
+      messages.forEach((msg) => {
+        const key = String(msg.idempotencyKey || msg._id);
+        const existing = merged.get(key);
+
+        if (!existing) {
+          merged.set(key, msg);
+          return;
+        }
+
+        merged.set(key, {
+          ...existing,
+          ...msg,
+          _id: msg._id || existing._id,
+          idempotencyKey: msg.idempotencyKey || existing.idempotencyKey,
+          createdAt: msg.createdAt || existing.createdAt,
+        });
+      });
+
+      return Array.from(merged.values()).sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+    });
   }, [messages, messageHistory.setMessages]);
 
   useEffect(() => {
@@ -1027,18 +1049,23 @@ export function useHomeDashboard() {
 
   // Send message handler
   const handleSendMessage = useCallback(
-    async (content: string, type: MessageType, mediaUrl?: string) => {
+    async (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => {
       if (!selectedConversationId || !userId) return;
 
       try {
         // Use sendMessage from useChat hook
-        await sendMessage(content, type, mediaUrl);
+        return await sendMessage(content, type, mediaUrl, options);
       } catch (error) {
         console.error('Failed to send message:', error);
+        return null;
       }
     },
     [selectedConversationId, userId, sendMessage],
   );
+
+  const handleCancelPendingMessage = useCallback((idempotencyKey: string) => {
+    cancelPendingMessage(idempotencyKey);
+  }, [cancelPendingMessage]);
 
   // Start typing handler
   const handleStartTyping = useCallback(() => {
@@ -1312,6 +1339,7 @@ export function useHomeDashboard() {
     onRemoveGroupMember: removeGroupMemberConversation,
     onDisbandGroup: disbandGroupConversation,
     onSendMessage: handleSendMessage,
+    onCancelPendingMessage: handleCancelPendingMessage,
     onStartTyping: handleStartTyping,
     onStopTyping: handleStopTyping,
     onDeleteMessageForMe: deleteMessageForMe,

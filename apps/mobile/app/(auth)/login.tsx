@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, Alert, KeyboardAvoidingView, Platform, Touchabl
 import { useRouter } from 'expo-router';
 import { Input } from '../../src/ui/Input';
 import { Button } from '../../src/ui/Button';
+import { GlassPanel } from '../../src/ui/GlassPanel';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import api from '../../src/services/api';
@@ -28,7 +29,7 @@ export default function LoginScreen() {
       // Navigate to verify OTP screen passing state
       router.push({
         pathname: '/(auth)/verify-otp',
-        params: { identifier: email, password, flow: 'login' },
+        params: { email, password, flow: 'login' },
       });
     } catch (error: any) {
       Alert.alert('Lỗi', error.response?.data?.message || 'Đăng nhập thất bại');
@@ -47,11 +48,12 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.formContainer}>
+        <GlassPanel style={styles.formCard}>
         <Text style={styles.title}>Đăng nhập vào Zync</Text>
         <Text style={styles.subtitle}>Kết nối và trò chuyện thời gian thực</Text>
 
         <Input
-          label="Email hoặc Số điện thoại"
+          label="Email"
           placeholder="Nhập email của bạn..."
           value={email}
           onChangeText={setEmail}
@@ -85,6 +87,7 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        </GlassPanel>
       </View>
     </KeyboardAvoidingView>
     </LinearGradient>
@@ -101,15 +104,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  formCard: {
+    padding: 22,
+    borderRadius: 26,
+  },
   title: {
     ...typography.h2,
-    color: colors.primary,
+    color: '#93ffdb',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
-    color: colors.textMuted,
+    color: '#c8e5db',
     marginBottom: 32,
     textAlign: 'center',
   },
@@ -119,10 +126,10 @@ const styles = StyleSheet.create({
   },
   linkText: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: '#c8e5db',
   },
   linkTextBold: {
-    color: colors.primary,
+    color: '#9effda',
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
 });

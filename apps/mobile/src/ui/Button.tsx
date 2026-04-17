@@ -84,14 +84,26 @@ const styles = StyleSheet.create({
   },
   primaryContainer: {
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: '#9effda',
+    shadowColor: colors.glassGlow,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    elevation: 5,
   },
   secondaryContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glassPanel,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
   },
   outlineContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: colors.glassSoft,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
   },
   ghostContainer: {
     backgroundColor: 'transparent',
@@ -107,7 +119,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   outlineText: {
-    color: colors.primary,
+    color: '#a8ffe1',
   },
   disabled: {
     opacity: 0.5,

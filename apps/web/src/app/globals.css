@@ -18,6 +18,13 @@
 	--zync-bg-soft: #0c7b58;
 	--zync-dashboard-bg: radial-gradient(circle at 72% 18%, #0d3a30 0, #031e18 48%, #021612 100%);
 	--zync-message-font-size: 1.02rem;
+	--zync-glass-bg-ultra: rgba(198, 255, 228, 0.06);
+	--zync-glass-bg-soft: rgba(9, 78, 58, 0.5);
+	--zync-glass-bg-strong: rgba(3, 35, 26, 0.76);
+	--zync-glass-border: rgba(124, 255, 196, 0.24);
+	--zync-glass-border-soft: rgba(124, 255, 196, 0.16);
+	--zync-glass-shadow: 0 22px 60px rgba(0, 0, 0, 0.36), 0 4px 18px rgba(24, 205, 143, 0.2);
+	--zync-glass-shadow-floating: 0 34px 96px rgba(0, 0, 0, 0.5), 0 6px 28px rgba(74, 245, 179, 0.22);
 }
 
 [data-zync-theme='dark'] {
@@ -115,6 +122,59 @@ html {
 		padding-left: 2.5rem;
 		padding-right: 2.5rem;
 	}
+}
+
+.zync-glass-panel {
+	position: relative;
+	overflow: hidden;
+	border: 1px solid var(--zync-glass-border-soft);
+	background: linear-gradient(155deg, var(--zync-glass-bg-ultra), var(--zync-glass-bg-soft));
+	backdrop-filter: blur(32px) saturate(165%);
+	-webkit-backdrop-filter: blur(32px) saturate(165%);
+	box-shadow: var(--zync-glass-shadow);
+	isolation: isolate;
+}
+
+.zync-glass-panel::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(120deg, rgba(214, 255, 236, 0.16), rgba(178, 255, 222, 0.05) 32%, transparent 62%);
+	opacity: 0.3;
+}
+
+.zync-glass-panel::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: radial-gradient(120% 80% at 84% 18%, rgba(126, 255, 201, 0.24), rgba(126, 255, 201, 0) 52%);
+	opacity: 0.44;
+}
+
+.zync-glass-panel-strong {
+	border: 1px solid var(--zync-glass-border);
+	background: linear-gradient(148deg, rgba(194, 255, 226, 0.1), var(--zync-glass-bg-strong));
+	box-shadow: var(--zync-glass-shadow-floating);
+	backdrop-filter: blur(42px) saturate(180%);
+	-webkit-backdrop-filter: blur(42px) saturate(180%);
+}
+
+.zync-glass-subtle {
+	border: 1px solid rgba(124, 255, 196, 0.14);
+	background: linear-gradient(155deg, rgba(194, 255, 226, 0.06), rgba(8, 63, 47, 0.48));
+	backdrop-filter: blur(24px) saturate(145%);
+	-webkit-backdrop-filter: blur(24px) saturate(145%);
+}
+
+.zync-glass-floating {
+	box-shadow: var(--zync-glass-shadow-floating);
+	transform: translateZ(0);
+}
+
+.zync-glass-divider {
+	border-color: var(--zync-glass-border-soft);
 }
 
 .zync-layer {

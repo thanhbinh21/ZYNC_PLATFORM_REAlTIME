@@ -12,9 +12,9 @@ export function HomeScreen({ data }: HomeScreenProps) {
       <div className="zync-layer zync-layer-left" aria-hidden />
       <div className="zync-layer zync-layer-right" aria-hidden />
 
-      <header className="fixed left-0 right-0 top-0 z-30 border-b border-white/10 bg-[#06382d]/55 backdrop-blur-xl">
+      <header className="fixed left-0 right-0 top-0 z-30 border-b zync-glass-divider bg-[#06382d]/42 backdrop-blur-2xl">
         <div className="zync-page-container py-3">
-          <div className="rounded-full border border-white/15 bg-white/5 px-4 py-3">
+          <div className="zync-glass-panel rounded-full px-4 py-3">
             <div className="flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3">
               <span className="relative block h-9 w-9 overflow-hidden rounded-xl bg-[#0a3e31] ring-1 ring-[#57d2a5]/40">
@@ -70,12 +70,12 @@ export function HomeScreen({ data }: HomeScreenProps) {
             </div>
           </div>
 
-          <aside className="zync-reveal-right zync-reveal-delay-1 rounded-[2rem] border border-white/15 bg-white/8 p-6 backdrop-blur-xl">
+          <aside className="zync-reveal-right zync-reveal-delay-1 zync-glass-panel zync-glass-floating rounded-[2rem] p-6">
             <p className="font-ui-title text-lg text-[#e6fff5]">{data.globalTitle}</p>
-            <p className="font-ui-content mt-3 text-sm leading-7 text-[#b5ddcc]">{data.globalSubtitle}</p>
+            <p className="font-ui-content mt-3 text-sm leading-7 text-[#d1eee2]">{data.globalSubtitle}</p>
             <div className="mt-6 space-y-3">
               {data.metrics.map((metric) => (
-                <div key={metric.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#0b4738]/55 px-4 py-3">
+                <div key={metric.id} className="zync-glass-subtle flex items-center justify-between rounded-2xl border-[#a7ffe0]/18 bg-[#0b4738]/46 px-4 py-3">
                   <p className="font-ui-content text-sm text-[#c6eddd]">{metric.label}</p>
                   <p className="font-ui-title text-lg text-[#ecfff8]">{metric.value}</p>
                 </div>
@@ -96,27 +96,27 @@ export function HomeScreen({ data }: HomeScreenProps) {
           ))}
         </section>
 
-        <section id="platforms" className="zync-reveal-up zync-reveal-delay-2 mt-10 rounded-[2rem] border border-[#65d8b1]/35 bg-gradient-to-r from-[#0a4738]/80 to-[#0d5844]/70 p-7 backdrop-blur-xl">
+        <section id="platforms" className="zync-reveal-up zync-reveal-delay-2 zync-glass-panel zync-glass-panel-strong mt-10 rounded-[2rem] p-7">
           <h2 className="font-ui-title max-w-[26ch] text-balance text-[clamp(1.5rem,3vw,2.15rem)] leading-tight text-[#ecfff8]">
             {data.ctaBlockTitle}
           </h2>
-          <p className="font-ui-content mt-3 max-w-[56ch] text-balance text-base leading-7 text-[#b8dfcf]">{data.ctaBlockSubtitle}</p>
+          <p className="font-ui-content mt-3 max-w-[56ch] text-balance text-base leading-7 text-[#d4efe4]">{data.ctaBlockSubtitle}</p>
           <div className="mt-6">
             <HomeCta label={data.ctaBlockButton} href="/auth" variant="primary" />
           </div>
         </section>
 
-        <footer id="pricing" className="zync-reveal-up zync-reveal-delay-3 mt-8 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-5 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
+        <footer id="pricing" className="zync-reveal-up zync-reveal-delay-3 zync-glass-panel mt-8 flex flex-col gap-4 rounded-3xl px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="font-ui-brand text-base tracking-wide text-[#d7f6ea]">{data.footerBrand}</p>
-            <p className="font-ui-content mt-1 text-sm text-[#9fcab9]">{data.footerCopyright}</p>
+            <p className="font-ui-content mt-1 text-sm text-[#c8e6dc]">{data.footerCopyright}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             {data.footerLinks.map((item) => (
               <a
                 key={item.id}
                 href={item.href}
-                className="font-ui-content rounded-full border border-white/15 px-4 py-1.5 text-sm text-[#cdefe2] transition hover:bg-white/10"
+                className="font-ui-content rounded-full border border-[#b7ffe6]/30 bg-[#07382f]/38 px-4 py-1.5 text-sm text-[#e6fff5] transition hover:bg-[#0f4b3d]/58"
               >
                 {item.label}
               </a>

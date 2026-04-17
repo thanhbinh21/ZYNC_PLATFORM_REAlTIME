@@ -22,7 +22,7 @@ export default function AuthPage() {
   if (isPageLoading) {
     return (
       <main className="zync-auth-shell flex min-h-screen items-center justify-center text-[#dffcf2]">
-        <div className="flex w-[92%] max-w-md flex-col gap-4 rounded-3xl border border-[#1b5a48] bg-[#0b362c]/70 p-6 backdrop-blur-xl">
+        <div className="zync-glass-panel zync-glass-panel-strong flex w-[92%] max-w-md flex-col gap-4 rounded-3xl p-6">
           <div className="h-3 w-28 animate-pulse rounded-full bg-[#2ed9ae]/50" />
           <div className="h-10 w-full animate-pulse rounded-xl bg-[#124738]" />
           <div className="h-10 w-full animate-pulse rounded-xl bg-[#124738]" />

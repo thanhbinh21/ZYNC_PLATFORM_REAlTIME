@@ -40,7 +40,6 @@ function extractOtpIdentifierFromBody(body: unknown): string | null {
   const payload = body as {
     identifier?: unknown;
     email?: unknown;
-    phoneNumber?: unknown;
   };
 
   const rawIdentifier =
@@ -48,9 +47,7 @@ function extractOtpIdentifierFromBody(body: unknown): string | null {
       ? payload.identifier
       : typeof payload.email === 'string'
         ? payload.email
-        : typeof payload.phoneNumber === 'string'
-          ? payload.phoneNumber
-          : null;
+        : null;
 
   if (!rawIdentifier) {
     return null;
@@ -102,7 +99,7 @@ export async function otpRateLimiter(
       if (identifierCount > OTP_RATE_LIMIT_MAX) {
         return next(
           new TooManyRequestsError(
-            `OTP rate limit exceeded for this phone/email. Max ${OTP_RATE_LIMIT_MAX} requests/${retryAfterMinutes} minutes.`,
+            `OTP rate limit exceeded for this email. Max ${OTP_RATE_LIMIT_MAX} requests/${retryAfterMinutes} minutes.`,
           ),
         );
       }

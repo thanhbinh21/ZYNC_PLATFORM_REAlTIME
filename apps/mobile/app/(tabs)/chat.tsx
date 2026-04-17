@@ -38,6 +38,7 @@ interface LastMessage {
 interface Conversation {
   _id: string;
   name?: string;
+  avatarUrl?: string;
   type: 'private' | 'group' | 'direct';
   users?: ConversationMember[];
   lastMessage?: LastMessage;
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surfaceHover,
+    backgroundColor: colors.glassPanel,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glassPanel,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.glassBorder,
@@ -455,7 +456,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
     paddingVertical: 10,
+    paddingHorizontal: 10,
     borderRadius: 16,
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
   },
   avatarContainer: {
     position: 'relative',
@@ -464,12 +469,12 @@ const styles = StyleSheet.create({
     width: 55,
     height: 55,
     borderRadius: 20,
-    backgroundColor: '#334155',
+    backgroundColor: colors.glassPanelStrong,
     justifyContent: 'center',
     alignItems: 'center',
   },
   groupAvatar: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: colors.glassSoft,
   },
   avatarText: {
     color: '#94a3b8',

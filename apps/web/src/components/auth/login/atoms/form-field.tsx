@@ -45,11 +45,11 @@ export function FormField({
 
   return (
     <label className="block">
-      <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9ab9af]">
+      <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c0e3d6]">
         <span>{label}</span>
         {rightNode}
       </div>
-      <div className="flex h-12 items-center gap-2 rounded-xl border border-[#1d5c4c] bg-[#0f4337]/70 px-3 transition focus-within:border-[#3ed8aa]">
+      <div className="zync-glass-subtle flex h-12 items-center gap-2 rounded-xl border-[#7ff0c7]/28 px-3 transition focus-within:border-[#9bffe0] focus-within:bg-[#184f40]/66">
         <FieldIcon type={type} />
         <input
           type={realType}
@@ -57,7 +57,7 @@ export function FormField({
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-full w-full bg-transparent text-[15px] text-[#d8eee6] outline-none placeholder:text-[#5f897d]"
+          className="h-full w-full bg-transparent text-[15px] text-[#eefff9] outline-none placeholder:text-[#9bc3b5]"
         />
       </div>
     </label>

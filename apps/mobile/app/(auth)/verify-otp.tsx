@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, Alert, KeyboardAvoidingView, Platform, Touchabl
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Input } from '../../src/ui/Input';
 import { Button } from '../../src/ui/Button';
+import { GlassPanel } from '../../src/ui/GlassPanel';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import api from '../../src/services/api';
@@ -13,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const login = useAuthStore(state => state.login);
-  const { identifier, password, displayName, flow } = useLocalSearchParams();
+  const { email, username, password, displayName, flow } = useLocalSearchParams();
   
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +47,7 @@ export default function VerifyOtpScreen() {
 
       if (flow === 'login') {
         const res = await api.post('/auth/login-password/verify-otp', {
-          email: identifier,
+          email,
           password: password,
           otp,
           deviceToken,
@@ -59,7 +60,8 @@ export default function VerifyOtpScreen() {
         }
       } else if (flow === 'register') {
         const res = await api.post('/auth/verify-otp', {
-          identifier,
+          email,
+          username,
           password: password,
           displayName,
           otp,
@@ -75,7 +77,7 @@ export default function VerifyOtpScreen() {
         // Implementation for forgot password
         router.replace({
           pathname: '/(auth)/forgot-password',
-          params: { step: 'reset', identifier, otp }
+          params: { step: 'reset', email, otp }
         });
       }
     } catch (error: any) {
@@ -95,8 +97,9 @@ export default function VerifyOtpScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.formContainer}>
+        <GlassPanel style={styles.formCard}>
         <Text style={styles.title}>Xác thực OTP</Text>
-        <Text style={styles.subtitle}>Mã gồm 6 chữ số đã được gửi tới {identifier}</Text>
+        <Text style={styles.subtitle}>Mã gồm 6 chữ số đã được gửi tới {email}</Text>
 
         <Input
           placeholder="Nhập mã OTP..."
@@ -117,6 +120,7 @@ export default function VerifyOtpScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 24, alignItems: 'center' }}>
           <Text style={styles.linkTextBold}>Quay lại</Text>
         </TouchableOpacity>
+        </GlassPanel>
       </View>
     </KeyboardAvoidingView>
     </LinearGradient>
@@ -126,7 +130,8 @@ export default function VerifyOtpScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   formContainer: { flex: 1, justifyContent: 'center', padding: 24, paddingBottom: 60 },
-  title: { ...typography.h2, color: colors.primary, marginBottom: 8, textAlign: 'center' },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: 32, textAlign: 'center' },
-  linkTextBold: { color: colors.primary, fontFamily: 'BeVietnamPro_600SemiBold' },
+  formCard: { padding: 22, borderRadius: 26 },
+  title: { ...typography.h2, color: '#93ffdb', marginBottom: 8, textAlign: 'center' },
+  subtitle: { ...typography.body, color: '#c8e5db', marginBottom: 32, textAlign: 'center' },
+  linkTextBold: { color: '#9effda', fontFamily: 'BeVietnamPro_600SemiBold' },
 });

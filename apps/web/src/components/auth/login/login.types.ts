@@ -2,6 +2,7 @@
 // Depends: none
 export interface LoginFormValues {
   identifier: string;
+  username: string;
   displayName: string;
   password: string;
   otp: string;
@@ -54,6 +55,7 @@ export interface LoginScreenProps {
   onStartRecovery: () => void;
   onCancelRecovery: () => void;
   onIdentifierChange: (value: string) => void;
+  onUsernameChange: (value: string) => void;
   onDisplayNameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onOtpChange: (value: string) => void;

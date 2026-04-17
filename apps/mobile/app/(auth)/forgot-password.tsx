@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, Alert, KeyboardAvoidingView, Platform, Touchabl
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Input } from '../../src/ui/Input';
 import { Button } from '../../src/ui/Button';
+import { GlassPanel } from '../../src/ui/GlassPanel';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import api from '../../src/services/api';
@@ -10,25 +11,25 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const { step, identifier: paramId, otp: paramOtp } = useLocalSearchParams();
+  const { step, email: paramEmail, otp: paramOtp } = useLocalSearchParams();
   
   const isResetStep = step === 'reset';
 
-  const [identifier, setIdentifier] = useState((paramId as string) || '');
+  const [email, setEmail] = useState((paramEmail as string) || '');
   const [newPassword, setNewPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRequestOtp = async () => {
-    if (!identifier) {
+    if (!email) {
       Alert.alert('Lỗi', 'Vui lòng nhập tài khoản');
       return;
     }
     try {
       setIsLoading(true);
-      await api.post('/auth/forgot-password/request-otp', { identifier });
+      await api.post('/auth/forgot-password/request-otp', { email });
       router.push({
         pathname: '/(auth)/verify-otp',
-        params: { identifier, flow: 'forgot' },
+        params: { email, flow: 'forgot' },
       });
     } catch (error: any) {
       Alert.alert('Lỗi', error.response?.data?.message || 'Có lỗi xảy ra');
@@ -45,7 +46,7 @@ export default function ForgotPasswordScreen() {
     try {
       setIsLoading(true);
       await api.post('/auth/forgot-password/reset', {
-        identifier,
+        email,
         otp: paramOtp,
         newPassword
       });
@@ -68,15 +69,16 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.formContainer}>
+        <GlassPanel style={styles.formCard}>
         <Text style={styles.title}>Quên mật khẩu</Text>
 
         {!isResetStep ? (
           <>
             <Input
-              label="Email hoặc Số điện thoại"
-              placeholder="Nhập thông tin khôi phục..."
-              value={identifier}
-              onChangeText={setIdentifier}
+              label="Email"
+              placeholder="Nhập email khôi phục..."
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
             />
             <Button title="Gửi mã OTP" onPress={handleRequestOtp} isLoading={isLoading} />
@@ -97,6 +99,7 @@ export default function ForgotPasswordScreen() {
         <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={{ marginTop: 24, alignItems: 'center' }}>
           <Text style={styles.linkTextBold}>Trở về trang Login</Text>
         </TouchableOpacity>
+        </GlassPanel>
       </View>
     </KeyboardAvoidingView>
     </LinearGradient>
@@ -106,6 +109,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   formContainer: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { ...typography.h2, color: colors.primary, marginBottom: 32, textAlign: 'center' },
-  linkTextBold: { color: colors.primary, fontFamily: 'BeVietnamPro_600SemiBold' },
+  formCard: { padding: 22, borderRadius: 26 },
+  title: { ...typography.h2, color: '#93ffdb', marginBottom: 32, textAlign: 'center' },
+  linkTextBold: { color: '#9effda', fontFamily: 'BeVietnamPro_600SemiBold' },
 });

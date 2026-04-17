@@ -14,7 +14,7 @@ Hệ thống nhắn tin tức thời quy mô vài nghìn người dùng, hỗ tr
 - Web app (Next.js/React) và Mobile (React Native)
 - Backend API + Real-time server (Socket.IO)
 - Redis (Pub/Sub, Presence, Cache) + Kafka (Message Queue) + MongoDB (Persistence)
-- Tích hợp: Twilio (SMS OTP), Resend (Email SMTP), FCM/APNs (Push), Cloudflare R2 / AWS S3 (Media)
+- Tích hợp: Email OTP (Resend API/SMTP), FCM/APNs (Push), Cloudflare R2 / AWS S3 (Media)
 
 ---
 
@@ -171,6 +171,8 @@ npm run dev:web
 - [x] Mở rộng luồng quên mật khẩu hỗ trợ identifier (email hoặc phone) cho tài khoản xác thực OTP <!-- done: 05/04/2026 -->
 - [x] Chuẩn hóa toggle OTP_HARDCODE: true dùng OTP cố định 123456 và không gọi mail thật, false dùng OTP thực qua provider email/SMS <!-- done: 05/04/2026 -->
 - [x] Harden cập nhật profile: validate strict payload, trim dữ liệu và chặn request rỗng cho PATCH /api/users/me <!-- done: 05/04/2026 -->
+- [x] Chuẩn hóa Auth email-only: bỏ phone ở luồng đăng ký/khôi phục, thêm `@username` duy nhất cho đăng ký + cập nhật profile, đồng bộ tìm kiếm theo `@username`/email cho Web + Mobile <!-- done: 17/04/2026 by binhdev -->
+- [ ] Bổ sung integration test cho các case trùng `@username` và luồng tìm kiếm `@username`/email trên Web + Mobile
 - [ ] Bổ sung integration test cho fallback Resend API -> SMTP khi provider lỗi
 - [x] Chuẩn hóa chiều rộng UI Web theo container dùng chung cho `/`, `/auth`, `/friends` <!-- done: 19/03/2026 -->
 - [x] Nâng cấp landing page `/` với fixed header, scroll section và bố cục chuẩn landing <!-- done: 19/03/2026 -->
@@ -185,8 +187,7 @@ npm run dev:web
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->
 - [x] Hủy kết bạn, chặn/bỏ chặn người dùng <!-- done: 19/03/2026 -->
 - [x] API danh sách bạn bè với cursor pagination <!-- done: 19/03/2026 -->
-- [x] Cache friends list trong Redis (TTL 10 phút) <!-- done: 19/03/2026 -->
-- [ ] (Optional) Đồng bộ danh bạ điện thoại
+- [x] Cache friends list trong Redis (TTL 10 phút) <!-- done: 19/03/2026 -->- [ ] (Optional) Đồng bộ danh bạ điện thoại
 - [x] Bổ sung API `GET /api/friends/requests` và `GET /api/users/search` phục vụ UI luồng kết bạn <!-- done: 19/03/2026 -->
 - [x] Dựng Friends Dashboard Web (search/send request/incoming-outgoing/list/unfriend/block) tại route `/friends` <!-- done: 19/03/2026 -->
 
@@ -232,18 +233,19 @@ npm run dev:web
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
-- [x] Tìm kiếm bạn bè theo tên/SĐT/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
+- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
 - [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
 - [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
-- [x] API `GET /api/users/:userId` trả thêm email/phone masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
+- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
 - [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
 - [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
+- [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
 - [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
 - [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
 - [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
 - [ ] Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)
-- [ ] Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance)
-- [ ] Web UI: Story bar trên dashboard (horizontal scroll, ring indicator)
+- [x] Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance) <!-- done: 17/04/2026  -->
+- [x] Web UI: Story bar trên dashboard (horizontal scroll, ring indicator) <!-- done: 17/04/2026  -->
 - [ ] Danh sách người đã xem story (Web UI cho story owner)
 
 ### Phase 7 – Notifications (Module F26)
@@ -284,12 +286,14 @@ npm run dev:web
 - [x] Typing indicator <!-- done: 12/04/2026 -->
 - [x] Media picker (expo-image-picker) + Cloudinary signed upload <!-- done: 12/04/2026 -->
 - [x] Đồng bộ chat Web ↔ Mobile: chuẩn hóa contract message/socket, hiển thị media file/image/video, sửa căn lề tin nhắn sender/receiver và fix keyboard che input trên mobile <!-- done: 12/04/2026 -->
+- [x] Hotfix Mobile media composer: chọn ảnh/video có thể nhập text kèm trước khi bấm Send, upload chạy nền và finalize bằng idempotencyKey <!-- done: 17/04/2026 by binhdev -->
+- [x] Mobile auth verify OTP: lấy Expo push token và gửi deviceToken lên backend để đăng ký thiết bị nhận thông báo <!-- done: 17/04/2026  -->
 - [ ] Push notification setup (expo-notifications + FCM/APNs)
 
 ### Phase M4 – Mobile Friends & Groups (Lõi)
 - [x] Friends tab: search bar, friend requests (incoming/outgoing), friend list <!-- done: 12/04/2026 -->
 - [ ] Quick profile view (RN bottom sheet)
-- [ ] Send/accept/reject friend request
+- [x] Send/accept/reject friend request <!-- done: 17/04/2026  -->
 - [ ] Group management: create, add/remove members, disband
 - [ ] Group info screen
 
@@ -320,17 +324,17 @@ npm run dev:web
 >
 > **Kiến trúc:** MongoDB (primary DB) ↔ Kafka (async sync) ↔ Neon PostgreSQL (vector-only DB)
 
-- [ ] Cài đặt dependencies: `@google/generative-ai`, `@neondatabase/serverless`, `pgvector`
-- [ ] Tạo `infrastructure/gemini.ts` – Gemini client singleton, config model IDs
-- [ ] Tạo `infrastructure/neon.ts` – Neon PostgreSQL connection + pgvector extension setup
-- [ ] SQL migration: tạo bảng `message_embeddings` với cột `embedding vector(768)` + HNSW index
-- [ ] Tạo `modules/ai/fallback/model-fallback.ts` – Gemini Pro → Flash → cached response chain
-- [ ] Tạo `modules/ai/guards/prompt-guard.ts` – Input sanitization + injection detection (3 layers: regex + system prompt + output validation)
-- [ ] Tạo `modules/ai/guards/rate-limiter.ts` – AI-specific rate limit (10 req/min/user, Redis sliding window)
-- [ ] Tạo `modules/ai/embeddings/embedding.service.ts` – text-embedding-004 wrapper
-- [ ] Tạo `modules/ai/embeddings/neon-vector.service.ts` – pgvector CRUD (insert, cosine search, delete)
-- [ ] Thêm env vars: `GEMINI_API_KEY`, `NEON_DATABASE_URL`, `AI_MODEL_PRIMARY`, `AI_MODEL_FALLBACK`, `AI_RATE_LIMIT_PER_MINUTE`
-- [ ] Unit test cho prompt guard (10+ adversarial cases) + model fallback (timeout, quota exceeded)
+- [x] Cài đặt dependencies: `@google/generative-ai`, `@neondatabase/serverless`, `pgvector` <!-- done: 17/04/2026  -->
+- [x] Tạo `infrastructure/gemini.ts` – Gemini client singleton, config model IDs <!-- done: 17/04/2026 by binhdev -->
+- [x] Tạo `infrastructure/neon.ts` – Neon PostgreSQL connection + pgvector extension setup <!-- done: 17/04/2026 by binhdev -->
+- [x] SQL migration: tạo bảng `message_embeddings` với cột `embedding vector(768)` + HNSW index <!-- done: 17/04/2026 by binhdev -->
+- [x] Tạo `modules/ai/fallback/model-fallback.ts` – Gemini Pro → Flash → cached response chain <!-- done: 17/04/2026 by binhdev -->
+- [x] Tạo `modules/ai/guards/prompt-guard.ts` – Input sanitization + injection detection (3 layers: regex + system prompt + output validation) <!-- done: 17/04/2026 by binhdev -->
+- [x] Tạo `modules/ai/guards/rate-limiter.ts` – AI-specific rate limit (10 req/min/user, Redis sliding window) <!-- done: 17/04/2026 by binhdev -->
+- [x] Tạo `modules/ai/embeddings/embedding.service.ts` – text-embedding-004 wrapper <!-- done: 17/04/2026 by binhdev -->
+- [x] Tạo `modules/ai/embeddings/neon-vector.service.ts` – pgvector CRUD (insert, cosine search, delete) <!-- done: 17/04/2026 by binhdev -->
+- [x] Thêm env vars: `GEMINI_API_KEY`, `NEON_DATABASE_URL`, `AI_MODEL_PRIMARY`, `AI_MODEL_FALLBACK`, `AI_RATE_LIMIT_PER_MINUTE` <!-- done: 17/04/2026 by binhdev -->
+- [x] Unit test cho prompt guard (10+ adversarial cases) + model fallback (timeout, quota exceeded) <!-- done: 17/04/2026 by binhdev -->
 
 ### Phase AI-1 – Kiểm Duyệt Nội Dung Tự Động (Content Moderation)
 
@@ -379,7 +383,7 @@ npm run dev:web
 
 - [ ] Tạo `modules/ai/ai.service.ts` – Core orchestrator: context building + Gemini chat + function calling loop
 - [ ] Tạo `modules/ai/ai.controller.ts` – REST API: `POST /api/ai/chat`, `GET /api/ai/suggestions`
-- [ ] Tạo `modules/ai/ai.routes.ts` + `ai.schema.ts` (Zod validation)
+- [x] Tạo `modules/ai/ai.routes.ts` + `ai.schema.ts` (Zod validation) <!-- done: 17/04/2026 -->
 - [ ] Implement 5 function handlers trong `modules/ai/functions/`:
   - [ ] `search_friends.fn.ts` – tìm bạn bè theo tên/mô tả
   - [ ] `create_group.fn.ts` – tạo nhóm chat mới
@@ -427,6 +431,24 @@ npm run dev:web
 - [ ] Backup strategy: MongoDB daily + Neon point-in-time recovery + restore test
 - [ ] Cấu hình Kubernetes + Helm chart (staging/production)
 - [ ] Blue-green deployment lên production
+
+### Phase 10 – Optimization Sprint (Server/Web/Mobile)
+- [x] Chốt danh sách tối ưu ưu tiên từ đối chiếu codebase thực tế và roadmap <!-- done: 17/04/2026  -->
+- [ ] OX1: Tối ưu unread count bằng atomic update (`$inc`, `$unset`) cho conversation map, loại bỏ read-modify-write loop trong service
+- [ ] OX2: Tối ưu Redis presence bằng pipeline + heartbeat key schema (`presence:lastSeen:{userId}`), tránh phụ thuộc `io.emit` toàn cục
+- [ ] OX3: Bổ sung index compound cho messages `{ conversationId: 1, createdAt: -1, _id: -1 }` để tối ưu cursor pagination ổn định
+- [ ] OX4: Siết security lớp message content: sanitize XSS ở input path (REST + Socket) trước persist/broadcast
+- [ ] OX5: Nâng health check từ mức cơ bản lên deep health (`MongoDB/Redis/Kafka/Neon/Gemini`) + readiness/liveness contract
+- [ ] OX6: Chuẩn hóa realtime contract reactions giữa Web/Mobile (`reaction_updated` và `message_reacted`) thành một schema thống nhất
+- [ ] OX7: Hoàn thiện presence API `GET /api/users/:id/presence` + hiển thị lastSeen ở Web/Mobile
+- [ ] OX8: Bổ sung kế hoạch benchmark sau tối ưu (p95 send_message, p95 history query, presence propagation)
+- [x] OX9: Tối ưu UX gửi media realtime (Web + Mobile) bằng optimistic message: hiển thị ngay khi bấm gửi, upload/verify xử lý nền, finalize với cùng idempotencyKey <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.1: Hotfix follow-up media UX: chỉ upload sau khi bấm Send, loading hiển thị 1 lần trên bubble pending, sửa render `blob:` để không vỡ ảnh tạm trên Web <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.2: Hotfix Web pending media: bỏ loading trùng ở composer sau khi gửi, dedupe receive_message theo idempotency và reconcile message_sent để tránh bubble loading treo <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.3: Hotfix sync Web->Mobile media+text: đồng bộ merge realtime vào messageHistory để tắt spinner pending đúng lúc trên Web và hiển thị caption text cho media message trên Mobile <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.4: Nâng cấp premium glassmorphism cho Web + Mobile (ultra transparency, blur mạnh, panel frosted nhiều lớp) và chuẩn hóa bộ quy tắc parity UI liên nền tảng <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.5: Đồng bộ màu giữa các tab Dashboard Web (Chat/Profile/Settings) bằng shared glass tokens để thống nhất palette liên tab <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.6: Giảm độ sáng trắng và tăng sắc xanh lá trong bộ token UI (Web + Mobile) để đồng bộ tone glass dịu mắt hơn <!-- done: 17/04/2026 by binhdev -->
 
 ---
 

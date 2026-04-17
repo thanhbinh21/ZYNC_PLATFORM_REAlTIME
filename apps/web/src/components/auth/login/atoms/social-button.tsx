@@ -31,9 +31,9 @@ export function SocialButton({ label, onClick, disabled = false }: SocialButtonP
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex h-11 items-center justify-center gap-2 rounded-xl border border-[#1a5748] bg-[#083b31]/70 px-3 text-sm font-semibold text-[#d3eee5] transition hover:border-[#2f8f73] hover:bg-[#0c4a3b] disabled:cursor-not-allowed disabled:opacity-60"
+      className="zync-glass-subtle flex h-11 items-center justify-center gap-2 rounded-xl border-[#86f8cf]/28 bg-[#0c4235]/62 px-3 text-sm font-semibold text-[#e8fff6] transition hover:border-[#adffe1]/42 hover:bg-[#145643]/64 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <span className="text-[#b8d9ce]">
+      <span className="text-[#d5f6ea]">
         <Icon />
       </span>
       <span>{label}</span>

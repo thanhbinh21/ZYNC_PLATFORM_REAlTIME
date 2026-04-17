@@ -26,6 +26,14 @@ function getInitials(name: string): string {
   return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
 }
 
+function normalizeUsername(value: string): string {
+  return value.trim().replace(/^@/, '').toLowerCase();
+}
+
+function isValidUsername(value: string): boolean {
+  return /^[a-z0-9._]{3,30}$/.test(value);
+}
+
 export function HomeDashboardProfilePanel({
   profile,
   loading,
@@ -46,6 +54,7 @@ export function HomeDashboardProfilePanel({
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [formValues, setFormValues] = useState({
+    username: '',
     displayName: '',
     bio: '',
   });
@@ -54,7 +63,9 @@ export function HomeDashboardProfilePanel({
 
   useEffect(() => {
     if (!profile) return;
+    const fallbackUsername = profile.email?.split('@')[0] ?? profile.displayName.replace(/\s+/g, '_').toLowerCase();
     setFormValues({
+      username: profile.username ?? fallbackUsername,
       displayName: profile.displayName ?? '',
       bio: profile.bio ?? '',
     });
@@ -81,7 +92,7 @@ export function HomeDashboardProfilePanel({
   // ─── Loading skeleton ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-5">
+      <section className="zync-glass-panel rounded-3xl p-5">
         <div className="h-44 animate-pulse rounded-3xl bg-[#0f3a31]" />
         <div className="mt-5 h-24 animate-pulse rounded-2xl bg-[#0d3228]" />
         <div className="mt-4 h-40 animate-pulse rounded-2xl bg-[#0d3228]" />
@@ -92,7 +103,7 @@ export function HomeDashboardProfilePanel({
   // ─── Error state ─────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <section className="rounded-3xl border border-[#4d2a2a] bg-[#2a1515]/60 p-5 text-[#ffd7d7]">
+      <section className="zync-glass-panel rounded-3xl border-[#ffb8b8]/35 bg-[#2a1515]/55 p-5 text-[#ffd7d7]">
         <p className="font-ui-title text-lg">Không tải được trang cá nhân</p>
         <p className="mt-2 font-ui-content text-sm text-[#ffc3c3]">{error}</p>
       </section>
@@ -102,30 +113,33 @@ export function HomeDashboardProfilePanel({
   // ─── Empty state ─────────────────────────────────────────────────────────────
   if (!profile) {
     return (
-      <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-5 text-[#d6f4e9]">
+      <section className="zync-glass-panel rounded-3xl p-5 text-[#d6f4e9]">
         <p className="font-ui-content text-sm">Chưa có dữ liệu profile.</p>
       </section>
     );
   }
 
   const initials = getInitials(profile.displayName);
-  const username = (
-    profile.email?.split('@')[0] ??
-    profile.displayName.replace(/\s+/g, '_')
-  ).toLowerCase();
+  const username = profile.username ?? profile.email?.split('@')[0] ?? profile.displayName.replace(/\s+/g, '_').toLowerCase();
   const joinedYear = profile.createdAt
     ? new Date(profile.createdAt).getFullYear()
     : null;
 
   const personalInfoItems: Array<{ label: string; value: string; icon: DashboardIconName }> = [
-    { label: 'Số điện thoại', value: profile.phoneNumber ?? '-', icon: 'chat' },
     { label: 'Email', value: profile.email ?? '-', icon: 'message' },
-    { label: 'Username', value: username, icon: 'profile' },
+    { label: 'Username', value: `@${username}`, icon: 'profile' },
   ];
 
   // ─── Save handler ─────────────────────────────────────────────────────────────
   const handleSaveProfile = async () => {
     const displayName = formValues.displayName.trim();
+    const normalizedUsername = normalizeUsername(formValues.username);
+
+    if (!isValidUsername(normalizedUsername)) {
+      setSaveError('Username phải từ 3-30 ký tự và chỉ gồm chữ thường, số, dấu chấm hoặc gạch dưới.');
+      return;
+    }
+
     if (!displayName) {
       setSaveError('Tên hiển thị không được để trống.');
       return;
@@ -146,6 +160,7 @@ export function HomeDashboardProfilePanel({
       }
 
       const updated = await updateMyProfile({
+        username: normalizedUsername,
         displayName,
         avatarUrl: avatarUrlToSave,
         bio: formValues.bio.trim() || undefined,
@@ -250,7 +265,7 @@ export function HomeDashboardProfilePanel({
 
       {/* ── Edit form ───────────────────────────────────────────────────────────── */}
       {isEditing && (
-        <section className="rounded-3xl border border-[#11513f] bg-[#07261f]/90 p-4 sm:p-5">
+        <section className="zync-glass-panel rounded-3xl p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="font-ui-title text-lg text-[#e2fff4]">Cập nhật hồ sơ</h3>
             <button
@@ -263,6 +278,20 @@ export function HomeDashboardProfilePanel({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-2 sm:col-span-1">
+              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[#7cb3a1]">
+                @Username
+              </span>
+              <input
+                value={formValues.username}
+                onChange={(e) =>
+                  setFormValues((prev) => ({ ...prev, username: e.target.value }))
+                }
+                className="font-ui-content h-11 w-full rounded-xl border border-[#1a5444] bg-[#0e3429] px-3 text-sm text-[#e1fff4] outline-none placeholder:text-[#6fa493]"
+                placeholder="zync.user"
+              />
+            </label>
+
             <label className="space-y-2 sm:col-span-1">
               <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[#7cb3a1]">
                 Tên hiển thị
@@ -360,7 +389,7 @@ export function HomeDashboardProfilePanel({
       )}
 
       {/* ── Tab navigation ──────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 rounded-2xl bg-[#0b2f25] p-1.5">
+      <div className="zync-glass-subtle flex gap-1 rounded-2xl bg-[#0b2f25]/58 p-1.5">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -390,7 +419,7 @@ export function HomeDashboardProfilePanel({
           <div className="space-y-4">
 
             {/* Personal info */}
-            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+            <section className="zync-glass-panel rounded-3xl p-4">
               <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
                 Thông tin cá nhân
               </h3>
@@ -414,7 +443,7 @@ export function HomeDashboardProfilePanel({
             </section>
 
             {/* Security placeholder */}
-            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+            <section className="zync-glass-panel rounded-3xl p-4">
               <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
                 Bảo mật
               </h3>
@@ -425,7 +454,7 @@ export function HomeDashboardProfilePanel({
             </section>
 
             {/* Reputation card */}
-            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+            <section className="zync-glass-panel rounded-3xl p-4">
               <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[#4cf0bf]">
                 Danh tiếng
               </h3>
@@ -482,7 +511,7 @@ export function HomeDashboardProfilePanel({
           <div className="space-y-4">
 
             {/* My Stories (real) */}
-            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+            <section className="zync-glass-panel rounded-3xl p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="font-ui-title text-lg text-[#dffcf0]">Story của tôi</h3>
                 <span className="font-ui-content text-sm text-[#7cb3a1]">{myStories.length} story</span>
@@ -534,7 +563,7 @@ export function HomeDashboardProfilePanel({
             </section>
 
             {/* Bio + Real stats */}
-            <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+            <section className="zync-glass-panel rounded-3xl p-4">
               <h3 className="font-ui-title text-lg text-[#dffcf0]">Giới thiệu</h3>
               <p className="font-ui-content mt-3 text-sm leading-relaxed text-[#cbeee2]">
                 {profile.bio ?? 'Chưa cập nhật giới thiệu.'}
@@ -561,7 +590,7 @@ export function HomeDashboardProfilePanel({
 
       {/* ── Tab: Bạn bè ────────────────────────────────────────────────────────── */}
       {activeTab === 'friends' && (
-        <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+        <section className="zync-glass-panel rounded-3xl p-4">
           <h3 className="font-ui-title mb-4 text-lg text-[#dffcf0]">
             Danh sách bạn bè ({friendsCount ?? friends.length})
           </h3>
@@ -599,7 +628,7 @@ export function HomeDashboardProfilePanel({
 
       {/* ── Tab: Stories Feed ───────────────────────────────────────────────────── */}
       {activeTab === 'stories' && (
-        <section className="rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4">
+        <section className="zync-glass-panel rounded-3xl p-4">
           <h3 className="font-ui-title mb-4 text-lg text-[#dffcf0]">
             Story của bạn bè ({feed.length})
           </h3>

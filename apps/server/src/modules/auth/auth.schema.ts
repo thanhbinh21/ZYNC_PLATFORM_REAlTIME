@@ -1,20 +1,25 @@
 import { z } from 'zod';
 
-/** Nhận dạng người dùng – có thể là số ĐT hoặc email */
-const phoneRegex = /^\+?\d{9,15}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const usernameRegex = /^[a-z0-9._]{3,30}$/;
 
-const identifierSchema = z
+const emailSchema = z
   .string()
   .trim()
-  .min(5, 'Identifier must be at least 5 characters')
-  .refine((value) => {
-    const compact = value.replace(/\s/g, '');
-    return phoneRegex.test(compact) || emailRegex.test(value.toLowerCase());
-  }, 'Identifier must be a valid phone number or email');
+  .toLowerCase()
+  .refine((value) => emailRegex.test(value), 'Email must be valid');
+
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, 'Username must be at least 3 characters')
+  .max(30, 'Username must be at most 30 characters')
+  .transform((value) => value.replace(/^@/, '').toLowerCase())
+  .refine((value) => usernameRegex.test(value), 'Username only supports letters, numbers, dot and underscore');
 
 export const RegisterSchema = z.object({
-  identifier: identifierSchema,
+  email: emailSchema,
+  username: usernameSchema,
 });
 export type RegisterDto = z.infer<typeof RegisterSchema>;
 
@@ -23,15 +28,10 @@ const passwordSchema = z
   .min(8, 'Password must be at least 8 characters')
   .max(128, 'Password must be at most 128 characters');
 
-const emailIdentifierSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .refine((value) => emailRegex.test(value), 'Email must be valid');
-
 export const VerifyOtpSchema = z.object({
-  identifier: identifierSchema,
+  email: emailSchema,
   otp: z.string().length(6, 'OTP must be exactly 6 digits').regex(/^\d{6}$/, 'OTP must be numeric'),
+  username: usernameSchema,
   displayName: z.string().min(1).max(50).optional(),
   password: passwordSchema,
   deviceToken: z.string().optional(),
@@ -40,13 +40,13 @@ export const VerifyOtpSchema = z.object({
 export type VerifyOtpDto = z.infer<typeof VerifyOtpSchema>;
 
 export const LoginPasswordRequestOtpSchema = z.object({
-  email: emailIdentifierSchema,
+  email: emailSchema,
   password: passwordSchema,
 });
 export type LoginPasswordRequestOtpDto = z.infer<typeof LoginPasswordRequestOtpSchema>;
 
 export const LoginPasswordVerifyOtpSchema = z.object({
-  email: emailIdentifierSchema,
+  email: emailSchema,
   password: passwordSchema,
   otp: z.string().length(6, 'OTP must be exactly 6 digits').regex(/^\d{6}$/, 'OTP must be numeric'),
   deviceToken: z.string().optional(),
@@ -62,24 +62,19 @@ export const GoogleLoginSchema = z.object({
 export type GoogleLoginDto = z.infer<typeof GoogleLoginSchema>;
 
 export const ForgotPasswordRequestOtpSchema = z.object({
-  identifier: identifierSchema.optional(),
-  email: emailIdentifierSchema.optional(),
-}).refine((payload) => Boolean(payload.identifier ?? payload.email), {
-  message: 'Identifier is required',
+  email: emailSchema,
 });
 export type ForgotPasswordRequestOtpDto = z.infer<typeof ForgotPasswordRequestOtpSchema>;
 
 export const ForgotPasswordResetSchema = z.object({
-  identifier: identifierSchema.optional(),
-  email: emailIdentifierSchema.optional(),
+  email: emailSchema,
   otp: z.string().length(6, 'OTP must be exactly 6 digits').regex(/^\d{6}$/, 'OTP must be numeric'),
   newPassword: passwordSchema,
-}).refine((payload) => Boolean(payload.identifier ?? payload.email), {
-  message: 'Identifier is required',
 });
 export type ForgotPasswordResetDto = z.infer<typeof ForgotPasswordResetSchema>;
 
 export const UpdateProfileSchema = z.object({
+  username: usernameSchema.optional(),
   displayName: z.string().trim().min(1).max(50).optional(),
   avatarUrl: z.string().url().optional(),
   bio: z.string().trim().max(200).optional(),

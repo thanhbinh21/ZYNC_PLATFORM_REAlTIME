@@ -9,8 +9,8 @@ interface HomeCtaProps {
 export function HomeCta({ label, href, variant }: HomeCtaProps) {
   const className =
     variant === 'primary'
-      ? 'font-ui-title inline-flex h-12 items-center justify-center rounded-full bg-[#4ed9aa] px-7 text-sm font-semibold text-[#073d2f] transition hover:brightness-110'
-      : 'font-ui-title inline-flex h-12 items-center justify-center rounded-full border border-white/25 bg-white/5 px-7 text-sm font-semibold text-[#d1f4e7] transition hover:bg-white/12';
+      ? 'font-ui-title zync-glass-floating inline-flex h-12 items-center justify-center rounded-full border border-[#adffe1]/45 bg-gradient-to-r from-[#96ffdc] to-[#3cd8ab] px-7 text-sm font-semibold text-[#053a2c] shadow-[0_8px_26px_rgba(48,215,171,0.28)] transition hover:brightness-110'
+      : 'font-ui-title zync-glass-panel inline-flex h-12 items-center justify-center rounded-full px-7 text-sm font-semibold text-[#e3fff4] transition hover:border-[#adffe1]/35 hover:bg-white/15';
 
   return (
     <Link href={href} className={className}>

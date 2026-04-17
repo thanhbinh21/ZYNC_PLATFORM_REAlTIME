@@ -19,7 +19,7 @@ interface SettingSwitchProps {
 
 function SettingSwitch({ label, description, checked, onChange }: SettingSwitchProps) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-2xl border border-[#15483b] bg-[#07241d]/80 p-4">
+    <div className="zync-glass-subtle flex items-start justify-between gap-4 rounded-2xl border-[#98ffe0]/18 bg-[#07241d]/58 p-4">
       <div>
         <p className="font-ui-title text-[0.98rem] text-[#e2fff4]">{label}</p>
         <p className="font-ui-content mt-1 text-sm text-[#9dc8ba]">{description}</p>
@@ -84,7 +84,7 @@ export function HomeDashboardSettingsPanel({
 
   return (
     <section className="mt-5 space-y-5">
-      <header className="rounded-3xl border border-[#12473a] bg-[linear-gradient(145deg,#0a3127_0%,#07221c_100%)] px-5 py-5">
+      <header className="zync-glass-panel zync-glass-panel-strong rounded-3xl px-5 py-5">
         <p className="font-ui-meta text-xs uppercase tracking-[0.16em] text-[#6db8a2]">Trung tâm thiết lập</p>
         <h2 className="font-ui-title mt-2 text-[clamp(1.35rem,2.5vw,2.1rem)] text-[#e5fff5]">Cài đặt tài khoản</h2>
         <p className="font-ui-content mt-2 text-sm text-[#aad5c6]">
@@ -94,7 +94,7 @@ export function HomeDashboardSettingsPanel({
       </header>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="space-y-3 rounded-3xl border border-[#103f33] bg-[#051f19]/70 p-4 sm:p-5">
+        <section className="zync-glass-panel space-y-3 rounded-3xl p-4 sm:p-5">
           <h3 className="font-ui-title text-lg text-[#defcef]">Quyền riêng tư</h3>
 
           <SettingSwitch
@@ -119,7 +119,7 @@ export function HomeDashboardSettingsPanel({
           />
         </section>
 
-        <section className="space-y-3 rounded-3xl border border-[#103f33] bg-[#051f19]/70 p-4 sm:p-5">
+        <section className="zync-glass-panel space-y-3 rounded-3xl p-4 sm:p-5">
           <h3 className="font-ui-title text-lg text-[#defcef]">Thông báo</h3>
 
           <SettingSwitch
@@ -145,7 +145,7 @@ export function HomeDashboardSettingsPanel({
         </section>
       </div>
 
-      <section className="rounded-3xl border border-[#103f33] bg-[#051f19]/70 p-4 sm:p-5">
+      <section className="zync-glass-panel rounded-3xl p-4 sm:p-5">
         <h3 className="font-ui-title text-lg text-[#defcef]">Giao diện hiển thị</h3>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">

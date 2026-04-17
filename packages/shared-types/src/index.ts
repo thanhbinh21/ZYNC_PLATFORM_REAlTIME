@@ -3,7 +3,7 @@
 // Kiểu dữ liệu User
 export interface User {
   _id: string;
-  phoneNumber: string;
+  username?: string;
   email?: string;
   displayName: string;
   avatarUrl?: string;

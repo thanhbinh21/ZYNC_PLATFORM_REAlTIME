@@ -126,6 +126,9 @@ export function UserProfileModal({
               <h3 className="font-ui-title text-xl text-[#e4fff5]">
                 {profile.displayName}
               </h3>
+              {profile.username && (
+                <p className="font-ui-content text-sm text-[#a9dccb]">@{profile.username}</p>
+              )}
               {profile.bio && (
                 <p className="mt-1.5 font-ui-content text-sm text-[#9fcabd]">
                   {profile.bio}
@@ -168,6 +171,19 @@ export function UserProfileModal({
 
               {/* Info items */}
               <div className="mt-4 space-y-2">
+                {profile.username && (
+                  <div className="flex items-center gap-3 rounded-xl bg-[#0b2f25] px-3 py-2.5 text-left">
+                    <span className="text-sm text-[#4cf0bf]">@</span>
+                    <div>
+                      <p className="font-ui-meta text-[0.6rem] uppercase tracking-[0.1em] text-[#78ad9d]">
+                        Username
+                      </p>
+                      <p className="font-ui-content text-sm text-[#d4f8eb]">
+                        @{profile.username}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {profile.emailMasked && (
                   <div className="flex items-center gap-3 rounded-xl bg-[#0b2f25] px-3 py-2.5 text-left">
                     <span className="text-sm text-[#4cf0bf]">✉</span>
@@ -177,19 +193,6 @@ export function UserProfileModal({
                       </p>
                       <p className="font-ui-content text-sm text-[#d4f8eb]">
                         {profile.emailMasked}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {profile.phoneMasked && (
-                  <div className="flex items-center gap-3 rounded-xl bg-[#0b2f25] px-3 py-2.5 text-left">
-                    <span className="text-sm text-[#4cf0bf]">📱</span>
-                    <div>
-                      <p className="font-ui-meta text-[0.6rem] uppercase tracking-[0.1em] text-[#78ad9d]">
-                        Số điện thoại
-                      </p>
-                      <p className="font-ui-content text-sm text-[#d4f8eb]">
-                        {profile.phoneMasked}
                       </p>
                     </div>
                   </div>

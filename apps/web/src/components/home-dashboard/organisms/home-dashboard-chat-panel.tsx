@@ -11,6 +11,11 @@ import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { ReactionDetailsResponse } from '@/services/chat';
 import { reportMessage, reactMessage } from '@/services/chat';
 
+interface SendMessageOptions {
+  idempotencyKey?: string;
+  deferEmit?: boolean;
+}
+
 // ==================== ICONS ====================
 
 function PhoneIcon({ className }: { className: string }) {
@@ -47,7 +52,8 @@ interface ChatPanelProps {
   messages?: Message[];
   messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
-  onSendMessage?: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
+  onSendMessage?: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null | undefined>;
+  onCancelPendingMessage?: (idempotencyKey: string) => void;
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
@@ -120,11 +126,11 @@ function ConversationList({
     : conversations;
 
   return (
-    <aside className="h-full min-h-0 overflow-y-auto border-r border-[#114538] bg-[linear-gradient(180deg,#06271f_0%,#052019_100%)] p-4">
+    <aside className="zync-glass-panel zync-glass-panel-strong h-full min-h-0 overflow-y-auto border-r zync-glass-divider p-4">
       <h2 className="text-2xl font-bold text-[#e6fff5] mb-4">Tin nhắn</h2>
 
       {/* Search */}
-      <label className="flex h-11 items-center gap-2 rounded-xl bg-[#12392f] px-3 mb-4 text-[#88bca9]">
+      <label className="zync-glass-subtle mb-4 flex h-11 items-center gap-2 rounded-xl bg-[#12392f]/48 px-3 text-[#b5ddd0]">
         <SearchIcon />
         <input
           type="text"
@@ -148,8 +154,8 @@ function ConversationList({
               onClick={() => onSelectConversation(item.id)}
               className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
                 selectedId === item.id
-                  ? 'border-[#2de3b3] bg-[#103a30]'
-                  : 'border-transparent hover:border-[#204d40] hover:bg-[#0b3027]'
+                  ? 'zync-glass-subtle border-[#9bffe0]/44 bg-[#113f32]/66'
+                  : 'border-transparent hover:border-[#8bf8d0]/22 hover:bg-[#0b3027]/62'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -190,7 +196,8 @@ function ChatPanel({
   messages = [],
   messageStatus = {},
   typingUsers = [],
-  onSendMessage = async () => {},
+  onSendMessage = async () => null,
+  onCancelPendingMessage = () => {},
   onStartTyping = () => {},
   onStopTyping = () => {},
   onLoadMore = async () => {},
@@ -264,9 +271,9 @@ function ChatPanel({
   }, []);
 
   return (
-    <article className="grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
+    <article className="zync-glass-panel zync-glass-panel-strong grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-[#114538] px-5 py-3 bg-[#06271f]">
+      <header className="zync-glass-subtle flex items-center justify-between border-b zync-glass-divider px-5 py-3 bg-[#06271f]/42">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -303,21 +310,21 @@ function ChatPanel({
         <div className="flex items-center gap-2 text-[#a8d8c7]">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a] hover:bg-[#16473a] transition-colors"
+            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72"
             title="Call"
           >
             <PhoneIcon className="w-5 h-5" />
           </button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a] hover:bg-[#16473a] transition-colors"
+            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72"
             title="Video call"
           >
             <VideoIcon className="w-5 h-5" />
           </button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a] hover:bg-[#16473a] transition-colors"
+            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72"
             title="Info"
             onClick={onInfoClick}
           >
@@ -359,7 +366,7 @@ function ChatPanel({
             <button
               onClick={onLoadMore}
               disabled={isLoading}
-              className="px-4 py-2 bg-[#103a30] hover:bg-[#0b3027] text-[#9ac7b7] text-sm rounded-lg transition-colors disabled:opacity-50"
+              className="zync-glass-subtle rounded-lg bg-[#103a30]/62 px-4 py-2 text-sm text-[#cdebe1] transition-colors hover:bg-[#0b3027]/72 disabled:opacity-50"
             >
               {isLoading ? 'Loading...' : 'Load more messages'}
             </button>
@@ -411,7 +418,7 @@ function ChatPanel({
       </div>
 
       {/* Moderation Penalty Bar */}
-      <div className="border-t border-[#114538] bg-[#12392f] px-4 py-1.5">
+      <div className="zync-glass-subtle border-t zync-glass-divider bg-[#12392f]/45 px-4 py-1.5">
         <div className="mb-1 flex items-center justify-between text-[11px] text-[#8cc4b0]">
           <span>Mức độ vi phạm tiêu chuẩn cộng đồng</span>
           <span className={userPenaltyScore >= 80 ? 'font-semibold text-red-400' : ''}>
@@ -437,9 +444,10 @@ function ChatPanel({
 
       {/* Input Area */}
       <MessageInput
-        onSend={(content, type, mediaUrl) => {
-          void onSendMessage(content, type as MessageType, mediaUrl);
+        onSend={(content, type, mediaUrl, options) => {
+          return onSendMessage(content, type as MessageType, mediaUrl, options);
         }}
+        onCancelPendingMessage={onCancelPendingMessage}
         onStartTyping={onStartTyping}
         onStopTyping={onStopTyping}
         isLoading={isLoading}
@@ -689,7 +697,7 @@ function AddMembersModal({
               type="text"
               value={query}
               onChange={(e) => onChangeQuery(e.target.value)}
-              placeholder="Nhập tên, số điện thoại"
+              placeholder="Nhập tên hiển thị hoặc @username"
               className="w-full bg-transparent text-sm text-[#d7f6eb] outline-none placeholder:text-[#7eb5a2]"
             />
           </label>
@@ -1196,8 +1204,8 @@ export function HomeDashboardChatPanel({
         }}
       />
 
-      <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-[#104136] bg-[#031c16]">
-        <div className="h-full w-[300px] shrink-0 border-r border-[#114538]">
+      <section className="zync-glass-panel zync-glass-floating flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border zync-glass-divider bg-[#031c16]/62">
+        <div className="h-full w-[300px] shrink-0 border-r zync-glass-divider">
           <ConversationList
             conversations={conversations}
             selectedId={selectedConversationId}
@@ -1221,8 +1229,8 @@ export function HomeDashboardChatPanel({
         </div>
 
           {isInfoOpen && (
-            <aside className="hidden h-full w-[320px] shrink-0 border-l border-[#114538] bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
-              <div className="border-b border-[#114538] px-5 py-4">
+            <aside className="zync-glass-panel zync-glass-panel-strong hidden h-full w-[320px] shrink-0 border-l zync-glass-divider bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
+              <div className="border-b zync-glass-divider px-5 py-4">
                 <h3 className="text-xl font-semibold text-[#e2fff4]">{infoTitle}</h3>
               </div>
 
@@ -1445,7 +1453,7 @@ export function HomeDashboardChatPanel({
 
       {isInfoOpen && (
         <div className="fixed inset-0 z-40 bg-black/45 xl:hidden">
-          <aside className="ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l border-[#114538] bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
+          <aside className="zync-glass-panel zync-glass-panel-strong ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[#e2fff4]">{infoTitle}</h3>
               <button
