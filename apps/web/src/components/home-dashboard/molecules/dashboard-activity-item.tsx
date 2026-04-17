@@ -9,7 +9,7 @@ interface DashboardActivityItemProps {
 export function DashboardActivityItemRow({ item, onClick }: DashboardActivityItemProps) {
   return (
     <article
-      className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-[#072f26] cursor-pointer"
+      className="grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-transparent px-3 py-3 transition hover:border-[#8cf8d0]/16 hover:bg-[#0b3a2e]/44"
       onClick={() => onClick?.(item)}
     >
       <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${item.toneClass} text-sm font-semibold text-[#e7fff6]`}>

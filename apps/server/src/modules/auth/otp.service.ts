@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
-import twilio from 'twilio';
 import { getRedis } from '../../infrastructure/redis';
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
@@ -26,62 +25,38 @@ export function generateOtp(): string {
 }
 
 /** Lưu OTP vào Redis với TTL 5 phút */
-export async function storeOtp(identifier: string, otp: string): Promise<void> {
+export async function storeOtp(email: string, otp: string): Promise<void> {
   if (shouldUseOtpHardcode()) {
     return;
   }
 
   const redis = getRedis();
-  await redis.set(`otp:${identifier}`, otp, 'EX', OTP_TTL_SECONDS);
+  await redis.set(`otp:${email}`, otp, 'EX', OTP_TTL_SECONDS);
 }
 
 /** Kiểm tra OTP. Trả về true nếu hợp lệ và xóa OTP sau khi verify thành công. */
-export async function verifyOtp(identifier: string, otp: string): Promise<boolean> {
+export async function verifyOtp(email: string, otp: string): Promise<boolean> {
   if (shouldUseOtpHardcode()) {
     return otp === getHardcodedOtpValue();
   }
 
   const redis = getRedis();
-  const stored = await redis.get(`otp:${identifier}`);
+  const stored = await redis.get(`otp:${email}`);
   if (!stored || stored !== otp) return false;
   // Xóa OTP sau khi dùng (one-time use)
-  await redis.del(`otp:${identifier}`);
+  await redis.del(`otp:${email}`);
   return true;
 }
 
-/** Gửi OTP qua SMS (Twilio) hoặc Email (Nodemailer/Resend) tuỳ identifier */
-export async function sendOtp(identifier: string, otp: string): Promise<void> {
-  // Môi trường non-production có thể dùng OTP hardcode để tránh phụ thuộc SMTP/SMS
+/** Gửi OTP qua email (Nodemailer/Resend) */
+export async function sendOtp(email: string, otp: string): Promise<void> {
+  // Môi trường non-production có thể dùng OTP hardcode để tránh phụ thuộc SMTP
   if (shouldUseOtpHardcode()) {
-    logger.info(`[OTP HARDCODE] identifier=${identifier} otp=${otp}`);
+    logger.info(`[OTP HARDCODE] email=${email} otp=${otp}`);
     return;
   }
 
-  const isPhone = /^\+?\d{9,15}$/.test(identifier.replace(/\s/g, ''));
-
-  if (isPhone) {
-    await sendSmsTwilio(identifier, otp);
-  } else {
-    await sendEmailResend(identifier, otp);
-  }
-}
-
-async function sendSmsTwilio(phone: string, otp: string): Promise<void> {
-  const accountSid = process.env['TWILIO_ACCOUNT_SID'];
-  const authToken = process.env['TWILIO_AUTH_TOKEN'];
-  const from = process.env['TWILIO_PHONE_NUMBER'];
-
-  if (!accountSid || !authToken || !from) {
-    throw new Error('Twilio credentials not configured');
-  }
-
-  const client = twilio(accountSid, authToken);
-  await client.messages.create({
-    body: `Mã xác thực Zync của bạn là: ${otp}. Có hiệu lực trong 5 phút.`,
-    from,
-    to: phone,
-  });
-  logger.info(`OTP SMS sent to ${phone}`);
+  await sendEmailResend(email, otp);
 }
 
 async function sendEmailResend(email: string, otp: string): Promise<void> {

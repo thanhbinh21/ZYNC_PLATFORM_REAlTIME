@@ -20,6 +20,7 @@ import {
 
 const DEFAULT_FORM: LoginFormValues = {
   identifier: '',
+  username: '',
   displayName: '',
   password: '',
   otp: '',
@@ -41,24 +42,20 @@ declare global {
   }
 }
 
-function normalizeIdentifier(value: string): string {
-  const trimmed = value.trim();
-  const compact = trimmed.replace(/\s/g, '');
-  const isPhone = /^\+?\d{9,15}$/.test(compact);
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
 
-  if (isPhone) {
-    return compact;
-  }
-
-  return trimmed.toLowerCase();
+function normalizeUsername(value: string): string {
+  return value.trim().replace(/^@/, '').toLowerCase();
 }
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim().toLowerCase());
 }
 
-function isPhone(value: string): boolean {
-  return /^\+?\d{9,15}$/.test(value.trim().replace(/\s/g, ''));
+function isValidUsername(value: string): boolean {
+  return /^[a-z0-9._]{3,30}$/.test(normalizeUsername(value));
 }
 
 function resolveDeviceToken(): string {
@@ -92,19 +89,15 @@ export function useLoginForm() {
 
   const canRequestOtp = useMemo(() => {
     const hasMinimumIdentifierLength = values.identifier.trim().length >= 5;
+    const hasUsername = mode === 'register' ? isValidUsername(values.username) : true;
     const hasDisplayName = mode === 'register' ? values.displayName.trim().length >= 1 : true;
     const hasPassword = mode !== 'register' && isRecoveryFlow
       ? true
       : values.password.trim().length >= 8;
-    const hasValidIdentifier =
-      mode === 'register'
-        ? true
-        : isRecoveryFlow
-          ? isEmail(values.identifier) || isPhone(values.identifier)
-          : isEmail(values.identifier);
+    const hasValidIdentifier = isEmail(values.identifier);
 
-    return hasMinimumIdentifierLength && hasDisplayName && hasPassword && hasValidIdentifier;
-  }, [isRecoveryFlow, mode, values.displayName, values.identifier, values.password]);
+    return hasMinimumIdentifierLength && hasUsername && hasDisplayName && hasPassword && hasValidIdentifier;
+  }, [isRecoveryFlow, mode, values.displayName, values.identifier, values.password, values.username]);
 
   const canVerifyOtp = useMemo(() => {
     const hasOtp = /^\d{6}$/.test(values.otp.trim());
@@ -174,6 +167,11 @@ export function useLoginForm() {
     setErrorMessage(null);
   };
 
+  const onUsernameChange = (value: string) => {
+    setValues((prev) => ({ ...prev, username: value }));
+    setErrorMessage(null);
+  };
+
   const onPasswordChange = (value: string) => {
     setValues((prev) => ({ ...prev, password: value }));
     setErrorMessage(null);
@@ -202,29 +200,32 @@ export function useLoginForm() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
-      const identifier = normalizeIdentifier(values.identifier);
+      const email = normalizeEmail(values.identifier);
 
       if (mode === 'register') {
-        await requestOtp(identifier);
+        await requestOtp({
+          email,
+          username: normalizeUsername(values.username),
+        });
       } else if (isRecoveryFlow) {
         await requestForgotPasswordOtp({
-          identifier,
+          email,
         });
       } else {
         await requestPasswordOtp({
-          email: identifier,
+          email,
           password: values.password,
         });
       }
 
       setStep('verify');
-      setPendingIdentifier(identifier);
+      setPendingIdentifier(email);
       setInfoMessage(
         isRecoveryFlow
-          ? 'Mã OTP khôi phục đã được gửi. Vui lòng kiểm tra email hoặc số điện thoại của bạn.'
-          : 'Mã OTP đã được gửi. Vui lòng kiểm tra điện thoại hoặc email của bạn.',
+          ? 'Mã OTP khôi phục đã được gửi. Vui lòng kiểm tra email của bạn.'
+          : 'Mã OTP đã được gửi. Vui lòng kiểm tra email của bạn.',
       );
-      setValues((prev) => ({ ...prev, identifier, otp: '' }));
+      setValues((prev) => ({ ...prev, identifier: email, otp: '' }));
     } catch (error: unknown) {
       const fallbackMessage = 'Không thể gửi OTP. Vui lòng thử lại.';
       const message =
@@ -249,10 +250,10 @@ export function useLoginForm() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
-      const verifyIdentifier = pendingIdentifier ?? normalizeIdentifier(values.identifier);
+      const verifyEmail = pendingIdentifier ?? normalizeEmail(values.identifier);
       if (isRecoveryFlow) {
         await resetForgotPassword({
-          identifier: verifyIdentifier,
+          email: verifyEmail,
           otp: values.otp,
           newPassword: values.password,
         });
@@ -269,14 +270,15 @@ export function useLoginForm() {
       const deviceToken = resolveDeviceToken();
       const response = mode === 'login'
         ? await verifyPasswordOtp({
-            email: verifyIdentifier,
+            email: verifyEmail,
             password: values.password,
             otp: values.otp,
             deviceToken,
             platform: 'web',
           })
         : await verifyOtp({
-            identifier: verifyIdentifier,
+            email: verifyEmail,
+            username: normalizeUsername(values.username),
             otp: values.otp,
             displayName: values.displayName.trim(),
             password: values.password,
@@ -408,6 +410,7 @@ export function useLoginForm() {
     onStartRecovery,
     onCancelRecovery,
     onIdentifierChange,
+    onUsernameChange,
     onDisplayNameChange,
     onPasswordChange,
     onOtpChange,

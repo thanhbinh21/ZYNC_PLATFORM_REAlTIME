@@ -2,9 +2,9 @@ import { apiClient } from './api';
 
 export interface MeUser {
   _id: string;
+  username?: string;
   displayName: string;
   email?: string;
-  phoneNumber?: string;
   avatarUrl?: string;
   bio?: string;
   createdAt?: string;
@@ -14,17 +14,18 @@ export interface MeUser {
 
 export interface PublicUserProfile {
   _id: string;
+  username?: string;
   displayName: string;
   avatarUrl?: string;
   bio?: string;
   emailMasked?: string;
-  phoneMasked?: string;
   friendCount: number;
   mutualFriends: number;
   createdAt?: string;
 }
 
 export interface UpdateMyProfilePayload {
+  username?: string;
   displayName?: string;
   avatarUrl?: string;
   bio?: string;

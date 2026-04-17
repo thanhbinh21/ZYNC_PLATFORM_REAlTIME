@@ -33,12 +33,12 @@ function FeatureIcon({ icon }: { icon: HomeFeatureItem['icon'] }) {
 
 export function HomeFeatureCard({ item }: HomeFeatureCardProps) {
   return (
-    <article className="zync-reveal-up rounded-3xl border border-white/15 bg-white/8 p-5 backdrop-blur-xl">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#53ca9f]/45 bg-[#0f4d3f]/75">
+    <article className="zync-reveal-up zync-glass-panel zync-glass-floating rounded-3xl p-5">
+      <div className="zync-glass-subtle flex h-11 w-11 items-center justify-center rounded-2xl border-[#8dffd9]/35 bg-[#0f4d3f]/58">
         <FeatureIcon icon={item.icon} />
       </div>
       <h3 className="font-ui-title mt-4 text-xl leading-tight text-[#e9fff7]">{item.title}</h3>
-      <p className="font-ui-content mt-2 text-base leading-7 text-[#b7dece]">{item.description}</p>
+      <p className="font-ui-content mt-2 text-base leading-7 text-[#d0efe2]">{item.description}</p>
     </article>
   );
 }

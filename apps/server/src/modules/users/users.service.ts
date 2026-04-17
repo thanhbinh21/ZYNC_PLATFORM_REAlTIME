@@ -13,26 +13,29 @@ export async function getMe(userId: string): Promise<IUser> {
 }
 
 /** Mask sensitive field: "user@example.com" → "us***@example.com" */
-function maskField(value: string | undefined, type: 'email' | 'phone'): string | undefined {
+function maskEmail(value: string | undefined): string | undefined {
   if (!value) return undefined;
-  if (type === 'email') {
-    const [local, domain] = value.split('@');
-    if (!local || !domain) return '***@***';
-    const visible = local.slice(0, Math.min(2, local.length));
-    return `${visible}***@${domain}`;
-  }
-  // phone: show last 3 digits
-  if (value.length <= 3) return '***';
-  return `${'*'.repeat(value.length - 3)}${value.slice(-3)}`;
+  const [local, domain] = value.split('@');
+  if (!local || !domain) return '***@***';
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}***@${domain}`;
+}
+
+function normalizeUsername(username: string): string {
+  return username.trim().replace(/^@/, '').toLowerCase();
+}
+
+function isValidUsername(username: string): boolean {
+  return /^[a-z0-9._]{3,30}$/.test(username);
 }
 
 export interface PublicUserProfile {
   _id: string;
+  username?: string;
   displayName: string;
   avatarUrl?: string;
   bio?: string;
   emailMasked?: string;
-  phoneMasked?: string;
   friendCount: number;
   mutualFriends: number;
   createdAt?: string;
@@ -44,7 +47,7 @@ export async function getUserById(
   requesterId?: string,
 ): Promise<PublicUserProfile> {
   const user = await UserModel.findById(userId).select(
-    'displayName avatarUrl bio email phoneNumber createdAt',
+    'displayName username avatarUrl bio email createdAt',
   );
   if (!user) throw new NotFoundError('User not found');
 
@@ -57,47 +60,50 @@ export async function getUserById(
 
   return {
     _id: user._id.toString(),
+    username: user.username,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     bio: user.bio,
-    emailMasked: maskField(user.email, 'email'),
-    phoneMasked: maskField(user.phoneNumber, 'phone'),
+    emailMasked: maskEmail(user.email),
     friendCount,
     mutualFriends,
     createdAt: (user as unknown as { createdAt?: Date }).createdAt?.toISOString(),
   };
 }
 
-/** Tìm user theo tên hiển thị/email/số điện thoại cho luồng kết bạn */
+/** Tìm user theo username/email cho luồng kết bạn */
 export async function searchUsers(
   requesterId: string,
   keyword: string,
   limit: number,
-): Promise<Array<{ id: string; displayName: string; avatarUrl?: string; bio?: string }>> {
+): Promise<Array<{ id: string; username?: string; displayName: string; email?: string; avatarUrl?: string; bio?: string }>> {
   const queryText = keyword.trim();
   if (queryText.length < 2) {
     throw new BadRequestError('Query must be at least 2 characters');
   }
 
   const safeLimit = Math.min(Math.max(limit, 1), 20);
-  const escaped = queryText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const normalizedQuery = queryText.startsWith('@') ? queryText.slice(1) : queryText;
+  const escaped = normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(escaped, 'i');
 
   const users = await UserModel.find({
     _id: { $ne: new Types.ObjectId(requesterId) },
     $or: [
-      { displayName: regex },
+      { username: regex },
       { email: regex },
-      { phoneNumber: regex },
+      { displayName: regex },
     ],
   })
-    .select('displayName avatarUrl bio')
+    .select('username displayName email avatarUrl bio')
     .limit(safeLimit)
     .lean();
 
   return users.map((user) => ({
     id: user._id.toString(),
+    username: user.username as string | undefined,
     displayName: user.displayName as string,
+    email: user.email as string | undefined,
     avatarUrl: user.avatarUrl as string | undefined,
     bio: user.bio as string | undefined,
   }));
@@ -108,7 +114,30 @@ export async function updateProfile(
   userId: string,
   dto: UpdateProfileDto,
 ): Promise<IUser> {
-  const updates: UpdateProfileDto = {};
+  const updates: {
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    bio?: string;
+  } = {};
+
+  if (dto.username !== undefined) {
+    const normalizedUsername = normalizeUsername(dto.username);
+    if (!isValidUsername(normalizedUsername)) {
+      throw new BadRequestError('Username không hợp lệ. Chỉ dùng chữ thường, số, dấu chấm và gạch dưới (3-30 ký tự).');
+    }
+
+    const existedUser = await UserModel.findOne({
+      username: normalizedUsername,
+      _id: { $ne: new Types.ObjectId(userId) },
+    }).select('_id').lean();
+
+    if (existedUser) {
+      throw new BadRequestError('Username đã tồn tại');
+    }
+
+    updates.username = normalizedUsername;
+  }
 
   if (dto.displayName !== undefined) {
     updates.displayName = dto.displayName.trim();

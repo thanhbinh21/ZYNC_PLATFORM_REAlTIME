@@ -210,9 +210,9 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `typing:{convId}:{userId}` | String | 3 giây | Typing indicator |
 | `idempotency:{key}` | String | 5 phút | Chống gửi trùng tin nhắn |
 | `friends:{userId}` | String (JSON) | 10 phút | Cache danh sách bạn bè |
-| `otp:{phoneOrEmail}` | String | 5 phút | OTP verification |
+| `otp:{email}` | String | 5 phút | OTP verification |
 | `otp_rl:ip:{ip}` | String | 1 giờ | Rate limit OTP theo IP |
-| `otp_rl:id:{identifier}` | String | 1 giờ | Rate limit OTP theo SĐT/Email |
+| `otp_rl:id:{identifier}` | String | 1 giờ | Rate limit OTP theo email |
 | `blacklist:token:{jti}` | String | = token expiry | JWT revocation |
 | `notif_debounce:{userId}:{convId}` | String | 30 giây | Debounce push notification |
 | `ai_rate:{userId}` | Sorted Set | 61 giây | Sliding-window rate limit cho AI requests |
@@ -225,12 +225,12 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 ### Public Endpoints
 | Method | Endpoint | Mô tả |
 |--------|----------|------|
-| POST | `/api/auth/register` | Gửi OTP đăng ký tới phone/email |
-| POST | `/api/auth/verify-otp` | Xác thực OTP đăng ký, tạo tài khoản mới và trả JWT |
+| POST | `/api/auth/register` | Gửi OTP đăng ký tới email (kèm `username` duy nhất) |
+| POST | `/api/auth/verify-otp` | Xác thực OTP đăng ký theo email, tạo tài khoản mới (`username` + `displayName`) và trả JWT |
 | POST | `/api/auth/login-password/request-otp` | Kiểm tra email + password hợp lệ, gửi OTP đăng nhập |
 | POST | `/api/auth/login-password/verify-otp` | Xác thực OTP đăng nhập (email + password + OTP), trả JWT |
-| POST | `/api/auth/forgot-password/request-otp` | Gửi OTP khôi phục mật khẩu theo identifier (email hoặc phone) |
-| POST | `/api/auth/forgot-password/reset` | Xác thực OTP khôi phục theo identifier và cập nhật mật khẩu mới |
+| POST | `/api/auth/forgot-password/request-otp` | Gửi OTP khôi phục mật khẩu theo email |
+| POST | `/api/auth/forgot-password/reset` | Xác thực OTP khôi phục theo email và cập nhật mật khẩu mới |
 | POST | `/api/auth/google` | Đăng nhập bằng Google ID token |
 | POST | `/api/auth/refresh` | Cấp lại access token từ refresh token cookie |
 | POST | `/api/auth/logout` | Thu hồi phiên hiện tại, blacklist access token |
@@ -238,7 +238,8 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 ### Quy tắc nghiệp vụ chính
 - Đăng nhập tài khoản nội bộ bắt buộc đi qua luồng Email + Password + OTP.
 - Luồng OTP-only không dùng cho user đã tồn tại.
-- Tạm thời cho phép OTP hardcode ở môi trường non-production (`OTP_HARDCODE=true`) để dev nhanh; production phải gửi OTP thực qua SMTP/SMS.
+- Username là định danh duy nhất song song với email và có thể cập nhật qua `PATCH /api/users/me`.
+- Tạm thời cho phép OTP hardcode ở môi trường non-production (`OTP_HARDCODE=true`) để dev nhanh; production phải gửi OTP thực qua SMTP email provider.
 
 ---
 
@@ -298,7 +299,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 
 | Collection | Indexes quan trọng |
 |------------|-------------------|
-| `users` | `phoneNumber` (unique), `email` (unique sparse) |
+| `users` | `email` (unique), `username` (unique sparse) |
 | `device_tokens` | `deviceToken` (unique), `userId` |
 | `friendships` | `{userId, friendId}` (unique), `status` |
 | `conversations` | `unreadCounts.userId` (multikey), `lastMessage.sentAt`, `updatedAt` |
@@ -329,7 +330,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | Containerization | Docker, Kubernetes, Helm |
 | CI/CD | GitHub Actions |
 | Monitoring | Prometheus, Grafana, ELK Stack |
-| SMS / OTP | Twilio (chỉ production, dev dùng OTP hardcode) |
+| OTP Delivery | Email provider (Resend API / SMTP, dev có thể dùng OTP hardcode) |
 | Email | Resend (SMTP relay: smtp.resend.com:587) |
 | Push Notification | FCM (Android/Web), APNs (iOS) |
 | Media Storage | Cloudinary (free 25 credits/tháng, CDN + image transformation, giữ nguyên lên production) |
@@ -337,3 +338,31 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | Message Broker (production) | Upstash Kafka (SASL/SSL, pay-as-you-go) |
 | Cache / Pub-Sub (local) | Redis 7 Alpine (~5MB, Docker) |
 | Cache / Pub-Sub (production) | Upstash Redis (TLS, pay-as-you-go) |
+
+---
+
+## UI Parity Rules (Web + Mobile)
+
+Để giữ UI đồng bộ giữa `apps/web` và `apps/mobile`, áp dụng bắt buộc các quy tắc sau:
+
+1. **Design tokens là nguồn chuẩn duy nhất**
+  - Web dùng CSS variables trong `apps/web/src/app/globals.css`.
+  - Mobile dùng theme tokens trong `apps/mobile/src/theme/colors.ts`.
+  - Không hardcode màu, opacity, blur trong component khi token tương đương đã tồn tại.
+
+2. **Parity theo cấp Atomic Design**
+  - Với mỗi Atom hoặc Molecule quan trọng ở Web (button, input, card, panel), phải có bản tương đương ở Mobile (`src/ui/` hoặc `src/components/`).
+  - UI component chỉ nhận dữ liệu qua props; logic API hoặc Socket đặt ở Screen/Page hoặc custom hook.
+
+3. **Mapping trạng thái UI đồng nhất**
+  - Mỗi feature phải có cùng tập trạng thái `loading`, `empty`, `error`, `default` trên cả 2 nền tảng.
+  - Text trạng thái hiển thị cho người dùng dùng tiếng Việt tự nhiên và nhất quán ngữ nghĩa.
+
+4. **Contract hiển thị dùng chung**
+  - Type dữ liệu hiển thị ưu tiên lấy từ `packages/shared-types` hoặc contract service thống nhất.
+  - Tránh việc mỗi nền tảng tự suy diễn field khác nhau cho cùng một entity.
+
+5. **QC parity trước khi merge**
+  - So sánh ảnh chụp Web và Mobile cho cùng một luồng chính.
+  - Kiểm tra tương phản chữ trên nền glass để đảm bảo readability.
+  - Kiểm tra responsive Web và các kích thước màn hình mobile phổ biến.

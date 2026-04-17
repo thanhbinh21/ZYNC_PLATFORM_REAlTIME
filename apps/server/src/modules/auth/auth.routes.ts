@@ -25,7 +25,7 @@ import {
 
 export const authRouter = Router();
 
-// POST /api/auth/register – request OTP via phone/email
+// POST /api/auth/register – request OTP via email
 authRouter.post('/register', otpRateLimiter, validateBody(RegisterSchema), registerHandler);
 
 // POST /api/auth/verify-otp – verify OTP, receive JWT + refresh token cookie

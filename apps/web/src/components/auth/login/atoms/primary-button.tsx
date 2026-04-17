@@ -8,7 +8,7 @@ export function PrimaryButton({ isSubmitting, label }: PrimaryButtonProps) {
     <button
       type="submit"
       disabled={isSubmitting}
-      className="h-12 w-full rounded-full bg-gradient-to-r from-[#49dfb3] to-[#159264] text-base font-semibold text-[#07372b] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+      className="zync-glass-floating h-12 w-full rounded-full border border-[#a8ffe0]/48 bg-gradient-to-r from-[#9affdd] to-[#2ecf9f] text-base font-semibold text-[#05392c] shadow-[0_10px_34px_rgba(48,215,171,0.32)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
     >
       {isSubmitting ? 'Đang xử lý...' : label}
     </button>

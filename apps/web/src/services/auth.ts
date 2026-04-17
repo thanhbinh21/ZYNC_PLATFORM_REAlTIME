@@ -10,22 +10,27 @@ interface VerifyOtpResponse {
   accessToken: string;
   user: {
     id: string;
+    username?: string;
     displayName: string;
-    phoneNumber?: string;
     email?: string;
     avatarUrl?: string;
   };
 }
 
-export async function requestOtp(identifier: string): Promise<RegisterResponse> {
+export async function requestOtp(payload: {
+  email: string;
+  username: string;
+}): Promise<RegisterResponse> {
   const { data } = await apiClient.post<RegisterResponse>('/api/auth/register', {
-    identifier,
+    email: payload.email,
+    username: payload.username,
   });
   return data;
 }
 
 export async function verifyOtp(payload: {
-  identifier: string;
+  email: string;
+  username: string;
   otp: string;
   displayName?: string;
   password?: string;
@@ -56,14 +61,14 @@ export async function verifyPasswordOtp(payload: {
 }
 
 export async function requestForgotPasswordOtp(payload: {
-  identifier: string;
+  email: string;
 }): Promise<RegisterResponse> {
   const { data } = await apiClient.post<RegisterResponse>('/api/auth/forgot-password/request-otp', payload);
   return data;
 }
 
 export async function resetForgotPassword(payload: {
-  identifier: string;
+  email: string;
   otp: string;
   newPassword: string;
 }): Promise<RegisterResponse> {

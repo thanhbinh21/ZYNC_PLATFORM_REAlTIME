@@ -50,7 +50,7 @@ export async function searchUsersHandler(
 ): Promise<void> {
   try {
     const { userId } = req as AuthRequest;
-    const query = (req.query['query'] as string | undefined) ?? '';
+    const query = ((req.query['query'] as string | undefined) ?? (req.query['q'] as string | undefined) ?? '');
     const limitRaw = Number(req.query['limit'] ?? 10);
     const users = await searchUsers(userId, query, limitRaw);
     res.json({ success: true, users });

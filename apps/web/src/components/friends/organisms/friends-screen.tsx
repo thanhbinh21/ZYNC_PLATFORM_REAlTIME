@@ -89,7 +89,7 @@ export function FriendsScreen({
               <input
                 value={searchKeyword}
                 onChange={(event) => onSearchKeywordChange(event.target.value)}
-                placeholder="Nhập tên, số điện thoại hoặc email"
+                placeholder="Nhập @username hoặc email"
                 className="font-ui-content h-11 w-full rounded-xl border border-[#1f6651] bg-[#0d4a3b]/75 px-4 text-sm text-[#d8f4eb] outline-none placeholder:text-[#7da79a]"
               />
               <button

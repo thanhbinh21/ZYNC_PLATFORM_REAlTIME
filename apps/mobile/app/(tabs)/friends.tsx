@@ -21,6 +21,7 @@ import { useAuthStore } from '../../src/store/useAuthStore';
 interface Friend {
   _id: string;
   id?: string;
+  username?: string;
   displayName: string;
   avatarUrl?: string;
   email?: string;
@@ -90,7 +91,7 @@ export default function FriendsScreen() {
     }
     try {
       setIsSearching(true);
-      const res = await api.get('/users/search', { params: { q: query } });
+      const res = await api.get('/users/search', { params: { query } });
       setSearchResults(res.data?.users || []);
     } catch (e) {
       console.error('Search error:', e);
@@ -102,7 +103,7 @@ export default function FriendsScreen() {
   // Send friend request
   const sendFriendRequest = async (userId: string) => {
     try {
-      await api.post('/friends/request', { friendId: userId });
+      await api.post('/friends/request', { toUserId: userId });
       Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
       setSearchQuery('');
       setSearchResults([]);
@@ -114,7 +115,7 @@ export default function FriendsScreen() {
   // Accept friend request
   const acceptRequest = async (requestId: string) => {
     try {
-      await api.post(`/friends/accept/${requestId}`);
+      await api.put(`/friends/request/${requestId}/accept`);
       loadFriendsData();
     } catch (e: any) {
       Alert.alert('Lỗi', e.response?.data?.message || 'Không thể chấp nhận');
@@ -124,7 +125,7 @@ export default function FriendsScreen() {
   // Reject friend request
   const rejectRequest = async (requestId: string) => {
     try {
-      await api.post(`/friends/reject/${requestId}`);
+      await api.put(`/friends/request/${requestId}/reject`);
       setRequests((prev) => prev.filter((r) => r._id !== requestId));
     } catch (e: any) {
       Alert.alert('Lỗi', e.response?.data?.message || 'Không thể từ chối');
@@ -156,7 +157,7 @@ export default function FriendsScreen() {
           <Ionicons name="search-outline" size={20} color="#64748b" style={styles.searchIcon} />
           <TextInput 
             style={styles.searchInput}
-            placeholder="Tìm bạn bè hoặc người dùng..."
+            placeholder="Tìm theo @username hoặc email..."
             placeholderTextColor="#64748b"
             value={searchQuery}
             onChangeText={handleSearch}
@@ -173,17 +174,17 @@ export default function FriendsScreen() {
           <View style={styles.searchResultsBox}>
             <Text style={styles.listTitle}>KẾT QUẢ TÌM KIẾM</Text>
             {searchResults.map((user) => (
-              <View key={user._id} style={styles.friendItem}>
+              <View key={user.id || user._id} style={styles.friendItem}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{(user.displayName || '?').charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{user.displayName}</Text>
-                  <Text style={styles.friendStatus}>{user.email || ''}</Text>
+                  <Text style={styles.friendStatus}>{user.username ? `@${user.username}` : (user.email || '')}</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.addFriendBtn}
-                  onPress={() => sendFriendRequest(user._id)}
+                  onPress={() => sendFriendRequest(user.id || user._id)}
                 >
                   <Ionicons name="person-add" size={16} color="#10b981" />
                 </TouchableOpacity>
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.surfaceHover,
+    backgroundColor: colors.glassPanel,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -338,7 +339,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glassPanel,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.glassBorder,
@@ -367,10 +368,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
   },
   tabActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: colors.glassUltra,
+    borderColor: colors.glassBorder,
   },
   tabText: {
     color: '#64748b',
@@ -397,12 +401,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
   },
   avatar: {
     width: 45,
     height: 45,
     borderRadius: 18,
-    backgroundColor: '#334155',
+    backgroundColor: colors.glassPanelStrong,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -430,7 +440,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    backgroundColor: colors.glassSoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -438,15 +448,23 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: colors.glassUltra,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
   },
   // ─ Request Items ─
   requestItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
   },
   requestActions: {
     flexDirection: 'row',

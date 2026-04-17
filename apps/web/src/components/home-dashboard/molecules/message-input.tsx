@@ -387,13 +387,13 @@ export function MessageInput({
   };
 
   return (
-    <div className="border-t border-[#114538] p-4 bg-[#0d2c24]">
+    <div className="zync-glass-subtle border-t zync-glass-divider bg-[#0d2c24]/44 p-4">
       {/* Action Buttons */}
       <div className="flex items-center gap-3 mb-3">
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isLoading}
-          className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
           title="Attachment"
         >
           <PaperclipIcon className="w-5 h-5 text-[#96c5b5]" />
@@ -402,7 +402,7 @@ export function MessageInput({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isLoading}
-          className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
           title="Images/Videos"
         >
           <ImageIcon className="w-5 h-5 text-[#96c5b5]" />
@@ -411,7 +411,7 @@ export function MessageInput({
         <button
           onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
           disabled={disabled || isLoading}
-          className="p-2 hover:bg-[#164336] rounded-lg transition-colors disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
           title="Emoji"
         >
           <EmojiIcon className="w-5 h-5 text-[#96c5b5]" />
@@ -427,13 +427,13 @@ export function MessageInput({
       </div>
 
       {isEmojiPickerOpen && (
-        <div className="mb-3 flex flex-wrap gap-2 rounded-lg border border-[#1e5a49] bg-[#12392f] p-2">
+        <div className="zync-glass-subtle mb-3 flex flex-wrap gap-2 rounded-lg border-[#88f7d0]/20 bg-[#12392f]/56 p-2">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => handleSendEmoji(emoji)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#0d2c24] text-lg hover:bg-[#164336]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#0d2c24]/62 text-lg hover:bg-[#164336]/72"
             >
               {emoji}
             </button>
@@ -451,7 +451,7 @@ export function MessageInput({
           placeholder="Nhập tin nhắn..."
           disabled={disabled || isLoading}
           rows={1}
-          className="flex-1 bg-[#0d2c24] text-[#dffcf2] placeholder:text-[#80ac9d] rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-[#33deb3] disabled:opacity-50"
+          className="zync-glass-subtle flex-1 rounded-lg bg-[#0d2c24]/62 px-4 py-2 text-[#dffcf2] placeholder:text-[#9bc4b6] resize-none focus:outline-none focus:ring-2 focus:ring-[#78ffd6] disabled:opacity-50"
           style={{
             minHeight: '40px',
             maxHeight: '120px',

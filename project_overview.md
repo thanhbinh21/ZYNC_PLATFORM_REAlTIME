@@ -14,7 +14,7 @@ Hệ thống nhắn tin tức thời quy mô vài nghìn người dùng, hỗ tr
 - Web app (Next.js/React) và Mobile (React Native)
 - Backend API + Real-time server (Socket.IO)
 - Redis (Pub/Sub, Presence, Cache) + Kafka (Message Queue) + MongoDB (Persistence)
-- Tích hợp: Twilio (SMS OTP), Resend (Email SMTP), FCM/APNs (Push), Cloudflare R2 / AWS S3 (Media)
+- Tích hợp: Email OTP (Resend API/SMTP), FCM/APNs (Push), Cloudflare R2 / AWS S3 (Media)
 
 ---
 
@@ -171,6 +171,8 @@ npm run dev:web
 - [x] Mở rộng luồng quên mật khẩu hỗ trợ identifier (email hoặc phone) cho tài khoản xác thực OTP <!-- done: 05/04/2026 -->
 - [x] Chuẩn hóa toggle OTP_HARDCODE: true dùng OTP cố định 123456 và không gọi mail thật, false dùng OTP thực qua provider email/SMS <!-- done: 05/04/2026 -->
 - [x] Harden cập nhật profile: validate strict payload, trim dữ liệu và chặn request rỗng cho PATCH /api/users/me <!-- done: 05/04/2026 -->
+- [x] Chuẩn hóa Auth email-only: bỏ phone ở luồng đăng ký/khôi phục, thêm `@username` duy nhất cho đăng ký + cập nhật profile, đồng bộ tìm kiếm theo `@username`/email cho Web + Mobile <!-- done: 17/04/2026 by binhdev -->
+- [ ] Bổ sung integration test cho các case trùng `@username` và luồng tìm kiếm `@username`/email trên Web + Mobile
 - [ ] Bổ sung integration test cho fallback Resend API -> SMTP khi provider lỗi
 - [x] Chuẩn hóa chiều rộng UI Web theo container dùng chung cho `/`, `/auth`, `/friends` <!-- done: 19/03/2026 -->
 - [x] Nâng cấp landing page `/` với fixed header, scroll section và bố cục chuẩn landing <!-- done: 19/03/2026 -->
@@ -231,10 +233,10 @@ npm run dev:web
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
-- [x] Tìm kiếm bạn bè theo tên/SĐT/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
+- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
 - [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
 - [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
-- [x] API `GET /api/users/:userId` trả thêm email/phone masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
+- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
 - [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
 - [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
 - [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
@@ -444,6 +446,9 @@ npm run dev:web
 - [x] OX9.1: Hotfix follow-up media UX: chỉ upload sau khi bấm Send, loading hiển thị 1 lần trên bubble pending, sửa render `blob:` để không vỡ ảnh tạm trên Web <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.2: Hotfix Web pending media: bỏ loading trùng ở composer sau khi gửi, dedupe receive_message theo idempotency và reconcile message_sent để tránh bubble loading treo <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.3: Hotfix sync Web->Mobile media+text: đồng bộ merge realtime vào messageHistory để tắt spinner pending đúng lúc trên Web và hiển thị caption text cho media message trên Mobile <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.4: Nâng cấp premium glassmorphism cho Web + Mobile (ultra transparency, blur mạnh, panel frosted nhiều lớp) và chuẩn hóa bộ quy tắc parity UI liên nền tảng <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.5: Đồng bộ màu giữa các tab Dashboard Web (Chat/Profile/Settings) bằng shared glass tokens để thống nhất palette liên tab <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.6: Giảm độ sáng trắng và tăng sắc xanh lá trong bộ token UI (Web + Mobile) để đồng bộ tone glass dịu mắt hơn <!-- done: 17/04/2026 by binhdev -->
 
 ---
 

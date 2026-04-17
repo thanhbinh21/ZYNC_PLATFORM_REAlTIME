@@ -37,26 +37,33 @@ function getRefreshSecret(): string {
   return secret;
 }
 
-function parseIdentifier(identifier: string): {
-  normalized: string;
-  isPhone: boolean;
-} {
-  const trimmed = identifier.trim();
-  const compact = trimmed.replace(/\s/g, '');
-  const isPhone = /^\+?\d{9,15}$/.test(compact);
-
-  if (isPhone) {
-    return { normalized: compact, isPhone: true };
-  }
-
-  return { normalized: trimmed.toLowerCase(), isPhone: false };
-}
-
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-async function findUserIncludingPassword(query: { phoneNumber?: string; email?: string }): Promise<IUser | null> {
+function normalizeUsername(username: string): string {
+  return username.trim().replace(/^@/, '').toLowerCase();
+}
+
+function isValidUsername(username: string): boolean {
+  return /^[a-z0-9._]{3,30}$/.test(username);
+}
+
+function sanitizeUsernameBase(value: string): string {
+  const cleaned = value
+    .toLowerCase()
+    .replace(/[^a-z0-9._]/g, '.')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\.+|\.+$/g, '');
+
+  if (cleaned.length >= 3) {
+    return cleaned.slice(0, 20);
+  }
+
+  return `user${Date.now().toString().slice(-6)}`;
+}
+
+async function findUserIncludingPassword(query: { email?: string; username?: string }): Promise<IUser | null> {
   const result = UserModel.findOne(query) as unknown as Promise<IUser | null> & {
     select?: (projection: string) => Promise<IUser | null>;
   };
@@ -66,6 +73,42 @@ async function findUserIncludingPassword(query: { phoneNumber?: string; email?: 
   }
 
   return result;
+}
+
+async function ensureUsernameAvailable(username: string, excludeUserId?: string): Promise<void> {
+  const query: { username: string; _id?: { $ne: string } } = { username };
+  if (excludeUserId) {
+    query._id = { $ne: excludeUserId };
+  }
+
+  const existing = await UserModel.findOne(query).select('_id').lean();
+  if (existing) {
+    throw new BadRequestError('Username đã tồn tại');
+  }
+}
+
+async function generateUniqueUsername(base: string, excludeUserId?: string): Promise<string> {
+  const baseUsername = sanitizeUsernameBase(base);
+  const candidates = [
+    baseUsername,
+    `${baseUsername}${Math.floor(1000 + Math.random() * 9000)}`,
+    `${baseUsername}${Math.floor(1000 + Math.random() * 9000)}`,
+    `${baseUsername}${Math.floor(1000 + Math.random() * 9000)}`,
+  ];
+
+  for (const candidate of candidates) {
+    const query: { username: string; _id?: { $ne: string } } = { username: candidate };
+    if (excludeUserId) {
+      query._id = { $ne: excludeUserId };
+    }
+
+    const exists = await UserModel.findOne(query).select('_id').lean();
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  return `${baseUsername}${Date.now().toString().slice(-6)}`;
 }
 
 async function upsertDeviceToken(
@@ -85,8 +128,8 @@ async function upsertDeviceToken(
 
 function toVerifyOtpResult(user: {
   id: string;
+  username?: string;
   displayName: string;
-  phoneNumber?: string;
   email?: string;
   avatarUrl?: string;
 }): VerifyOtpResult {
@@ -117,13 +160,31 @@ function issueTokenPair(userId: string): TokenPair {
 
 // ─── Register ────────────────────────────────────────────────────────────────
 
-/** Tạo và gửi OTP cho identifier (phone hoặc email) */
-export async function register(identifier: string): Promise<void> {
-  const { normalized } = parseIdentifier(identifier);
+/** Tạo và gửi OTP đăng ký theo email */
+export async function register(email: string, username: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedUsername = normalizeUsername(username);
+
+  if (!isValidUsername(normalizedUsername)) {
+    throw new BadRequestError('Username không hợp lệ. Chỉ dùng chữ thường, số, dấu chấm và gạch dưới (3-30 ký tự).');
+  }
+
+  const existedUser = await UserModel.findOne({
+    $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
+  }).select('email username').lean();
+
+  if (existedUser) {
+    if ((existedUser.email as string | undefined) === normalizedEmail) {
+      throw new UnauthorizedError('Tài khoản đã tồn tại. Vui lòng đăng nhập bằng email + mật khẩu + OTP');
+    }
+
+    throw new BadRequestError('Username đã tồn tại');
+  }
+
   const otp = generateOtp();
-  await storeOtp(normalized, otp);
-  await sendOtp(normalized, otp);
-  logger.info(`OTP issued for ${normalized}`);
+  await storeOtp(normalizedEmail, otp);
+  await sendOtp(normalizedEmail, otp);
+  logger.info(`OTP issued for ${normalizedEmail}`);
 }
 
 // ─── Verify OTP ──────────────────────────────────────────────────────────────
@@ -133,8 +194,8 @@ export interface VerifyOtpResult {
   refreshToken: string;
   user: {
     id: string;
+    username?: string;
     displayName: string;
-    phoneNumber?: string;
     email?: string;
     avatarUrl?: string;
   };
@@ -145,47 +206,47 @@ export interface VerifyOtpResult {
  * Trả về JWT pair.
  */
 export async function verifyOtpAndLogin(
-  identifier: string,
+  email: string,
   otp: string,
+  username: string,
   displayName?: string,
   password?: string,
   deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
 ): Promise<VerifyOtpResult> {
-  const { normalized, isPhone } = parseIdentifier(identifier);
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedUsername = normalizeUsername(username);
 
-  const valid = await verifyOtpRedis(normalized, otp);
+  if (!isValidUsername(normalizedUsername)) {
+    throw new BadRequestError('Username không hợp lệ. Chỉ dùng chữ thường, số, dấu chấm và gạch dưới (3-30 ký tự).');
+  }
+
+  const valid = await verifyOtpRedis(normalizedEmail, otp);
   if (!valid) throw new UnauthorizedError('Invalid or expired OTP');
 
-  const query = isPhone
-    ? { phoneNumber: normalized }
-    : { email: normalized };
-
-  // Upsert user
-  let user = await findUserIncludingPassword(query);
-  if (!user) {
-    if (!displayName) {
-      displayName = isPhone
-        ? `User${normalized.slice(-4)}`
-        : normalized.split('@')[0];
-    }
-
-    const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
-    user = await UserModel.create({
-      ...query,
-      displayName,
-      passwordHash,
-    });
-    logger.info(`New user created: ${user.id}`);
-  } else {
+  const existingByEmail = await findUserIncludingPassword({ email: normalizedEmail });
+  if (existingByEmail) {
     throw new UnauthorizedError('Tài khoản đã tồn tại. Vui lòng đăng nhập bằng email + mật khẩu + OTP');
   }
+
+  await ensureUsernameAvailable(normalizedUsername);
+
+  const normalizedDisplayName = displayName?.trim() || normalizedUsername;
+  const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
+
+  const user = await UserModel.create({
+    email: normalizedEmail,
+    username: normalizedUsername,
+    displayName: normalizedDisplayName,
+    passwordHash,
+  });
+  logger.info(`New user created: ${user.id}`);
 
   await upsertDeviceToken(user.id as string, deviceInfo);
 
   return toVerifyOtpResult({
     id: user.id as string,
+    username: user.username,
     displayName: user.displayName,
-    phoneNumber: user.phoneNumber,
     email: user.email,
     avatarUrl: user.avatarUrl,
   });
@@ -239,8 +300,8 @@ export async function verifyLoginWithPasswordAndOtp(
 
   return toVerifyOtpResult({
     id: user.id as string,
+    username: user.username,
     displayName: user.displayName,
-    phoneNumber: user.phoneNumber,
     email: user.email,
     avatarUrl: user.avatarUrl,
   });
@@ -248,33 +309,29 @@ export async function verifyLoginWithPasswordAndOtp(
 
 // ─── Forgot Password ────────────────────────────────────────────────────────
 
-export async function requestForgotPasswordOtp(identifier: string): Promise<void> {
-  const { normalized, isPhone } = parseIdentifier(identifier);
-  const user = await findUserIncludingPassword(
-    isPhone ? { phoneNumber: normalized } : { email: normalizeEmail(normalized) },
-  );
+export async function requestForgotPasswordOtp(email: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserIncludingPassword({ email: normalizedEmail });
 
   if (!user) {
     throw new UnauthorizedError('Tài khoản không tồn tại trong hệ thống');
   }
 
   const otp = generateOtp();
-  await storeOtp(normalized, otp);
-  await sendOtp(normalized, otp);
-  logger.info(`Forgot password OTP issued for ${normalized}`);
+  await storeOtp(normalizedEmail, otp);
+  await sendOtp(normalizedEmail, otp);
+  logger.info(`Forgot password OTP issued for ${normalizedEmail}`);
 }
 
-export async function resetForgotPassword(identifier: string, otp: string, newPassword: string): Promise<void> {
-  const { normalized, isPhone } = parseIdentifier(identifier);
-  const user = await findUserIncludingPassword(
-    isPhone ? { phoneNumber: normalized } : { email: normalizeEmail(normalized) },
-  );
+export async function resetForgotPassword(email: string, otp: string, newPassword: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await findUserIncludingPassword({ email: normalizedEmail });
 
   if (!user) {
     throw new UnauthorizedError('Tài khoản không tồn tại trong hệ thống');
   }
 
-  const validOtp = await verifyOtpRedis(normalized, otp);
+  const validOtp = await verifyOtpRedis(normalizedEmail, otp);
   if (!validOtp) {
     throw new UnauthorizedError('OTP không hợp lệ hoặc đã hết hạn');
   }
@@ -317,26 +374,33 @@ export async function loginWithGoogle(
   const displayName = payload?.name?.trim() || email.split('@')[0] || 'Google User';
   const avatarUrl = payload?.picture;
 
-  const user = await UserModel.findOneAndUpdate(
-    { email },
-    {
+  let user = await UserModel.findOne({ email });
+
+  if (!user) {
+    const username = await generateUniqueUsername(email.split('@')[0] || displayName);
+    user = await UserModel.create({
       email,
+      username,
       displayName,
       avatarUrl,
-    },
-    {
-      upsert: true,
-      new: true,
-      setDefaultsOnInsert: true,
-    },
-  );
+    });
+  } else {
+    user.displayName = displayName;
+    user.avatarUrl = avatarUrl;
+
+    if (!user.username) {
+      user.username = await generateUniqueUsername(email.split('@')[0] || displayName, user.id as string);
+    }
+
+    await user.save();
+  }
 
   await upsertDeviceToken(user.id as string, deviceInfo);
 
   return toVerifyOtpResult({
     id: user.id as string,
+    username: user.username,
     displayName: user.displayName,
-    phoneNumber: user.phoneNumber,
     email: user.email,
     avatarUrl: user.avatarUrl,
   });

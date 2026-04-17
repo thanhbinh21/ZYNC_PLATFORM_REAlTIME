@@ -21,6 +21,7 @@ export function LoginScreen({
   onStartRecovery,
   onCancelRecovery,
   onIdentifierChange,
+  onUsernameChange,
   onDisplayNameChange,
   onPasswordChange,
   onOtpChange,
@@ -58,6 +59,7 @@ export function LoginScreen({
             onStartRecovery={onStartRecovery}
             onCancelRecovery={onCancelRecovery}
             onIdentifierChange={onIdentifierChange}
+            onUsernameChange={onUsernameChange}
             onDisplayNameChange={onDisplayNameChange}
             onPasswordChange={onPasswordChange}
             onOtpChange={onOtpChange}

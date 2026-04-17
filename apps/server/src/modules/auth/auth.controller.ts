@@ -23,9 +23,9 @@ export async function registerHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { identifier } = req.body as { identifier: string };
-    await register(identifier);
-    res.json({ success: true, message: 'OTP sent. Check your phone or email.' });
+    const { email, username } = req.body as { email: string; username: string };
+    await register(email, username);
+    res.json({ success: true, message: 'OTP sent. Check your email.' });
   } catch (err) {
     next(err);
   }
@@ -39,16 +39,17 @@ export async function verifyOtpHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { identifier, otp, displayName, password, deviceToken, platform } = req.body as {
-      identifier: string;
+    const { email, otp, username, displayName, password, deviceToken, platform } = req.body as {
+      email: string;
       otp: string;
+      username: string;
       displayName?: string;
       password?: string;
       deviceToken?: string;
       platform?: 'ios' | 'android' | 'web';
     };
 
-    const result = await verifyOtpAndLogin(identifier, otp, displayName, password, {
+    const result = await verifyOtpAndLogin(email, otp, username, displayName, password, {
       deviceToken,
       platform,
     });
@@ -88,7 +89,7 @@ export async function loginPasswordRequestOtpHandler(
   try {
     const { email, password } = req.body as { email: string; password: string };
     await requestLoginOtpWithPassword(email, password);
-    res.json({ success: true, message: 'OTP sent. Check your phone or email.' });
+    res.json({ success: true, message: 'OTP sent. Check your email.' });
   } catch (err) {
     next(err);
   }
@@ -147,9 +148,8 @@ export async function forgotPasswordRequestOtpHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { identifier, email } = req.body as { identifier?: string; email?: string };
-    const resolvedIdentifier = (identifier ?? email ?? '').trim();
-    await requestForgotPasswordOtp(resolvedIdentifier);
+    const { email } = req.body as { email: string };
+    await requestForgotPasswordOtp(email);
     res.json({ success: true, message: 'OTP sent. Check your email.' });
   } catch (err) {
     next(err);
@@ -164,15 +164,13 @@ export async function forgotPasswordResetHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { identifier, email, otp, newPassword } = req.body as {
-      identifier?: string;
-      email?: string;
+    const { email, otp, newPassword } = req.body as {
+      email: string;
       otp: string;
       newPassword: string;
     };
 
-    const resolvedIdentifier = (identifier ?? email ?? '').trim();
-    await resetForgotPassword(resolvedIdentifier, otp, newPassword);
+    await resetForgotPassword(email, otp, newPassword);
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (err) {
     next(err);

@@ -16,6 +16,8 @@ export function SearchResultItem({ user, isLoading, onSendRequest }: SearchResul
           <FriendsAvatar name={user.displayName} />
           <div>
             <p className="font-ui-title text-base text-[#d7f2e8]">{user.displayName}</p>
+            {user.username ? <p className="font-ui-meta text-xs text-[#90b8ab]">@{user.username}</p> : null}
+            {user.email ? <p className="font-ui-meta text-xs text-[#78a798]">{user.email}</p> : null}
             {user.bio ? <p className="font-ui-meta text-xs text-[#90b8ab]">{user.bio}</p> : null}
           </div>
         </div>

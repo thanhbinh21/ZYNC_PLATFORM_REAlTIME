@@ -26,7 +26,8 @@ export default function ProfileScreen() {
   const [conversationCount, setConversationCount] = useState(0);
 
   const displayName = userInfo?.displayName || 'Zync User';
-  const email = userInfo?.email || userInfo?.phoneNumber || 'user@zync.platform';
+  const email = userInfo?.email || 'user@zync.platform';
+  const username = userInfo?.username ? `@${userInfo.username}` : null;
   const joinedYear = userInfo?.createdAt ? new Date(userInfo.createdAt).getFullYear() : new Date().getFullYear();
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Text style={styles.userName}>{displayName}</Text>
+          {username ? <Text style={styles.userHandle}>{username}</Text> : null}
           <Text style={styles.userEmail}>{email}</Text>
           
           <View style={styles.headerActions}>
@@ -191,6 +193,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: 'BeVietnamPro_700Bold',
   },
+  userHandle: {
+    color: '#86efac',
+    fontSize: 14,
+    fontFamily: 'BeVietnamPro_500Medium',
+    marginTop: 4,
+  },
   userEmail: {
     color: '#64748b',
     fontSize: 14,
@@ -218,9 +226,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glassPanel,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
   },
   statsRow: {
     flexDirection: 'row',
@@ -228,10 +238,17 @@ const styles = StyleSheet.create({
     paddingVertical: 25,
     marginHorizontal: 20,
     marginTop: -25,
-    backgroundColor: colors.surfaceHover,
+    backgroundColor: colors.glassPanel,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.glassBorder,
+    shadowColor: colors.glassShadow,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
   },
   statItem: {
     alignItems: 'center',
@@ -261,8 +278,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 15,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
+    marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'transparent',
   },
   menuIcon: {
     width: 42,
@@ -285,10 +308,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 30,
     paddingVertical: 15,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: 'rgba(127, 29, 29, 0.32)',
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: 'rgba(248, 113, 113, 0.36)',
   },
   logoutText: {
     color: '#ef4444',

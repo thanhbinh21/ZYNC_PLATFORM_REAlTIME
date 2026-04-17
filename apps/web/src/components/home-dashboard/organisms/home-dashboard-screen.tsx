@@ -110,7 +110,7 @@ export function HomeDashboardScreen({
       <button
         type="button"
         onClick={() => setIsMobileSidebarOpen(true)}
-        className="fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#1a5140] bg-[#0d3128]/95 text-[#d7f3e9] lg:hidden"
+        className="zync-glass-panel zync-glass-floating fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full text-[#f0fff9] lg:hidden"
         aria-label="Mở thanh điều hướng"
       >
         <span className="text-lg leading-none">☰</span>
@@ -119,7 +119,7 @@ export function HomeDashboardScreen({
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 bg-black/55 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)}>
           <aside
-            className="h-full w-[84%] max-w-[320px] overflow-y-auto border-r border-[#124335] bg-[linear-gradient(180deg,#0a2d24_0,#08241e_100%)] px-4 py-6"
+            className="zync-glass-panel zync-glass-panel-strong h-full w-[84%] max-w-[320px] overflow-y-auto rounded-r-[2rem] border-r px-4 py-6"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -132,14 +132,14 @@ export function HomeDashboardScreen({
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d3128] text-[#d7f3e9]"
+                className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d3128]/66 text-[#e9fff7]"
                 aria-label="Đóng thanh điều hướng"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-6 flex items-center gap-3 rounded-2xl bg-[#0d3228] px-3 py-3">
+            <div className="zync-glass-subtle mt-6 flex items-center gap-3 rounded-2xl bg-[#0d3228]/52 px-3 py-3">
               <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#b0e4d2] text-sm font-semibold text-[#0a2a22]">
                 {data.user.avatarUrl ? (
                   <Image
@@ -192,7 +192,7 @@ export function HomeDashboardScreen({
       )}
 
       <div className="grid h-screen grid-cols-1 lg:grid-cols-[220px_1fr]">
-        <aside className="sticky top-0 hidden h-screen flex-col overflow-y-auto border-r border-[#124335] bg-[linear-gradient(180deg,#0a2d24_0,#08241e_100%)] px-4 py-6 lg:flex">
+        <aside className="zync-glass-panel zync-glass-panel-strong sticky top-0 hidden h-screen flex-col overflow-y-auto border-r px-4 py-6 lg:flex">
           <div className="flex items-center gap-3 px-2">
             <span className="relative block h-10 w-10 overflow-hidden rounded-xl bg-[#0a3e31] ring-1 ring-[#57d2a5]/35">
               <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
@@ -200,7 +200,7 @@ export function HomeDashboardScreen({
             <p className="font-ui-brand text-4xl leading-none text-[#39e0af]">{data.brand}</p>
           </div>
 
-          <div className="mt-8 flex items-center gap-3 rounded-2xl bg-[#0d3228] px-3 py-3">
+          <div className="zync-glass-subtle mt-8 flex items-center gap-3 rounded-2xl bg-[#0d3228]/52 px-3 py-3">
             <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#b0e4d2] text-sm font-semibold text-[#0a2a22]">
               {data.user.avatarUrl ? (
                 <Image
@@ -252,12 +252,12 @@ export function HomeDashboardScreen({
 
         <section className={sectionClassName}>
           {selectedNavId === 'home' && (
-            <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#062920]/80 px-4 py-3">
+            <header className="zync-glass-panel zync-glass-floating flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3">
               <h1 className="font-ui-title text-[clamp(1.3rem,2.3vw,2rem)] text-[#e4fff5]">{data.greeting}</h1>
               <div className="flex items-center gap-3">
                 {/* ─── Search bar with live results ─── */}
                 <div ref={searchContainerRef} className="relative hidden sm:block">
-                  <label className="relative flex h-11 w-[320px] items-center rounded-full border border-[#1a5140] bg-[#0f2f27] pl-10 pr-4">
+                  <label className="zync-glass-subtle relative flex h-11 w-[320px] items-center rounded-full border-[#85f6ce]/24 bg-[#0f2f27]/52 pl-10 pr-4">
                     <span className="absolute left-4 text-[#6cb9a2]">
                       <DashboardIcon name="search" className="h-4 w-4" />
                     </span>
@@ -266,7 +266,7 @@ export function HomeDashboardScreen({
                       value={searchQuery}
                       onChange={(e) => handleSearchChange(e.target.value)}
                       onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
-                      placeholder="Tìm bạn theo tên, SĐT, email..."
+                      placeholder="Tìm bạn theo @username hoặc email..."
                       className="font-ui-content w-full bg-transparent text-sm text-[#cdece0] outline-none placeholder:text-[#739f91]"
                     />
                     {searchLoading && (
@@ -276,11 +276,11 @@ export function HomeDashboardScreen({
 
                   {/* Dropdown results */}
                   {searchOpen && searchResults.length > 0 && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-80 overflow-y-auto rounded-2xl border border-[#104638] bg-[#051f19] shadow-xl">
+                    <div className="zync-glass-panel zync-glass-floating absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-80 overflow-y-auto rounded-2xl border-[#9effda]/25 bg-[#051f19]/76 shadow-xl">
                       {searchResults.map((user) => (
                         <div
                           key={user.id}
-                          className="flex items-center gap-3 border-b border-[#0d3228] px-4 py-3 last:border-b-0 hover:bg-[#0d3228]/60 transition"
+                          className="flex items-center gap-3 border-b border-[#0d3228]/55 px-4 py-3 transition last:border-b-0 hover:bg-[#0d3228]/72"
                         >
                           <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-[#b0e4d2]">
                             {user.avatarUrl ? (
@@ -293,6 +293,8 @@ export function HomeDashboardScreen({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-ui-title truncate text-sm text-[#e4fff5]">{user.displayName}</p>
+                            {user.username && <p className="font-ui-content truncate text-xs text-[#8fd0bc]">@{user.username}</p>}
+                            {user.email && <p className="font-ui-content truncate text-xs text-[#79b4a2]">{user.email}</p>}
                             {user.bio && <p className="font-ui-content truncate text-xs text-[#7cb3a1]">{user.bio}</p>}
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -320,18 +322,18 @@ export function HomeDashboardScreen({
                     </div>
                   )}
                   {searchOpen && searchResults.length === 0 && searchQuery.trim().length >= 2 && !searchLoading && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 rounded-2xl border border-[#104638] bg-[#051f19] px-4 py-4 text-center shadow-xl">
+                    <div className="zync-glass-panel absolute left-0 right-0 top-[calc(100%+6px)] z-50 rounded-2xl border-[#9effda]/25 bg-[#051f19]/78 px-4 py-4 text-center shadow-xl">
                       <p className="font-ui-content text-sm text-[#7cb3a1]">Không tìm thấy người dùng nào.</p>
                     </div>
                   )}
                 </div>
 
                 {notificationSlot ?? (
-                  <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128] text-[#cdece0] transition hover:bg-[#14463a]">
+                  <button type="button" className="zync-glass-subtle inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128]/62 text-[#e5fff4] transition hover:bg-[#14463a]/72">
                     <DashboardIcon name="bell" className="h-4 w-4" />
                   </button>
                 )}
-                <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128] text-[#cdece0] transition hover:bg-[#14463a]">
+                <button type="button" className="zync-glass-subtle inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128]/62 text-[#e5fff4] transition hover:bg-[#14463a]/72">
                   <DashboardIcon name="gear" className="h-4 w-4" />
                 </button>
               </div>
@@ -362,7 +364,7 @@ export function HomeDashboardScreen({
                 ))}
               </div>
 
-              <section className="mt-8 rounded-3xl border border-[#103b30] bg-[#051f19]/70 p-4 sm:p-5">
+              <section className="zync-glass-panel mt-8 rounded-3xl p-4 sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="font-ui-title text-[clamp(1.35rem,2.3vw,2rem)] text-[#defaee]">{data.activityTitle}</h2>
                   <Link href="/friends" className="font-ui-title text-sm text-[#43e6b8] transition hover:text-[#91ffdc]">

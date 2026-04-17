@@ -9,34 +9,42 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: '#9effda',
+        tabBarInactiveTintColor: '#8ca69f',
         tabBarLabelStyle: {
           fontFamily: 'BeVietnamPro_500Medium',
           fontSize: 11,
           marginBottom: 5,
         },
         tabBarStyle: {
-          backgroundColor: 'rgba(2, 22, 18, 0.65)',
+          backgroundColor: colors.glassPanelStrong,
           borderTopWidth: 1,
           borderTopColor: colors.glassBorder,
-          height: 65,
+          height: 70,
           paddingTop: 8,
+          paddingBottom: 4,
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
+          shadowColor: colors.glassShadow,
+          shadowOpacity: 0.52,
+          shadowRadius: 20,
+          shadowOffset: {
+            width: 0,
+            height: 10,
+          },
           elevation: 0,
         },
         tabBarBackground: () => (
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={88} tint="dark" style={StyleSheet.absoluteFill} />
         ),
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Trang chủ',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'grid' : 'grid-outline'} size={24} color={color} />
           ),
