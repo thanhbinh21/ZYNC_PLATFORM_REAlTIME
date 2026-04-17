@@ -56,6 +56,24 @@ interface Message {
   };
 }
 
+interface SendMessageOptions {
+  idempotencyKey?: string;
+  deferEmit?: boolean;
+}
+
+interface PendingMediaDraft {
+  asset: ImagePicker.ImagePickerAsset;
+  localUri: string;
+  messageType: 'image' | 'video';
+  uploadType: 'image' | 'video';
+}
+
+interface PendingMediaSend {
+  idempotencyKey: string;
+  content: string;
+  messageType: 'image' | 'video';
+}
+
 interface ConversationMeta {
   _id: string;
   name?: string;
@@ -422,6 +440,8 @@ export default function ChatRoomScreen() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showOptionsId, setShowOptionsId] = useState<string | null>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [pendingMediaDraft, setPendingMediaDraft] = useState<PendingMediaDraft | null>(null);
+  const [pendingMediaSend, setPendingMediaSend] = useState<PendingMediaSend | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [conversationName, setConversationName] = useState(name || 'Chat');
   const [conversationAvatarUrl, setConversationAvatarUrl] = useState<string | undefined>(
@@ -1257,14 +1277,19 @@ export default function ChatRoomScreen() {
     }
   }, [messages, conversationId, userId]);
 
-  const handleSend = useCallback((content?: string, type: Message['type'] = 'text', mediaUrl?: string) => {
+  const handleSend = useCallback((
+    content?: string,
+    type: Message['type'] = 'text',
+    mediaUrl?: string,
+    options?: SendMessageOptions,
+  ) => {
     const textToSend = (content ?? inputText).trim();
     if (!conversationId || (!textToSend && !mediaUrl)) return;
 
     const socket = socketService.getSocket();
     if (!socket) return;
 
-    const idempotencyKey = generateUUID();
+    const idempotencyKey = options?.idempotencyKey || generateUUID();
     const optimisticMessage: Message = {
       _id: idempotencyKey,
       conversationId,
@@ -1277,7 +1302,25 @@ export default function ChatRoomScreen() {
       idempotencyKey,
     };
 
-    setMessages((prev) => dedupeMessages([...prev, optimisticMessage]));
+    setMessages((prev) => {
+      const index = prev.findIndex(
+        (message) => message.idempotencyKey === idempotencyKey || message._id === idempotencyKey,
+      );
+
+      if (index === -1) {
+        return dedupeMessages([...prev, optimisticMessage]);
+      }
+
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        ...optimisticMessage,
+        _id: next[index]._id,
+        createdAt: next[index].createdAt || optimisticMessage.createdAt,
+      };
+      return dedupeMessages(next);
+    });
+
     if (!mediaUrl) setInputText('');
 
     if (isTypingRef.current) {
@@ -1285,21 +1328,22 @@ export default function ChatRoomScreen() {
       isTypingRef.current = false;
     }
 
-    socket.emit('send_message', {
-      conversationId,
-      content: textToSend,
-      type,
-      mediaUrl,
-      idempotencyKey,
-    });
+    if (!options?.deferEmit) {
+      socket.emit('send_message', {
+        conversationId,
+        content: textToSend,
+        type,
+        mediaUrl,
+        idempotencyKey,
+      });
+    }
 
     setTimeout(() => scrollToBottom(), 80);
+    return idempotencyKey;
   }, [inputText, conversationId, userId, scrollToBottom]);
 
   const handlePickImage = async () => {
     try {
-      setIsUploadingMedia(true);
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.All,
         allowsEditing: true,
@@ -1310,18 +1354,89 @@ export default function ChatRoomScreen() {
       const asset = result.assets[0];
 
       const isVideo = asset.type === 'video' || Boolean(asset.mimeType?.startsWith('video/'));
-      const uploadType = isVideo ? 'video' : 'image';
+      const messageType: PendingMediaDraft['messageType'] = isVideo ? 'video' : 'image';
+      const uploadType: PendingMediaDraft['uploadType'] = isVideo ? 'video' : 'image';
 
-      const secureUrl = await uploadAssetToCloudinary(asset, uploadType);
-      if (secureUrl) {
-        handleSend('', isVideo ? 'video' : 'image', secureUrl);
-      }
+      setPendingMediaDraft({
+        asset,
+        localUri: asset.uri,
+        messageType,
+        uploadType,
+      });
     } catch (err) {
-      console.error('Upload failed:', err);
-    } finally {
-      setIsUploadingMedia(false);
+      console.error('Pick media failed:', err);
     }
   };
+
+  const handleComposerSend = useCallback(() => {
+    if (pendingMediaDraft) {
+      if (pendingMediaSend || isUploadingMedia) {
+        return;
+      }
+
+      const messageContent = inputText.trim();
+      const pendingMessageId = handleSend(
+        messageContent,
+        pendingMediaDraft.messageType,
+        pendingMediaDraft.localUri,
+        { deferEmit: true },
+      );
+
+      if (!pendingMessageId) {
+        return;
+      }
+
+      setInputText('');
+      setPendingMediaSend({
+        idempotencyKey: pendingMessageId,
+        content: messageContent,
+        messageType: pendingMediaDraft.messageType,
+      });
+
+      void (async () => {
+        try {
+          setIsUploadingMedia(true);
+          const secureUrl = await uploadAssetToCloudinary(
+            pendingMediaDraft.asset,
+            pendingMediaDraft.uploadType,
+          );
+
+          if (!secureUrl) {
+            throw new Error('Upload verify failed');
+          }
+
+          handleSend(
+            messageContent,
+            pendingMediaDraft.messageType,
+            secureUrl,
+            { idempotencyKey: pendingMessageId },
+          );
+
+          setPendingMediaSend(null);
+          setPendingMediaDraft(null);
+        } catch (err) {
+          console.error('Upload failed after send:', err);
+          setMessages((prev) =>
+            prev.filter(
+              (message) => message.idempotencyKey !== pendingMessageId && message._id !== pendingMessageId,
+            ),
+          );
+          setPendingMediaSend(null);
+          Alert.alert('Thong bao', 'Tai media that bai. Vui long thu lai.');
+        } finally {
+          setIsUploadingMedia(false);
+        }
+      })();
+
+      return;
+    }
+
+    if (!inputText.trim()) {
+      return;
+    }
+
+    handleSend();
+  }, [handleSend, inputText, isUploadingMedia, pendingMediaDraft, pendingMediaSend, uploadAssetToCloudinary]);
 
   const handleRecall = async (messageId: string, idempotencyKey?: string) => {
     try {
@@ -1457,6 +1572,16 @@ export default function ChatRoomScreen() {
                 </Pressable>
               ) : (
                 <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content || '[Media]'}</Text>
+              )}
+
+              {message.type !== 'text'
+                && message.type !== 'sticker'
+                && message.type !== 'system-recall'
+                && message.content
+                && message.content.trim().length > 0 && (
+                <Text style={[bubbleStyles.msgText, bubbleStyles.mediaCaptionText, isMe && bubbleStyles.msgTextMe]}>
+                  {message.content}
+                </Text>
               )}
 
               <View style={bubbleStyles.meta}>
@@ -1720,13 +1845,50 @@ export default function ChatRoomScreen() {
           <View style={[styles.composerContainer, { marginBottom: androidKeyboardOffset }]}>
             <TypingIndicator typingUsers={typingUsers} />
 
+            {pendingMediaDraft && (
+              <View style={styles.mediaDraftBar}>
+                {pendingMediaDraft.messageType === 'image' ? (
+                  <Image source={{ uri: pendingMediaDraft.localUri }} style={styles.mediaDraftPreview} resizeMode="cover" />
+                ) : (
+                  <View style={styles.mediaDraftVideoCard}>
+                    <Ionicons name="videocam-outline" size={18} color="#cbd5e1" />
+                    <Text style={styles.mediaDraftVideoText}>Video da chon</Text>
+                  </View>
+                )}
+
+                <View style={styles.mediaDraftMeta}>
+                  <Text style={styles.mediaDraftTitle} numberOfLines={1}>
+                    {pendingMediaDraft.messageType === 'image' ? 'Anh dinh kem' : 'Video dinh kem'}
+                  </Text>
+                  <Text style={styles.mediaDraftStatus}>
+                    {pendingMediaSend
+                      ? isUploadingMedia
+                        ? 'Dang tai sau khi gui'
+                        : 'Dang gui tin nhan'
+                      : 'San sang gui'}
+                  </Text>
+                </View>
+
+                {!pendingMediaSend && !isUploadingMedia && (
+                  <TouchableOpacity
+                    style={styles.mediaDraftRemoveBtn}
+                    onPress={() => {
+                      setPendingMediaDraft(null);
+                    }}
+                  >
+                    <Ionicons name="close" size={16} color="#e2e8f0" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
               <TouchableOpacity
                 style={styles.inputAction}
                 onPress={() => {
                   void handlePickImage();
                 }}
-                disabled={isUploadingMedia}
+                disabled={isUploadingMedia || Boolean(pendingMediaSend)}
               >
                 {isUploadingMedia ? (
                   <ActivityIndicator size="small" color="#10b981" />
@@ -1748,14 +1910,18 @@ export default function ChatRoomScreen() {
                 <TouchableOpacity
                   style={styles.emojiBtn}
                   onPress={() => handleSend(':)', 'sticker')}
-                  disabled={isUploadingMedia}
+                  disabled={Boolean(pendingMediaSend) || isUploadingMedia}
                 >
                   <Ionicons name="happy-outline" size={22} color="#64748b" />
                 </TouchableOpacity>
               </View>
 
-              {inputText.trim() ? (
-                <TouchableOpacity style={styles.sendBtn} onPress={() => handleSend()} disabled={isUploadingMedia}>
+              {inputText.trim() || pendingMediaDraft ? (
+                <TouchableOpacity
+                  style={[styles.sendBtn, pendingMediaSend ? styles.sendBtnDisabled : null]}
+                  onPress={handleComposerSend}
+                  disabled={Boolean(pendingMediaSend)}
+                >
                   <Ionicons name="send" size={20} color="#111827" />
                 </TouchableOpacity>
               ) : (
@@ -1978,6 +2144,9 @@ const bubbleStyles = StyleSheet.create({
   },
   msgTextMe: {
     color: '#111827',
+  },
+  mediaCaptionText: {
+    marginTop: 8,
   },
   recallText: {
     fontStyle: 'italic',
@@ -2267,6 +2436,61 @@ const styles = StyleSheet.create({
     borderTopColor: colors.glassBorder,
     backgroundColor: colors.surfaceHover,
   },
+  mediaDraftBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginHorizontal: 12,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.25)',
+    gap: 10,
+  },
+  mediaDraftPreview: {
+    width: 46,
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: '#0f172a',
+  },
+  mediaDraftVideoCard: {
+    width: 46,
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaDraftVideoText: {
+    marginTop: 2,
+    color: '#cbd5e1',
+    fontSize: 8,
+    fontFamily: 'BeVietnamPro_500Medium',
+  },
+  mediaDraftMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  mediaDraftTitle: {
+    color: '#e2e8f0',
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  mediaDraftStatus: {
+    marginTop: 2,
+    color: '#94a3b8',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  mediaDraftRemoveBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(30,41,59,0.8)',
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -2312,6 +2536,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 0,
+  },
+  sendBtnDisabled: {
+    opacity: 0.65,
   },
   micBtn: {
     width: 40,

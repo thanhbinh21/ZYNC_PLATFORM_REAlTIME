@@ -58,11 +58,17 @@ interface UseChatOptions {
   displayName: string;
 }
 
+export interface SendMessageOptions {
+  idempotencyKey?: string;
+  deferEmit?: boolean;
+}
+
 interface UseChatReturn {
   messages: Message[];
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
-  sendMessage: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
+  sendMessage: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null>;
+  cancelPendingMessage: (idempotencyKey: string) => void;
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
@@ -164,19 +170,41 @@ export function useChat({
         status: 'delivered',
         createdAt: data.createdAt,
       };
-      setMessages((prev) => [...prev, newMessage]);
+
+      setMessages((prev) => {
+        const index = prev.findIndex(
+          (msg) => msg._id === data.messageId || msg.idempotencyKey === data.idempotencyKey,
+        );
+
+        if (index === -1) {
+          return [...prev, newMessage];
+        }
+
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          ...newMessage,
+          _id: data.messageId,
+          createdAt: data.createdAt || next[index].createdAt,
+        };
+        return next;
+      });
+
       setMessageStatus((prev) => ({
         ...prev,
+        [data.idempotencyKey]: 'delivered',
         [data.messageId]: 'delivered',
       }));
 
-      // Notify backend that message was delivered
-      markAsDelivered(data.conversationId, [data.messageId]);
+      if (data.senderId !== userId) {
+        // Notify backend that message was delivered only for messages from other users.
+        markAsDelivered(data.conversationId, [data.messageId]);
 
-      // Auto-mark as read after 500ms
-      setTimeout(() => {
-        markAsRead(data.conversationId as string, [data.messageId]);
-      }, 500);
+        // Auto-mark as read after 500ms
+        setTimeout(() => {
+          markAsRead(data.conversationId as string, [data.messageId]);
+        }, 500);
+      }
     };
 
     const handleMessageSent = (data: {
@@ -184,25 +212,22 @@ export function useChat({
       idempotencyKey: string;
       createdAt: string;
     }) => {
-      // // Replace optimistic message (using idempotencyKey) with real message (using messageId)
-      // setMessages((prev) =>
-      //   prev.map((msg) =>
-      //     msg._id === data.idempotencyKey
-      //       ? { ...msg, _id: data.messageId, createdAt: data.createdAt }
-      //       : msg,
-      //   ),
-      // );
+      // Replace optimistic message (idempotency key) with real server message id.
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === data.idempotencyKey || msg.idempotencyKey === data.idempotencyKey
+            ? { ...msg, _id: data.messageId, createdAt: data.createdAt || msg.createdAt }
+            : msg,
+        ),
+      );
 
-      // Transfer status tracking from idempotencyKey to real messageId (keep status as is)
-      // setMessageStatus((prev) => {
-      //   const newStatus = { ...prev };
-      //   if (prev[data.idempotencyKey]) {
-      //     // Keep the same status, just move it to the real messageId
-      //     newStatus[data.messageId] = prev[data.idempotencyKey];
-      //     delete newStatus[data.idempotencyKey];
-      //   }
-      //   return newStatus;
-      // });
+      setMessageStatus((prev) => {
+        const next = { ...prev };
+        const previousStatus = next[data.idempotencyKey] ?? 'sent';
+        next[data.messageId] = previousStatus;
+        delete next[data.idempotencyKey];
+        return next;
+      });
     };
 
     const handleContentBlocked = (data: {
@@ -292,7 +317,7 @@ export function useChat({
         console.error('Failed to cleanup message listener:', err);
       }
     };
-  }, [conversationId, token]);
+  }, [conversationId, token, userId]);
 
   // Setup status update listener
   useEffect(() => {
@@ -408,17 +433,20 @@ export function useChat({
 
   // Send message
   const handleSendMessage = useCallback(
-    async (content: string, type: MessageType, mediaUrl?: string) => {
+    async (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => {
       if (!isConnected()) {
         setError('Not connected to messaging service');
-        return;
+        return null;
       }
 
-      const idempotencyKey = uuidv4();
+      const idempotencyKey = options?.idempotencyKey || uuidv4();
+      const shouldEmitNow = !options?.deferEmit;
       const timestamp = new Date().toISOString();
 
       try {
-        setIsLoading(true);
+        if (shouldEmitNow) {
+          setIsLoading(true);
+        }
         setError(null);
 
         // Optimistic update
@@ -434,27 +462,68 @@ export function useChat({
           createdAt: timestamp,
         };
 
-        setMessages((prev) => [...prev, optimisticMessage]);
+        setMessages((prev) => {
+          const index = prev.findIndex(
+            (msg) => msg.idempotencyKey === idempotencyKey || msg._id === idempotencyKey,
+          );
+
+          if (index === -1) {
+            return [...prev, optimisticMessage];
+          }
+
+          const next = [...prev];
+          next[index] = {
+            ...next[index],
+            ...optimisticMessage,
+            _id: next[index]._id,
+            createdAt: next[index].createdAt || optimisticMessage.createdAt,
+          };
+          return next;
+        });
+
         setMessageStatus((prev) => ({
           ...prev,
           [idempotencyKey]: 'sent',
         }));
 
-        // Send via socket
-        emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl);
+        if (shouldEmitNow) {
+          // Send via socket only when media is ready or message is plain text
+          emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl);
 
-        // Clear pending typing indicator immediately (don't wait 3s)
-        emitClearPendingTyping(conversationId);
+          // Clear pending typing indicator immediately (don't wait 3s)
+          emitClearPendingTyping(conversationId);
+        }
+
+        return idempotencyKey;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
         setError(errorMsg);
         console.error('Send message error:', err);
+        return null;
       } finally {
-        setIsLoading(false);
+        if (shouldEmitNow) {
+          setIsLoading(false);
+        }
       }
     },
     [conversationId, userId],
   );
+
+  const handleCancelPendingMessage = useCallback((idempotencyKey: string) => {
+    setMessages((prev) =>
+      prev.filter((msg) => msg.idempotencyKey !== idempotencyKey && msg._id !== idempotencyKey),
+    );
+
+    setMessageStatus((prev) => {
+      if (!prev[idempotencyKey]) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      delete next[idempotencyKey];
+      return next;
+    });
+  }, []);
 
   // Mark as read
   const handleMarkAsRead = useCallback(
@@ -588,6 +657,7 @@ export function useChat({
     typingUsers,
     messageStatus,
     sendMessage: handleSendMessage,
+    cancelPendingMessage: handleCancelPendingMessage,
     markAsRead: handleMarkAsRead,
     startTyping: handleStartTyping,
     stopTyping: handleStopTyping,

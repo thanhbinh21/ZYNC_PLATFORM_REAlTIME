@@ -11,6 +11,11 @@ import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { ReactionDetailsResponse } from '@/services/chat';
 import { reportMessage, reactMessage } from '@/services/chat';
 
+interface SendMessageOptions {
+  idempotencyKey?: string;
+  deferEmit?: boolean;
+}
+
 // ==================== ICONS ====================
 
 function PhoneIcon({ className }: { className: string }) {
@@ -47,7 +52,8 @@ interface ChatPanelProps {
   messages?: Message[];
   messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
-  onSendMessage?: (content: string, type: MessageType, mediaUrl?: string) => Promise<void>;
+  onSendMessage?: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null | undefined>;
+  onCancelPendingMessage?: (idempotencyKey: string) => void;
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
@@ -190,7 +196,8 @@ function ChatPanel({
   messages = [],
   messageStatus = {},
   typingUsers = [],
-  onSendMessage = async () => {},
+  onSendMessage = async () => null,
+  onCancelPendingMessage = () => {},
   onStartTyping = () => {},
   onStopTyping = () => {},
   onLoadMore = async () => {},
@@ -437,9 +444,10 @@ function ChatPanel({
 
       {/* Input Area */}
       <MessageInput
-        onSend={(content, type, mediaUrl) => {
-          void onSendMessage(content, type as MessageType, mediaUrl);
+        onSend={(content, type, mediaUrl, options) => {
+          return onSendMessage(content, type as MessageType, mediaUrl, options);
         }}
+        onCancelPendingMessage={onCancelPendingMessage}
         onStartTyping={onStartTyping}
         onStopTyping={onStopTyping}
         isLoading={isLoading}

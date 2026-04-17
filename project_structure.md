@@ -21,6 +21,7 @@ zync-platform/
 │   │   │   │   ├── messages/     # Tin nhắn, media, idempotency
 │   │   │   │   ├── stories/      # Story 24h
 │   │   │   │   ├── notifications/ # Push notification, preferences
+│   │   │   │   ├── ai/           # AI foundation + moderation (moderation/, guards/, fallback/, embeddings/)
 │   │   │   │   └── upload/       # Cấp pre-signed URL upload media
 │   │   │   ├── socket/           # Socket.IO gateway & event handlers
 │   │   │   │   ├── gateway.ts
@@ -32,7 +33,9 @@ zync-platform/
 │   │   │   │   ├── redis.ts      # Redis client
 │   │   │   │   ├── kafka.ts      # Kafka producer/consumer setup
 │   │   │   │   ├── fcm.ts        # Firebase Cloud Messaging
-│   │   │   │   └── web-push.ts   # Web Push API (VAPID)
+│   │   │   │   ├── web-push.ts   # Web Push API (VAPID)
+│   │   │   │   ├── gemini.ts     # Gemini model clients/config
+│   │   │   │   └── neon.ts       # Neon + pgvector migration/client
 │   │   │   ├── shared/           # Utilities, constants, types dùng chung
 │   │   │   │   ├── errors/
 │   │   │   │   ├── logger.ts
@@ -72,21 +75,24 @@ zync-platform/
 │   │   │   │   │   ├── organisms/
 │   │   │   │   │   ├── home.types.ts
 │   │   │   │   │   └── mockData.ts
-│   │   │   │   └── home-dashboard/
+│   │   │   │   ├── home-dashboard/
 │   │   │   │       ├── atoms/
 │   │   │   │       ├── molecules/
 │   │   │   │       ├── organisms/
 │   │   │   │       ├── home-dashboard.types.ts
 │   │   │   │       └── mock-data.ts
+│   │   │   │   └── stories/
 │   │   │   ├── hooks/
 │   │   │   │   ├── use-friends-dashboard.ts
 │   │   │   │   ├── use-home-dashboard.ts
+│   │   │   │   ├── use-stories.ts
 │   │   │   │   ├── use-notifications.ts
 │   │   │   │   └── use-login-form.ts
 │   │   │   └── services/
 │   │   │       ├── api.ts
 │   │   │       ├── auth.ts
 │   │   │       ├── friends.ts
+│   │   │       ├── stories.ts
 │   │   │       ├── notifications.ts
 │   │   │       ├── web-push.ts
 │   │   │       └── socket.ts
@@ -95,8 +101,18 @@ zync-platform/
 │   │   └── package.json
 │   │
 │   └── mobile/                   # React Native application
-│       ├── app/
-│       │   └── index.tsx
+│       ├── app/                  # Expo Router screens
+│       │   ├── (auth)/
+│       │   ├── (tabs)/
+│       │   ├── chat-room.tsx
+│       │   └── _layout.tsx
+│       ├── src/
+│       │   ├── services/
+│       │   ├── store/
+│       │   ├── hooks/
+│       │   ├── components/
+│       │   ├── theme/
+│       │   └── ui/
 │       └── package.json
 │
 ├── packages/
@@ -126,6 +142,7 @@ zync-platform/
 | `messages` | Gửi/nhận tin nhắn, media, idempotency | `messages`, `message_status` |
 | `stories` | CRUD story 24h, viewers | `stories` |
 | `notifications` | Push notification, preferences, mute/unmute | `notifications`, `notification_preferences` |
+| `ai` | Moderation, guard prompt injection, model fallback, embedding/vector services | `moderation_logs` + Neon pgvector tables |
 | `upload` | Cấp pre-signed URL upload media | - (gọi Cloudinary) |
 
 ---
@@ -138,6 +155,8 @@ zync-platform/
 | Socket Gateway | `apps/server/src/socket/gateway.ts` | Đăng ký tất cả socket event handlers |
 | Kafka Worker | `apps/server/src/workers/message.worker.ts` | Consumer Kafka topic `raw-messages` |
 | Notification Worker | `apps/server/src/workers/notification.worker.ts` | Consumer Kafka topic `notifications` |
+| Moderation Worker | `apps/server/src/modules/ai/moderation/moderation.worker.ts` | Worker moderation async (AI-1) |
+| AI Router | `apps/server/src/modules/ai/ai.routes.ts` | AI health route + placeholder AI endpoints |
 | Web App | `apps/web/src/app/page.tsx` | Next.js root page |
 
 ---
@@ -186,7 +205,8 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | Key Pattern | Kiểu | TTL | Mục đích |
 |-------------|------|-----|---------|
 | `user:{userId}:conversations` | String (JSON) | 5 phút | Cache danh sách hội thoại |
-| `online_users` | Hash (userId → timestamp) | 30 giây/field | Presence tracking |
+| `online_users` | Hash (userId → timestamp) | không TTL field | Presence realtime theo kết nối socket |
+| `presence:lastSeen:{userId}` | String | chưa áp dụng (planned) | Last seen cho offline presence API/UI |
 | `typing:{convId}:{userId}` | String | 3 giây | Typing indicator |
 | `idempotency:{key}` | String | 5 phút | Chống gửi trùng tin nhắn |
 | `friends:{userId}` | String (JSON) | 10 phút | Cache danh sách bạn bè |
@@ -195,6 +215,8 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `otp_rl:id:{identifier}` | String | 1 giờ | Rate limit OTP theo SĐT/Email |
 | `blacklist:token:{jti}` | String | = token expiry | JWT revocation |
 | `notif_debounce:{userId}:{convId}` | String | 30 giây | Debounce push notification |
+| `ai_rate:{userId}` | Sorted Set | 61 giây | Sliding-window rate limit cho AI requests |
+| `embed:{taskType}:{slug}` | String (JSON vector) | 30 phút | Cache embedding query/document |
 
 ---
 
@@ -225,6 +247,8 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 ### Client → Server
 | Event | Payload | Mô tả |
 |-------|---------|-------|
+| `join_conversation` | `{conversationId}` | Join room conversation hợp lệ theo membership |
+| `leave_conversation` | `{conversationId}` | Leave room conversation |
 | `send_message` | `{conversationId, content?, type, mediaUrl?, idempotencyKey}` | Gửi tin nhắn (`type`: `text`/`image`/`video`/`audio`/`file`/`sticker`) |
 | `message_read` | `{conversationId, messageIds[]}` | Báo đã đọc |
 | `typing_start` | `{conversationId}` | Bắt đầu gõ |
@@ -237,12 +261,25 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `status_update` | `{messageId, status, userId}` | Cập nhật trạng thái tin nhắn |
 | `typing_indicator` | `{userId, conversationId, isTyping}` | Broadcast typing |
 | `user_online` | `{userId, online, lastSeen}` | Trạng thái online |
+| `new_notification` | `{type, title, body, ...}` | Thông báo realtime toàn cục |
 | `friend_request` | `{requestId, fromUserId, createdAt}` | Lời mời kết bạn mới |
 | `group_updated` | `{groupId, type, data}` | Cập nhật nhóm |
 | `content_blocked` | `{messageId, conversationId, reason, confidence}` | Báo tin nhắn bị chặn bởi moderation |
 | `content_warning` | `{conversationId, messageId?, message}` | Nhắc nhở nội dung nhạy cảm và cảnh báo vi phạm |
+| `reaction_updated` | `{requestId, conversationId, messageRef, ...}` | Event reaction realtime chuẩn mới cho Web/Mobile |
 | `message_reacted` | `{messageId, conversationId, reactionType, userId, actionType, reactions[]}` | Cập nhật reaction realtime |
 | `user_penalty_updated` | `{conversationId, penaltyScore, mutedUntil}` | Đồng bộ điểm vi phạm/mute của user theo conversation |
+| `story_reaction` | `{storyId, userId, reactionType, displayName}` | Realtime reaction cho story owner |
+| `story_reply` | `{storyId, senderId, content, displayName}` | Realtime reply story về DM + notify |
+
+---
+
+## Health & AI Endpoints
+
+| Method | Endpoint | Mô tả |
+|--------|----------|------|
+| GET | `/health` | Liveness cơ bản của server process |
+| GET | `/api/ai/health` | Trạng thái cấu hình AI (Gemini/Neon/toggles) |
 
 ---
 
@@ -271,6 +308,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `stories` | `expiresAt` (TTL index – tự xóa sau 24h), `userId` |
 | `notifications` | `{userId, createdAt: -1}`, `{userId, read}`, `createdAt` (TTL 30 ngày) |
 | `notification_preferences` | `userId` (unique) |
+| `moderation_logs` | `{messageId, createdAt}`, `{reporterId, createdAt}`, `{status, createdAt}` |
 
 ---
 
@@ -281,8 +319,10 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | Runtime | Node.js 20 LTS |
 | Framework | Express.js + Socket.IO |
 | Database | MongoDB 7 (Mongoose ODM) |
+| Vector Database | Neon PostgreSQL + pgvector |
 | Cache / Pub-Sub | Redis 7 (ioredis) |
 | Message Queue | Apache Kafka (kafkajs) |
+| LLM / Embedding | Google Gemini (2.5 Pro/Flash + text-embedding-004) |
 | Web Frontend | Next.js 14 (App Router) |
 | Mobile | React Native (Expo) |
 | Testing | Jest, React Testing Library, Artillery/K6 |

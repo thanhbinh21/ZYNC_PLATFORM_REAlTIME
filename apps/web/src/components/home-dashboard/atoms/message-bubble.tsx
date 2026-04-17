@@ -67,6 +67,8 @@ export function MessageBubble({
   timestamp,
   senderAvatar,
 }: MessageBubbleProps) {
+  const isPendingLocalMedia = Boolean(mediaUrl?.startsWith('blob:'));
+
   const timeStr = new Date(timestamp).toLocaleTimeString('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
@@ -107,20 +109,28 @@ export function MessageBubble({
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-xs lg:max-w-md`}>
         {/* Media */}
         {mediaUrl && (type === 'image' || type === 'video' || type?.startsWith('file/')) && (
-          <div className="mb-1 rounded-lg overflow-hidden">
+          <div className="mb-1 rounded-lg overflow-hidden relative">
             {type === 'image' && (
-              <Image
-                src={mediaUrl}
-                alt="message-image"
-                width={300}
-                height={300}
-                className="max-w-xs max-h-80 object-cover"
-              />
+              isPendingLocalMedia ? (
+                <img
+                  src={mediaUrl}
+                  alt="message-image"
+                  className="max-w-xs max-h-80 object-cover"
+                />
+              ) : (
+                <Image
+                  src={mediaUrl}
+                  alt="message-image"
+                  width={300}
+                  height={300}
+                  className="max-w-xs max-h-80 object-cover"
+                />
+              )
             )}
             {type === 'video' && (
               <video
                 src={mediaUrl}
-                controls
+                controls={!isPendingLocalMedia}
                 className="max-w-xs max-h-80"
               />
             )}
@@ -129,6 +139,12 @@ export function MessageBubble({
                 filename={type.replace('file/', '')}
                 mediaUrl={mediaUrl}
               />
+            )}
+
+            {isPendingLocalMedia && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+                <div className="h-8 w-8 rounded-full border-4 border-[#b8f2e1] border-t-transparent animate-spin" />
+              </div>
             )}
           </div>
         )}
