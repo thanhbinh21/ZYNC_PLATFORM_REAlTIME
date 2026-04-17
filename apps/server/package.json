@@ -9,6 +9,8 @@
     "seed:qa": "ts-node-dev --transpile-only scripts/seed-friend-test-data.ts",
     "build": "tsc",
     "start": "node dist/main.js",
+    "seed:users:4": "ts-node-dev --transpile-only scripts/seed.ts",
+    "reset:data": "ts-node-dev --transpile-only scripts/reset-data.ts",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

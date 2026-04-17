@@ -187,8 +187,7 @@ npm run dev:web
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->
 - [x] Hủy kết bạn, chặn/bỏ chặn người dùng <!-- done: 19/03/2026 -->
 - [x] API danh sách bạn bè với cursor pagination <!-- done: 19/03/2026 -->
-- [x] Cache friends list trong Redis (TTL 10 phút) <!-- done: 19/03/2026 -->
-- [ ] (Optional) Đồng bộ danh bạ điện thoại
+- [x] Cache friends list trong Redis (TTL 10 phút) <!-- done: 19/03/2026 -->- [ ] (Optional) Đồng bộ danh bạ điện thoại
 - [x] Bổ sung API `GET /api/friends/requests` và `GET /api/users/search` phục vụ UI luồng kết bạn <!-- done: 19/03/2026 -->
 - [x] Dựng Friends Dashboard Web (search/send request/incoming-outgoing/list/unfriend/block) tại route `/friends` <!-- done: 19/03/2026 -->
 
@@ -230,6 +229,7 @@ npm run dev:web
 - [x] Hotfix UI chat: khôi phục danh sách hội thoại và header khung chat sau khi chỉnh layout chiều ngang <!-- done: 05/04/2026 -->
 - [x] Thay thế mock data trong Chat Info Panel bằng dữ liệu thông tin thực (Pin, Mute) <!-- done: 12/04/2026 -->
 - [x] Hotfix căn lề bubble chat: tin nhắn gửi bên phải, nhận bên trái trên Web dashboard <!-- done: 16/04/2026 -->
+
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
