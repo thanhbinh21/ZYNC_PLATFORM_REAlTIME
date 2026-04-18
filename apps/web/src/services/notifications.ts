@@ -16,6 +16,8 @@ export interface Notification {
 export interface NotificationPreferences {
   userId: string;
   mutedConversations: string[];
+  mutedUntil?: Record<string, string>;
+  pinnedConversations: string[];
   enablePush: boolean;
   enableSound: boolean;
   enableBadge: boolean;
@@ -78,4 +80,12 @@ export async function muteConversation(conversationId: string, until?: string): 
 // H1.8 – Unmute a conversation
 export async function unmuteConversation(conversationId: string): Promise<void> {
   await apiClient.delete(`/api/notifications/mute/${conversationId}`);
+}
+
+export async function pinConversation(conversationId: string): Promise<void> {
+  await apiClient.post(`/api/notifications/pin/${conversationId}`, { pin: true });
+}
+
+export async function unpinConversation(conversationId: string): Promise<void> {
+  await apiClient.delete(`/api/notifications/pin/${conversationId}`);
 }

@@ -170,6 +170,8 @@ export async function muteConversation(
 
   if (until) {
     update['$set'] = { [`mutedUntil.${conversationId}`]: until };
+  } else {
+    update['$unset'] = { [`mutedUntil.${conversationId}`]: '' };
   }
 
   await NotificationPreferenceModel.findOneAndUpdate(
@@ -191,7 +193,26 @@ export async function unmuteConversation(userId: string, conversationId: string)
   );
 }
 
-// ─── C1.10 – Get preferences ───
+// ─── C1.10 – Pin conversation ───
+
+export async function pinConversation(userId: string, conversationId: string): Promise<void> {
+  await NotificationPreferenceModel.findOneAndUpdate(
+    { userId },
+    { $addToSet: { pinnedConversations: conversationId } },
+    { upsert: true, new: true },
+  );
+}
+
+// ─── C1.11 – Unpin conversation ───
+
+export async function unpinConversation(userId: string, conversationId: string): Promise<void> {
+  await NotificationPreferenceModel.updateOne(
+    { userId },
+    { $pull: { pinnedConversations: conversationId } },
+  );
+}
+
+// ─── C1.12 – Get preferences ───
 
 export async function getPreferences(userId: string): Promise<INotificationPreference> {
   let pref = await NotificationPreferenceModel.findOne({ userId });
@@ -200,6 +221,7 @@ export async function getPreferences(userId: string): Promise<INotificationPrefe
     pref = await NotificationPreferenceModel.create({
       userId,
       mutedConversations: [],
+      pinnedConversations: [],
       enablePush: true,
       enableSound: true,
       enableBadge: true,
@@ -209,7 +231,7 @@ export async function getPreferences(userId: string): Promise<INotificationPrefe
   return pref;
 }
 
-// ─── C1.11 – Update preferences ───
+// ─── C1.13 – Update preferences ───
 
 export async function updatePreferences(
   userId: string,

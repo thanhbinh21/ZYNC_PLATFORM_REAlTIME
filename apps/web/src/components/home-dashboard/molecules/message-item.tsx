@@ -167,7 +167,9 @@ function isGroupLifecycleNotice(message: Message): boolean {
     || normalized.includes('được bạn thêm vào nhóm')
     || normalized.includes('được thêm vào nhóm')
     || normalized.includes('đã bị xóa khỏi nhóm')
-    || normalized.includes('đã bị xoá khỏi nhóm');
+    || normalized.includes('đã bị xoá khỏi nhóm')
+    || normalized.includes('là quản trị viên')
+    || normalized.includes('là trưởng nhóm');
 }
 
 function initialsFromNotice(content: string): string {
@@ -177,6 +179,8 @@ function initialsFromNotice(content: string): string {
     .replace(/được thêm vào nhóm.*/i, '')
     .replace(/đã bị xóa khỏi nhóm.*/i, '')
     .replace(/đã bị xoá khỏi nhóm.*/i, '')
+    .replace(/là quản trị viên.*/i, '')
+    .replace(/là trưởng nhóm.*/i, '')
     .trim();
 
   if (!rawName) {

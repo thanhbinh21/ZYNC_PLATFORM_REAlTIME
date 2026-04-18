@@ -79,12 +79,20 @@ interface ConversationMeta {
   name?: string;
   avatarUrl?: string;
   type?: 'group' | 'private' | 'direct';
+  createdBy?: string;
+  adminIds?: string[];
+  memberApprovalEnabled?: boolean;
+  users?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
 }
 
 interface GroupUpdatedEvent {
   groupId?: string;
   type?: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'member_approval_changed' | 'disbanded';
   data?: {
+    userId?: string;
+    role?: 'admin' | 'member';
+    createdBy?: string;
+    adminIds?: string[];
     name?: string;
     avatarUrl?: string;
   };
@@ -448,10 +456,18 @@ export default function ChatRoomScreen() {
     avatarUrl && avatarUrl.length > 0 ? avatarUrl : undefined,
   );
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+  const [isConversationPinned, setIsConversationPinned] = useState(false);
+  const [conversationMutedUntil, setConversationMutedUntil] = useState<Date | null>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
   const [groupNameDraft, setGroupNameDraft] = useState('');
   const [groupAvatarDraft, setGroupAvatarDraft] = useState<string | undefined>(undefined);
   const [isSavingGroupInfo, setIsSavingGroupInfo] = useState(false);
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
+  const [isUpdatingMemberRole, setIsUpdatingMemberRole] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<Array<{ _id: string; displayName: string; avatarUrl?: string }>>([]);
+  const [groupAdminIds, setGroupAdminIds] = useState<string[]>([]);
+  const [groupCreatorId, setGroupCreatorId] = useState<string | undefined>(undefined);
 
   const isGroupChat = isGroup === 'true';
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
@@ -507,7 +523,10 @@ export default function ChatRoomScreen() {
     if (!conversationId) return;
 
     try {
-      const response = await api.get('/conversations');
+      const [response, prefResponse] = await Promise.all([
+        api.get('/conversations'),
+        api.get('/notifications/preferences'),
+      ]);
       const conversations = Array.isArray(response.data?.data)
         ? (response.data.data as ConversationMeta[])
         : [];
@@ -522,10 +541,52 @@ export default function ChatRoomScreen() {
       if (typeof currentConversation.avatarUrl === 'string' && currentConversation.avatarUrl.trim().length > 0) {
         setConversationAvatarUrl(currentConversation.avatarUrl);
       }
+
+      if (isGroupChat) {
+        setGroupMembers(Array.isArray(currentConversation.users) ? currentConversation.users : []);
+        setGroupAdminIds(Array.isArray(currentConversation.adminIds) ? currentConversation.adminIds : []);
+        setGroupCreatorId(currentConversation.createdBy || currentConversation.adminIds?.[0]);
+      }
+
+      const prefs = (prefResponse.data?.data || {}) as {
+        pinnedConversations?: string[];
+        mutedUntil?: Record<string, string>;
+      };
+
+      const pinnedIds = Array.isArray(prefs.pinnedConversations) ? prefs.pinnedConversations : [];
+      setIsConversationPinned(pinnedIds.includes(conversationId));
+
+      const mutedRaw = prefs.mutedUntil?.[conversationId];
+      if (typeof mutedRaw === 'string') {
+        const mutedDate = new Date(mutedRaw);
+        setConversationMutedUntil(Number.isNaN(mutedDate.getTime()) ? null : mutedDate);
+      } else {
+        setConversationMutedUntil(null);
+      }
     } catch (err: any) {
       console.error('[ERROR] Failed to load conversation meta:', err?.response?.data || err?.message || err);
     }
-  }, [conversationId]);
+  }, [conversationId, isGroupChat]);
+
+  const applyGroupMeta = useCallback((updatedGroup?: {
+    createdBy?: string;
+    adminIds?: string[];
+    users?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
+  }) => {
+    if (!updatedGroup) {
+      return;
+    }
+
+    if (Array.isArray(updatedGroup.users)) {
+      setGroupMembers(updatedGroup.users);
+    }
+    if (Array.isArray(updatedGroup.adminIds)) {
+      setGroupAdminIds(updatedGroup.adminIds);
+    }
+    if (typeof updatedGroup.createdBy === 'string' && updatedGroup.createdBy.trim().length > 0) {
+      setGroupCreatorId(updatedGroup.createdBy);
+    }
+  }, []);
 
   const uploadAssetToCloudinary = useCallback(async (
     asset: ImagePicker.ImagePickerAsset,
@@ -682,6 +743,149 @@ export default function ChatRoomScreen() {
     isGroupChat,
     router,
   ]);
+
+  const handleToggleConversationPin = useCallback(async () => {
+    if (!conversationId) {
+      return;
+    }
+
+    const nextPinned = !isConversationPinned;
+    setIsConversationPinned(nextPinned);
+
+    try {
+      if (nextPinned) {
+        await api.post(`/notifications/pin/${conversationId}`, { pin: true });
+      } else {
+        await api.delete(`/notifications/pin/${conversationId}`);
+      }
+    } catch (err: any) {
+      setIsConversationPinned(!nextPinned);
+      const message = err?.response?.data?.message;
+      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat ghim hoi thoai.');
+    }
+  }, [conversationId, isConversationPinned]);
+
+  const muteConversationWithDuration = useCallback(async (duration: '1h' | '4h' | '8h' | 'until_enabled') => {
+    if (!conversationId) {
+      return;
+    }
+
+    const now = Date.now();
+    const untilDate = duration === '1h'
+      ? new Date(now + 60 * 60 * 1000)
+      : duration === '4h'
+        ? new Date(now + 4 * 60 * 60 * 1000)
+        : duration === '8h'
+          ? new Date(now + 8 * 60 * 60 * 1000)
+          : new Date('9999-12-31T23:59:59.999Z');
+
+    try {
+      await api.post(`/notifications/mute/${conversationId}`, { until: untilDate.toISOString() });
+      setConversationMutedUntil(untilDate);
+      Alert.alert('Thong bao', 'Da tat thong bao hoi thoai.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message;
+      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the tat thong bao hoi thoai.');
+    }
+  }, [conversationId]);
+
+  const handleMuteConversation = useCallback(() => {
+    Alert.alert('Tat thong bao', 'Chon thoi gian tat thong bao:', [
+      { text: 'Trong 1h', onPress: () => { void muteConversationWithDuration('1h'); } },
+      { text: 'Trong 4h', onPress: () => { void muteConversationWithDuration('4h'); } },
+      { text: 'Trong 8h', onPress: () => { void muteConversationWithDuration('8h'); } },
+      { text: 'Cho den khi toi bat lai', onPress: () => { void muteConversationWithDuration('until_enabled'); } },
+      { text: 'Huy', style: 'cancel' },
+    ]);
+  }, [muteConversationWithDuration]);
+
+  const handleUnmuteConversation = useCallback(async () => {
+    if (!conversationId) {
+      return;
+    }
+
+    try {
+      await api.delete(`/notifications/mute/${conversationId}`);
+      setConversationMutedUntil(null);
+      Alert.alert('Thong bao', 'Da bat lai thong bao.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message;
+      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the bat thong bao.');
+    }
+  }, [conversationId]);
+
+  const handleLeaveGroup = useCallback(async () => {
+    if (!conversationId || !isGroupChat) {
+      return;
+    }
+
+    Alert.alert('Roi nhom', 'Ban co chac muon roi nhom nay?', [
+      { text: 'Huy', style: 'cancel' },
+      {
+        text: 'Roi nhom',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await api.delete(`/groups/${conversationId}/members/me`);
+              setIsGroupInfoOpen(false);
+              router.back();
+            } catch (err: any) {
+              const message = err?.response?.data?.message;
+              Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the roi nhom luc nay.');
+            }
+          })();
+        },
+      },
+    ]);
+  }, [conversationId, isGroupChat, router]);
+
+  const handleAssignMemberRole = useCallback(async (memberId: string, role: 'admin' | 'member') => {
+    if (!conversationId || !isGroupChat) {
+      return;
+    }
+
+    try {
+      setIsUpdatingMemberRole(true);
+      const response = await api.patch(`/groups/${conversationId}/members/${memberId}/role`, { role });
+      applyGroupMeta(response.data?.data);
+      Alert.alert('Thong bao', role === 'admin' ? 'Da gan quyen quan tri vien.' : 'Da go quyen quan tri vien.');
+    } catch (err: any) {
+      const message = err?.response?.data?.message;
+      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat quyen thanh vien.');
+    } finally {
+      setIsUpdatingMemberRole(false);
+    }
+  }, [applyGroupMeta, conversationId, isGroupChat]);
+
+  const handleRemoveMember = useCallback(async (memberId: string, memberDisplayName: string) => {
+    if (!conversationId || !isGroupChat) {
+      return;
+    }
+
+    Alert.alert('Xoa thanh vien', `Ban co chac muon xoa ${memberDisplayName} khoi nhom?`, [
+      { text: 'Huy', style: 'cancel' },
+      {
+        text: 'Xoa',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              setIsUpdatingMemberRole(true);
+              const response = await api.delete(`/groups/${conversationId}/members/${memberId}`);
+              applyGroupMeta(response.data?.data);
+              Alert.alert('Thong bao', 'Da xoa thanh vien khoi nhom.');
+            } catch (err: any) {
+              const message = err?.response?.data?.message;
+              Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the xoa thanh vien luc nay.');
+            } finally {
+              setIsUpdatingMemberRole(false);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [applyGroupMeta, conversationId, isGroupChat]);
   const getReactionUserStateForMessage = useCallback((message: Message) => {
     const byId = reactionUserStateByMessage[message._id];
     if (byId) return byId;
@@ -1186,6 +1390,46 @@ export default function ChatRoomScreen() {
         return;
       }
 
+      if (payload.type === 'disbanded') {
+        Alert.alert('Thong bao', 'Nhom da giai tan.');
+        router.back();
+        return;
+      }
+
+      if (payload.type === 'member_removed' && payload.data?.userId === userId) {
+        Alert.alert('Thong bao', 'Ban da roi khoi nhom nay.');
+        router.back();
+        return;
+      }
+
+      if (typeof payload.data?.createdBy === 'string' && payload.data.createdBy.trim().length > 0) {
+        setGroupCreatorId(payload.data.createdBy);
+      }
+
+      if (Array.isArray(payload.data?.adminIds)) {
+        setGroupAdminIds(payload.data.adminIds.filter((id): id is string => typeof id === 'string'));
+      }
+
+      if (payload.type === 'member_removed' && payload.data?.userId) {
+        const removedUserId = payload.data.userId;
+        setGroupMembers((prev) => prev.filter((member) => member._id !== removedUserId));
+        setGroupAdminIds((prev) => prev.filter((adminId) => adminId !== removedUserId));
+      }
+
+      if (payload.type === 'role_changed' && payload.data?.userId && payload.data?.role && !Array.isArray(payload.data?.adminIds)) {
+        const changedUserId = payload.data.userId;
+        const changedRole = payload.data.role;
+        setGroupAdminIds((prev) => {
+          const set = new Set(prev);
+          if (changedRole === 'admin') {
+            set.add(changedUserId);
+          } else {
+            set.delete(changedUserId);
+          }
+          return Array.from(set);
+        });
+      }
+
       if (payload.type === 'name_changed' && typeof payload.data?.name === 'string') {
         setConversationName(payload.data.name);
         router.setParams({ name: payload.data.name });
@@ -1195,6 +1439,10 @@ export default function ChatRoomScreen() {
         const nextAvatar = typeof payload.data?.avatarUrl === 'string' ? payload.data.avatarUrl : '';
         setConversationAvatarUrl(nextAvatar || undefined);
         router.setParams({ avatarUrl: nextAvatar });
+      }
+
+      if (payload.type === 'member_added') {
+        void loadConversationMeta();
       }
     };
 
@@ -1258,6 +1506,7 @@ export default function ChatRoomScreen() {
   }, [
     applyReactionSummaryToMessage,
     conversationId,
+    loadConversationMeta,
     scrollToBottom,
     updateReactionUserStateCache,
     userId,
@@ -1652,11 +1901,22 @@ export default function ChatRoomScreen() {
     ? reactionSheetRows
     : reactionSheetRows.filter((row) => (row.emojiCounts?.[reactionSheetTab] || 0) > 0);
 
+  const allMediaItems = messages.filter((message) => message.type === 'image' || message.type === 'video');
+  const allFileItems = messages.filter((message) => isFileType(String(message.type)) || message.type === 'audio');
+  const allLinkItems = messages.filter((message) => {
+    const content = typeof message.content === 'string' ? message.content : '';
+    return /(https?:\/\/|www\.)/i.test(content);
+  });
+
   const closeReactionSheet = useCallback(() => {
     setReactionSheetVisible(false);
     setReactionSheetData(null);
     setReactionSheetTab('ALL');
   }, []);
+
+  const isCurrentUserGroupCreator = Boolean(isGroupChat && userId && groupCreatorId && userId === groupCreatorId);
+  const isCurrentUserGroupAdmin = Boolean(isGroupChat && userId && groupAdminIds.includes(userId));
+  const canManageMemberRoles = isCurrentUserGroupCreator || isCurrentUserGroupAdmin;
 
   return (
     <LinearGradient
@@ -1764,6 +2024,56 @@ export default function ChatRoomScreen() {
               <View style={styles.groupModalCard}>
                 <Text style={styles.groupModalTitle}>Cap nhat nhom</Text>
 
+                <View style={styles.groupActionRow}>
+                  <TouchableOpacity
+                    style={styles.groupActionItem}
+                    onPress={() => {
+                      if (conversationMutedUntil) {
+                        void handleUnmuteConversation();
+                        return;
+                      }
+                      handleMuteConversation();
+                    }}
+                  >
+                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#d1fae5" />
+                    <Text style={styles.groupActionText}>{conversationMutedUntil ? 'Bat thong bao' : 'Tat thong bao'}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.groupActionItem}
+                    onPress={() => {
+                      void handleToggleConversationPin();
+                    }}
+                  >
+                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#d1fae5" />
+                    <Text style={styles.groupActionText}>{isConversationPinned ? 'Bo ghim' : 'Ghim hoi thoai'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.groupActionRow}>
+                  <TouchableOpacity
+                    style={styles.groupActionItem}
+                    onPress={() => {
+                      setArchiveTab('media');
+                      setIsArchiveOpen(true);
+                    }}
+                  >
+                    <Ionicons name="images-outline" size={18} color="#d1fae5" />
+                    <Text style={styles.groupActionText}>Anh/Video</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.groupActionItem}
+                    onPress={() => {
+                      setArchiveTab('files');
+                      setIsArchiveOpen(true);
+                    }}
+                  >
+                    <Ionicons name="document-text-outline" size={18} color="#d1fae5" />
+                    <Text style={styles.groupActionText}>Files</Text>
+                  </TouchableOpacity>
+                </View>
+
                 <TouchableOpacity
                   style={styles.groupAvatarPicker}
                   onPress={() => {
@@ -1797,6 +2107,53 @@ export default function ChatRoomScreen() {
                   editable={!isSavingGroupInfo}
                 />
 
+                {isGroupChat && (
+                  <View style={styles.memberRoleSection}>
+                    <Text style={styles.memberRoleTitle}>Thanh vien nhom</Text>
+                    <ScrollView style={styles.memberRoleList} nestedScrollEnabled>
+                      {groupMembers.map((member) => {
+                        const isCreator = groupCreatorId === member._id;
+                        const isAdmin = groupAdminIds.includes(member._id);
+                        const isMe = member._id === userId;
+                        return (
+                          <View key={member._id} style={styles.memberRoleItem}>
+                            <View style={styles.memberRoleInfo}>
+                              <Text style={styles.memberRoleName} numberOfLines={1}>
+                                {member.displayName}{isMe ? ' (Ban)' : ''}
+                              </Text>
+                              <Text style={styles.memberRoleMeta}>
+                                {isCreator ? 'Truong nhom' : isAdmin ? 'Quan tri vien' : 'Thanh vien'}
+                              </Text>
+                            </View>
+                            {canManageMemberRoles && !isCreator && (
+                              <View style={styles.memberRoleActions}>
+                                <TouchableOpacity
+                                  style={styles.memberRoleAction}
+                                  onPress={() => {
+                                    void handleAssignMemberRole(member._id, isAdmin ? 'member' : 'admin');
+                                  }}
+                                  disabled={isUpdatingMemberRole}
+                                >
+                                  <Text style={styles.memberRoleActionText}>{isAdmin ? 'Go quyen' : 'Gan quyen'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.memberRemoveAction}
+                                  onPress={() => {
+                                    void handleRemoveMember(member._id, member.displayName);
+                                  }}
+                                  disabled={isUpdatingMemberRole}
+                                >
+                                  <Text style={styles.memberRemoveActionText}>Xoa</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+
                 <View style={styles.groupModalActions}>
                   <TouchableOpacity
                     style={[styles.groupModalButton, styles.groupModalCancelButton]}
@@ -1819,6 +2176,78 @@ export default function ChatRoomScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
+
+                {isGroupChat && (
+                  <TouchableOpacity style={styles.leaveGroupButton} onPress={() => { void handleLeaveGroup(); }}>
+                    <Text style={styles.leaveGroupText}>Roi nhom</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={isArchiveOpen}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setIsArchiveOpen(false)}
+          >
+            <View style={styles.groupModalOverlay}>
+              <View style={[styles.groupModalCard, styles.archiveModalCard]}>
+                <View style={styles.archiveHeaderRow}>
+                  <Text style={styles.groupModalTitle}>Kho luu tru</Text>
+                  <TouchableOpacity onPress={() => setIsArchiveOpen(false)}>
+                    <Text style={styles.groupModalCancelText}>Dong</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.archiveTabRow}>
+                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'media' && styles.archiveTabActive]} onPress={() => setArchiveTab('media')}><Text style={styles.archiveTabText}>Anh/Video</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'files' && styles.archiveTabActive]} onPress={() => setArchiveTab('files')}><Text style={styles.archiveTabText}>Files</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'links' && styles.archiveTabActive]} onPress={() => setArchiveTab('links')}><Text style={styles.archiveTabText}>Links</Text></TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.archiveBody}>
+                  {archiveTab === 'media' && (
+                    <View style={styles.archiveMediaGrid}>
+                      {allMediaItems.length === 0 && <Text style={styles.archiveEmptyText}>Chua co anh/video.</Text>}
+                      {allMediaItems.map((item) => (
+                        <TouchableOpacity key={item._id} style={styles.archiveMediaItem} onPress={() => handleOpenMedia(item.mediaUrl)}>
+                          {item.type === 'image' ? (
+                            <Image source={{ uri: item.mediaUrl }} style={styles.archiveMediaImage} resizeMode="cover" />
+                          ) : (
+                            <View style={styles.archiveVideoPlaceholder}><Ionicons name="play" size={16} color="#d1fae5" /></View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {archiveTab === 'files' && (
+                    <View style={styles.archiveList}>
+                      {allFileItems.length === 0 && <Text style={styles.archiveEmptyText}>Chua co file nao.</Text>}
+                      {allFileItems.map((item) => (
+                        <TouchableOpacity key={item._id} style={styles.archiveListItem} onPress={() => handleOpenMedia(item.mediaUrl)}>
+                          <Text style={styles.archiveListText}>{item.content || 'Tep dinh kem'}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {archiveTab === 'links' && (
+                    <View style={styles.archiveList}>
+                      {allLinkItems.length === 0 && <Text style={styles.archiveEmptyText}>Chua co link nao.</Text>}
+                      {allLinkItems.map((item) => (
+                        <TouchableOpacity key={item._id} style={styles.archiveListItem} onPress={() => {
+                          const content = item.content || '';
+                          void Linking.openURL(content.startsWith('http') ? content : `https://${content}`);
+                        }}>
+                          <Text style={styles.archiveListText}>{item.content || ''}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
               </View>
             </View>
           </Modal>
@@ -2613,6 +3042,79 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#111c2b',
   },
+  memberRoleSection: {
+    width: '100%',
+    marginBottom: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#23415f',
+    backgroundColor: '#0f1f30',
+    padding: 10,
+  },
+  memberRoleTitle: {
+    color: '#d1fae5',
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_700Bold',
+    marginBottom: 8,
+  },
+  memberRoleList: {
+    maxHeight: 180,
+  },
+  memberRoleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1f3a56',
+    backgroundColor: '#13263b',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  memberRoleInfo: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  memberRoleName: {
+    color: '#e2e8f0',
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  memberRoleMeta: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_500Medium',
+    marginTop: 2,
+  },
+  memberRoleAction: {
+    borderRadius: 8,
+    backgroundColor: '#1b7058',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  memberRoleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  memberRoleActionText: {
+    color: '#d1fae5',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  memberRemoveAction: {
+    borderRadius: 8,
+    backgroundColor: '#7f1d1d',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  memberRemoveActionText: {
+    color: '#fecaca',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
   groupModalActions: {
     width: '100%',
     flexDirection: 'row',
@@ -2640,6 +3142,119 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
+  },
+  groupActionRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  groupActionItem: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#13263b',
+    borderWidth: 1,
+    borderColor: '#23415f',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  groupActionText: {
+    color: '#d1fae5',
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_500Medium',
+    textAlign: 'center',
+  },
+  leaveGroupButton: {
+    marginTop: 12,
+    width: '100%',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#7f1d1d',
+    backgroundColor: '#3f1212',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  leaveGroupText: {
+    color: '#fecaca',
+    fontSize: 14,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  archiveModalCard: {
+    maxHeight: '80%',
+    alignItems: 'stretch',
+  },
+  archiveHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  archiveTabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  archiveTab: {
+    flex: 1,
+    borderRadius: 10,
+    backgroundColor: '#13263b',
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  archiveTabActive: {
+    backgroundColor: '#1b7058',
+  },
+  archiveTabText: {
+    color: '#d1fae5',
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  archiveBody: {
+    width: '100%',
+  },
+  archiveMediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  archiveMediaItem: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: '#13263b',
+    overflow: 'hidden',
+  },
+  archiveMediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  archiveVideoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  archiveList: {
+    gap: 8,
+  },
+  archiveListItem: {
+    borderRadius: 8,
+    backgroundColor: '#13263b',
+    borderWidth: 1,
+    borderColor: '#23415f',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  archiveListText: {
+    color: '#d1fae5',
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  archiveEmptyText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_400Regular',
+    marginTop: 6,
   },
   reactionOverlay: {
     flex: 1,
