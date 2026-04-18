@@ -3,12 +3,44 @@ import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { fetchFriends, type FriendUser } from '@/services/friends';
 import {
+  emitCallAccept,
+  emitCallEnd,
+  emitCallInvite,
+  emitCallReject,
+  emitWebRtcAnswer,
+  emitWebRtcIceCandidate,
+  emitWebRtcOffer,
   emitForwardMessage,
+  type CallIncomingPayload,
+  type CallInvitedPayload,
+  type CallParticipantPayload,
+  type CallStatusPayload,
+  type WebRtcAnswerPayload,
+  type WebRtcIceCandidatePayload,
+  type WebRtcOfferPayload,
   emitReactionRemoveAllMine,
   emitReactionUpsert,
+  listenToCallIncoming,
+  listenToCallInvited,
+  listenToCallParticipantJoined,
+  listenToCallParticipantLeft,
+  listenToCallStatus,
+  listenToErrors,
+  listenToWebRtcAnswer,
+  listenToWebRtcIceCandidate,
+  listenToWebRtcOffer,
   listenToReactionAck,
   listenToReactionError,
   listenToReactionUpdated,
+  unlistenToCallIncoming,
+  unlistenToCallInvited,
+  unlistenToCallParticipantJoined,
+  unlistenToCallParticipantLeft,
+  unlistenToCallStatus,
+  unlistenToErrors,
+  unlistenToWebRtcAnswer,
+  unlistenToWebRtcIceCandidate,
+  unlistenToWebRtcOffer,
   unlistenToReactionAck,
   unlistenToReactionError,
   unlistenToReactionUpdated,
@@ -78,6 +110,19 @@ interface PendingReactionRequest {
   ackTimeout: NodeJS.Timeout | null;
 }
 
+type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
+
+interface ActiveCallState {
+  sessionId: string;
+  conversationId?: string;
+  peerUserId: string;
+  peerDisplayName: string;
+  direction: 'incoming' | 'outgoing';
+  status: CallUiStatus;
+  callToken: string;
+  reason?: string;
+}
+
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
@@ -90,9 +135,296 @@ export function useHomeDashboard() {
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [forwardLoading, setForwardLoading] = useState(false);
   const [reactionUserStateByMessage, setReactionUserStateByMessage] = useState<Record<string, MessageReactionUserState>>({});
+  const [activeCall, setActiveCall] = useState<ActiveCallState | null>(null);
+  const [callError, setCallError] = useState<string | null>(null);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingReactionRequestsRef = useRef<Map<string, PendingReactionRequest>>(new Map());
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
+  const activeCallRef = useRef<ActiveCallState | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const pendingRemoteCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const autoResetCallTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingOutgoingCallRef = useRef<{
+    peerUserId: string;
+    peerDisplayName: string;
+    conversationId?: string;
+  } | null>(null);
+
+  const syncLocalPreview = useCallback(() => {
+    if (!localVideoRef.current || !localStreamRef.current) {
+      return;
+    }
+
+    if (localVideoRef.current.srcObject !== localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, []);
+
+  const syncRemotePreview = useCallback(() => {
+    if (!remoteVideoRef.current || !remoteStreamRef.current) {
+      return;
+    }
+
+    if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    }
+  }, []);
+
+  const getRtcConfiguration = useCallback((): RTCConfiguration => {
+    const stunServers: RTCIceServer = {
+      urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'],
+    };
+
+    const turnUrlsRaw = process.env['NEXT_PUBLIC_TURN_URLS'] ?? '';
+    const turnUrls = turnUrlsRaw
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+
+    if (turnUrls.length === 0) {
+      return { iceServers: [stunServers] };
+    }
+
+    return {
+      iceServers: [
+        stunServers,
+        {
+          urls: turnUrls,
+          username: process.env['NEXT_PUBLIC_TURN_USERNAME'] ?? undefined,
+          credential: process.env['NEXT_PUBLIC_TURN_PASSWORD'] ?? undefined,
+        },
+      ],
+    };
+  }, []);
+
+  const stopLocalMedia = useCallback(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+
+    setIsScreenSharing(false);
+  }, []);
+
+  const stopRemoteMedia = useCallback(() => {
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach((track) => track.stop());
+      remoteStreamRef.current = null;
+    }
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const closePeerConnection = useCallback(() => {
+    const connection = peerConnectionRef.current;
+    if (connection) {
+      connection.onicecandidate = null;
+      connection.ontrack = null;
+      connection.onconnectionstatechange = null;
+      connection.close();
+      peerConnectionRef.current = null;
+    }
+    pendingRemoteCandidatesRef.current = [];
+  }, []);
+
+  const attachLocalTracksToPeer = useCallback((connection: RTCPeerConnection) => {
+    const stream = localStreamRef.current;
+    if (!stream) {
+      return;
+    }
+
+    const existingTrackIds = new Set(
+      connection
+        .getSenders()
+        .map((sender) => sender.track?.id)
+        .filter((trackId): trackId is string => Boolean(trackId)),
+    );
+
+    stream.getTracks().forEach((track) => {
+      if (!existingTrackIds.has(track.id)) {
+        connection.addTrack(track, stream);
+      }
+    });
+  }, []);
+
+  const replacePeerVideoTrack = useCallback((videoTrack: MediaStreamTrack | null) => {
+    const connection = peerConnectionRef.current;
+    if (!connection) {
+      return;
+    }
+
+    const videoSender = connection.getSenders().find((sender) => sender.track?.kind === 'video');
+    if (!videoSender) {
+      if (videoTrack && localStreamRef.current) {
+        connection.addTrack(videoTrack, localStreamRef.current);
+      }
+      return;
+    }
+
+    void videoSender.replaceTrack(videoTrack);
+  }, []);
+
+  const flushPendingRemoteCandidates = useCallback(async (connection: RTCPeerConnection) => {
+    if (!connection.remoteDescription || pendingRemoteCandidatesRef.current.length === 0) {
+      return;
+    }
+
+    const candidates = [...pendingRemoteCandidatesRef.current];
+    pendingRemoteCandidatesRef.current = [];
+
+    for (const candidate of candidates) {
+      try {
+        await connection.addIceCandidate(candidate);
+      } catch {
+        setCallError('Khong the dong bo ICE candidate cho cuoc goi.');
+      }
+    }
+  }, []);
+
+  const ensurePeerConnection = useCallback((currentCall: ActiveCallState): RTCPeerConnection | null => {
+    if (typeof RTCPeerConnection === 'undefined') {
+      return null;
+    }
+
+    const existing = peerConnectionRef.current;
+    if (existing) {
+      attachLocalTracksToPeer(existing);
+      return existing;
+    }
+
+    const connection = new RTCPeerConnection(getRtcConfiguration());
+
+    connection.onicecandidate = (event) => {
+      const latestCall = activeCallRef.current;
+      if (!event.candidate || !latestCall || !latestCall.sessionId || !latestCall.callToken) {
+        return;
+      }
+
+      try {
+        emitWebRtcIceCandidate(
+          latestCall.sessionId,
+          latestCall.peerUserId,
+          latestCall.callToken,
+          event.candidate.toJSON(),
+        );
+      } catch {
+        setCallError('Khong the gui ICE candidate.');
+      }
+    };
+
+    connection.ontrack = (event) => {
+      if (!remoteStreamRef.current) {
+        remoteStreamRef.current = new MediaStream();
+      }
+
+      event.streams[0]?.getTracks().forEach((track) => {
+        if (!remoteStreamRef.current?.getTracks().some((currentTrack) => currentTrack.id === track.id)) {
+          remoteStreamRef.current?.addTrack(track);
+        }
+      });
+
+      syncRemotePreview();
+    };
+
+    peerConnectionRef.current = connection;
+    pendingRemoteCandidatesRef.current = [];
+    attachLocalTracksToPeer(connection);
+
+    if (currentCall.status === 'connected') {
+      void flushPendingRemoteCandidates(connection);
+    }
+
+    return connection;
+  }, [attachLocalTracksToPeer, flushPendingRemoteCandidates, getRtcConfiguration, syncRemotePreview]);
+
+  const ensureLocalMedia = useCallback(async (cameraEnabled: boolean = true) => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: cameraEnabled,
+    });
+
+    const audioEnabled = !isMicMuted;
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = audioEnabled;
+    });
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = cameraEnabled;
+    });
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+
+    localStreamRef.current = stream;
+    replacePeerVideoTrack(stream.getVideoTracks()[0] ?? null);
+    setIsCameraEnabled(cameraEnabled);
+    setIsScreenSharing(false);
+    syncLocalPreview();
+  }, [isMicMuted, replacePeerVideoTrack, syncLocalPreview]);
+
+  const scheduleCallReset = useCallback((delayMs: number = 2500) => {
+    if (autoResetCallTimeoutRef.current) {
+      clearTimeout(autoResetCallTimeoutRef.current);
+    }
+
+    autoResetCallTimeoutRef.current = setTimeout(() => {
+      setActiveCall(null);
+      setCallError(null);
+      pendingOutgoingCallRef.current = null;
+      closePeerConnection();
+      stopLocalMedia();
+      stopRemoteMedia();
+    }, delayMs);
+  }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+
+  const clearCallResetTimer = useCallback(() => {
+    if (autoResetCallTimeoutRef.current) {
+      clearTimeout(autoResetCallTimeoutRef.current);
+      autoResetCallTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resolvePeerInfo = useCallback((peerUserId: string): { displayName: string; conversationId?: string } => {
+    const matchedConversation = conversations.find((conversation) => {
+      if (conversation.type !== 'direct') {
+        return false;
+      }
+
+      return conversation.users.some((member) => member._id === peerUserId);
+    });
+
+    const matchedUser = matchedConversation?.users.find((member) => member._id === peerUserId);
+    return {
+      displayName: matchedUser?.displayName ?? 'Người dùng',
+      conversationId: matchedConversation?._id,
+    };
+  }, [conversations]);
+
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
+
+  useEffect(() => {
+    syncLocalPreview();
+    syncRemotePreview();
+  }, [activeCall, syncLocalPreview, syncRemotePreview]);
 
   // Initialize chat hook for real-time messaging
   const {
@@ -976,6 +1308,500 @@ export function useHomeDashboard() {
     };
   }, [ensureConversationAvailable, selectedConversationId, userId]);
 
+  useEffect(() => {
+    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
+    if (!token || !userId) {
+      return;
+    }
+
+    getSocket(token);
+
+    const handleCallInvited = (payload: CallInvitedPayload) => {
+      const pendingOutgoing = pendingOutgoingCallRef.current;
+      const peerInfo = resolvePeerInfo(payload.targetUserId);
+
+      clearCallResetTimer();
+      closePeerConnection();
+      stopRemoteMedia();
+      setCallError(null);
+      setActiveCall({
+        sessionId: payload.sessionId,
+        conversationId: payload.conversationId ?? pendingOutgoing?.conversationId,
+        peerUserId: payload.targetUserId,
+        peerDisplayName: pendingOutgoing?.peerDisplayName ?? peerInfo.displayName,
+        direction: 'outgoing',
+        status: 'outgoing',
+        callToken: payload.callToken,
+      });
+    };
+
+    const handleCallIncoming = (payload: CallIncomingPayload) => {
+      const peerInfo = resolvePeerInfo(payload.fromUserId);
+
+      clearCallResetTimer();
+      closePeerConnection();
+      stopRemoteMedia();
+      setCallError(null);
+      setActiveCall({
+        sessionId: payload.sessionId,
+        conversationId: payload.conversationId ?? peerInfo.conversationId,
+        peerUserId: payload.fromUserId,
+        peerDisplayName: peerInfo.displayName,
+        direction: 'incoming',
+        status: 'incoming',
+        callToken: payload.callToken,
+      });
+
+      if (peerInfo.conversationId) {
+        setSelectedConversationId(peerInfo.conversationId);
+      }
+    };
+
+    const handleCallStatus = (payload: CallStatusPayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      clearCallResetTimer();
+      setActiveCall((prev) => {
+        if (!prev || prev.sessionId !== payload.sessionId) {
+          return prev;
+        }
+
+        const nextStatus: CallUiStatus = payload.status === 'ringing'
+          ? (prev.direction === 'incoming' ? 'incoming' : 'outgoing')
+          : payload.status;
+
+        return {
+          ...prev,
+          status: nextStatus,
+          reason: payload.reason,
+        };
+      });
+
+      if (payload.status === 'connected') {
+        void ensureLocalMedia(isCameraEnabled)
+          .then(() => {
+            const latestCall = activeCallRef.current;
+            if (!latestCall || latestCall.sessionId !== payload.sessionId) {
+              return;
+            }
+
+            const connection = ensurePeerConnection(latestCall);
+            if (!connection) {
+              setCallError('Trinh duyet khong ho tro WebRTC.');
+              return;
+            }
+
+            void flushPendingRemoteCandidates(connection);
+          })
+          .catch(() => {
+            setCallError('Khong the truy cap camera/microphone.');
+          });
+      }
+
+      if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
+        scheduleCallReset();
+      }
+    };
+
+    const handleCallParticipantJoined = async (payload: CallParticipantPayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      if (payload.userId === userId) {
+        return;
+      }
+
+      setActiveCall((prev) => {
+        if (!prev || prev.sessionId !== payload.sessionId) {
+          return prev;
+        }
+
+        if (prev.status === 'connected') {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          status: 'connecting',
+        };
+      });
+
+      if (current.direction === 'outgoing' && current.callToken) {
+        try {
+          const connection = ensurePeerConnection(current);
+          if (!connection) {
+            setCallError('Trinh duyet khong ho tro WebRTC.');
+            return;
+          }
+
+          const offer = await connection.createOffer();
+          await connection.setLocalDescription(offer);
+
+          emitWebRtcOffer(
+            current.sessionId,
+            current.peerUserId,
+            current.callToken,
+            offer,
+          );
+        } catch {
+          setCallError('Khong the gui yeu cau ket noi WebRTC.');
+        }
+      }
+    };
+
+    const handleCallParticipantLeft = (payload: CallParticipantPayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      if (payload.userId === userId) {
+        return;
+      }
+
+      setActiveCall((prev) => {
+        if (!prev || prev.sessionId !== payload.sessionId) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          status: 'ended',
+          reason: payload.reason ?? 'ended',
+        };
+      });
+
+      scheduleCallReset();
+    };
+
+    const handleWebRtcOffer = async (payload: WebRtcOfferPayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      if (!current.callToken || payload.fromUserId !== current.peerUserId) {
+        return;
+      }
+
+      try {
+        const connection = ensurePeerConnection(current);
+        if (!connection) {
+          setCallError('Trinh duyet khong ho tro WebRTC.');
+          return;
+        }
+
+        await connection.setRemoteDescription(payload.sdp as RTCSessionDescriptionInit);
+        await flushPendingRemoteCandidates(connection);
+
+        const answer = await connection.createAnswer();
+        await connection.setLocalDescription(answer);
+
+        emitWebRtcAnswer(
+          payload.sessionId,
+          payload.fromUserId,
+          current.callToken,
+          answer,
+        );
+      } catch {
+        setCallError('Khong the gui phan hoi ket noi WebRTC.');
+      }
+    };
+
+    const handleWebRtcAnswer = async (payload: WebRtcAnswerPayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId || payload.fromUserId !== current.peerUserId) {
+        return;
+      }
+
+      const connection = peerConnectionRef.current;
+      if (!connection) {
+        return;
+      }
+
+      try {
+        await connection.setRemoteDescription(payload.sdp as RTCSessionDescriptionInit);
+        await flushPendingRemoteCandidates(connection);
+      } catch {
+        setCallError('Khong the dong bo phan hoi WebRTC.');
+      }
+    };
+
+    const handleWebRtcIceCandidate = async (payload: WebRtcIceCandidatePayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId || payload.fromUserId !== current.peerUserId) {
+        return;
+      }
+
+      const connection = peerConnectionRef.current ?? ensurePeerConnection(current);
+      if (!connection) {
+        return;
+      }
+
+      if (!connection.remoteDescription) {
+        pendingRemoteCandidatesRef.current.push(payload.candidate);
+        return;
+      }
+
+      try {
+        await connection.addIceCandidate(payload.candidate);
+      } catch {
+        setCallError('Khong the nhan ICE candidate.');
+      }
+    };
+
+    const handleSocketError = (payload: { message: string }) => {
+      if (!payload.message.toLowerCase().includes('call')) {
+        return;
+      }
+      setCallError(payload.message);
+    };
+
+    listenToCallInvited(handleCallInvited);
+    listenToCallIncoming(handleCallIncoming);
+    listenToCallStatus(handleCallStatus);
+    listenToCallParticipantJoined(handleCallParticipantJoined);
+    listenToCallParticipantLeft(handleCallParticipantLeft);
+    listenToWebRtcOffer(handleWebRtcOffer);
+    listenToWebRtcAnswer(handleWebRtcAnswer);
+    listenToWebRtcIceCandidate(handleWebRtcIceCandidate);
+    listenToErrors(handleSocketError);
+
+    return () => {
+      unlistenToCallInvited();
+      unlistenToCallIncoming();
+      unlistenToCallStatus();
+      unlistenToCallParticipantJoined();
+      unlistenToCallParticipantLeft();
+      unlistenToWebRtcOffer();
+      unlistenToWebRtcAnswer();
+      unlistenToWebRtcIceCandidate();
+      unlistenToErrors();
+    };
+  }, [
+    closePeerConnection,
+    clearCallResetTimer,
+    ensureLocalMedia,
+    ensurePeerConnection,
+    flushPendingRemoteCandidates,
+    isCameraEnabled,
+    resolvePeerInfo,
+    scheduleCallReset,
+    stopRemoteMedia,
+    userId,
+  ]);
+
+  const handleStartVideoCall = useCallback(async () => {
+    if (!selectedConversationId || !userId) {
+      return;
+    }
+
+    const selectedConversation = conversations.find((conversation) => conversation._id === selectedConversationId);
+    if (!selectedConversation || selectedConversation.type !== 'direct') {
+      return;
+    }
+
+    const peer = selectedConversation.users.find((member) => member._id !== userId);
+    if (!peer) {
+      return;
+    }
+
+    clearCallResetTimer();
+    closePeerConnection();
+    stopRemoteMedia();
+    setCallError(null);
+    setIsMicMuted(false);
+    setIsCameraEnabled(true);
+
+    pendingOutgoingCallRef.current = {
+      peerUserId: peer._id,
+      peerDisplayName: peer.displayName,
+      conversationId: selectedConversation._id,
+    };
+
+    setActiveCall({
+      sessionId: '',
+      conversationId: selectedConversation._id,
+      peerUserId: peer._id,
+      peerDisplayName: peer.displayName,
+      direction: 'outgoing',
+      status: 'outgoing',
+      callToken: '',
+    });
+
+    try {
+      await ensureLocalMedia(true);
+      emitCallInvite(peer._id, selectedConversation._id);
+    } catch {
+      setCallError('Khong the bat dau cuoc goi. Vui long kiem tra camera/microphone.');
+      setActiveCall(null);
+      pendingOutgoingCallRef.current = null;
+      stopLocalMedia();
+    }
+  }, [
+    closePeerConnection,
+    clearCallResetTimer,
+    conversations,
+    ensureLocalMedia,
+    selectedConversationId,
+    stopRemoteMedia,
+    stopLocalMedia,
+    userId,
+  ]);
+
+  const handleAcceptIncomingCall = useCallback(async () => {
+    const current = activeCallRef.current;
+    if (!current || current.direction !== 'incoming') {
+      return;
+    }
+
+    clearCallResetTimer();
+    setCallError(null);
+
+    try {
+      try {
+        await ensureLocalMedia(isCameraEnabled);
+      } catch {
+        await ensureLocalMedia(false);
+        setCallError('Khong truy cap duoc camera, tiep tuc cuoc goi voi audio.');
+      }
+
+      const connection = ensurePeerConnection(current);
+      if (!connection) {
+        setCallError('Trinh duyet khong ho tro WebRTC.');
+        return;
+      }
+
+      attachLocalTracksToPeer(connection);
+      emitCallAccept(current.sessionId, current.callToken);
+      setActiveCall((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          status: 'connecting',
+        };
+      });
+    } catch {
+      setCallError('Khong the chap nhan cuoc goi. Vui long thu lai.');
+    }
+  }, [attachLocalTracksToPeer, clearCallResetTimer, ensureLocalMedia, ensurePeerConnection, isCameraEnabled]);
+
+  const handleRejectIncomingCall = useCallback(() => {
+    const current = activeCallRef.current;
+    if (!current || current.direction !== 'incoming') {
+      return;
+    }
+
+    try {
+      emitCallReject(current.sessionId, current.callToken, 'rejected');
+    } catch {
+      setCallError('Khong the tu choi cuoc goi luc nay.');
+    }
+
+    setActiveCall((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      return {
+        ...prev,
+        status: 'rejected',
+        reason: 'rejected',
+      };
+    });
+    scheduleCallReset(1200);
+  }, [scheduleCallReset]);
+
+  const handleEndCall = useCallback(() => {
+    const current = activeCallRef.current;
+    if (!current) {
+      return;
+    }
+
+    if (current.sessionId && current.callToken) {
+      try {
+        emitCallEnd(current.sessionId, current.callToken, 'ended');
+      } catch {
+        setCallError('Khong the ket thuc cuoc goi tu server.');
+      }
+    }
+
+    setActiveCall((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      return {
+        ...prev,
+        status: 'ended',
+        reason: 'ended',
+      };
+    });
+    scheduleCallReset(1200);
+  }, [scheduleCallReset]);
+
+  const handleToggleMic = useCallback(() => {
+    setIsMicMuted((prev) => {
+      const next = !prev;
+      localStreamRef.current?.getAudioTracks().forEach((track) => {
+        track.enabled = !next;
+      });
+      return next;
+    });
+  }, []);
+
+  const handleToggleCamera = useCallback(() => {
+    setIsCameraEnabled((prev) => {
+      const next = !prev;
+      localStreamRef.current?.getVideoTracks().forEach((track) => {
+        track.enabled = next;
+      });
+      return next;
+    });
+  }, []);
+
+  const handleToggleScreenShare = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
+      setCallError('Trinh duyet khong ho tro chia se man hinh.');
+      return;
+    }
+
+    if (isScreenSharing) {
+      await ensureLocalMedia(isCameraEnabled);
+      return;
+    }
+
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const displayTrack = displayStream.getVideoTracks()[0];
+      if (!displayTrack) {
+        return;
+      }
+
+      const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
+      localStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
+
+      const mergedStream = new MediaStream([...audioTracks, displayTrack]);
+      localStreamRef.current = mergedStream;
+      replacePeerVideoTrack(displayTrack);
+      setIsScreenSharing(true);
+      syncLocalPreview();
+
+      displayTrack.onended = () => {
+        void ensureLocalMedia(isCameraEnabled).catch(() => {
+          setCallError('Khong the quay lai camera sau khi dung chia se man hinh.');
+        });
+      };
+    } catch {
+      setCallError('Khong the bat chia se man hinh.');
+    }
+  }, [ensureLocalMedia, isCameraEnabled, isScreenSharing, replacePeerVideoTrack, syncLocalPreview]);
+
   const disbandGroupConversation = useCallback(
     async (groupId: string) => {
       setGroupActionLoading(true);
@@ -1006,6 +1832,7 @@ export function useHomeDashboard() {
         participantAvatar: conv.name?.substring(0, 2).toUpperCase() || 'GR',
         participantAvatarUrl: conv.avatarUrl,
         isOnline: true,
+        participantUserId: undefined,
       };
     }
 
@@ -1015,6 +1842,7 @@ export function useHomeDashboard() {
       participantAvatar: otherUser?.displayName?.substring(0, 2).toUpperCase(),
       participantAvatarUrl: otherUser?.avatarUrl,
       isOnline: true,
+      participantUserId: otherUser?._id,
     };
   }, [conversations, selectedConversationId, userId]);
 
@@ -1301,12 +2129,22 @@ export function useHomeDashboard() {
     }
   }, [forwardingMessage]);
 
+  const selectedConversationRaw = conversations.find((conversation) => conversation._id === selectedConversationId);
+  const isOneToOneConversationSelected = Boolean(
+    selectedConversationRaw && selectedConversationRaw.type === 'direct',
+  );
+
   // Cleanup typing timeout on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+
+      clearCallResetTimer();
+      closePeerConnection();
+      stopLocalMedia();
+      stopRemoteMedia();
 
       pendingReactionRequestsRef.current.forEach((pending) => {
         if (pending.ackTimeout) {
@@ -1315,7 +2153,7 @@ export function useHomeDashboard() {
       });
       pendingReactionRequestsRef.current.clear();
     };
-  }, []);
+  }, [clearCallResetTimer, closePeerConnection, stopLocalMedia, stopRemoteMedia]);
 
   return {
     data,
@@ -1349,6 +2187,22 @@ export function useHomeDashboard() {
     onReactionRemoveAllMine: handleReactionRemoveAllMine,
     onFetchReactionDetails: handleFetchReactionDetails,
     reactionUserStateByMessage,
+    callStatus: activeCall?.status ?? 'idle',
+    callPeerName: activeCall?.peerDisplayName,
+    callError,
+    isMicMuted,
+    isCameraEnabled,
+    isScreenSharing,
+    localVideoRef,
+    remoteVideoRef,
+    isCallingAvailable: isOneToOneConversationSelected,
+    onStartVideoCall: handleStartVideoCall,
+    onAcceptIncomingCall: handleAcceptIncomingCall,
+    onRejectIncomingCall: handleRejectIncomingCall,
+    onEndCall: handleEndCall,
+    onToggleMic: handleToggleMic,
+    onToggleCamera: handleToggleCamera,
+    onToggleScreenShare: handleToggleScreenShare,
     userPenaltyScore,
     userMutedUntil,
     forwardModalOpen,

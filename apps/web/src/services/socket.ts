@@ -310,6 +310,269 @@ export function unlistenToTypingIndicators(): void {
   }
 }
 
+export interface CallInvitedPayload {
+  sessionId: string;
+  conversationId?: string;
+  targetUserId: string;
+  callType: 'video';
+  timeoutAt?: string;
+  callToken: string;
+  callTokenExpiresInSeconds: number;
+}
+
+export interface CallIncomingPayload {
+  sessionId: string;
+  conversationId?: string;
+  fromUserId: string;
+  callType: 'video';
+  timeoutAt?: string;
+  callToken: string;
+  callTokenExpiresInSeconds: number;
+}
+
+export interface CallStatusPayload {
+  sessionId: string;
+  status: 'ringing' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
+  reason?: string;
+}
+
+export interface CallParticipantPayload {
+  sessionId: string;
+  userId: string;
+  reason?: string;
+}
+
+export interface WebRtcOfferPayload {
+  sessionId: string;
+  fromUserId: string;
+  sdp: unknown;
+}
+
+export interface WebRtcAnswerPayload {
+  sessionId: string;
+  fromUserId: string;
+  sdp: unknown;
+}
+
+export interface WebRtcIceCandidatePayload {
+  sessionId: string;
+  fromUserId: string;
+  candidate: RTCIceCandidateInit;
+}
+
+export function emitCallInvite(targetUserId: string, conversationId?: string): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('call_invite', {
+    targetUserId,
+    conversationId,
+  });
+}
+
+export function emitCallAccept(sessionId: string, callToken: string): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('call_accept', { sessionId, callToken });
+}
+
+export function emitCallReject(
+  sessionId: string,
+  callToken: string,
+  reason: 'rejected' | 'busy' = 'rejected',
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('call_reject', { sessionId, callToken, reason });
+}
+
+export function emitCallEnd(sessionId: string, callToken: string, reason: string = 'ended'): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('call_end', { sessionId, callToken, reason });
+}
+
+export function emitWebRtcOffer(
+  sessionId: string,
+  toUserId: string,
+  callToken: string,
+  sdp: unknown,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('webrtc_offer', {
+    sessionId,
+    toUserId,
+    callToken,
+    sdp,
+  });
+}
+
+export function emitWebRtcAnswer(
+  sessionId: string,
+  toUserId: string,
+  callToken: string,
+  sdp: unknown,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('webrtc_answer', {
+    sessionId,
+    toUserId,
+    callToken,
+    sdp,
+  });
+}
+
+export function emitWebRtcIceCandidate(
+  sessionId: string,
+  toUserId: string,
+  callToken: string,
+  candidate: RTCIceCandidateInit,
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('webrtc_ice_candidate', {
+    sessionId,
+    toUserId,
+    callToken,
+    candidate,
+  });
+}
+
+export function listenToCallInvited(callback: (data: CallInvitedPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('call_invited');
+  socket.on('call_invited', callback);
+}
+
+export function unlistenToCallInvited(): void {
+  if (socket) {
+    socket.off('call_invited');
+  }
+}
+
+export function listenToCallIncoming(callback: (data: CallIncomingPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('call_incoming');
+  socket.on('call_incoming', callback);
+}
+
+export function unlistenToCallIncoming(): void {
+  if (socket) {
+    socket.off('call_incoming');
+  }
+}
+
+export function listenToCallStatus(callback: (data: CallStatusPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('call_status');
+  socket.on('call_status', callback);
+}
+
+export function unlistenToCallStatus(): void {
+  if (socket) {
+    socket.off('call_status');
+  }
+}
+
+export function listenToCallParticipantJoined(callback: (data: CallParticipantPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('call_participant_joined');
+  socket.on('call_participant_joined', callback);
+}
+
+export function unlistenToCallParticipantJoined(): void {
+  if (socket) {
+    socket.off('call_participant_joined');
+  }
+}
+
+export function listenToCallParticipantLeft(callback: (data: CallParticipantPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('call_participant_left');
+  socket.on('call_participant_left', callback);
+}
+
+export function unlistenToCallParticipantLeft(): void {
+  if (socket) {
+    socket.off('call_participant_left');
+  }
+}
+
+export function listenToWebRtcOffer(callback: (data: WebRtcOfferPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('webrtc_offer');
+  socket.on('webrtc_offer', callback);
+}
+
+export function unlistenToWebRtcOffer(): void {
+  if (socket) {
+    socket.off('webrtc_offer');
+  }
+}
+
+export function listenToWebRtcAnswer(callback: (data: WebRtcAnswerPayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('webrtc_answer');
+  socket.on('webrtc_answer', callback);
+}
+
+export function unlistenToWebRtcAnswer(): void {
+  if (socket) {
+    socket.off('webrtc_answer');
+  }
+}
+
+export function listenToWebRtcIceCandidate(callback: (data: WebRtcIceCandidatePayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  socket.off('webrtc_ice_candidate');
+  socket.on('webrtc_ice_candidate', callback);
+}
+
+export function unlistenToWebRtcIceCandidate(): void {
+  if (socket) {
+    socket.off('webrtc_ice_candidate');
+  }
+}
+
 export const listenToContentBlocked = (callback: (data: any) => void) => {
   if (socket) socket.on('content_blocked', callback);
 };
@@ -708,6 +971,29 @@ export const socketService = {
   clearPendingTyping,
   listenToTypingIndicators,
   unlistenToTypingIndicators,
+  emitCallInvite,
+  emitCallAccept,
+  emitCallReject,
+  emitCallEnd,
+  emitWebRtcOffer,
+  emitWebRtcAnswer,
+  emitWebRtcIceCandidate,
+  listenToCallInvited,
+  unlistenToCallInvited,
+  listenToCallIncoming,
+  unlistenToCallIncoming,
+  listenToCallStatus,
+  unlistenToCallStatus,
+  listenToCallParticipantJoined,
+  unlistenToCallParticipantJoined,
+  listenToCallParticipantLeft,
+  unlistenToCallParticipantLeft,
+  listenToWebRtcOffer,
+  unlistenToWebRtcOffer,
+  listenToWebRtcAnswer,
+  unlistenToWebRtcAnswer,
+  listenToWebRtcIceCandidate,
+  unlistenToWebRtcIceCandidate,
   deleteMessageForMe,
   recallMessage,
   listenToMessageDeletion,

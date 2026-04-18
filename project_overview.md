@@ -109,6 +109,10 @@ npm run dev:web
 | D6 | Idempotency key cho tin nhắn | Chống gửi trùng do retry từ client |
 | D7 | Modular Monolith trước Microservices | Giảm complexity triển khai ở giai đoạn đầu |
 | D8 | Hybrid dev: Redis+Kafka local Docker, MongoDB+Cloudinary+Resend cloud | Redis 10K cmd/ngày không đủ cho real-time; Redpanda nhẹ hơn Kafka+ZK 4x; Cloudinary có CDN+transformation miễn phí và giữ nguyên lên production |
+| D9 | Realtime Calling rollout theo 2 bước: 1-1 P2P trước, group SFU sau | Giảm effort ban đầu, ship nhanh value cao cho user, hạn chế context cost khi mobile core chưa ổn định |
+| D10 | Signaling call đi qua Socket.IO, media đi trực tiếp qua WebRTC | Tận dụng hạ tầng realtime sẵn có, tách control-plane và media-plane để giảm tải app server |
+| D11 | Bắt buộc TURN (coturn) cho production + fallback audio-only khi mạng yếu | Tăng tỷ lệ kết nối thành công qua NAT/firewall và giữ trải nghiệm ổn định trên mạng di động |
+| D12 | Defer SFU group call tới sau khi hoàn tất mobile core M4/M5 | Tránh vừa build core mobile vừa debug media-plane phức tạp, giảm rủi ro tiến độ |
 
 ---
 
@@ -256,6 +260,54 @@ npm run dev:web
 - [x] Notification preferences: user chọn mute conversation/group <!-- done: 12/04/2026 -->
 - [x] Đảm bảo thông báo hiển thị toàn cục (global) trên tất cả các tab của Web Dashboard <!-- done: 12/04/2026 -->
 - [ ] APNs placeholder cho iOS (implement khi có mobile app)
+
+### Phase 7.5 – Realtime Calling 1-1 & Group (Module F27–F33)
+
+> **Định hướng rollout:** Ưu tiên 1-1 video call WebRTC P2P + TURN trước (value cao, effort thấp), group call dùng SFU (LiveKit/mediasoup) triển khai ở đợt sau khi M4/M5 mobile ổn định.
+
+- [x] BA: Chốt chiến lược triển khai gọi video theo 2 bước (P2P 1-1 trước, SFU group sau) + TURN mandatory <!-- done: 18/04/2026 by binhdev -->
+- [x] BA: Chốt acceptance criteria rollout <!-- done: 18/04/2026 by binhdev -->
+  - Milestone A (1-1 P2P):
+    - Given 2 user đã là bạn bè accepted, When caller gửi `call_invite`, Then callee nhận `call_incoming` và toàn bộ luồng setup đạt p95 < 3 giây (từ invite đến `call_status=connected`) trong môi trường mạng ổn định.
+    - Given 100 phiên gọi thử nghiệm trên Wi-Fi/4G ổn định, When thực hiện invite->accept->offer/answer, Then tỷ lệ join thành công >= 95%.
+    - Given callee không bắt máy trong timeout, When hết thời gian `CALL_RING_TIMEOUT_MS`, Then session tự chuyển `missed` với reason `timeout` và phát `call_status` cho cả 2 phía.
+    - Given client gửi signaling event thiếu `callToken`, When server nhận payload, Then request bị từ chối và không relay offer/answer/ice.
+  - Milestone B (group SFU, defer):
+    - Given phòng gọi nhóm 3-10 người, When thành viên join/leave liên tục, Then phiên gọi vẫn ổn định, không crash room và chất lượng media giữ mức chấp nhận được.
+    - Given host kết thúc cuộc gọi nhóm, When phát lệnh end-call, Then toàn bộ participant nhận trạng thái kết thúc đồng bộ.
+
+- [x] BA: Chốt state machine cuộc gọi Milestone A (ringing, connecting, connected, ended, missed, rejected, busy) <!-- done: 18/04/2026 by binhdev -->
+- [x] BA: Chốt policy nghiệp vụ Milestone A
+  - 1-1: chỉ gọi khi friendship `accepted`
+  - timeout: auto-miss sau 30 giây nếu không bắt máy <!-- done: 18/04/2026 by binhdev -->
+- [x] BA: Chốt policy nghiệp vụ group call (member conversation mới được vào call) <!-- done: 18/04/2026 by binhdev -->
+  - Chỉ user đang là member hợp lệ của conversation mới được cấp token/join call room.
+  - User bị remove khỏi conversation trong lúc call phải bị revoke quyền signaling/media ở lần heartbeat/token check kế tiếp.
+  - Milestone B giới hạn mặc định 10 participant/room; vượt ngưỡng trả lỗi business để tránh degrade chất lượng.
+  - Quyền host/admin nhóm có thể kết thúc phiên gọi cho toàn bộ participant; member thường chỉ được rời cuộc gọi của mình.
+- [x] DEV-BE (Milestone A): Tạo `modules/calls/` cho 1-1 P2P (create session, invite, accept/reject, end, missed) <!-- done: 18/04/2026 by binhdev -->
+- [x] DEV-BE (Milestone A): Thêm collections `call_sessions`, `call_participants`, `call_events` + index truy vết call quality <!-- done: 18/04/2026 by binhdev -->
+- [x] DEV-RT (Milestone A): Hoàn thiện signaling P2P cho 1-1 (offer/answer/ice + invite/accepted/rejected/timeout/ended) <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hotfix end-call reliability: cho phep `call_end` dung token het han (van verify signature/session/user) de 1 ben ket thuc la dong bo ket thuc cho ca 2 ben <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hotfix call history: ghi message text "Cuoc goi da ket thuc" (kem thoi luong neu co) vao conversation khi ket thuc cuoc goi <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hotfix call history day du: ghi message tom tat cho ca `missed`/`rejected` va dedupe theo `sessionId+status` de tranh trung lich su <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hotfix stale call session: tu dong xu ly session active bi ket (`ringing` qua han -> `missed`, `connected` qua nguong stale -> `ended`) truoc khi tao invite moi, tranh loi `A call between these users is already active` sau restart <!-- done: 18/04/2026 by binhdev -->
+- [x] DEV-INFRA (Milestone A): Dựng coturn local (Docker Compose) + chuẩn hóa biến cấu hình TURN creds/URLs <!-- done: 18/04/2026 by binhdev -->
+- [ ] DEV-INFRA (Milestone A): Dựng coturn staging, kiểm thử NAT traversal và fallback audio-only
+- [x] DEV-INFRA (Milestone A): Thêm metrics call quality cho 1-1 (join success rate, setup time, reconnect, drop rate) <!-- done: 18/04/2026 by binhdev -->
+- [x] DEV-WEB: UI gọi video 1-1 (incoming/outgoing ring, preview camera, mute/unmute, on/off camera, share screen, end call) <!-- done: 18/04/2026 by binhdev -->
+  - [x] Baseline Web call UI: incoming/outgoing ring, panel điều khiển cuộc gọi, preview local camera, mute/unmute, on/off camera, share screen, end call + nối signaling event từ socket <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hoàn thiện render media peer thật bằng WebRTC peer connection + offer/answer/ICE trên Web chat panel <!-- done: 18/04/2026 by binhdev -->
+  - [x] Chuẩn hóa biến môi trường WebRTC cho browser (`NEXT_PUBLIC_TURN_*`) để test call Web ổn định với TURN local <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hotfix Web call UX: chuyển panel call thành modal overlay nổi trên chat + fallback nhận cuộc gọi audio-only khi camera bị chặn <!-- done: 18/04/2026 by binhdev -->
+- [ ] DEV-MOBILE (Milestone A): UI/UX parity cho 1-1 call với Web (audio route, camera switch, background/foreground handling)
+- [x] DEV-SECURITY: Bảo vệ call bằng access token ngắn hạn (ephemeral call token), chống join trái phép qua roomId đoán được <!-- done: 18/04/2026 by binhdev -->
+- [x] QC (Milestone A): E2E test 1-1 call (happy path, reject, missed, reconnect) <!-- done: 18/04/2026 by binhdev -->
+- [ ] QC (Milestone A): Test TURN bắt buộc trên mạng NAT/4G, xác nhận fallback audio-only khi mạng yếu
+- [ ] DEV (Milestone B - Defer): Tích hợp SFU group call (ưu tiên LiveKit) sau khi hoàn tất Mobile M4/M5
+- [ ] DEV-WEB (Milestone B - Defer): UI gọi nhóm (grid layout động, active speaker, raise hand/mute all cho admin nhóm)
+- [ ] DEV-MOBILE (Milestone B - Defer): Parity UI/UX group call trên mobile
+- [ ] QC (Milestone B - Defer): E2E group call (3-10 users, join/leave liên tục, host end-call)
 
 ### Phase M1 – Mobile Foundation & Infrastructure (Lõi)
 
@@ -413,7 +465,6 @@ npm run dev:web
 - [ ] D3: Error code standardization (AUTH_001, MSG_002, AI_001...)
 
 ### Phase 8 – Quality & Hardening
-- [x] Chuẩn hóa pipeline QC: sau khi test phải dọn process/service để tránh chiếm port dev (`3000`, `3001`) <!-- done: 05/04/2026 -->
 - [ ] Unit test coverage > 60% (target 80% iterative) – Jest + React Testing Library
 - [ ] Integration test: API + Socket.IO + Kafka mock + AI module (Gemini mock)
 - [ ] Load test: Artillery/K6 – 500 CCU, 200 msg/s

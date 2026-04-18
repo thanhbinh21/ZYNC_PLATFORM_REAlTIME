@@ -14,8 +14,10 @@ import { uploadRouter } from './modules/upload/upload.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { aiRouter } from './modules/ai/ai.routes';
 import { moderationAdminRouter } from './modules/ai/moderation/moderation.controller';
+import { callsRouter } from './modules/calls/calls.routes';
 import { AppError } from './shared/errors/app-error';
 import { logger } from './shared/logger';
+import { renderMetrics } from './shared/metrics';
 
 export function createApp(): Application {
   const app = express();
@@ -45,6 +47,16 @@ export function createApp(): Application {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  app.get('/metrics', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const metrics = await renderMetrics();
+      res.setHeader('Content-Type', metrics.contentType);
+      res.send(metrics.body);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Đăng ký toàn bộ routes
   app.use('/api/auth', authRouter);
   app.use('/api/users', usersRouter);
@@ -56,6 +68,7 @@ export function createApp(): Application {
   app.use('/api/upload', uploadRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/ai', aiRouter);
+  app.use('/api/calls', callsRouter);
   app.use('/api/admin/moderation', moderationAdminRouter);
 
   // Xử lý route không tồn tại
