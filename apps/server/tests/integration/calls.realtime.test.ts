@@ -37,6 +37,8 @@ import { initSocketGateway } from '../../src/socket/gateway';
 import { UserModel } from '../../src/modules/users/user.model';
 import { FriendshipModel } from '../../src/modules/friends/friendship.model';
 import { CallEventModel, CallParticipantModel, CallSessionModel } from '../../src/modules/calls/calls.model';
+import { ConversationModel } from '../../src/modules/conversations/conversation.model';
+import { ConversationMemberModel } from '../../src/modules/conversations/conversation-member.model';
 
 let app: Application;
 let mongoServer: MongoMemoryServer;
@@ -203,6 +205,8 @@ beforeEach(async () => {
     CallEventModel.deleteMany({}),
     CallParticipantModel.deleteMany({}),
     CallSessionModel.deleteMany({}),
+    ConversationMemberModel.deleteMany({}),
+    ConversationModel.deleteMany({}),
     FriendshipModel.deleteMany({}),
     UserModel.deleteMany({}),
   ]);
@@ -567,6 +571,119 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
     } finally {
       disconnectSockets(callerSocket, calleeSocket);
       delete process.env['CALL_CONNECTED_STALE_MS'];
+    }
+  });
+
+  it('group call path: invite group -> multiple incoming -> participant join signaling', async () => {
+    const caller = await UserModel.create({
+      email: 'group-caller@test.com',
+      displayName: 'Group Caller',
+    });
+    const participantA = await UserModel.create({
+      email: 'group-a@test.com',
+      displayName: 'Group Member A',
+    });
+    const participantB = await UserModel.create({
+      email: 'group-b@test.com',
+      displayName: 'Group Member B',
+    });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Nhóm test call',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      {
+        conversationId: conversation._id.toString(),
+        userId: caller._id.toString(),
+        role: 'admin',
+      },
+      {
+        conversationId: conversation._id.toString(),
+        userId: participantA._id.toString(),
+        role: 'member',
+      },
+      {
+        conversationId: conversation._id.toString(),
+        userId: participantB._id.toString(),
+        role: 'member',
+      },
+    ]);
+
+    const callerSocket = await connectClient(issueAccessToken(caller._id.toString()));
+    const participantASocket = await connectClient(issueAccessToken(participantA._id.toString()));
+    const participantBSocket = await connectClient(issueAccessToken(participantB._id.toString()));
+
+    try {
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true,
+      );
+
+      expect(invited['participantIds']).toHaveLength(3);
+      expect(invited['callToken']).toBeTruthy();
+
+      const incomingA = await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+      const incomingB = await waitForEventMatching<Record<string, any>>(
+        participantBSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      expect(incomingA['isGroupCall']).toBe(true);
+      expect(incomingB['isGroupCall']).toBe(true);
+
+      participantASocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incomingA['callToken'],
+      });
+
+      const joinedPayload = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+      expect(Array.isArray(joinedPayload['joinedParticipantIds'])).toBe(true);
+      expect(joinedPayload['joinedParticipantIds']).toContain(caller._id.toString());
+      expect(joinedPayload['joinedParticipantIds']).toContain(participantA._id.toString());
+
+      callerSocket.emit('webrtc_offer', {
+        sessionId: invited['sessionId'],
+        toUserId: participantA._id.toString(),
+        sdp: { type: 'offer', sdp: 'group-offer-a' },
+        callToken: invited['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'webrtc_offer',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['fromUserId'] === caller._id.toString(),
+      );
+
+      participantASocket.emit('webrtc_answer', {
+        sessionId: invited['sessionId'],
+        toUserId: caller._id.toString(),
+        sdp: { type: 'answer', sdp: 'group-answer-a' },
+        callToken: incomingA['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'webrtc_answer',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['fromUserId'] === participantA._id.toString(),
+      );
+    } finally {
+      disconnectSockets(callerSocket, participantASocket, participantBSocket);
     }
   });
 });

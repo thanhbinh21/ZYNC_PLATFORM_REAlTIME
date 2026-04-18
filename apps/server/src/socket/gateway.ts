@@ -60,6 +60,10 @@ interface CallInvitePayload {
   conversationId?: string;
 }
 
+interface CallGroupInvitePayload {
+  conversationId: string;
+}
+
 interface CallSessionPayload {
   sessionId: string;
   callToken: string;
@@ -359,6 +363,15 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
+    socket.on('call_group_invite', async (payload: unknown) => {
+      try {
+        await handleCallGroupInvite(io, socket as AuthSocket, payload);
+      } catch (err) {
+        logger.error('call_group_invite error', err);
+        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to invite group call' });
+      }
+    });
+
     socket.on('call_accept', async (payload: unknown) => {
       try {
         await handleCallAccept(io, socket as AuthSocket, payload);
@@ -514,6 +527,22 @@ function parseCallInvitePayload(payload: unknown): CallInvitePayload {
   return {
     targetUserId,
     conversationId: typeof conversationId === 'string' ? conversationId : undefined,
+  };
+}
+
+function parseCallGroupInvitePayload(payload: unknown): CallGroupInvitePayload {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new BadRequestError('Invalid call_group_invite payload');
+  }
+
+  const data = payload as Record<string, unknown>;
+  const conversationId = data['conversationId'];
+  if (typeof conversationId !== 'string' || conversationId.length === 0) {
+    throw new BadRequestError('conversationId is required');
+  }
+
+  return {
+    conversationId,
   };
 }
 
@@ -694,6 +723,94 @@ async function handleCallInvite(
   });
 }
 
+async function handleCallGroupInvite(
+  io: Server,
+  socket: AuthSocket,
+  payload: unknown,
+): Promise<void> {
+  const { userId } = socket;
+  const input = parseCallGroupInvitePayload(payload);
+
+  const session = await CallsService.createGroupSession(userId, {
+    conversationId: input.conversationId,
+    callType: 'video',
+  });
+
+  const tokenEntries = await Promise.all(
+    session.participantIds.map(async (participantId) => {
+      const token = await CallsService.issueSessionTokenForUser(session.sessionId, participantId);
+      return [participantId, token] as const;
+    }),
+  );
+  const tokensByUserId = new Map(tokenEntries);
+
+  registerCallTimeout(session.sessionId, async () => {
+    const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
+    if (!timeoutSession) {
+      return;
+    }
+
+    await emitCallSummaryMessage(io, {
+      sessionId: timeoutSession.sessionId,
+      status: 'missed',
+      conversationId: timeoutSession.conversationId ?? undefined,
+      senderId: timeoutSession.initiatedBy,
+      endedReason: timeoutSession.endedReason ?? undefined,
+      startedAt: timeoutSession.startedAt ?? undefined,
+      endedAt: timeoutSession.endedAt ?? undefined,
+    });
+
+    emitCallStatus(io, timeoutSession.participantIds, {
+      sessionId: timeoutSession.sessionId,
+      status: 'missed',
+      reason: timeoutSession.endedReason,
+    });
+  });
+
+  const callerToken = tokensByUserId.get(userId);
+  if (!callerToken) {
+    throw new BadRequestError('Caller token missing for group call');
+  }
+
+  socket.emit('call_invited', {
+    sessionId: session.sessionId,
+    conversationId: session.conversationId,
+    isGroupCall: true,
+    participantIds: session.participantIds,
+    callType: session.callType,
+    timeoutAt: session.timeoutAt,
+    callToken: callerToken.token,
+    callTokenExpiresInSeconds: callerToken.expiresInSeconds,
+  });
+
+  for (const participantId of session.participantIds) {
+    if (participantId === userId) {
+      continue;
+    }
+    const participantToken = tokensByUserId.get(participantId);
+    if (!participantToken) {
+      continue;
+    }
+
+    io.to(`user:${participantId}`).emit('call_incoming', {
+      sessionId: session.sessionId,
+      conversationId: session.conversationId,
+      fromUserId: userId,
+      isGroupCall: true,
+      participantIds: session.participantIds,
+      callType: session.callType,
+      timeoutAt: session.timeoutAt,
+      callToken: participantToken.token,
+      callTokenExpiresInSeconds: participantToken.expiresInSeconds,
+    });
+  }
+
+  emitCallStatus(io, session.participantIds, {
+    sessionId: session.sessionId,
+    status: 'ringing',
+  });
+}
+
 async function handleCallAccept(
   io: Server,
   socket: AuthSocket,
@@ -703,6 +820,7 @@ async function handleCallAccept(
   const input = parseCallSessionPayload(payload);
   CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
   const session = await CallsService.acceptCallSession(input.sessionId, userId);
+  const joinedParticipantIds = await CallsService.listJoinedParticipantIds(session.sessionId);
 
   clearCallTimeout(session.sessionId);
 
@@ -710,6 +828,7 @@ async function handleCallAccept(
     io.to(`user:${participantId}`).emit('call_participant_joined', {
       sessionId: session.sessionId,
       userId,
+      joinedParticipantIds,
     });
   }
 
