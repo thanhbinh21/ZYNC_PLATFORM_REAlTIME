@@ -110,6 +110,14 @@ export function sendMessage(
   type: MessageType,
   idempotencyKey: string,
   mediaUrl?: string,
+  replyTo?: {
+    messageRef: string;
+    messageId?: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    contentPreview?: string;
+    type?: string;
+  },
 ): void {
   if (!socket?.connected) {
     throw new Error('Socket not connected');
@@ -121,6 +129,12 @@ export function sendMessage(
     type,
     mediaUrl,
     idempotencyKey,
+    replyToMessageRef: replyTo?.messageRef,
+    replyToMessageId: replyTo?.messageId,
+    replyToSenderId: replyTo?.senderId,
+    replyToSenderDisplayName: replyTo?.senderDisplayName,
+    replyToPreview: replyTo?.contentPreview,
+    replyToType: replyTo?.type,
   });
 }
 
@@ -136,6 +150,15 @@ export function listenToMessages(
     content: string;
     type: string;
     mediaUrl?: string;
+      moderationWarning?: boolean;
+      replyTo?: {
+        messageRef: string;
+        messageId?: string;
+        senderId?: string;
+        contentPreview?: string;
+        type?: string;
+        isDeleted?: boolean;
+      };
     idempotencyKey: string;
     createdAt: string;
   }) => void,

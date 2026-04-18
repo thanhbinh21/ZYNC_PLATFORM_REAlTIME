@@ -26,6 +26,30 @@ export const SendMessageSchema = z.object({
     .string()
     .uuid('Idempotency key must be a valid UUID')
     .describe('Unique key to prevent duplicate messages on retry'),
+  replyToMessageRef: z
+    .string()
+    .max(100, 'replyToMessageRef must not exceed 100 characters')
+    .optional(),
+  replyToMessageId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId format')
+    .optional(),
+  replyToPreview: z
+    .string()
+    .max(160, 'replyToPreview must not exceed 160 characters')
+    .optional(),
+  replyToSenderId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId format')
+    .optional(),
+  replyToSenderDisplayName: z
+    .string()
+    .max(120, 'replyToSenderDisplayName must not exceed 120 characters')
+    .optional(),
+  replyToType: z
+    .string()
+    .max(24, 'replyToType must not exceed 24 characters')
+    .optional(),
 }).refine(
   (data) => data.content || data.mediaUrl,
   { message: 'Either content or mediaUrl must be provided' }

@@ -26,7 +26,19 @@ export const sendMessageHandler = (async (
       return next(new BadRequestError(`Validation error: ${validationResult.error.message}`));
     }
 
-    const { conversationId, content, type, mediaUrl, idempotencyKey } = validationResult.data;
+    const {
+      conversationId,
+      content,
+      type,
+      mediaUrl,
+      idempotencyKey,
+      replyToMessageRef,
+      replyToMessageId,
+      replyToPreview,
+      replyToSenderId,
+      replyToSenderDisplayName,
+      replyToType,
+    } = validationResult.data;
     const userId = req.userId;
 
     const membership = await ConversationMemberModel.findOne({
@@ -51,6 +63,19 @@ export const sendMessageHandler = (async (
     }
 
     // Create message
+    const replyRef = replyToMessageRef || replyToMessageId;
+    const replyTo = replyRef
+      ? {
+          messageRef: replyRef,
+          messageId: replyToMessageId,
+          senderId: replyToSenderId,
+          senderDisplayName: replyToSenderDisplayName,
+          contentPreview: replyToPreview,
+          type: replyToType,
+          isDeleted: false,
+        }
+      : undefined;
+
     const message = await MessagesService.createMessage(
       conversationId,
       userId,
@@ -58,6 +83,8 @@ export const sendMessageHandler = (async (
       type as MessageType,
       idempotencyKey,
       mediaUrl ?? undefined,
+      false,
+      replyTo,
     );
 
     res.status(201).json({

@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { MessageStatus } from '@zync/shared-types';
+import type { MessageStatus, MessageReplyTo } from '@zync/shared-types';
 import { GetFileIcon } from './file-type-icons';
 
 function CheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
@@ -51,6 +51,8 @@ interface MessageBubbleProps {
   content: string;
   type: string;
   mediaUrl?: string;
+  replyTo?: MessageReplyTo;
+  onJumpToMessage?: (messageRef: string) => void;
   moderationWarning?: boolean;
   status?: MessageStatus;
   timestamp: string;
@@ -62,6 +64,8 @@ export function MessageBubble({
   content,
   type,
   mediaUrl,
+  replyTo,
+  onJumpToMessage,
   moderationWarning = false,
   status,
   timestamp,
@@ -107,6 +111,27 @@ export function MessageBubble({
 
       {/* Media */}
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-xs lg:max-w-md`}>
+        {replyTo?.messageRef && (
+          <button
+            type="button"
+            onClick={() => onJumpToMessage?.(replyTo.messageRef)}
+            className={`mb-1 w-full rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors ${
+              isOwn
+                ? 'border-[#0d5a48] bg-[#22b894]/30 text-[#05382e] hover:bg-[#22b894]/40'
+                : 'border-[#2d6a58] bg-[#0b2f26]/70 text-[#bce8d9] hover:bg-[#124236]/80'
+            }`}
+            title="Di den tin nhan goc"
+          >
+            <p className={`mb-0.5 text-[10px] uppercase tracking-wide ${isOwn ? 'text-[#075445]' : 'text-[#89d8bf]'}`}>Tra loi</p>
+            {replyTo.senderDisplayName && (
+              <p className={`mb-0.5 truncate text-sm font-semibold ${isOwn ? 'text-[#043329]' : 'text-[#d8f8ec]'}`}>
+                {replyTo.senderDisplayName}
+              </p>
+            )}
+            <p className="truncate">{replyTo.contentPreview || '[Tin nhan]'}</p>
+          </button>
+        )}
+
         {/* Media */}
         {mediaUrl && (type === 'image' || type === 'video' || type?.startsWith('file/')) && (
           <div className="mb-1 rounded-lg overflow-hidden relative">

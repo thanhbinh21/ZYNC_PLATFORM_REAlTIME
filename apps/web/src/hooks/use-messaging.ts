@@ -61,6 +61,7 @@ interface UseChatOptions {
 export interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
+  replyTo?: Message['replyTo'];
 }
 
 interface UseChatReturn {
@@ -151,6 +152,7 @@ export function useChat({
       type: string;
       mediaUrl?: string;
       moderationWarning?: boolean;
+      replyTo?: Message['replyTo'];
       idempotencyKey: string;
       createdAt: string;
     }) => {
@@ -166,6 +168,7 @@ export function useChat({
         type: data.type as Message['type'],
         mediaUrl: data.mediaUrl,
         moderationWarning: data.moderationWarning,
+        replyTo: data.replyTo,
         idempotencyKey: data.idempotencyKey, // Will be set on send
         status: 'delivered',
         createdAt: data.createdAt,
@@ -457,6 +460,7 @@ export function useChat({
           content,
           type,
           mediaUrl,
+          replyTo: options?.replyTo,
           idempotencyKey,
           status: 'sent',
           createdAt: timestamp,
@@ -488,7 +492,7 @@ export function useChat({
 
         if (shouldEmitNow) {
           // Send via socket only when media is ready or message is plain text
-          emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl);
+          emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl, options?.replyTo);
 
           // Clear pending typing indicator immediately (don't wait 3s)
           emitClearPendingTyping(conversationId);

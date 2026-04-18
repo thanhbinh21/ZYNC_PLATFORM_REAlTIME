@@ -79,6 +79,8 @@ interface MessageItemProps {
   onDeleteForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecall?: (messageId: string, idempotencyKey: string) => void;
   onForward?: (message: Message) => void;
+  onReply?: (message: Message) => void;
+  onJumpToMessage?: (messageRef: string) => void;
   onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
   onReactionRemoveAllMine?: (message: Message) => void;
   onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
@@ -206,6 +208,8 @@ export function MessageItem({
   onDeleteForMe,
   onRecall,
   onForward,
+  onReply,
+  onJumpToMessage,
   onReactionUpsert,
   onReactionRemoveAllMine,
   onFetchReactionDetails,
@@ -278,6 +282,11 @@ export function MessageItem({
     onForward?.(message);
     setShowMenu(false);
   }, [message, onForward]);
+
+  const handleReplyClick = useCallback(() => {
+    onReply?.(message);
+    setShowMenu(false);
+  }, [message, onReply]);
 
   const handleReactionClick = useCallback((emoji: string, source = 'menu') => {
     if (onReactionUpsert) {
@@ -457,6 +466,8 @@ export function MessageItem({
             content={message.content}
             type={message.type}
             mediaUrl={message.mediaUrl}
+            replyTo={message.replyTo}
+            onJumpToMessage={onJumpToMessage}
             moderationWarning={Boolean((message as any).moderationWarning)}
             status={status}
             timestamp={message.createdAt}
@@ -494,6 +505,14 @@ export function MessageItem({
                 <ForwardIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Chuyen tiep</span>
               </button>
+
+              <button
+                onClick={handleReplyClick}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-t border-[#234a3f]"
+              >
+                <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Tra loi</span>
+              </button>
             </div>
           )}
 
@@ -522,6 +541,14 @@ export function MessageItem({
               >
                 <FlagIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Bao cao vi pham</span>
+              </button>
+
+              <button
+                onClick={handleReplyClick}
+                className="flex w-full items-center gap-3 border-t border-[#234a3f] px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+              >
+                <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Tra loi</span>
               </button>
             </div>
           )}

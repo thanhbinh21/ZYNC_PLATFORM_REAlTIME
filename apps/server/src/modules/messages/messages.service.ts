@@ -1,4 +1,4 @@
-import { MessageModel, MessageType, type IMessage } from './message.model';
+import { MessageModel, MessageType, type IMessage, type IReplyTo } from './message.model';
 import { MessageStatusModel, type IMessageStatus } from './message-status.model';
 import { checkIdempotencyKey, setIdempotencyKey } from '../../infrastructure/redis';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -85,6 +85,7 @@ export class MessagesService {
     idempotencyKey: string,
     mediaUrl?: string,
     moderationWarning: boolean = false,
+    replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check idempotency cache
     const cachedMessage = await checkIdempotencyKey(idempotencyKey);
@@ -98,6 +99,7 @@ export class MessagesService {
         type: cachedMessage.type,
         mediaUrl: cachedMessage.mediaUrl,
         moderationWarning: Boolean(cachedMessage.moderationWarning),
+        replyTo: cachedMessage.replyTo as IReplyTo | undefined,
         idempotencyKey,
         createdAt: new Date(cachedMessage.createdAt as number),
       } as unknown as IMessage;
@@ -114,6 +116,7 @@ export class MessagesService {
       type,
       mediaUrl,
       moderationWarning,
+      replyTo,
       createdAt: now,
     });
 
@@ -127,6 +130,7 @@ export class MessagesService {
         type,
         mediaUrl,
         moderationWarning,
+        replyTo,
         idempotencyKey,
         createdAt: now,
       });
@@ -145,6 +149,7 @@ export class MessagesService {
       type,
       mediaUrl,
       moderationWarning,
+      replyTo,
       idempotencyKey,
       createdAt: now,
     } as unknown as IMessage;
@@ -166,6 +171,7 @@ export class MessagesService {
     mediaUrl?: string,
     mockId?: string,
     moderationWarning: boolean = false,
+    replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
     const existing = await MessageModel.findOne({ idempotencyKey }).lean();
@@ -182,6 +188,7 @@ export class MessagesService {
       type,
       mediaUrl,
       moderationWarning,
+      replyTo,
       idempotencyKey,
       createdAt: new Date(),
     });
@@ -302,6 +309,8 @@ export class MessagesService {
       content: string;
       type: string;
       mediaUrl?: string;
+      moderationWarning?: boolean;
+      replyTo?: IReplyTo;
       idempotencyKey: string;
       createdAt: Date;
     }>
@@ -318,6 +327,8 @@ export class MessagesService {
           msg.idempotencyKey,
           msg.mediaUrl,
           msg.mockId,
+          Boolean(msg.moderationWarning),
+          msg.replyTo,
         );
       } catch (err) {
         logger.error(`[Fallback] Failed to insert message ${msg.idempotencyKey}`, err);

@@ -56,6 +56,16 @@ export interface MessageReactionUserState {
   emojiCounts: Record<string, number>;
 }
 
+export interface MessageReplyTo {
+  messageRef: string;
+  messageId?: string;
+  senderId?: string;
+  senderDisplayName?: string;
+  contentPreview?: string;
+  type?: string;
+  isDeleted?: boolean;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -64,6 +74,7 @@ export interface Message {
   type: MessageType;
   mediaUrl?: string;
   moderationWarning?: boolean;
+  replyTo?: MessageReplyTo;
   idempotencyKey: string;
   status: MessageStatus;
   createdAt: string;
@@ -94,6 +105,12 @@ export interface SendMessagePayload {
   type: MessageType;
   idempotencyKey: string;
   mediaUrl?: string;
+  replyToMessageRef?: string;
+  replyToMessageId?: string;
+  replyToPreview?: string;
+  replyToSenderId?: string;
+  replyToSenderDisplayName?: string;
+  replyToType?: string;
 }
 
 export interface MessageReadPayload {
@@ -108,11 +125,14 @@ export interface TypingPayload {
 // Server gửi xuống Client
 export interface ReceiveMessagePayload {
   messageId: string;
+  conversationId: string;
+  idempotencyKey: string;
   senderId: string;
   content: string;
   type: MessageType;
   mediaUrl?: string;
   moderationWarning?: boolean;
+  replyTo?: MessageReplyTo;
   createdAt: string;
 }
 

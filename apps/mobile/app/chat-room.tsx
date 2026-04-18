@@ -45,6 +45,15 @@ interface Message {
   status?: 'sent' | 'delivered' | 'read';
   createdAt: string;
   idempotencyKey?: string;
+  replyTo?: {
+    messageRef: string;
+    messageId?: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    contentPreview?: string;
+    type?: string;
+    isDeleted?: boolean;
+  };
   reactionSummary?: {
     totalCount: number;
     emojiCounts: Record<string, number>;
@@ -59,6 +68,7 @@ interface Message {
 interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
+  replyTo?: Message['replyTo'];
 }
 
 interface PendingMediaDraft {
@@ -72,6 +82,13 @@ interface PendingMediaSend {
   idempotencyKey: string;
   content: string;
   messageType: 'image' | 'video';
+}
+
+interface PendingJumpTarget {
+  messageRef: string;
+  attempts: number;
+  stagnantRounds: number;
+  lastMessageCount: number;
 }
 
 interface ConversationMeta {
@@ -200,6 +217,38 @@ function normalizeMessage(raw: unknown): Message | null {
       }
       : undefined;
 
+  const rawReplyTo = data.replyTo;
+  const normalizedReplyTo =
+    rawReplyTo && typeof rawReplyTo === 'object'
+      ? {
+        messageRef: String((rawReplyTo as Record<string, unknown>).messageRef || ''),
+        messageId:
+          typeof (rawReplyTo as Record<string, unknown>).messageId === 'string'
+            ? (rawReplyTo as Record<string, unknown>).messageId as string
+            : undefined,
+        senderId:
+          typeof (rawReplyTo as Record<string, unknown>).senderId === 'string'
+            ? (rawReplyTo as Record<string, unknown>).senderId as string
+            : undefined,
+        senderDisplayName:
+          typeof (rawReplyTo as Record<string, unknown>).senderDisplayName === 'string'
+            ? (rawReplyTo as Record<string, unknown>).senderDisplayName as string
+            : undefined,
+        contentPreview:
+          typeof (rawReplyTo as Record<string, unknown>).contentPreview === 'string'
+            ? (rawReplyTo as Record<string, unknown>).contentPreview as string
+            : undefined,
+        type:
+          typeof (rawReplyTo as Record<string, unknown>).type === 'string'
+            ? (rawReplyTo as Record<string, unknown>).type as string
+            : undefined,
+        isDeleted:
+          typeof (rawReplyTo as Record<string, unknown>).isDeleted === 'boolean'
+            ? (rawReplyTo as Record<string, unknown>).isDeleted as boolean
+            : undefined,
+      }
+      : undefined;
+
   return {
     _id: String(rawId),
     conversationId: typeof data.conversationId === 'string' ? data.conversationId : undefined,
@@ -210,6 +259,7 @@ function normalizeMessage(raw: unknown): Message | null {
     status,
     createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
     idempotencyKey: typeof data.idempotencyKey === 'string' ? data.idempotencyKey : undefined,
+    replyTo: normalizedReplyTo && normalizedReplyTo.messageRef ? normalizedReplyTo : undefined,
     reactionSummary: normalizedReactionSummary,
     reactionUserState: normalizedReactionUserState,
   };
@@ -477,6 +527,7 @@ export default function ChatRoomScreen() {
   const [reactionSheetLoading, setReactionSheetLoading] = useState(false);
   const [reactionSheetData, setReactionSheetData] = useState<ReactionDetailsResponse | null>(null);
   const [reactionSheetTab, setReactionSheetTab] = useState('ALL');
+  const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
 
   const {
     previews,
@@ -487,9 +538,17 @@ export default function ChatRoomScreen() {
   } = useMessagePreview(conversationId ?? null);
 
   const flatListRef = useRef<FlatList>(null);
+  const jumpTargetRef = useRef<PendingJumpTarget | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
+  const scrollOffsetRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const preserveViewportRef = useRef<{ offset: number; contentHeight: number } | null>(null);
+
+  const notifyInaccessibleReplyTarget = useCallback(() => {
+    Alert.alert('Thong bao', 'Tin nhan khong the truy cap.');
+  }, []);
 
   const scrollToBottom = useCallback((animated = true) => {
     requestAnimationFrame(() => {
@@ -1130,6 +1189,8 @@ export default function ChatRoomScreen() {
       setNextCursor(null);
       setHasMore(true);
       setShowOptionsId(null);
+      setReplyingTo(null);
+      jumpTargetRef.current = null;
       void loadMessages();
       void loadConversationMeta();
 
@@ -1147,6 +1208,7 @@ export default function ChatRoomScreen() {
     setReactionSheetVisible(false);
     setReactionSheetData(null);
     setReactionSheetTab('ALL');
+    jumpTargetRef.current = null;
   }, [conversationId]);
 
   useEffect(() => {
@@ -1250,14 +1312,103 @@ export default function ChatRoomScreen() {
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || isMoreLoading || isLoading || !nextCursor) return;
+
+    preserveViewportRef.current = {
+      offset: scrollOffsetRef.current,
+      contentHeight: contentHeightRef.current,
+    };
+
     void loadMessages(nextCursor);
   }, [hasMore, isMoreLoading, isLoading, nextCursor, loadMessages]);
 
+  const findMessageIndexByRef = useCallback((messageRef: string) => {
+    if (!messageRef) {
+      return -1;
+    }
+
+    return messages.findIndex(
+      (msg) => msg._id === messageRef || msg.idempotencyKey === messageRef,
+    );
+  }, [messages]);
+
+  const jumpToMessage = useCallback((messageRef: string) => {
+    if (!messageRef) {
+      return;
+    }
+
+    const idx = findMessageIndexByRef(messageRef);
+
+    if (idx >= 0) {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      return;
+    }
+
+    if (!hasMore) {
+      notifyInaccessibleReplyTarget();
+      return;
+    }
+
+    jumpTargetRef.current = {
+      messageRef,
+      attempts: 0,
+      stagnantRounds: 0,
+      lastMessageCount: messages.length,
+    };
+
+    handleLoadMore();
+  }, [findMessageIndexByRef, handleLoadMore, hasMore, messages.length, notifyInaccessibleReplyTarget]);
+
   const handleScrollList = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+
     if (event.nativeEvent.contentOffset.y < 120) {
       handleLoadMore();
     }
   }, [handleLoadMore]);
+
+  useEffect(() => {
+    const pendingJump = jumpTargetRef.current;
+    if (!pendingJump) {
+      return;
+    }
+
+    if (isMoreLoading) {
+      return;
+    }
+
+    const idx = findMessageIndexByRef(pendingJump.messageRef);
+
+    if (idx >= 0) {
+      jumpTargetRef.current = null;
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      return;
+    }
+
+    if (!hasMore) {
+      jumpTargetRef.current = null;
+      notifyInaccessibleReplyTarget();
+      return;
+    }
+
+    const nextAttempts = pendingJump.attempts + 1;
+    const hasNewMessages = messages.length > pendingJump.lastMessageCount;
+    const nextStagnantRounds = hasNewMessages ? 0 : pendingJump.stagnantRounds + 1;
+
+    if (nextAttempts >= 8 || nextStagnantRounds >= 2) {
+      jumpTargetRef.current = null;
+      notifyInaccessibleReplyTarget();
+      return;
+    }
+
+    jumpTargetRef.current = {
+      messageRef: pendingJump.messageRef,
+      attempts: nextAttempts,
+      stagnantRounds: nextStagnantRounds,
+      lastMessageCount: messages.length,
+    };
+
+    handleLoadMore();
+  }, [findMessageIndexByRef, handleLoadMore, hasMore, isMoreLoading, messages.length, notifyInaccessibleReplyTarget]);
 
   useEffect(() => {
     const socket = socketService.getSocket();
@@ -1549,6 +1700,7 @@ export default function ChatRoomScreen() {
       status: 'sent',
       createdAt: new Date().toISOString(),
       idempotencyKey,
+      replyTo: options?.replyTo,
     };
 
     setMessages((prev) => {
@@ -1584,7 +1736,17 @@ export default function ChatRoomScreen() {
         type,
         mediaUrl,
         idempotencyKey,
+        replyToMessageRef: options?.replyTo?.messageRef,
+        replyToMessageId: options?.replyTo?.messageId,
+        replyToSenderId: options?.replyTo?.senderId,
+        replyToSenderDisplayName: options?.replyTo?.senderDisplayName,
+        replyToPreview: options?.replyTo?.contentPreview,
+        replyToType: options?.replyTo?.type,
       });
+
+      if (options?.replyTo) {
+        setReplyingTo(null);
+      }
     }
 
     setTimeout(() => scrollToBottom(), 80);
@@ -1628,7 +1790,7 @@ export default function ChatRoomScreen() {
         messageContent,
         pendingMediaDraft.messageType,
         pendingMediaDraft.localUri,
-        { deferEmit: true },
+        { deferEmit: true, replyTo: replyingTo ?? undefined },
       );
 
       if (!pendingMessageId) {
@@ -1658,7 +1820,7 @@ export default function ChatRoomScreen() {
             messageContent,
             pendingMediaDraft.messageType,
             secureUrl,
-            { idempotencyKey: pendingMessageId },
+            { idempotencyKey: pendingMessageId, replyTo: replyingTo ?? undefined },
           );
 
           setPendingMediaSend(null);
@@ -1684,8 +1846,8 @@ export default function ChatRoomScreen() {
       return;
     }
 
-    handleSend();
-  }, [handleSend, inputText, isUploadingMedia, pendingMediaDraft, pendingMediaSend, uploadAssetToCloudinary]);
+    handleSend(undefined, 'text', undefined, { replyTo: replyingTo ?? undefined });
+  }, [handleSend, inputText, isUploadingMedia, pendingMediaDraft, pendingMediaSend, replyingTo, uploadAssetToCloudinary]);
 
   const handleRecall = async (messageId: string, idempotencyKey?: string) => {
     try {
@@ -1783,6 +1945,23 @@ export default function ChatRoomScreen() {
             )}
 
             <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleOther]}>
+              {message.replyTo && message.replyTo.messageRef && (
+                <Pressable
+                  onPress={() => jumpToMessage(message.replyTo?.messageRef || '')}
+                  style={[bubbleStyles.replyCard, isMe ? bubbleStyles.replyCardMe : bubbleStyles.replyCardOther]}
+                >
+                  <Text style={[bubbleStyles.replyLabel, isMe && bubbleStyles.replyLabelMe]}>Tra loi</Text>
+                  {message.replyTo.senderDisplayName && (
+                    <Text style={[bubbleStyles.replySenderName, isMe && bubbleStyles.replySenderNameMe]} numberOfLines={1}>
+                      {message.replyTo.senderDisplayName}
+                    </Text>
+                  )}
+                  <Text style={[bubbleStyles.replyPreview, isMe && bubbleStyles.replyPreviewMe]} numberOfLines={1}>
+                    {message.replyTo.contentPreview || '[Tin nhan]'}
+                  </Text>
+                </Pressable>
+              )}
+
               {isRecalled ? (
                 <Text style={[bubbleStyles.msgText, bubbleStyles.recallText, isMe && bubbleStyles.recallTextMe]}>
                   {isMe ? 'Ban da thu hoi tin nhan' : 'Tin nhan da duoc thu hoi'}
@@ -1882,6 +2061,7 @@ export default function ChatRoomScreen() {
       isGroup,
       openReactionDetailsSheet,
       openReactionPicker,
+      jumpToMessage,
       showOptionsId,
       userId,
     ],
@@ -1997,8 +2177,31 @@ export default function ChatRoomScreen() {
               contentContainerStyle={styles.messageList}
               showsVerticalScrollIndicator={false}
               onScroll={handleScrollList}
+              onContentSizeChange={(_, height) => {
+                const pending = preserveViewportRef.current;
+                contentHeightRef.current = height;
+
+                if (!pending) {
+                  return;
+                }
+
+                preserveViewportRef.current = null;
+
+                const delta = height - pending.contentHeight;
+                if (delta <= 0) {
+                  return;
+                }
+
+                flatListRef.current?.scrollToOffset({
+                  offset: Math.max(0, pending.offset + delta),
+                  animated: false,
+                });
+              }}
               scrollEventThrottle={16}
               onLayout={() => scrollToBottom(false)}
+              onScrollToIndexFailed={() => {
+                // Fallback when item layout has not been measured yet.
+              }}
               ListHeaderComponent={isMoreLoading ? (
                 <View style={styles.loadMoreIndicator}>
                   <ActivityIndicator size="small" color="#10b981" />
@@ -2274,6 +2477,20 @@ export default function ChatRoomScreen() {
           <View style={[styles.composerContainer, { marginBottom: androidKeyboardOffset }]}>
             <TypingIndicator typingUsers={typingUsers} />
 
+            {replyingTo && (
+              <View style={styles.replyComposerBar}>
+                <View style={styles.replyComposerMeta}>
+                  <Text style={styles.replyComposerLabel}>Dang tra loi</Text>
+                  <Text style={styles.replyComposerPreview} numberOfLines={1}>
+                    {replyingTo.contentPreview || '[Tin nhan]'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.replyComposerCancelBtn} onPress={() => setReplyingTo(null)}>
+                  <Ionicons name="close" size={16} color="#cbd5e1" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {pendingMediaDraft && (
               <View style={styles.mediaDraftBar}>
                 {pendingMediaDraft.messageType === 'image' ? (
@@ -2338,7 +2555,7 @@ export default function ChatRoomScreen() {
                 />
                 <TouchableOpacity
                   style={styles.emojiBtn}
-                  onPress={() => handleSend(':)', 'sticker')}
+                  onPress={() => handleSend(':)', 'sticker', undefined, { replyTo: replyingTo ?? undefined })}
                   disabled={Boolean(pendingMediaSend) || isUploadingMedia}
                 >
                   <Ionicons name="happy-outline" size={22} color="#64748b" />
@@ -2395,6 +2612,31 @@ export default function ChatRoomScreen() {
 
                 {targetMessage && (
                   <View style={styles.reactionActionRow}>
+                    <Pressable
+                      style={styles.reactionActionButton}
+                      onPress={() => {
+                        const senderNameFromMessage = getSenderName(targetMessage);
+                        const inferredReplySenderDisplayName = senderNameFromMessage
+                          || (getSenderId(targetMessage) === userId
+                            ? 'Ban'
+                            : (!isGroupChat ? conversationName : 'Thanh vien'));
+
+                        setReplyingTo({
+                          messageRef: targetMessage.idempotencyKey || targetMessage._id,
+                          messageId: targetMessage._id,
+                          senderId: getSenderId(targetMessage),
+                          senderDisplayName: inferredReplySenderDisplayName,
+                          contentPreview: String(targetMessage.content || '').slice(0, 160),
+                          type: targetMessage.type,
+                          isDeleted: false,
+                        });
+                        closeReactionPicker();
+                      }}
+                    >
+                      <Ionicons name="return-up-back-outline" size={16} color="#e2e8f0" />
+                      <Text style={styles.reactionActionText}>Tra loi</Text>
+                    </Pressable>
+
                     <Pressable
                       style={styles.reactionActionButton}
                       onPress={() => {
@@ -2564,6 +2806,47 @@ const bubbleStyles = StyleSheet.create({
   bubbleOther: {
     backgroundColor: '#1e293b',
     borderBottomLeftRadius: 6,
+  },
+  replyCard: {
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+  },
+  replyCardMe: {
+    borderLeftColor: '#0f172a',
+    backgroundColor: 'rgba(2,6,23,0.18)',
+  },
+  replyCardOther: {
+    borderLeftColor: '#34d399',
+    backgroundColor: 'rgba(15,23,42,0.5)',
+  },
+  replyLabel: {
+    fontSize: 10,
+    color: '#86efac',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    marginBottom: 1,
+  },
+  replyLabelMe: {
+    color: '#0f172a',
+  },
+  replySenderName: {
+    fontSize: 11,
+    color: '#a7f3d0',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    marginBottom: 1,
+  },
+  replySenderNameMe: {
+    color: 'rgba(15,23,42,0.82)',
+  },
+  replyPreview: {
+    fontSize: 12,
+    color: '#d1fae5',
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  replyPreviewMe: {
+    color: '#0f172a',
   },
   msgText: {
     color: '#e2e8f0',
@@ -2864,6 +3147,42 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.glassBorder,
     backgroundColor: colors.surfaceHover,
+  },
+  replyComposerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginHorizontal: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(2, 45, 35, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.35)',
+    gap: 10,
+  },
+  replyComposerMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  replyComposerLabel: {
+    color: '#86efac',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  replyComposerPreview: {
+    marginTop: 2,
+    color: '#d1fae5',
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  replyComposerCancelBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(30,41,59,0.8)',
   },
   mediaDraftBar: {
     flexDirection: 'row',

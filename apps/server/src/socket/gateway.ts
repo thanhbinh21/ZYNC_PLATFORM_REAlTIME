@@ -2,6 +2,7 @@ import { type Server as HttpServer } from 'http';
 import { Server, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
+import { Types } from 'mongoose';
 import { createRedisDuplicate, getRedis, setTypingIndicator, removeTypingIndicator, setUserOnline, removeUserOnline, checkMessageRateLimit } from '../infrastructure/redis';
 import { logger } from '../shared/logger';
 import type { StoryReactionType } from '../modules/stories/story.model';
@@ -972,7 +973,19 @@ async function handleSendMessage(
   }
 
   const msg = payload as Record<string, unknown>;
-  let { conversationId, content, type, mediaUrl, idempotencyKey } = msg;
+  let {
+    conversationId,
+    content,
+    type,
+    mediaUrl,
+    idempotencyKey,
+    replyToMessageRef,
+    replyToMessageId,
+    replyToPreview,
+    replyToSenderId,
+    replyToSenderDisplayName,
+    replyToType,
+  } = msg;
 
   if (!conversationId || !idempotencyKey) {
     socket.emit('error', { message: 'Missing required fields: conversationId, idempotencyKey' });
@@ -998,6 +1011,94 @@ async function handleSendMessage(
   if (!isValidMessageType(normalizedType)) {
     socket.emit('error', { message: 'Invalid message type' });
     return;
+  }
+
+  const normalizedReplyMessageRef = typeof replyToMessageRef === 'string'
+    ? replyToMessageRef.trim()
+    : '';
+  const normalizedReplyMessageId = typeof replyToMessageId === 'string'
+    ? replyToMessageId.trim()
+    : '';
+
+  if (normalizedReplyMessageRef.length > 0 && normalizedReplyMessageRef.length > 100) {
+    socket.emit('error', { message: 'replyToMessageRef is too long' });
+    return;
+  }
+
+  if (normalizedReplyMessageId.length > 0 && normalizedReplyMessageId.length > 100) {
+    socket.emit('error', { message: 'replyToMessageId is too long' });
+    return;
+  }
+
+  const normalizedReplyToPreview = typeof replyToPreview === 'string'
+    ? replyToPreview.trim().slice(0, 160)
+    : undefined;
+
+  const normalizedReplyToSenderId = typeof replyToSenderId === 'string'
+    ? replyToSenderId.trim()
+    : undefined;
+
+  const normalizedReplyToSenderDisplayName = typeof replyToSenderDisplayName === 'string'
+    ? replyToSenderDisplayName.trim().slice(0, 120)
+    : undefined;
+
+  const normalizedReplyToType = typeof replyToType === 'string'
+    ? replyToType.trim().slice(0, 24)
+    : undefined;
+
+  let resolvedReplyTo: {
+    messageRef: string;
+    messageId?: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    contentPreview?: string;
+    type?: string;
+    isDeleted?: boolean;
+  } | undefined;
+
+  const requestedReplyRef = normalizedReplyMessageRef.length > 0
+    ? normalizedReplyMessageRef
+    : normalizedReplyMessageId;
+
+  if (requestedReplyRef.length > 0) {
+    const replyMessageFilters: Array<Record<string, unknown>> = [
+      { idempotencyKey: requestedReplyRef },
+    ];
+    if (Types.ObjectId.isValid(requestedReplyRef)) {
+      replyMessageFilters.push({ _id: requestedReplyRef });
+    }
+
+    const repliedMessage = await MessageModel.findOne({
+      $or: replyMessageFilters,
+      conversationId: conversationId as string,
+    }).select('_id idempotencyKey senderId content type').lean();
+
+    let resolvedReplySenderDisplayName: string | undefined = normalizedReplyToSenderDisplayName;
+    if (repliedMessage?.senderId) {
+      try {
+        const replySender = await UserModel.findOne({ _id: repliedMessage.senderId }).select('displayName').lean();
+        if (typeof replySender?.displayName === 'string' && replySender.displayName.trim().length > 0) {
+          resolvedReplySenderDisplayName = replySender.displayName.trim();
+        }
+      } catch (lookupErr) {
+        logger.warn('[Gateway] Failed to resolve reply sender displayName', {
+          senderId: repliedMessage.senderId,
+          error: lookupErr instanceof Error ? lookupErr.message : String(lookupErr),
+        });
+      }
+    }
+
+    resolvedReplyTo = {
+      messageRef: repliedMessage?.idempotencyKey || requestedReplyRef,
+      messageId: repliedMessage?._id ? String(repliedMessage._id) : (normalizedReplyMessageId || undefined),
+      senderId: repliedMessage?.senderId || normalizedReplyToSenderId,
+      senderDisplayName: resolvedReplySenderDisplayName,
+      contentPreview: repliedMessage?.content
+        ? String(repliedMessage.content).slice(0, 160)
+        : normalizedReplyToPreview,
+      type: repliedMessage?.type || normalizedReplyToType,
+      isDeleted: false,
+    };
   }
 
   const membership = await ConversationMemberModel.findOne({
@@ -1116,6 +1217,7 @@ async function handleSendMessage(
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
       moderationWarning,
+      resolvedReplyTo,
     );
 
     // Note: createMessage already publishes to Kafka (worker will insert)
@@ -1130,6 +1232,7 @@ async function handleSendMessage(
       type: normalizedType,
       mediaUrl,
       moderationWarning,
+      replyTo: message.replyTo,
       idempotencyKey,
       createdAt: message.createdAt,
     });

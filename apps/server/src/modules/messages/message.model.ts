@@ -12,6 +12,16 @@ export interface IStoryRef {
   thumbnail?: string;
 }
 
+export interface IReplyTo {
+  messageRef: string;
+  messageId?: string;
+  senderId?: string;
+  senderDisplayName?: string;
+  contentPreview?: string;
+  type?: string;
+  isDeleted?: boolean;
+}
+
 export interface IMessage extends Document {
   conversationId: string;
   senderId: string;
@@ -19,6 +29,7 @@ export interface IMessage extends Document {
   type: MessageType;
   mediaUrl?: string;
   storyRef?: IStoryRef;
+  replyTo?: IReplyTo;
   idempotencyKey: string;
   
     // Deletion fields
@@ -53,6 +64,19 @@ const storyRefSchema = new Schema<IStoryRef>(
   { _id: false },
 );
 
+const replyToSchema = new Schema<IReplyTo>(
+  {
+    messageRef: { type: String, required: true },
+    messageId: { type: String },
+    senderId: { type: String },
+    senderDisplayName: { type: String },
+    contentPreview: { type: String },
+    type: { type: String },
+    isDeleted: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const messageSchema = new Schema<IMessage>(
   {
     conversationId: { type: String, required: true },
@@ -68,6 +92,7 @@ const messageSchema = new Schema<IMessage>(
     },
     mediaUrl: { type: String },
     storyRef: { type: storyRefSchema },
+    replyTo: { type: replyToSchema },
     idempotencyKey: { type: String, required: true, unique: true },
     
     // Chat Reactions

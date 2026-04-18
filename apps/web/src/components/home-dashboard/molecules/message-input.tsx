@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
-import type { MessageType } from '@zync/shared-types';
+import type { Message, MessageType } from '@zync/shared-types';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
@@ -41,6 +41,7 @@ interface UploadedMedia {
 interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
+  replyTo?: Message['replyTo'];
 }
 
 interface QueuedMediaSend {
@@ -57,6 +58,8 @@ interface MessageInputProps {
   onStopTyping: () => void;
   isLoading?: boolean;
   disabled?: boolean;
+  replyingTo?: Message['replyTo'] | null;
+  onCancelReply?: () => void;
 }
 
 export function MessageInput({
@@ -66,6 +69,8 @@ export function MessageInput({
   onStopTyping,
   isLoading = false,
   disabled = false,
+  replyingTo,
+  onCancelReply,
 }: MessageInputProps) {
   const [input, setInput] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -124,7 +129,11 @@ export function MessageInput({
 
   const finalizeQueuedMediaSend = useCallback(async (pending: QueuedMediaSend, remoteUrl: string) => {
     try {
-      await onSend(pending.content, pending.type, remoteUrl, { idempotencyKey: pending.idempotencyKey });
+      await onSend(pending.content, pending.type, remoteUrl, {
+        idempotencyKey: pending.idempotencyKey,
+        replyTo: replyingTo ?? undefined,
+      });
+      onCancelReply?.();
     } catch (error) {
       onCancelPendingMessage?.(pending.idempotencyKey);
       console.error('Finalize media message failed:', error);
@@ -144,7 +153,7 @@ export function MessageInput({
         fileInputRef.current.value = '';
       }
     }
-  }, [onCancelPendingMessage, onSend]);
+  }, [onCancelPendingMessage, onCancelReply, onSend, replyingTo]);
 
   const uploadMediaToCloudinary = useCallback(async (media: UploadedMedia): Promise<string> => {
     const signatureData = await generateUploadSignature(media.uploadType);
@@ -255,6 +264,7 @@ export function MessageInput({
         setIsSending(true);
         const pendingId = await onSend(messageContent, uploadedMedia.type, uploadedMedia.previewUrl, {
           deferEmit: true,
+          replyTo: replyingTo ?? undefined,
         });
 
         if (!pendingId) {
@@ -297,9 +307,10 @@ export function MessageInput({
       }
 
       setIsSending(true);
-      await onSend(messageContent, 'text');
+      await onSend(messageContent, 'text', undefined, { replyTo: replyingTo ?? undefined });
       setInput('');
       resetTypingState();
+      onCancelReply?.();
 
       // Prevent double-click for 500ms
       setTimeout(() => setIsSending(false), 500);
@@ -382,12 +393,29 @@ export function MessageInput({
       return;
     }
 
-    void onSend(emoji, 'sticker');
+    void onSend(emoji, 'sticker', undefined, { replyTo: replyingTo ?? undefined });
     setIsEmojiPickerOpen(false);
+    onCancelReply?.();
   };
 
   return (
     <div className="zync-glass-subtle border-t zync-glass-divider bg-[#0d2c24]/44 p-4">
+      {replyingTo && (
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-[#2d6a58] bg-[#0f3a2f]/75 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[#89d8bf]">Dang tra loi</p>
+            <p className="truncate text-sm text-[#dffcf2]">{replyingTo.contentPreview || '[Tin nhan]'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="ml-3 rounded-md bg-[#174b3d] px-2 py-1 text-xs text-[#c7f5e6] hover:bg-[#1d5c4a]"
+          >
+            Huy
+          </button>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex items-center gap-3 mb-3">
         <button
