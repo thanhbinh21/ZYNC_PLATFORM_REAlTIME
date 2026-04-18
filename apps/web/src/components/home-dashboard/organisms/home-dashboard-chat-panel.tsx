@@ -1202,6 +1202,7 @@ export function HomeDashboardChatPanel({
   onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
+  const conversationItems = conversations ?? [];
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
@@ -1214,6 +1215,8 @@ export function HomeDashboardChatPanel({
   const [isMembersViewOpen, setIsMembersViewOpen] = useState(false);
   const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
   const [groupManageError, setGroupManageError] = useState<string | null>(null);
+  const [groupManageSuccess, setGroupManageSuccess] = useState<string | null>(null);
+  const [locallyRemovedConversationIds, setLocallyRemovedConversationIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupQuery, setGroupQuery] = useState('');
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
@@ -1226,11 +1229,38 @@ export function HomeDashboardChatPanel({
   useEffect(() => {
     setIsManageGroupOpen(false);
     setGroupManageError(null);
+    setGroupManageSuccess(null);
     setIsArchiveOpen(false);
     setIsMembersViewOpen(false);
   }, [selectedConversationId]);
 
-  const selectedConversation = (conversations ?? []).find((item) => item.id === selectedConversationId);
+  useEffect(() => {
+    if (!groupManageSuccess) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setGroupManageSuccess(null);
+    }, 3000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [groupManageSuccess]);
+
+  const visibleConversations = conversationItems.filter(
+    (item) => !locallyRemovedConversationIds.includes(item.id),
+  );
+  const visibleSearchTargets = searchTargets.filter((target) => {
+    if (target.type !== 'group') {
+      return true;
+    }
+
+    const groupId = target.conversationId ?? target.id;
+    return !locallyRemovedConversationIds.includes(groupId);
+  });
+
+  const selectedConversation = visibleConversations.find((item) => item.id === selectedConversationId);
 
   const uploadGroupAvatar = async (file: File): Promise<string> => {
     const signatureData = await generateUploadSignature('image');
@@ -1452,9 +1482,20 @@ export function HomeDashboardChatPanel({
 
     try {
       setGroupManageError(null);
+      setGroupManageSuccess(null);
       await onDisbandGroup(selectedConversationId);
+
+      setLocallyRemovedConversationIds((prev) => (
+        prev.includes(selectedConversationId) ? prev : [...prev, selectedConversationId]
+      ));
+
+      const fallbackConversationId = visibleConversations
+        .find((conversation) => conversation.id !== selectedConversationId)?.id;
+      onSelectConversation(fallbackConversationId ?? '');
+
       setIsManageGroupOpen(false);
       setIsInfoOpen(false);
+      setGroupManageSuccess('Nhóm đã giải tán');
     } catch {
       setGroupManageError('Không thể giải tán nhóm. Vui lòng thử lại.');
     }
@@ -1599,10 +1640,10 @@ export function HomeDashboardChatPanel({
       <section className="zync-glass-panel zync-glass-floating flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border zync-glass-divider bg-[#031c16]/62">
         <div className="h-full w-[300px] shrink-0 border-r zync-glass-divider">
           <ConversationList
-            conversations={conversations}
+            conversations={visibleConversations}
             selectedId={selectedConversationId}
             onSelectConversation={onSelectConversation}
-            searchTargets={searchTargets}
+            searchTargets={visibleSearchTargets}
             onSelectSearchTarget={onSelectSearchTarget}
           />
         </div>
@@ -2390,6 +2431,12 @@ export function HomeDashboardChatPanel({
       {groupManageError && (
         <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-lg -translate-x-1/2 rounded-xl border border-[#7a3131] bg-[#421f1f] px-4 py-3 text-sm text-[#ffd0d0]">
           {groupManageError}
+        </div>
+      )}
+
+      {groupManageSuccess && (
+        <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-lg -translate-x-1/2 rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-4 py-3 text-sm text-[#d4fbe9]">
+          {groupManageSuccess}
         </div>
       )}
 

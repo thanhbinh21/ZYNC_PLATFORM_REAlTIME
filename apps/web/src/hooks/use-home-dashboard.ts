@@ -2004,6 +2004,13 @@ export function useHomeDashboard() {
           }
           return filtered;
         });
+
+        setPinnedConversationIds((prev) => prev.filter((id) => id !== groupId));
+        setMutedUntilByConversation((prev) => {
+          const next = { ...prev };
+          delete next[groupId];
+          return next;
+        });
       } finally {
         setGroupActionLoading(false);
       }
