@@ -14,6 +14,7 @@
 #   Push     → FCM            | mien phi mai mai
 #
 # Tong RAM local: Redis ~5MB + Redpanda ~150MB ≈ 155MB
+# Neu bat TURN local cho WebRTC call: +~30-50MB tuy load
 #
 # Khoi dong: docker compose -f infra/docker-compose.yml up -d
 # Redpanda Console (UI): http://localhost:8080
@@ -97,6 +98,40 @@ services:
       - "8080:8080"
     environment:
       KAFKA_BROKERS: redpanda:29092
+    networks:
+      - zync_net
+
+  # ---------------------------------------------------------------------------
+  # coturn – TURN server local cho WebRTC call (Milestone A)
+  #
+  # Mac dinh dung static credential tu .env:
+  #   TURN_USERNAME / TURN_PASSWORD / TURN_REALM
+  #
+  # Luu y:
+  # - Local dev cho phep no-tls/no-dtls de giam complexity
+  # - Staging/production bat buoc turns + TLS certificate that
+  # ---------------------------------------------------------------------------
+  coturn:
+    image: coturn/coturn:4.6.2-r1
+    container_name: zync_coturn
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/tcp"
+      - "49160-49200:49160-49200/udp"
+    command:
+      - -n
+      - --no-cli
+      - --log-file=stdout
+      - --fingerprint
+      - --realm=${TURN_REALM:-zync.local}
+      - --listening-port=3478
+      - --min-port=49160
+      - --max-port=49200
+      - --user=${TURN_USERNAME:-zync}:${TURN_PASSWORD:-zync123}
+      - --no-tls
+      - --no-dtls
     networks:
       - zync_net
 

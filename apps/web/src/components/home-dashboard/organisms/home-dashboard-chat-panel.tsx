@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent,useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
@@ -15,6 +15,8 @@ interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
 }
+
+type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
 
 // ==================== ICONS ====================
 
@@ -73,6 +75,22 @@ interface ChatPanelProps {
     totalCount: number;
     emojiCounts: Record<string, number>;
   }>;
+  callStatus?: CallUiStatus;
+  callPeerName?: string;
+  callError?: string | null;
+  isCallingAvailable?: boolean;
+  isMicMuted?: boolean;
+  isCameraEnabled?: boolean;
+  isScreenSharing?: boolean;
+  localVideoRef?: RefObject<HTMLVideoElement>;
+  remoteVideoRef?: RefObject<HTMLVideoElement>;
+  onStartVideoCall?: () => void;
+  onAcceptIncomingCall?: () => void;
+  onRejectIncomingCall?: () => void;
+  onEndCall?: () => void;
+  onToggleMic?: () => void;
+  onToggleCamera?: () => void;
+  onToggleScreenShare?: () => void;
   isLoading?: boolean;
   error?: string | null;
   userPenaltyScore?: number;
@@ -215,6 +233,22 @@ function ChatPanel({
   onReactionRemoveAllMine,
   onFetchReactionDetails,
   reactionUserStateByMessage = {},
+  callStatus = 'idle',
+  callPeerName,
+  callError = null,
+  isCallingAvailable = false,
+  isMicMuted = false,
+  isCameraEnabled = true,
+  isScreenSharing = false,
+  localVideoRef,
+  remoteVideoRef,
+  onStartVideoCall = () => {},
+  onAcceptIncomingCall = () => {},
+  onRejectIncomingCall = () => {},
+  onEndCall = () => {},
+  onToggleMic = () => {},
+  onToggleCamera = () => {},
+  onToggleScreenShare = () => {},
   userPenaltyScore = 0,
   userMutedUntil = null,
 }: ChatPanelProps) {
@@ -248,6 +282,16 @@ function ChatPanel({
 
   const isRemovedFromGroup = inputDisabled && inputDisabledReason?.toLowerCase().includes('bị xóa khỏi nhóm');
   const hasRemovedNoticeInMessages = messages.some((message) => message.content.toLowerCase().includes('bị xóa khỏi nhóm'));
+  const isCallVisible = callStatus !== 'idle';
+  const callStatusLabel: Record<Exclude<CallUiStatus, 'idle'>, string> = {
+    outgoing: 'Dang do chuong...',
+    incoming: 'Cuoc goi den',
+    connecting: 'Dang ket noi...',
+    connected: 'Dang trong cuoc goi',
+    ended: 'Da ket thuc',
+    missed: 'Nho cuoc goi',
+    rejected: 'Da tu choi',
+  };
   // Report message
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const handleReportMessage = useCallback(async (messageId: string) => {
@@ -310,15 +354,19 @@ function ChatPanel({
         <div className="flex items-center gap-2 text-[#a8d8c7]">
           <button
             type="button"
-            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72"
+            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72 disabled:cursor-not-allowed disabled:opacity-45"
             title="Call"
+            disabled={!isCallingAvailable || isGroupConversation}
+            onClick={onStartVideoCall}
           >
             <PhoneIcon className="w-5 h-5" />
           </button>
           <button
             type="button"
-            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72"
+            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72 disabled:cursor-not-allowed disabled:opacity-45"
             title="Video call"
+            disabled={!isCallingAvailable || isGroupConversation}
+            onClick={onStartVideoCall}
           >
             <VideoIcon className="w-5 h-5" />
           </button>
@@ -351,6 +399,109 @@ function ChatPanel({
       {inputDisabled && (
         <div className="border-b border-[#8a3f3f] bg-[#4a2222] px-6 py-2 text-sm text-[#ffd9d9]">
           {inputDisabledReason ?? 'Bạn không thể nhắn tin trong hội thoại này.'}
+        </div>
+      )}
+
+      {isCallVisible && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#010d0ad4] px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[#2f6b58] bg-[linear-gradient(180deg,#04241c_0%,#031912_100%)] text-[#d9fff1] shadow-[0_28px_80px_rgba(0,0,0,0.55)]">
+            <div className="border-b border-[#245b4b] px-5 py-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#dffef2]">
+                    {callStatusLabel[callStatus]}
+                  </p>
+                  <p className="text-xs text-[#8cc4b0]">
+                    {callPeerName ? `Nguoi tham gia: ${callPeerName}` : 'Dang dong bo thong tin cuoc goi'}
+                  </p>
+                  {callError && <p className="mt-1 text-xs text-[#ff9f9f]">{callError}</p>}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {callStatus === 'incoming' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onAcceptIncomingCall}
+                        className="rounded-lg bg-[#1d7f62] px-3 py-1.5 text-xs font-semibold text-[#e8fff7] hover:bg-[#249875]"
+                      >
+                        Nhan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onRejectIncomingCall}
+                        className="rounded-lg bg-[#7f2f2f] px-3 py-1.5 text-xs font-semibold text-[#ffe6e6] hover:bg-[#9a3a3a]"
+                      >
+                        Tu choi
+                      </button>
+                    </>
+                  )}
+
+                  {callStatus === 'connected' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onToggleMic}
+                        className="rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                      >
+                        {isMicMuted ? 'Bat mic' : 'Tat mic'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onToggleCamera}
+                        className="rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                      >
+                        {isCameraEnabled ? 'Tat camera' : 'Bat camera'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void onToggleScreenShare();
+                        }}
+                        className="rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                      >
+                        {isScreenSharing ? 'Dung chia se' : 'Chia se man hinh'}
+                      </button>
+                    </>
+                  )}
+
+                  {callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected' && (
+                    <button
+                      type="button"
+                      onClick={onEndCall}
+                      className="rounded-lg bg-[#8a2f2f] px-3 py-1.5 text-xs font-semibold text-[#ffe4e4] hover:bg-[#a53d3d]"
+                    >
+                      Ket thuc
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {(callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected' || callStatus === 'incoming') && (
+              <div className="grid gap-3 p-4 sm:grid-cols-[240px_minmax(0,1fr)]">
+                <div className="overflow-hidden rounded-xl border border-[#235747] bg-[#031b15]">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="h-44 w-full object-cover"
+                  />
+                  <p className="border-t border-[#1a4a3b] px-2 py-1 text-[11px] text-[#8cc4b0]">Preview camera</p>
+                </div>
+
+                <div className="relative overflow-hidden rounded-xl border border-[#235747] bg-[#041f18]">
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="h-44 w-full object-cover sm:h-full"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

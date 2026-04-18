@@ -21,6 +21,7 @@ zync-platform/
 │   │   │   │   ├── messages/     # Tin nhắn, media, idempotency
 │   │   │   │   ├── stories/      # Story 24h
 │   │   │   │   ├── notifications/ # Push notification, preferences
+│   │   │   │   ├── calls/        # Realtime gọi 1-1/group (WebRTC signaling + session state)
 │   │   │   │   ├── ai/           # AI foundation + moderation (moderation/, guards/, fallback/, embeddings/)
 │   │   │   │   └── upload/       # Cấp pre-signed URL upload media
 │   │   │   ├── socket/           # Socket.IO gateway & event handlers
@@ -142,6 +143,7 @@ zync-platform/
 | `messages` | Gửi/nhận tin nhắn, media, idempotency | `messages`, `message_status` |
 | `stories` | CRUD story 24h, viewers | `stories` |
 | `notifications` | Push notification, preferences, mute/unmute | `notifications`, `notification_preferences` |
+| `calls` | Realtime calling rollout 2 bước: 1-1 P2P trước, group SFU sau; quản lý signaling + trạng thái phiên gọi | `call_sessions`, `call_participants`, `call_events` |
 | `ai` | Moderation, guard prompt injection, model fallback, embedding/vector services | `moderation_logs` + Neon pgvector tables |
 | `upload` | Cấp pre-signed URL upload media | - (gọi Cloudinary) |
 
@@ -215,6 +217,9 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `otp_rl:id:{identifier}` | String | 1 giờ | Rate limit OTP theo email |
 | `blacklist:token:{jti}` | String | = token expiry | JWT revocation |
 | `notif_debounce:{userId}:{convId}` | String | 30 giây | Debounce push notification |
+| `call:session:{sessionId}` | Hash | theo thời lượng cuộc gọi + 5 phút | Trạng thái phiên gọi hiện tại |
+| `call:ring:{calleeUserId}` | String | 30 giây | Chống đổ chuông trùng / đồng bộ incoming call |
+| `call:sfu:{sessionId}:{userId}` | String | 60 giây (heartbeat) | Theo dõi participant còn online trong phiên gọi |
 | `ai_rate:{userId}` | Sorted Set | 61 giây | Sliding-window rate limit cho AI requests |
 | `embed:{taskType}:{slug}` | String (JSON vector) | 30 phút | Cache embedding query/document |
 
@@ -243,6 +248,85 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 
 ---
 
+## Calls API Contract (Milestone A)
+
+| Method | Endpoint | Payload | Mô tả |
+|--------|----------|---------|------|
+| POST | `/api/calls/sessions` | `{targetUserId, conversationId?, callType: 'video'}` | Tạo phiên gọi 1-1 P2P mới |
+| GET | `/api/calls/sessions/:sessionId` | - | Lấy chi tiết phiên gọi (chỉ participant truy cập được) |
+| POST | `/api/calls/sessions/:sessionId/token` | - | Cấp ephemeral call token ngắn hạn cho participant |
+| POST | `/api/calls/sessions/:sessionId/accept` | - | Chấp nhận cuộc gọi |
+| POST | `/api/calls/sessions/:sessionId/reject` | `{reason?: 'rejected'|'busy'}` | Từ chối hoặc báo bận |
+| POST | `/api/calls/sessions/:sessionId/end` | `{reason?}` | Kết thúc phiên gọi |
+
+---
+
+## Call Rollout Acceptance Criteria (BA Locked)
+
+### Milestone A (1-1 P2P + TURN)
+- Setup time p95 < 3 giây (đo từ `call_invite` đến `call_status=connected`) trên môi trường mạng ổn định.
+- Join success rate >= 95% trên Wi-Fi/4G ổn định.
+- Missed-call timeout hoạt động đúng theo `CALL_RING_TIMEOUT_MS`, kết quả trạng thái `missed` + reason `timeout` đồng bộ cho participant.
+- Toàn bộ signaling event (`call_accept`, `call_reject`, `call_end`, `webrtc_offer`, `webrtc_answer`, `webrtc_ice_candidate`) bắt buộc `callToken` hợp lệ.
+
+### Milestone B (Group SFU - Defer)
+- Room 3-10 participant hoạt động ổn định khi join/leave liên tục.
+- Host end-call phải đồng bộ kết thúc cho toàn room.
+
+---
+
+## Group Call Business Policy Baseline (Milestone B)
+
+- Chỉ thành viên conversation hợp lệ mới được join group call.
+- User bị remove khỏi conversation trong lúc call phải bị revoke quyền tham gia ở vòng xác thực token/heartbeat kế tiếp.
+- Giới hạn mặc định 10 participant/room cho Milestone B giai đoạn đầu; vượt ngưỡng trả lỗi business.
+- Host/admin conversation có quyền kết thúc cuộc gọi cho toàn bộ participant; member thường chỉ được self-leave.
+
+---
+
+## Realtime Call Infra (Milestone A)
+
+### Web Milestone A UI status
+- Đã có call panel trong Dashboard chat: incoming/outgoing ring, accept/reject, end call, local preview camera, mute/unmute, on/off camera, share screen.
+- Trạng thái kết nối call đi qua signaling event (`call_*`, `webrtc_offer/answer`, `webrtc_ice_candidate`) đã nối vào web hook.
+- Web chat panel đã render remote peer stream thật qua WebRTC (`RTCPeerConnection` + `ontrack`), không còn placeholder media ở luồng 1-1.
+- Call UI hiển thị theo modal overlay fixed nổi trên nội dung chat để tránh chồng layout khi cuộc gọi đang diễn ra.
+- Luồng nhận cuộc gọi có fallback audio-only nếu camera bị chặn, giúp thao tác `Nhan` ổn định hơn trong môi trường browser.
+- Khi `call_end`, server chấp nhận call token đã hết hạn (vẫn kiểm tra chữ ký + đúng session/user) để tránh lỗi end-call khi cuộc gọi kéo dài.
+- Khi kết thúc cuộc gọi, server ghi một message text tóm tắt vào conversation (`Cuoc goi da ket thuc`, kèm thời lượng nếu có) để chat history hiển thị ngay.
+- Với case `missed` và `rejected`, server cũng ghi message tóm tắt vào conversation và dedupe theo key `sessionId+status` để tránh tạo trùng lịch sử.
+- Trước khi tạo `call_invite` mới, server tự dọn session `ringing` đã quá hạn (`timeoutAt`) bằng cách chuyển sang `missed`, tránh kẹt conflict `A call between these users is already active` sau khi restart process.
+- Trước khi tạo `call_invite` mới, server cũng tự đóng session `connected` bị kẹt khi vượt ngưỡng `CALL_CONNECTED_STALE_MS` (mặc định 180000ms) với reason `superseded_reinvite` để tránh block cuộc gọi mới.
+
+### Local TURN (coturn)
+- Service: `coturn` trong `infra/docker-compose.yml`
+- Listening: `3478/tcp`, `3478/udp`
+- Relay range: `49160-49200` (tcp/udp)
+- Local auth: static credential qua `.env` (`TURN_USERNAME`, `TURN_PASSWORD`, `TURN_REALM`)
+- Web client doc TURN config qua `.env` (`NEXT_PUBLIC_TURN_USERNAME`, `NEXT_PUBLIC_TURN_PASSWORD`, `NEXT_PUBLIC_TURN_URLS`)
+- Ring timeout canh missed-call: `.env` `CALL_RING_TIMEOUT_MS` (default 30000)
+- Local URLs cho client:
+  - `turn:localhost:3478?transport=udp`
+  - `turn:localhost:3478?transport=tcp`
+
+### Staging / Production TURN checklist
+- Bắt buộc dùng `turns://` + TLS certificate hợp lệ
+- Mở firewall cho `3478` và dải relay media ports
+- Verify NAT traversal tối thiểu 3 profile mạng: Wi-Fi NAT thường, 4G carrier NAT, office firewall strict
+- Kiểm thử fallback audio-only khi packet loss/jitter cao
+
+### Call quality metrics (Prometheus)
+- `call_invite_total`
+- `call_connected_total`
+- `call_setup_duration_seconds`
+- `call_reconnect_offer_total`
+- `call_drop_total`
+- `call_missed_total`
+- `call_ended_total{reason=...}`
+- `call_duration_seconds`
+
+---
+
 ## Socket.IO Events Contract
 
 ### Client → Server
@@ -254,6 +338,13 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `message_read` | `{conversationId, messageIds[]}` | Báo đã đọc |
 | `typing_start` | `{conversationId}` | Bắt đầu gõ |
 | `typing_stop` | `{conversationId}` | Dừng gõ |
+| `call_invite` | `{targetUserId, conversationId?}` | Tạo lời mời cuộc gọi 1-1 |
+| `call_accept` | `{sessionId, callToken}` | Chấp nhận cuộc gọi với ephemeral token |
+| `call_reject` | `{sessionId, reason?: 'busy'|'rejected', callToken}` | Từ chối cuộc gọi với ephemeral token |
+| `call_end` | `{sessionId, reason?, callToken}` | Kết thúc cuộc gọi với ephemeral token |
+| `webrtc_offer` | `{sessionId, toUserId, sdp, callToken}` | Signaling WebRTC offer |
+| `webrtc_answer` | `{sessionId, toUserId, sdp, callToken}` | Signaling WebRTC answer |
+| `webrtc_ice_candidate` | `{sessionId, toUserId, candidate, callToken}` | Truyền ICE candidate |
 
 ### Server → Client
 | Event | Payload | Mô tả |
@@ -272,6 +363,14 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `user_penalty_updated` | `{conversationId, penaltyScore, mutedUntil}` | Đồng bộ điểm vi phạm/mute của user theo conversation |
 | `story_reaction` | `{storyId, userId, reactionType, displayName}` | Realtime reaction cho story owner |
 | `story_reply` | `{storyId, senderId, content, displayName}` | Realtime reply story về DM + notify |
+| `call_invited` | `{sessionId, conversationId?, targetUserId, callType, timeoutAt, callToken, callTokenExpiresInSeconds}` | Xác nhận caller đã tạo phiên gọi + token ngắn hạn |
+| `call_incoming` | `{sessionId, conversationId?, fromUserId, callType, callToken, callTokenExpiresInSeconds}` | Sự kiện có cuộc gọi đến + token ngắn hạn |
+| `call_status` | `{sessionId, status, reason?}` | Đồng bộ trạng thái call: ringing/connected/rejected/missed/ended |
+| `call_participant_joined` | `{sessionId, userId}` | Participant vào phiên gọi |
+| `call_participant_left` | `{sessionId, userId}` | Participant rời phiên gọi |
+| `webrtc_offer` | `{sessionId, fromUserId, sdp}` | Forward offer cho peer mục tiêu |
+| `webrtc_answer` | `{sessionId, fromUserId, sdp}` | Forward answer cho peer mục tiêu |
+| `webrtc_ice_candidate` | `{sessionId, fromUserId, candidate}` | Forward ICE candidate cho peer mục tiêu |
 
 ---
 
@@ -280,6 +379,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | Method | Endpoint | Mô tả |
 |--------|----------|------|
 | GET | `/health` | Liveness cơ bản của server process |
+| GET | `/metrics` | Prometheus metrics (bao gồm call quality metrics Milestone A) |
 | GET | `/api/ai/health` | Trạng thái cấu hình AI (Gemini/Neon/toggles) |
 
 ---
@@ -310,6 +410,9 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `notifications` | `{userId, createdAt: -1}`, `{userId, read}`, `createdAt` (TTL 30 ngày) |
 | `notification_preferences` | `userId` (unique) |
 | `moderation_logs` | `{messageId, createdAt}`, `{reporterId, createdAt}`, `{status, createdAt}` |
+| `call_sessions` | `{initiatedBy, createdAt}`, `{participantIds, status, createdAt}`, `{conversationId, createdAt}` |
+| `call_participants` | `{sessionId, userId}` (unique), `{userId, status, updatedAt}` |
+| `call_events` | `{sessionId, createdAt}` |
 
 ---
 
@@ -333,6 +436,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | OTP Delivery | Email provider (Resend API / SMTP, dev có thể dùng OTP hardcode) |
 | Email | Resend (SMTP relay: smtp.resend.com:587) |
 | Push Notification | FCM (Android/Web), APNs (iOS) |
+| Realtime Calling | Milestone A backend+signaling đã chạy với WebRTC P2P (1-1), TURN local (coturn) đã có trong docker-compose; TURN staging/prod và SFU group call (LiveKit/mediasoup) vẫn ở bước triển khai tiếp theo |
 | Media Storage | Cloudinary (free 25 credits/tháng, CDN + image transformation, giữ nguyên lên production) |
 | Message Broker (local) | Redpanda (Kafka-compatible, no ZK, ~150MB) |
 | Message Broker (production) | Upstash Kafka (SASL/SSL, pay-as-you-go) |
