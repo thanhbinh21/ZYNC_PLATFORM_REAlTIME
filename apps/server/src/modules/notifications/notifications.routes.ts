@@ -5,6 +5,7 @@ import {
   MarkReadSchema,
   UpdatePreferencesSchema,
   MuteConversationSchema,
+  PinConversationSchema,
   WebPushSubscribeSchema,
 } from './notifications.schema';
 import {
@@ -16,6 +17,8 @@ import {
   updatePreferencesHandler,
   muteConversationHandler,
   unmuteConversationHandler,
+  pinConversationHandler,
+  unpinConversationHandler,
 } from './notifications.controller';
 import {
   subscribeWebPushHandler,
@@ -56,6 +59,12 @@ notificationsRouter.post('/mute/:conversationId', validateBody(MuteConversationS
 
 // DELETE /api/notifications/mute/:conversationId
 notificationsRouter.delete('/mute/:conversationId', unmuteConversationHandler);
+
+// POST /api/notifications/pin/:conversationId
+notificationsRouter.post('/pin/:conversationId', validateBody(PinConversationSchema), pinConversationHandler);
+
+// DELETE /api/notifications/pin/:conversationId
+notificationsRouter.delete('/pin/:conversationId', unpinConversationHandler);
 
 // ─── Web Push ───
 

@@ -431,6 +431,8 @@ export class GroupsService {
       data: {
         userId: targetUserId,
         removedBy: currentUserId,
+        createdBy: getGroupCreatorId(group),
+        adminIds: group.adminIds,
       },
     });
 
@@ -441,9 +443,7 @@ export class GroupsService {
     const group = await getGroupOrThrow(groupId);
     await ensureGroupMember(groupId, currentUserId);
 
-    if (getGroupCreatorId(group) === currentUserId) {
-      throw new ForbiddenError('Group creator cannot leave. Please disband the group instead');
-    }
+    const isCreatorLeaving = getGroupCreatorId(group) === currentUserId;
 
     await ConversationMemberModel.deleteOne({
       conversationId: groupId,
@@ -465,12 +465,20 @@ export class GroupsService {
     const wasAdmin = group.adminIds.includes(currentUserId);
     group.adminIds = group.adminIds.filter((id) => id !== currentUserId);
 
+    const remainingAdminSet = new Set(group.adminIds);
+
+    const promotedLeaderId = remainingMembers.find((member) => remainingAdminSet.has(member.userId))?.userId
+      ?? remainingMembers[0]?.userId;
+
+    if (isCreatorLeaving && promotedLeaderId) {
+      group.createdBy = promotedLeaderId;
+    }
+
     if (wasAdmin && group.adminIds.length === 0) {
-      const promotedMember = remainingMembers[0];
-      if (promotedMember) {
-        group.adminIds = [promotedMember.userId];
+      if (promotedLeaderId) {
+        group.adminIds = [promotedLeaderId];
         await ConversationMemberModel.updateOne(
-          { conversationId: groupId, userId: promotedMember.userId },
+          { conversationId: groupId, userId: promotedLeaderId },
           { role: 'admin' },
         );
       }
@@ -489,6 +497,18 @@ export class GroupsService {
       [...remainingIds, currentUserId],
     );
 
+    if (isCreatorLeaving && promotedLeaderId) {
+      const promotedLeader = await UserModel.findById(promotedLeaderId).select('displayName').lean();
+      const promotedLeaderName = (promotedLeader?.displayName as string) ?? 'Thành viên';
+
+      await createAndEmitGroupSystemMessage(
+        groupId,
+        currentUserId,
+        `${promotedLeaderName} là trưởng nhóm`,
+        [...remainingIds, currentUserId],
+      );
+    }
+
     emitGroupUpdated([...remainingIds, currentUserId], {
       groupId,
       type: 'member_removed',
@@ -496,6 +516,8 @@ export class GroupsService {
         userId: currentUserId,
         removedBy: currentUserId,
         action: 'left',
+        createdBy: getGroupCreatorId(group),
+        adminIds: group.adminIds,
       },
     });
 
@@ -542,6 +564,19 @@ export class GroupsService {
     await targetMember.save();
     await group.save();
 
+    if (role === 'admin') {
+      const targetUser = await UserModel.findById(targetUserId).select('displayName').lean();
+      const targetDisplayName = (targetUser?.displayName as string) ?? 'Thành viên';
+      const memberIds = await getGroupMemberIds(groupId);
+
+      await createAndEmitGroupSystemMessage(
+        groupId,
+        currentUserId,
+        `${targetDisplayName} là quản trị viên`,
+        [...memberIds, currentUserId],
+      );
+    }
+
     const summary = await buildGroupSummary(groupId);
     emitGroupUpdated(summary.users.map((u) => u._id), {
       groupId,
@@ -550,6 +585,8 @@ export class GroupsService {
         userId: targetUserId,
         role,
         updatedBy: currentUserId,
+        createdBy: getGroupCreatorId(group),
+        adminIds: group.adminIds,
       },
     });
 

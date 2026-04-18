@@ -2,7 +2,13 @@ import { type NextFunction, type Request, type Response } from 'express';
 import { ZodError } from 'zod';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 import { BadRequestError } from '../../shared/errors';
-import { GetNotificationsQuerySchema, type MarkReadDto, type UpdatePreferencesDto, type MuteConversationDto } from './notifications.schema';
+import {
+  GetNotificationsQuerySchema,
+  type MarkReadDto,
+  type UpdatePreferencesDto,
+  type MuteConversationDto,
+  type PinConversationDto,
+} from './notifications.schema';
 import {
   getNotifications,
   getUnreadCount,
@@ -12,6 +18,8 @@ import {
   updatePreferences,
   muteConversation,
   unmuteConversation,
+  pinConversation,
+  unpinConversation,
 } from './notifications.service';
 
 function parseNotificationsQuery(req: Request): { cursor?: string; limit: number } {
@@ -146,6 +154,46 @@ export async function unmuteConversationHandler(
     const conversationId = req.params['conversationId'] as string;
     await unmuteConversation(userId, conversationId);
     res.json({ success: true, message: 'Conversation unmuted' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// D1.9 – POST /api/notifications/pin/:conversationId
+export async function pinConversationHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const conversationId = req.params['conversationId'] as string;
+    const dto = req.body as PinConversationDto;
+
+    if (dto.pin === false) {
+      await unpinConversation(userId, conversationId);
+      res.json({ success: true, message: 'Conversation unpinned' });
+      return;
+    }
+
+    await pinConversation(userId, conversationId);
+    res.json({ success: true, message: 'Conversation pinned' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// D1.10 – DELETE /api/notifications/pin/:conversationId
+export async function unpinConversationHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const conversationId = req.params['conversationId'] as string;
+    await unpinConversation(userId, conversationId);
+    res.json({ success: true, message: 'Conversation unpinned' });
   } catch (err) {
     next(err);
   }

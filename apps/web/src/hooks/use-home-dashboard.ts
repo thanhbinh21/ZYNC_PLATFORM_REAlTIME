@@ -51,11 +51,19 @@ import {
   addGroupMembers,
   createGroup,
   disbandGroup,
+  leaveGroup,
   removeGroupMember,
   updateGroup,
   updateGroupMemberApproval,
   updateGroupMemberRole,
 } from '@/services/groups';
+import {
+  fetchPreferences,
+  muteConversation,
+  pinConversation,
+  unmuteConversation,
+  unpinConversation,
+} from '@/services/notifications';
 import { getSocket } from '@/services/socket';
 import { useChat, useMessageHistory, type SendMessageOptions } from '@/hooks/use-messaging';
 import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
@@ -72,6 +80,7 @@ interface Conversation {
   name?: string;
   avatarUrl?: string;
   type: 'direct' | 'group';
+  updatedAt?: string;
   createdBy?: string;
   adminIds?: string[];
   memberApprovalEnabled?: boolean;
@@ -86,8 +95,11 @@ interface ConversationListItem {
   name: string;
   preview: string;
   time: string;
+  timestamp: number;
   avatar: string;
   avatarUrl?: string;
+  isPinned?: boolean;
+  mutedUntil?: Date | null;
   isGroup?: boolean;
   createdBy?: string;
   adminIds?: string[];
@@ -97,6 +109,14 @@ interface ConversationListItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+}
+
+interface ConversationSearchTarget {
+  id: string;
+  type: 'friend' | 'group';
+  name: string;
+  avatar?: string;
+  conversationId?: string;
 }
 
 const REACTION_ACK_TIMEOUT_MS = 8000;
@@ -128,6 +148,8 @@ export function useHomeDashboard() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [pinnedConversationIds, setPinnedConversationIds] = useState<string[]>([]);
+  const [mutedUntilByConversation, setMutedUntilByConversation] = useState<Record<string, Date | null>>({});
   const [selectedConversationId, setSelectedConversationId] = useState<string>('');
   const [friendsForGroup, setFriendsForGroup] = useState<FriendUser[]>([]);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
@@ -827,10 +849,11 @@ export function useHomeDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [meRes, requestsRes, convosRes] = await Promise.all([
+        const [meRes, requestsRes, convosRes, prefs] = await Promise.all([
           apiClient.get('/api/users/me'),
           apiClient.get('/api/friends/requests'),
           apiClient.get('/api/conversations'),
+          fetchPreferences(),
         ]);
 
         const user = meRes.data.user;
@@ -839,6 +862,17 @@ export function useHomeDashboard() {
         const convos: Conversation[] = convosRes.data.data || [];
 
         setConversations(convos);
+        setPinnedConversationIds(Array.isArray(prefs.pinnedConversations) ? prefs.pinnedConversations : []);
+
+        const mutedMapRaw = (prefs.mutedUntil || {}) as Record<string, string>;
+        const mutedMap: Record<string, Date | null> = {};
+        Object.entries(mutedMapRaw).forEach(([conversationId, untilRaw]) => {
+          const untilDate = new Date(untilRaw);
+          if (!Number.isNaN(untilDate.getTime())) {
+            mutedMap[conversationId] = untilDate;
+          }
+        });
+        setMutedUntilByConversation(mutedMap);
 
         const allFriends: FriendUser[] = [];
         let cursor: string | undefined;
@@ -849,9 +883,20 @@ export function useHomeDashboard() {
         } while (cursor);
         setFriendsForGroup(allFriends);
 
-        // Select first conversation
+        // Select first conversation (pinned first, then latest updated)
         if (convos.length > 0) {
-          setSelectedConversationId(convos[0]._id);
+          const pinnedSet = new Set(Array.isArray(prefs.pinnedConversations) ? prefs.pinnedConversations : []);
+          const sorted = [...convos].sort((a, b) => {
+            const aPinned = pinnedSet.has(a._id) ? 1 : 0;
+            const bPinned = pinnedSet.has(b._id) ? 1 : 0;
+            if (aPinned !== bPinned) {
+              return bPinned - aPinned;
+            }
+            const aTs = new Date(a.lastMessage?.sentAt || a.updatedAt || 0).getTime();
+            const bTs = new Date(b.lastMessage?.sentAt || b.updatedAt || 0).getTime();
+            return bTs - aTs;
+          });
+          setSelectedConversationId(sorted[0]?._id || '');
         }
 
         let unreadMessagesCount = 0;
@@ -1011,7 +1056,20 @@ export function useHomeDashboard() {
   }
 
   const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
-    return conversations.map((conv, idx) => ({
+    const pinnedSet = new Set(pinnedConversationIds);
+    const sortedConversations = [...conversations].sort((a, b) => {
+      const aPinned = pinnedSet.has(a._id) ? 1 : 0;
+      const bPinned = pinnedSet.has(b._id) ? 1 : 0;
+      if (aPinned !== bPinned) {
+        return bPinned - aPinned;
+      }
+
+      const aTs = new Date(a.lastMessage?.sentAt || a.updatedAt || 0).getTime();
+      const bTs = new Date(b.lastMessage?.sentAt || b.updatedAt || 0).getTime();
+      return bTs - aTs;
+    });
+
+    return sortedConversations.map((conv, idx) => ({
       id: conv._id,
       name: conv.type === 'group'
         ? conv.name || 'Nhóm'
@@ -1020,12 +1078,15 @@ export function useHomeDashboard() {
       time: conv.lastMessage?.sentAt
         ? new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         : '',
+      timestamp: new Date(conv.lastMessage?.sentAt || conv.updatedAt || 0).getTime(),
       avatar: conv.type === 'group'
         ? (conv.name?.substring(0, 2).toUpperCase() || 'GR')
         : (conv.users.find(u => u._id !== userId)?.displayName?.substring(0, 2).toUpperCase() || 'U'),
       avatarUrl: conv.type === 'group'
         ? conv.avatarUrl
         : conv.users.find(u => u._id !== userId)?.avatarUrl,
+      isPinned: pinnedSet.has(conv._id),
+      mutedUntil: mutedUntilByConversation[conv._id] || null,
       isGroup: conv.type === 'group',
       createdBy: conv.createdBy,
       adminIds: conv.adminIds,
@@ -1036,7 +1097,7 @@ export function useHomeDashboard() {
       online: true,
       active: conv._id === selectedConversationId,
     }));
-  }, [conversations, selectedConversationId, userId]);
+  }, [conversations, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
 
   const createGroupConversation = useCallback(
     async (name: string, memberIds: string[]) => {
@@ -1212,6 +1273,98 @@ export function useHomeDashboard() {
     [],
   );
 
+  const openConversationFromSearch = useCallback(async (target: ConversationSearchTarget) => {
+    if (target.type === 'group') {
+      if (target.conversationId) {
+        setSelectedConversationId(target.conversationId);
+      }
+      return;
+    }
+
+    const existingDirect = conversations.find((conversation) => (
+      conversation.type !== 'group'
+      && conversation.users.some((member) => member._id === target.id)
+    ));
+
+    if (existingDirect) {
+      setSelectedConversationId(existingDirect._id);
+      return;
+    }
+
+    const response = await apiClient.post('/api/conversations/direct', { targetUserId: target.id });
+    const directConversation = response.data?.data as Conversation | undefined;
+    if (!directConversation?._id) {
+      return;
+    }
+
+    const normalizedConversation: Conversation = {
+      _id: directConversation._id,
+      type: directConversation.type,
+      name: directConversation.name,
+      avatarUrl: directConversation.avatarUrl,
+      createdBy: directConversation.createdBy,
+      adminIds: directConversation.adminIds,
+      memberApprovalEnabled: directConversation.memberApprovalEnabled,
+      removedFromGroup: false,
+      users: directConversation.users || [],
+      unreadCounts: directConversation.unreadCounts || {},
+      lastMessage: directConversation.lastMessage,
+      updatedAt: directConversation.updatedAt,
+    };
+
+    setConversations((prev) => {
+      const exists = prev.some((conversation) => conversation._id === normalizedConversation._id);
+      if (exists) {
+        return prev.map((conversation) => (
+          conversation._id === normalizedConversation._id
+            ? { ...conversation, ...normalizedConversation }
+            : conversation
+        ));
+      }
+      return [normalizedConversation, ...prev];
+    });
+
+    setSelectedConversationId(normalizedConversation._id);
+  }, [conversations]);
+
+  const searchTargets = useCallback((): ConversationSearchTarget[] => {
+    const targets: ConversationSearchTarget[] = [];
+
+    const seenGroupIds = new Set<string>();
+    for (const conversation of conversations) {
+      if (conversation.type !== 'group') {
+        continue;
+      }
+      if (seenGroupIds.has(conversation._id)) {
+        continue;
+      }
+      seenGroupIds.add(conversation._id);
+      targets.push({
+        id: conversation._id,
+        type: 'group',
+        name: conversation.name || 'Nhóm',
+        avatar: conversation.name?.substring(0, 2).toUpperCase() || 'GR',
+        conversationId: conversation._id,
+      });
+    }
+
+    const seenFriendIds = new Set<string>();
+    for (const friend of friendsForGroup) {
+      if (seenFriendIds.has(friend.id)) {
+        continue;
+      }
+      seenFriendIds.add(friend.id);
+      targets.push({
+        id: friend.id,
+        type: 'friend',
+        name: friend.displayName,
+        avatar: friend.displayName.substring(0, 2).toUpperCase(),
+      });
+    }
+
+    return targets;
+  }, [conversations, friendsForGroup]);
+
   useEffect(() => {
     const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
     if (!token || !userId) {
@@ -1240,6 +1393,12 @@ export function useHomeDashboard() {
           if (index === -1) {
             return prev;
           }
+          setPinnedConversationIds((ids) => ids.filter((id) => id !== payload.groupId));
+          setMutedUntilByConversation((current) => {
+            const next = { ...current };
+            delete next[payload.groupId];
+            return next;
+          });
           return prev.filter((conversation) => conversation._id !== payload.groupId);
         }
 
@@ -1280,9 +1439,25 @@ export function useHomeDashboard() {
           current.memberApprovalEnabled = Boolean(payload.data['memberApprovalEnabled']);
         }
 
+        const nextCreatedBy = payload.data['createdBy'];
+        if (typeof nextCreatedBy === 'string' && nextCreatedBy.trim().length > 0) {
+          current.createdBy = nextCreatedBy;
+        }
+
+        const nextAdminIds = payload.data['adminIds'];
+        if (Array.isArray(nextAdminIds)) {
+          current.adminIds = nextAdminIds.filter((id): id is string => typeof id === 'string');
+        }
+
         if (payload.type === 'member_removed') {
           const removedUserId = payload.data['userId'] as string | undefined;
           if (removedUserId === userId) {
+            setPinnedConversationIds((ids) => ids.filter((id) => id !== payload.groupId));
+            setMutedUntilByConversation((current) => {
+              const next = { ...current };
+              delete next[payload.groupId];
+              return next;
+            });
             const filtered = prev.filter((conversation) => conversation._id !== payload.groupId);
             if (selectedConversationId === payload.groupId) {
               setSelectedConversationId(filtered[0]?._id ?? '');
@@ -1293,6 +1468,20 @@ export function useHomeDashboard() {
           if (removedUserId) {
             current.users = current.users.filter((member) => member._id !== removedUserId);
             current.adminIds = (current.adminIds ?? []).filter((id) => id !== removedUserId);
+          }
+        }
+
+        if (payload.type === 'role_changed') {
+          const changedUserId = payload.data['userId'] as string | undefined;
+          const changedRole = payload.data['role'] as 'admin' | 'member' | undefined;
+          if (changedUserId && changedRole && !Array.isArray(nextAdminIds)) {
+            const adminSet = new Set(current.adminIds ?? []);
+            if (changedRole === 'admin') {
+              adminSet.add(changedUserId);
+            } else {
+              adminSet.delete(changedUserId);
+            }
+            current.adminIds = Array.from(adminSet);
           }
         }
 
@@ -1822,6 +2011,102 @@ export function useHomeDashboard() {
     [selectedConversationId],
   );
 
+  const leaveGroupConversation = useCallback(
+    async (groupId: string) => {
+      setGroupActionLoading(true);
+      try {
+        await leaveGroup(groupId);
+
+        setConversations((prev) => {
+          const filtered = prev.filter((conversation) => conversation._id !== groupId);
+          if (selectedConversationId === groupId) {
+            setSelectedConversationId(filtered[0]?._id ?? '');
+          }
+          return filtered;
+        });
+
+        setPinnedConversationIds((prev) => prev.filter((id) => id !== groupId));
+        setMutedUntilByConversation((prev) => {
+          const next = { ...prev };
+          delete next[groupId];
+          return next;
+        });
+      } finally {
+        setGroupActionLoading(false);
+      }
+    },
+    [selectedConversationId],
+  );
+
+  const toggleConversationPin = useCallback(
+    async (conversationId: string, shouldPin: boolean) => {
+      if (!conversationId) {
+        return;
+      }
+
+      const prevPinned = pinnedConversationIds;
+      setPinnedConversationIds((prev) => (
+        shouldPin ? Array.from(new Set([...prev, conversationId])) : prev.filter((id) => id !== conversationId)
+      ));
+
+      try {
+        if (shouldPin) {
+          await pinConversation(conversationId);
+        } else {
+          await unpinConversation(conversationId);
+        }
+      } catch (error) {
+        setPinnedConversationIds(prevPinned);
+        throw error;
+      }
+    },
+    [pinnedConversationIds],
+  );
+
+  const muteConversationByDuration = useCallback(
+    async (conversationId: string, duration: '1h' | '4h' | '8h' | 'until_enabled') => {
+      if (!conversationId) {
+        return;
+      }
+
+      const now = Date.now();
+      const until = duration === '1h'
+        ? new Date(now + 60 * 60 * 1000)
+        : duration === '4h'
+          ? new Date(now + 4 * 60 * 60 * 1000)
+          : duration === '8h'
+            ? new Date(now + 8 * 60 * 60 * 1000)
+            : new Date('9999-12-31T23:59:59.999Z');
+
+      const prevMuted = mutedUntilByConversation[conversationId] ?? null;
+      setMutedUntilByConversation((prev) => ({ ...prev, [conversationId]: until }));
+
+      try {
+        await muteConversation(conversationId, until.toISOString());
+      } catch (error) {
+        setMutedUntilByConversation((prev) => ({ ...prev, [conversationId]: prevMuted }));
+        throw error;
+      }
+    },
+    [mutedUntilByConversation],
+  );
+
+  const unmuteConversationById = useCallback(async (conversationId: string) => {
+    if (!conversationId) {
+      return;
+    }
+
+    const prevMuted = mutedUntilByConversation[conversationId] ?? null;
+    setMutedUntilByConversation((prev) => ({ ...prev, [conversationId]: null }));
+
+    try {
+      await unmuteConversation(conversationId);
+    } catch (error) {
+      setMutedUntilByConversation((prev) => ({ ...prev, [conversationId]: prevMuted }));
+      throw error;
+    }
+  }, [mutedUntilByConversation]);
+
   const getSelectedConversationInfo = useCallback(() => {
     const conv = conversations.find(c => c._id === selectedConversationId);
     if (!conv) return null;
@@ -2162,6 +2447,8 @@ export function useHomeDashboard() {
     conversations: convertConversationsToListItems(),
     selectedConversationId,
     onSelectConversation: setSelectedConversationId,
+    searchTargets: searchTargets(),
+    onSelectSearchTarget: openConversationFromSearch,
     messages: messageHistory.messages,
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
@@ -2176,6 +2463,12 @@ export function useHomeDashboard() {
     onUpdateGroupMemberApproval: updateGroupMemberApprovalConversation,
     onRemoveGroupMember: removeGroupMemberConversation,
     onDisbandGroup: disbandGroupConversation,
+    onLeaveGroup: leaveGroupConversation,
+    onToggleConversationPin: toggleConversationPin,
+    onMuteConversation: muteConversationByDuration,
+    onUnmuteConversation: unmuteConversationById,
+    isSelectedConversationPinned: pinnedConversationIds.includes(selectedConversationId),
+    selectedConversationMutedUntil: selectedConversationId ? (mutedUntilByConversation[selectedConversationId] ?? null) : null,
     onSendMessage: handleSendMessage,
     onCancelPendingMessage: handleCancelPendingMessage,
     onStartTyping: handleStartTyping,

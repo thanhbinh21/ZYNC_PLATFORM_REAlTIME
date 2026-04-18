@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -47,6 +48,25 @@ interface Conversation {
   updatedAt?: string;
 }
 
+interface NotificationPreferences {
+  pinnedConversations?: string[];
+}
+
+interface FriendUser {
+  id: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+interface SearchTarget {
+  key: string;
+  type: 'friend' | 'group';
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  conversationId?: string;
+}
+
 interface IncomingMessageEvent {
   conversationId?: string;
   senderId?: string | { _id?: string };
@@ -59,6 +79,8 @@ interface GroupUpdatedEvent {
   groupId?: string;
   type?: 'created' | 'name_changed' | 'avatar_changed' | 'member_added' | 'member_removed' | 'role_changed' | 'member_approval_changed' | 'disbanded';
   data?: {
+    userId?: string;
+    memberIds?: string[];
     name?: string;
     avatarUrl?: string;
   };
@@ -119,6 +141,8 @@ export default function ChatScreen() {
   const userId = String(userInfo?._id || userInfo?.id || '');
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [allFriends, setAllFriends] = useState<FriendUser[]>([]);
+  const [pinnedConversationIds, setPinnedConversationIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,10 +158,33 @@ export default function ChatScreen() {
 
   const loadConversations = useCallback(async () => {
     try {
-      const res = await api.get('/conversations');
+      const loadAllFriends = async (): Promise<FriendUser[]> => {
+        const friends: FriendUser[] = [];
+        let cursor: string | undefined;
+
+        do {
+          const response = await api.get('/friends', { params: { limit: 50, cursor } });
+          const page = Array.isArray(response.data?.friends) ? (response.data.friends as FriendUser[]) : [];
+          const nextCursor = typeof response.data?.nextCursor === 'string' ? response.data.nextCursor : null;
+          friends.push(...page);
+          cursor = nextCursor ?? undefined;
+        } while (cursor);
+
+        return friends;
+      };
+
+      const [res, prefRes, friends] = await Promise.all([
+        api.get('/conversations'),
+        api.get('/notifications/preferences'),
+        loadAllFriends(),
+      ]);
       const items = Array.isArray(res.data?.data) ? (res.data.data as Conversation[]) : [];
+      const prefs = (prefRes.data?.data || {}) as NotificationPreferences;
+      const pinnedIds = Array.isArray(prefs.pinnedConversations) ? prefs.pinnedConversations : [];
 
       setConversations(items);
+      setPinnedConversationIds(pinnedIds);
+      setAllFriends(friends);
       joinAllConversations(items);
     } catch (err: any) {
       console.error('[ERROR] Failed to load conversations:', err?.response?.data || err?.message || err);
@@ -211,6 +258,24 @@ export default function ChatScreen() {
 
     const handleGroupUpdated = (payload: GroupUpdatedEvent) => {
       if (!payload?.groupId) return;
+
+      if (payload.type === 'member_added') {
+        const memberIds = Array.isArray(payload.data?.memberIds) ? payload.data?.memberIds : [];
+        if (memberIds.includes(userId)) {
+          void loadConversations();
+        }
+      }
+
+      if (payload.type === 'disbanded') {
+        setConversations((prev) => prev.filter((conversation) => conversation._id !== payload.groupId));
+        return;
+      }
+
+      if (payload.type === 'member_removed' && payload.data?.userId === userId) {
+        setConversations((prev) => prev.filter((conversation) => conversation._id !== payload.groupId));
+        return;
+      }
+
       if (payload.type !== 'name_changed' && payload.type !== 'avatar_changed') return;
 
       setConversations((prev) => prev.map((conversation) => {
@@ -258,11 +323,125 @@ export default function ChatScreen() {
     });
   };
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const isSearchMode = normalizedSearch.length > 0;
+
+  const searchTargets = useMemo<SearchTarget[]>(() => {
+    if (!isSearchMode) {
+      return [];
+    }
+
+    const targets: SearchTarget[] = [];
+
+    const seenGroupIds = new Set<string>();
+    for (const conversation of conversations) {
+      if (conversation.type !== 'group') {
+        continue;
+      }
+
+      const name = getConversationName(conversation, userId);
+      if (!name.toLowerCase().includes(normalizedSearch)) {
+        continue;
+      }
+
+      if (seenGroupIds.has(conversation._id)) {
+        continue;
+      }
+
+      seenGroupIds.add(conversation._id);
+      targets.push({
+        key: `group-${conversation._id}`,
+        type: 'group',
+        id: conversation._id,
+        name,
+        avatarUrl: conversation.avatarUrl,
+        conversationId: conversation._id,
+      });
+    }
+
+    const seenFriendIds = new Set<string>();
+    for (const friend of allFriends) {
+      if (seenFriendIds.has(friend.id)) {
+        continue;
+      }
+
+      if (!friend.displayName.toLowerCase().includes(normalizedSearch)) {
+        continue;
+      }
+
+      seenFriendIds.add(friend.id);
+      targets.push({
+        key: `friend-${friend.id}`,
+        type: 'friend',
+        id: friend.id,
+        name: friend.displayName,
+        avatarUrl: friend.avatarUrl,
+      });
+    }
+
+    return targets;
+  }, [allFriends, conversations, isSearchMode, normalizedSearch, userId]);
+
+  const openSearchTarget = useCallback(async (target: SearchTarget) => {
+    if (target.type === 'group') {
+      const groupConversation = conversations.find((conversation) => conversation._id === target.conversationId);
+      if (groupConversation) {
+        openChatRoom(groupConversation);
+      }
+      return;
+    }
+
+    const existingDirect = conversations.find((conversation) => (
+      conversation.type !== 'group'
+      && conversation.users?.some((member) => member._id === target.id)
+    ));
+
+    if (existingDirect) {
+      openChatRoom(existingDirect);
+      return;
+    }
+
+    try {
+      const response = await api.post('/conversations/direct', { targetUserId: target.id });
+      const conversation = response.data?.data as Conversation | undefined;
+      if (!conversation?._id) {
+        return;
+      }
+
+      setConversations((prev) => {
+        const exists = prev.some((item) => item._id === conversation._id);
+        if (exists) {
+          return prev.map((item) => (item._id === conversation._id ? { ...item, ...conversation } : item));
+        }
+        return [conversation, ...prev];
+      });
+
+      joinAllConversations([conversation]);
+      openChatRoom(conversation);
+    } catch (err: any) {
+      const message = err?.response?.data?.error;
+      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the mo hoi thoai luc nay.');
+    }
+  }, [conversations, joinAllConversations, openChatRoom]);
+
   const filteredConversations = searchQuery
     ? conversations.filter((c) =>
         getConversationName(c, userId).toLowerCase().includes(searchQuery.toLowerCase())
       )
     : conversations;
+
+  const pinnedSet = new Set(pinnedConversationIds);
+  const sortedConversations = [...filteredConversations].sort((a, b) => {
+    const aPinned = pinnedSet.has(a._id) ? 1 : 0;
+    const bPinned = pinnedSet.has(b._id) ? 1 : 0;
+    if (aPinned !== bPinned) {
+      return bPinned - aPinned;
+    }
+
+    const aTs = new Date(a.lastMessage?.sentAt || a.updatedAt || 0).getTime();
+    const bTs = new Date(b.lastMessage?.sentAt || b.updatedAt || 0).getTime();
+    return bTs - aTs;
+  });
 
   return (
     <LinearGradient
@@ -305,8 +484,8 @@ export default function ChatScreen() {
           </View>
         ) : (
           <FlatList
-            data={filteredConversations}
-            keyExtractor={(item) => item._id}
+            data={isSearchMode ? searchTargets : sortedConversations}
+            keyExtractor={(item) => ('key' in item ? item.key : item._id)}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
@@ -317,22 +496,55 @@ export default function ChatScreen() {
               />
             }
             renderItem={({ item }) => {
-              const displayName = getConversationName(item, userId);
-              const unread = item.unreadCount ?? item.unreadCounts?.[userId] ?? 0;
+              if ('key' in item) {
+                const target = item as SearchTarget;
+                return (
+                  <TouchableOpacity style={styles.chatItem} onPress={() => { void openSearchTarget(target); }}>
+                    <View style={styles.avatarContainer}>
+                      <View style={[styles.avatar, target.type === 'group' && styles.groupAvatar]}>
+                        {target.avatarUrl ? (
+                          <Image source={{ uri: target.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                        ) : (
+                          <Text style={styles.avatarText}>{target.name.charAt(0).toUpperCase()}</Text>
+                        )}
+                        {target.type === 'group' && (
+                          <View style={styles.groupBadge}>
+                            <Ionicons name="people" size={10} color="#fff" />
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.chatInfo}>
+                      <View style={styles.chatHeader}>
+                        <Text style={styles.chatName}>{target.name}</Text>
+                      </View>
+                      <View style={styles.chatFooter}>
+                        <Text style={styles.lastMsg} numberOfLines={1}>
+                          {target.type === 'group' ? 'Nhom' : 'Ban be'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }
+
+              const conversationItem = item as Conversation;
+              const displayName = getConversationName(conversationItem, userId);
+              const unread = conversationItem.unreadCount ?? conversationItem.unreadCounts?.[userId] ?? 0;
               const hasUnread = unread > 0;
 
               return (
-                <TouchableOpacity style={styles.chatItem} onPress={() => openChatRoom(item)}>
+                <TouchableOpacity style={styles.chatItem} onPress={() => openChatRoom(conversationItem)}>
                   <View style={styles.avatarContainer}>
-                    <View style={[styles.avatar, item.type === 'group' && styles.groupAvatar]}>
-                      {item.avatarUrl ? (
-                        <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                    <View style={[styles.avatar, conversationItem.type === 'group' && styles.groupAvatar]}>
+                      {conversationItem.avatarUrl ? (
+                        <Image source={{ uri: conversationItem.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
                       ) : (
                         <Text style={styles.avatarText}>
                           {displayName.charAt(0).toUpperCase()}
                         </Text>
                       )}
-                      {item.type === 'group' && (
+                      {conversationItem.type === 'group' && (
                         <View style={styles.groupBadge}>
                           <Ionicons name="people" size={10} color="#fff" />
                         </View>
@@ -344,16 +556,23 @@ export default function ChatScreen() {
                       <Text style={[styles.chatName, hasUnread && styles.chatNameBold]}>
                         {displayName}
                       </Text>
-                      <Text style={[styles.chatTime, hasUnread && styles.chatTimeActive]}>
-                        {formatRelativeTime(item.lastMessage?.sentAt || item.updatedAt)}
-                      </Text>
+                      <View style={styles.timeColumn}>
+                        <Text style={[styles.chatTime, hasUnread && styles.chatTimeActive]}>
+                          {formatRelativeTime(conversationItem.lastMessage?.sentAt || conversationItem.updatedAt)}
+                        </Text>
+                        {pinnedSet.has(conversationItem._id) && (
+                          <View style={styles.pinBadge}>
+                            <Ionicons name="pin" size={10} color="#b8ffe9" />
+                          </View>
+                        )}
+                      </View>
                     </View>
                     <View style={styles.chatFooter}>
                       <Text
                         style={[styles.lastMsg, hasUnread && styles.lastMsgBold]}
                         numberOfLines={1}
                       >
-                        {getLastMessagePreview(item.lastMessage)}
+                        {getLastMessagePreview(conversationItem.lastMessage)}
                       </Text>
                       {hasUnread && (
                         <View style={styles.unreadBadge}>
@@ -370,11 +589,11 @@ export default function ChatScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="chatbubbles-outline" size={64} color="#334155" />
-                <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện</Text>
-                <Text style={styles.emptySubtext}>Bắt đầu trò chuyện với bạn bè nhé!</Text>
+                <Text style={styles.emptyTitle}>{isSearchMode ? 'Khong tim thay ket qua' : 'Chưa có cuộc trò chuyện'}</Text>
+                <Text style={styles.emptySubtext}>{isSearchMode ? 'Thu tim voi tu khoa khac.' : 'Bắt đầu trò chuyện với bạn bè nhé!'}</Text>
               </View>
             }
-            contentContainerStyle={filteredConversations.length === 0 ? { flex: 1 } : { paddingBottom: 100 }}
+            contentContainerStyle={(isSearchMode ? searchTargets.length : sortedConversations.length) === 0 ? { flex: 1 } : { paddingBottom: 100 }}
           />
         )}
       </View>
@@ -501,8 +720,11 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 5,
+  },
+  timeColumn: {
+    alignItems: 'flex-end',
   },
   chatName: {
     color: '#fff',
@@ -519,6 +741,13 @@ const styles = StyleSheet.create({
   },
   chatTimeActive: {
     color: '#10b981',
+  },
+  pinBadge: {
+    marginTop: 3,
+    borderRadius: 8,
+    backgroundColor: '#145140',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
   },
   chatFooter: {
     flexDirection: 'row',
