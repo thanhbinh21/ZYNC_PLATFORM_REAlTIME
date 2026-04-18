@@ -20,6 +20,31 @@ export interface MessageWithStatus extends IMessage {
   status?: string;
 }
 
+interface DeleteForMeSyncResult {
+  message: IMessage;
+  effectiveLastMessage: {
+    content: string;
+    senderId: string;
+    sentAt: Date;
+  } | null;
+  unreadCount: number;
+  lastVisibleMessage: {
+    content: string;
+    senderId: string;
+    senderDisplayName: string;
+    sentAt: Date;
+  } | null;
+}
+
+interface RecallSyncResult {
+  message: IMessage;
+  conversationLastMessage: {
+    content: string;
+    senderId: string;
+    sentAt: Date;
+  } | null;
+}
+
 export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
 
@@ -263,6 +288,8 @@ export class MessagesService {
         senderId,
         sentAt: savedMessage.createdAt,
       });
+
+      await ConversationsService.clearConversationMemberOverrideOnNewMessage(conversationId);
     } catch (err) {
       logger.warn('[InsertMetadata] Failed to update conversation lastMessage', err);
     }
@@ -764,9 +791,7 @@ export class MessagesService {
     idempotencyKey: string,
     userId: string,
   ): Promise<IMessage> {
-    const message = await MessageModel.findOne({
-      idempotencyKey: idempotencyKey
-    });
+    const message = await MessageModel.findOne(this.getMessageLookupQuery(idempotencyKey));
 
     if (!message) {
       throw new BadRequestError('Message not found');
@@ -790,6 +815,23 @@ export class MessagesService {
     await message.save();
     logger.info(`[Delete] Message ${idempotencyKey} deleted for me by user ${userId}`);
     return message.toObject() as unknown as IMessage;
+  }
+
+  static async deleteMessageForMeWithConversationSync(
+    messageReference: string,
+    userId: string,
+  ): Promise<DeleteForMeSyncResult> {
+    const message = await this.deleteMessageForMe(messageReference, userId);
+
+    const { effectiveLastMessage, unreadCount, lastVisibleMessage } =
+      await ConversationsService.applyDeleteForMeMemberState(message.conversationId, userId);
+
+    return {
+      message,
+      effectiveLastMessage,
+      unreadCount,
+      lastVisibleMessage,
+    };
   }
 
   /**
@@ -838,6 +880,20 @@ export class MessagesService {
 
     logger.info(`[Recall] Message ${messageReference} recalled by user ${userId}`);
     return message.toObject() as unknown as IMessage;
+  }
+
+  static async recallMessageWithConversationSync(
+    messageReference: string,
+    userId: string,
+    force: boolean = false,
+  ): Promise<RecallSyncResult> {
+    const message = await this.recallMessageWithRetry(messageReference, userId, force);
+    const conversationLastMessage = await ConversationsService.recomputeConversationLastMessage(message.conversationId);
+
+    return {
+      message,
+      conversationLastMessage,
+    };
   }
 
   /**

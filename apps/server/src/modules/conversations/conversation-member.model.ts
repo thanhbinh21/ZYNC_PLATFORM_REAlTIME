@@ -8,6 +8,9 @@ export interface IConversationMember extends Document {
   penaltyScore: number;
   penaltyWindowStartedAt?: Date;
   mutedUntil?: Date;
+  lastVisibleMessageRef?: string;
+  lastVisibleAt?: Date;
+  unreadCount?: number;
 }
 
 const memberSchema = new Schema<IConversationMember>({
@@ -18,6 +21,9 @@ const memberSchema = new Schema<IConversationMember>({
   penaltyScore: { type: Number, default: 0, min: 0, max: 100 },
   penaltyWindowStartedAt: { type: Date },
   mutedUntil: { type: Date },
+  lastVisibleMessageRef: { type: String },
+  lastVisibleAt: { type: Date },
+  unreadCount: { type: Number, min: 0 },
 });
 
 memberSchema.index({ conversationId: 1, userId: 1 }, { unique: true });

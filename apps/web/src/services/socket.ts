@@ -665,6 +665,18 @@ export function listenToMessageDeletion(
     messageId: string;
     conversationId: string;
     deletedAt: string;
+    effectiveLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
+    unreadCount?: number;
+    lastVisibleMessage?: {
+      content: string;
+      senderId: string;
+      senderDisplayName?: string;
+      sentAt: string;
+    } | null;
   }) => void,
 ): void {
   if (!socket) {
@@ -672,16 +684,33 @@ export function listenToMessageDeletion(
     return;
   }
 
-  socket.off('message_deleted_for_me'); // prevent duplicate listeners
   socket.on('message_deleted_for_me', callback);
 }
 
 /**
  * Stop listening to message deletion events
  */
-export function unlistenToMessageDeletion(): void {
+export function unlistenToMessageDeletion(
+  callback: (data: {
+    messageId: string;
+    conversationId: string;
+    deletedAt: string;
+    effectiveLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
+    unreadCount?: number;
+    lastVisibleMessage?: {
+      content: string;
+      senderId: string;
+      senderDisplayName?: string;
+      sentAt: string;
+    } | null;
+  }) => void,
+): void {
   if (socket) {
-    socket.off('message_deleted_for_me');
+    socket.off('message_deleted_for_me', callback);
   }
 }
 
@@ -696,6 +725,11 @@ export function listenToMessageRecall(
     conversationId: string;
     recalledBy: string;
     recalledAt: string;
+    conversationLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
   }) => void,
 ): void {
   if (!socket) {
@@ -703,16 +737,28 @@ export function listenToMessageRecall(
     return;
   }
 
-  socket.off('message_recalled'); // prevent duplicate listeners
   socket.on('message_recalled', callback);
 }
 
 /**
  * Stop listening to message recall events
  */
-export function unlistenToMessageRecall(): void {
+export function unlistenToMessageRecall(
+  callback: (data: {
+    messageId: string;
+    idempotencyKey: string;
+    conversationId: string;
+    recalledBy: string;
+    recalledAt: string;
+    conversationLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
+  }) => void,
+): void {
   if (socket) {
-    socket.off('message_recalled');
+    socket.off('message_recalled', callback);
   }
 }
 

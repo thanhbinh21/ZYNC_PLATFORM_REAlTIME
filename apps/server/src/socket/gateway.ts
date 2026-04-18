@@ -1500,13 +1500,16 @@ async function handleDeleteMessageForMe(
   }
 
   // ✅ USE .then() INSTEAD OF await
-  MessagesService.deleteMessageForMe(idempotencyKey, userId)
-    .then((message) => {
+  MessagesService.deleteMessageForMeWithConversationSync(idempotencyKey, userId)
+    .then(({ message, effectiveLastMessage, unreadCount, lastVisibleMessage }) => {
       // Notify only this user (only they see the change)
       socket.emit('message_deleted_for_me', {
         messageId: messageId,
         conversationId,
         deletedAt: new Date().toISOString(),
+        effectiveLastMessage: effectiveLastMessage || null,
+        unreadCount,
+        lastVisibleMessage: lastVisibleMessage || null,
       });
 
       logger.debug(`Message ${messageId} deleted for me by user ${userId}`);
@@ -1541,8 +1544,8 @@ async function handleRecallMessage(
   }
 
   // ✅ USE .then() INSTEAD OF await
-  MessagesService.recallMessage(idempotencyKey, userId)
-    .then((message) => {
+  MessagesService.recallMessageWithConversationSync(idempotencyKey, userId)
+    .then(({ message, conversationLastMessage }) => {
       // Broadcast to EVERYONE in conversation (sender + all recipients)
       io.to(`conv:${conversationId}`).emit('message_recalled', {
         messageId: messageId,
@@ -1550,6 +1553,7 @@ async function handleRecallMessage(
         conversationId,
         recalledBy: userId,
         recalledAt: new Date().toISOString(),
+        conversationLastMessage: conversationLastMessage || null,
       });
 
       logger.info(`Message ${messageId} recalled by user ${userId}`);

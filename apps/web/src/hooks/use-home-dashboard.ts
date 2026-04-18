@@ -30,6 +30,8 @@ import {
   listenToWebRtcIceCandidate,
   listenToWebRtcOffer,
   listenToReactionAck,
+  listenToMessageDeletion,
+  listenToMessageRecall,
   listenToReactionError,
   listenToReactionUpdated,
   unlistenToCallIncoming,
@@ -42,6 +44,8 @@ import {
   unlistenToWebRtcIceCandidate,
   unlistenToWebRtcOffer,
   unlistenToReactionAck,
+  unlistenToMessageDeletion,
+  unlistenToMessageRecall,
   unlistenToReactionError,
   unlistenToReactionUpdated,
 } from '@/services/socket';
@@ -86,7 +90,7 @@ interface Conversation {
   memberApprovalEnabled?: boolean;
   removedFromGroup?: boolean;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
-  lastMessage?: { senderId: string; content: string; sentAt: string };
+  lastMessage?: { senderId: string; senderDisplayName?: string; content: string; sentAt: string };
   unreadCounts?: Record<string, number>;
 }
 
@@ -117,6 +121,35 @@ interface ConversationSearchTarget {
   name: string;
   avatar?: string;
   conversationId?: string;
+}
+
+function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string {
+  return message.content && message.content.trim().length > 0
+    ? message.content
+    : message.type === 'image'
+      ? 'Da gui anh'
+      : message.type === 'video'
+        ? 'Da gui video'
+        : message.type?.startsWith('file/')
+          ? 'Da gui tep dinh kem'
+          : message.type === 'audio'
+            ? 'Da gui am thanh'
+            : message.type === 'sticker'
+              ? 'Da gui sticker'
+              : 'Tin nhan media';
+}
+
+function formatConversationPreview(lastMessage?: Conversation['lastMessage']): string {
+  if (!lastMessage?.content) {
+    return 'Không có tin nhắn';
+  }
+
+  const senderDisplayName = lastMessage.senderDisplayName?.trim();
+  if (!senderDisplayName) {
+    return lastMessage.content;
+  }
+
+  return `${senderDisplayName}: ${lastMessage.content}`;
 }
 
 const REACTION_ACK_TIMEOUT_MS = 8000;
@@ -998,24 +1031,14 @@ export function useHomeDashboard() {
     const latestMessage = messages[messages.length - 1];
     setConversations(prev => prev.map(conv => {
       if (conv._id === latestMessage.conversationId) {
-        const messagePreview = latestMessage.content && latestMessage.content.trim().length > 0
-          ? latestMessage.content
-          : latestMessage.type === 'image'
-            ? 'Da gui anh'
-            : latestMessage.type === 'video'
-              ? 'Da gui video'
-              : latestMessage.type?.startsWith('file/')
-                ? 'Da gui tep dinh kem'
-                : latestMessage.type === 'audio'
-                  ? 'Da gui am thanh'
-                  : latestMessage.type === 'sticker'
-                    ? 'Da gui sticker'
-                    : 'Tin nhan media';
+        const senderDisplayName = conv.users.find((member) => member._id === latestMessage.senderId)?.displayName;
+        const messagePreview = buildMessagePreview(latestMessage);
 
         return {
           ...conv,
           lastMessage: {
             senderId: latestMessage.senderId,
+            senderDisplayName,
             content: messagePreview,
             sentAt: latestMessage.createdAt,
           },
@@ -1028,24 +1051,14 @@ export function useHomeDashboard() {
   const updatePreviewConversation = (message: Message) => {
     setConversations(prev => prev.map(conv => {
       if (conv._id === message.conversationId) {
-        const messagePreview = message.content && message.content.trim().length > 0
-          ? message.content
-          : message.type === 'image'
-            ? 'Da gui anh'
-            : message.type === 'video'
-              ? 'Da gui video'
-              : message.type?.startsWith('file/')
-                ? 'Da gui tep dinh kem'
-                : message.type === 'audio'
-                  ? 'Da gui am thanh'
-                  : message.type === 'sticker'
-                    ? 'Da gui sticker'
-                    : 'Tin nhan media';
+        const senderDisplayName = conv.users.find((member) => member._id === message.senderId)?.displayName;
+        const messagePreview = buildMessagePreview(message);
 
         return {
           ...conv,
           lastMessage: {
             senderId: message.senderId,
+            senderDisplayName,
             content: messagePreview,
             sentAt: message.createdAt,
           },
@@ -1053,7 +1066,125 @@ export function useHomeDashboard() {
       }
       return conv;
     }));
-  }
+  };
+
+  useEffect(() => {
+    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
+    if (!token || !userId) {
+      return;
+    }
+
+    getSocket(token);
+
+    const handleMessageDeletedForMe = (payload: {
+      conversationId: string;
+      unreadCount?: number;
+      effectiveLastMessage?: {
+        content: string;
+        senderId: string;
+        sentAt: string;
+      } | null;
+      lastVisibleMessage?: {
+        content: string;
+        senderId: string;
+        senderDisplayName?: string;
+        sentAt: string;
+      } | null;
+    }) => {
+      if (!payload?.conversationId) {
+        return;
+      }
+
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== payload.conversationId) {
+          return conversation;
+        }
+
+        let nextLastMessage = conversation.lastMessage;
+
+        if (payload.lastVisibleMessage) {
+          nextLastMessage = {
+            senderId: payload.lastVisibleMessage.senderId,
+            senderDisplayName: payload.lastVisibleMessage.senderDisplayName,
+            content: payload.lastVisibleMessage.content,
+            sentAt: payload.lastVisibleMessage.sentAt,
+          };
+        } else if (payload.effectiveLastMessage) {
+          nextLastMessage = {
+            senderId: payload.effectiveLastMessage.senderId,
+            senderDisplayName: conversation.users.find((member) => member._id === payload.effectiveLastMessage?.senderId)?.displayName,
+            content: payload.effectiveLastMessage.content,
+            sentAt: payload.effectiveLastMessage.sentAt,
+          };
+        }
+
+        const unreadCounts = {
+          ...(conversation.unreadCounts || {}),
+        };
+
+        if (typeof payload.unreadCount === 'number') {
+          unreadCounts[userId] = payload.unreadCount;
+        }
+
+        return {
+          ...conversation,
+          lastMessage: nextLastMessage,
+          unreadCounts,
+        };
+      }));
+    };
+
+    const handleMessageRecalled = (payload: {
+      conversationId?: string;
+      recalledBy?: string;
+      recalledAt?: string;
+      conversationLastMessage?: {
+        content: string;
+        senderId: string;
+        sentAt: string;
+      } | null;
+    }) => {
+      if (!payload.conversationId) {
+        return;
+      }
+
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== payload.conversationId) {
+          return conversation;
+        }
+
+        if (payload.conversationLastMessage) {
+          return {
+            ...conversation,
+            lastMessage: {
+              senderId: payload.conversationLastMessage.senderId,
+              senderDisplayName: conversation.users.find((member) => member._id === payload.conversationLastMessage?.senderId)?.displayName,
+              content: 'Tin nhắn đã được thu hồi cho tôi',
+              sentAt: payload.conversationLastMessage.sentAt,
+            },
+          };
+        }
+
+        return {
+          ...conversation,
+          lastMessage: {
+            senderId: payload.recalledBy || conversation.lastMessage?.senderId || '',
+            senderDisplayName: conversation.lastMessage?.senderDisplayName,
+            content: 'Tin nhắn đã được thu hồi cho tôi',
+            sentAt: payload.recalledAt || conversation.lastMessage?.sentAt || new Date().toISOString(),
+          },
+        };
+      }));
+    };
+
+    listenToMessageDeletion(handleMessageDeletedForMe);
+    listenToMessageRecall(handleMessageRecalled);
+
+    return () => {
+      unlistenToMessageDeletion(handleMessageDeletedForMe);
+      unlistenToMessageRecall(handleMessageRecalled);
+    };
+  }, [userId]);
 
   const convertConversationsToListItems = useCallback((): ConversationListItem[] => {
     const pinnedSet = new Set(pinnedConversationIds);
@@ -1074,7 +1205,7 @@ export function useHomeDashboard() {
       name: conv.type === 'group'
         ? conv.name || 'Nhóm'
         : conv.users.find(u => u._id !== userId)?.displayName || 'Người dùng',
-      preview: conv.lastMessage?.content || 'Không có tin nhắn',
+      preview: formatConversationPreview(conv.lastMessage),
       time: conv.lastMessage?.sentAt
         ? new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         : '',

@@ -612,8 +612,8 @@ export function useChat({
 
     return () => {
       try {
-        unlistenToMessageDeletion();
-        unlistenToMessageRecall();
+        unlistenToMessageDeletion(handleMessageDeletedForMe);
+        unlistenToMessageRecall(handleMessageRecalled);
       } catch (err) {
         console.error('Failed to cleanup deletion listeners:', err);
       }
@@ -820,8 +820,8 @@ export function useMessageHistory({
 
     return () => {
       try {
-        unlistenToMessageDeletion();
-        unlistenToMessageRecall();
+        unlistenToMessageDeletion(handleMessageDeletedForMe);
+        unlistenToMessageRecall(handleMessageRecalled);
         unlistenToMessageForwarded();
       } catch (err) {
         console.error('Failed to cleanup deletion listeners:', err);

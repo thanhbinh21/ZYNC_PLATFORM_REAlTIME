@@ -67,12 +67,32 @@ interface SearchTarget {
   conversationId?: string;
 }
 
+type ChatListItem = Conversation | SearchTarget;
+
+function isSearchTarget(item: ChatListItem): item is SearchTarget {
+  return 'key' in item;
+}
+
 interface IncomingMessageEvent {
   conversationId?: string;
   senderId?: string | { _id?: string };
   content?: string;
   type?: string;
   createdAt?: string;
+}
+
+interface MessageDeletedForMeEvent {
+  messageId?: string;
+  conversationId?: string;
+  deletedAt?: string;
+}
+
+interface MessageRecalledEvent {
+  messageId?: string;
+  idempotencyKey?: string;
+  conversationId?: string;
+  recalledBy?: string;
+  recalledAt?: string;
 }
 
 interface GroupUpdatedEvent {
@@ -256,6 +276,22 @@ export default function ChatScreen() {
       void loadConversations();
     };
 
+    const handleMessageDeletedForMe = (payload: MessageDeletedForMeEvent) => {
+      if (!payload?.conversationId) {
+        return;
+      }
+
+      void loadConversations();
+    };
+
+    const handleMessageRecalled = (payload: MessageRecalledEvent) => {
+      if (!payload?.conversationId) {
+        return;
+      }
+
+      void loadConversations();
+    };
+
     const handleGroupUpdated = (payload: GroupUpdatedEvent) => {
       if (!payload?.groupId) return;
 
@@ -292,15 +328,15 @@ export default function ChatScreen() {
     };
 
     socket.on('receive_message', handleNewMessage);
-    socket.on('message_recalled', handleNewMessage);
-    socket.on('message_deleted_for_me', handleNewMessage);
+    socket.on('message_recalled', handleMessageRecalled);
+    socket.on('message_deleted_for_me', handleMessageDeletedForMe);
     socket.on('group_updated', handleGroupUpdated);
     socket.on('connect', handleSocketReconnect);
 
     return () => {
       socket.off('receive_message', handleNewMessage);
-      socket.off('message_recalled', handleNewMessage);
-      socket.off('message_deleted_for_me', handleNewMessage);
+      socket.off('message_recalled', handleMessageRecalled);
+      socket.off('message_deleted_for_me', handleMessageDeletedForMe);
       socket.off('group_updated', handleGroupUpdated);
       socket.off('connect', handleSocketReconnect);
     };
@@ -443,6 +479,8 @@ export default function ChatScreen() {
     return bTs - aTs;
   });
 
+  const listData: ChatListItem[] = isSearchMode ? searchTargets : sortedConversations;
+
   return (
     <LinearGradient
       colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
@@ -483,9 +521,9 @@ export default function ChatScreen() {
             <Text style={styles.loadingText}>Đang tải hội thoại...</Text>
           </View>
         ) : (
-          <FlatList
-            data={isSearchMode ? searchTargets : sortedConversations}
-            keyExtractor={(item) => ('key' in item ? item.key : item._id)}
+          <FlatList<ChatListItem>
+            data={listData}
+            keyExtractor={(item) => (isSearchTarget(item) ? item.key : item._id)}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
@@ -496,8 +534,8 @@ export default function ChatScreen() {
               />
             }
             renderItem={({ item }) => {
-              if ('key' in item) {
-                const target = item as SearchTarget;
+              if (isSearchTarget(item)) {
+                const target = item;
                 return (
                   <TouchableOpacity style={styles.chatItem} onPress={() => { void openSearchTarget(target); }}>
                     <View style={styles.avatarContainer}>
@@ -528,7 +566,7 @@ export default function ChatScreen() {
                 );
               }
 
-              const conversationItem = item as Conversation;
+              const conversationItem = item;
               const displayName = getConversationName(conversationItem, userId);
               const unread = conversationItem.unreadCount ?? conversationItem.unreadCounts?.[userId] ?? 0;
               const hasUnread = unread > 0;
