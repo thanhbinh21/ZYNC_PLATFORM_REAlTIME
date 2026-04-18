@@ -293,6 +293,7 @@ npm run dev:web
   - [x] Hotfix call history day du: ghi message tom tat cho ca `missed`/`rejected` va dedupe theo `sessionId+status` de tranh trung lich su <!-- done: 18/04/2026 by binhdev -->
   - [x] Hotfix stale call session: tu dong xu ly session active bi ket (`ringing` qua han -> `missed`, `connected` qua nguong stale -> `ended`) truoc khi tao invite moi, tranh loi `A call between these users is already active` sau restart <!-- done: 18/04/2026 by binhdev -->
   - [x] Baseline group signaling tren socket: them `call_group_invite`, participant join payload co `joinedParticipantIds`, va test integration cho luong group invite/accept/webrtc offer-answer <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hardening group call room lifecycle: participant reject/leave chi cap nhat participant state (khong ket thuc toan room), host hoac last active participant moi dong session <!-- done: 18/04/2026 by binhdev -->
 - [x] DEV-INFRA (Milestone A): Dựng coturn local (Docker Compose) + chuẩn hóa biến cấu hình TURN creds/URLs <!-- done: 18/04/2026 by binhdev -->
 - [ ] DEV-INFRA (Milestone A): Dựng coturn staging, kiểm thử NAT traversal và fallback audio-only
 - [x] DEV-INFRA (Milestone A): Thêm metrics call quality cho 1-1 (join success rate, setup time, reconnect, drop rate) <!-- done: 18/04/2026 by binhdev -->
@@ -302,6 +303,8 @@ npm run dev:web
   - [x] Chuẩn hóa biến môi trường WebRTC cho browser (`NEXT_PUBLIC_TURN_*`) để test call Web ổn định với TURN local <!-- done: 18/04/2026 by binhdev -->
   - [x] Hotfix Web call UX: chuyển panel call thành modal overlay nổi trên chat + fallback nhận cuộc gọi audio-only khi camera bị chặn <!-- done: 18/04/2026 by binhdev -->
   - [x] Nâng cấp UI call: Việt hóa có dấu + thêm icon điều khiển (nhận/từ chối, mic, camera, chia sẻ, kết thúc) + hỗ trợ group modal với lưới video participant <!-- done: 18/04/2026 by binhdev -->
+  - [x] Group call UX hardening: active-speaker highlight theo audio RMS tren grid participant + hien thi "Dang noi" realtime <!-- done: 18/04/2026 by binhdev -->
+  - [x] Hotfix Web call modal: tu dong dong banner trang thai ket thuc de tra ve doan chat (khong can F5) + thu gon modal vao khung chat, tranh che toan bo khung hoi thoai <!-- done: 18/04/2026 by binhdev -->
 - [ ] DEV-MOBILE (Milestone A): UI/UX parity cho 1-1 call với Web (audio route, camera switch, background/foreground handling)
 - [x] DEV-SECURITY: Bảo vệ call bằng access token ngắn hạn (ephemeral call token), chống join trái phép qua roomId đoán được <!-- done: 18/04/2026 by binhdev -->
 - [x] QC (Milestone A): E2E test 1-1 call (happy path, reject, missed, reconnect) <!-- done: 18/04/2026 by binhdev -->

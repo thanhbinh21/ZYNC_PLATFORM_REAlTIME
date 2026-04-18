@@ -206,6 +206,13 @@ async function appendCallEvent(
   });
 }
 
+async function countActiveParticipants(sessionId: string): Promise<number> {
+  return CallParticipantModel.countDocuments({
+    sessionId,
+    status: { $in: ['joined', 'invited'] },
+  });
+}
+
 export class CallsService {
   private static async cleanupExpiredRingingSessionsForPair(
     callerUserId: string,
@@ -600,14 +607,28 @@ export class CallsService {
       },
     );
 
+    await appendCallEvent(sessionId, 'call_rejected', userId, { reason });
+    recordCallRejected(reason);
+
+    if (session.mode === 'sfu') {
+      const remainingActive = await countActiveParticipants(sessionId);
+      if (remainingActive <= 0) {
+        session.status = 'rejected';
+        session.endedAt = new Date();
+        session.endedReason = reason;
+        await session.save();
+        recordCallEnded(reason);
+      }
+
+      return buildCallSessionDetail(sessionId);
+    }
+
     session.status = 'rejected';
     session.endedAt = new Date();
     session.endedReason = reason;
     await session.save();
-    recordCallRejected(reason);
     recordCallEnded(reason);
 
-    await appendCallEvent(sessionId, 'call_rejected', userId, { reason });
     return buildCallSessionDetail(sessionId);
   }
 
@@ -651,6 +672,38 @@ export class CallsService {
     await ensureParticipant(sessionId, userId);
 
     if (session.status === 'ended' || session.status === 'missed' || session.status === 'rejected') {
+      return buildCallSessionDetail(sessionId);
+    }
+
+    if (session.mode === 'sfu' && session.initiatedBy !== userId) {
+      await CallParticipantModel.updateOne(
+        {
+          sessionId,
+          userId,
+        },
+        {
+          $set: {
+            status: 'left',
+            leftAt: new Date(),
+          },
+        },
+      );
+
+      await appendCallEvent(sessionId, 'call_left', userId, { reason: reason ?? 'left' });
+
+      const remainingActive = await countActiveParticipants(sessionId);
+      if (remainingActive <= 0) {
+        session.status = 'ended';
+        session.endedAt = new Date();
+        session.endedReason = reason ?? 'ended';
+        await session.save();
+        const durationSeconds = session.startedAt
+          ? (session.endedAt.getTime() - session.startedAt.getTime()) / 1000
+          : undefined;
+        recordCallEnded(session.endedReason, durationSeconds);
+        await appendCallEvent(sessionId, 'call_ended', userId, { reason: session.endedReason });
+      }
+
       return buildCallSessionDetail(sessionId);
     }
 

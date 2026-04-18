@@ -511,20 +511,25 @@ export function useHomeDashboard() {
     syncLocalPreview();
   }, [isMicMuted, replacePeerVideoTrack, syncLocalPreview]);
 
+  const resetCallUi = useCallback(() => {
+    setActiveCall(null);
+    setCallError(null);
+    pendingOutgoingCallRef.current = null;
+    closePeerConnection();
+    stopLocalMedia();
+    stopRemoteMedia();
+  }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+
   const scheduleCallReset = useCallback((delayMs: number = 2500) => {
     if (autoResetCallTimeoutRef.current) {
       clearTimeout(autoResetCallTimeoutRef.current);
     }
 
     autoResetCallTimeoutRef.current = setTimeout(() => {
-      setActiveCall(null);
-      setCallError(null);
-      pendingOutgoingCallRef.current = null;
-      closePeerConnection();
-      stopLocalMedia();
-      stopRemoteMedia();
+      autoResetCallTimeoutRef.current = null;
+      resetCallUi();
     }, delayMs);
-  }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+  }, [resetCallUi]);
 
   const clearCallResetTimer = useCallback(() => {
     if (autoResetCallTimeoutRef.current) {
@@ -536,6 +541,28 @@ export function useHomeDashboard() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    const callStatus = activeCall?.status;
+    if (!activeCall || (callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected')) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      const latestCall = activeCallRef.current;
+      if (!latestCall || latestCall.sessionId !== activeCall.sessionId) {
+        return;
+      }
+
+      if (latestCall.status === 'ended' || latestCall.status === 'missed' || latestCall.status === 'rejected') {
+        resetCallUi();
+      }
+    }, 1600);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [activeCall?.sessionId, activeCall?.status, resetCallUi]);
 
   useEffect(() => {
     syncLocalPreview();
@@ -1705,6 +1732,7 @@ export function useHomeDashboard() {
       }
 
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
+        setCallError(null);
         scheduleCallReset();
       }
     };
@@ -1799,6 +1827,11 @@ export function useHomeDashboard() {
 
       const latestCall = activeCallRef.current;
       if (latestCall && latestCall.sessionId === payload.sessionId) {
+        if (payload.userId === userId) {
+          scheduleCallReset(500);
+          return;
+        }
+
         const remainingPeers = latestCall.joinedParticipantIds
           .filter((participantId) => participantId !== payload.userId)
           .filter((participantId) => participantId !== userId);
@@ -2093,6 +2126,7 @@ export function useHomeDashboard() {
         reason: 'rejected',
       };
     });
+    setCallError(null);
     scheduleCallReset(1200);
   }, [scheduleCallReset]);
 
@@ -2120,8 +2154,14 @@ export function useHomeDashboard() {
         reason: 'ended',
       };
     });
+    setCallError(null);
     scheduleCallReset(1200);
   }, [scheduleCallReset]);
+
+  const handleDismissCallUi = useCallback(() => {
+    clearCallResetTimer();
+    resetCallUi();
+  }, [clearCallResetTimer, resetCallUi]);
 
   const handleToggleMic = useCallback(() => {
     setIsMicMuted((prev) => {
@@ -2631,9 +2671,7 @@ export function useHomeDashboard() {
       }
 
       clearCallResetTimer();
-      closePeerConnection();
-      stopLocalMedia();
-      stopRemoteMedia();
+      resetCallUi();
 
       pendingReactionRequestsRef.current.forEach((pending) => {
         if (pending.ackTimeout) {
@@ -2642,7 +2680,7 @@ export function useHomeDashboard() {
       });
       pendingReactionRequestsRef.current.clear();
     };
-  }, [clearCallResetTimer, closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+  }, [clearCallResetTimer, resetCallUi]);
 
   return {
     data,
@@ -2700,6 +2738,7 @@ export function useHomeDashboard() {
     onAcceptIncomingCall: handleAcceptIncomingCall,
     onRejectIncomingCall: handleRejectIncomingCall,
     onEndCall: handleEndCall,
+    onDismissCallUi: handleDismissCallUi,
     onToggleMic: handleToggleMic,
     onToggleCamera: handleToggleCamera,
     onToggleScreenShare: handleToggleScreenShare,

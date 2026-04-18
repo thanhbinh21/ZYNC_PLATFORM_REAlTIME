@@ -852,7 +852,23 @@ async function handleCallReject(
     input.reason ?? 'rejected',
   );
 
-  clearCallTimeout(session.sessionId);
+  const isSessionActive = session.status === 'ringing' || session.status === 'connecting' || session.status === 'connected';
+  const isGroupPartialReject = session.mode === 'sfu' && isSessionActive;
+
+  if (!isGroupPartialReject && session.status !== 'ringing') {
+    clearCallTimeout(session.sessionId);
+  }
+
+  if (isGroupPartialReject) {
+    for (const participantId of session.participantIds) {
+      io.to(`user:${participantId}`).emit('call_participant_left', {
+        sessionId: session.sessionId,
+        userId,
+        reason: input.reason ?? 'rejected',
+      });
+    }
+    return;
+  }
 
   await emitCallSummaryMessage(io, {
     sessionId: session.sessionId,
@@ -881,7 +897,23 @@ async function handleCallEnd(
   CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   const session = await CallsService.endCallSession(input.sessionId, userId, input.reason);
 
-  clearCallTimeout(session.sessionId);
+  const isSessionActive = session.status === 'ringing' || session.status === 'connecting' || session.status === 'connected';
+  const isGroupPartialLeave = session.mode === 'sfu' && isSessionActive && session.initiatedBy !== userId;
+
+  if (!isGroupPartialLeave && session.status !== 'ringing') {
+    clearCallTimeout(session.sessionId);
+  }
+
+  if (isGroupPartialLeave) {
+    for (const participantId of session.participantIds) {
+      io.to(`user:${participantId}`).emit('call_participant_left', {
+        sessionId: session.sessionId,
+        userId,
+        reason: input.reason ?? 'left',
+      });
+    }
+    return;
+  }
 
   await emitCallSummaryMessage(io, {
     sessionId: session.sessionId,

@@ -138,6 +138,7 @@ interface ChatPanelProps {
   onAcceptIncomingCall?: () => void;
   onRejectIncomingCall?: () => void;
   onEndCall?: () => void;
+  onDismissCallBanner?: () => void;
   onToggleMic?: () => void;
   onToggleCamera?: () => void;
   onToggleScreenShare?: () => void;
@@ -392,6 +393,7 @@ function ChatPanel({
   onAcceptIncomingCall = () => {},
   onRejectIncomingCall = () => {},
   onEndCall = () => {},
+  onDismissCallBanner = () => {},
   onToggleMic = () => {},
   onToggleCamera = () => {},
   onToggleScreenShare = () => {},
@@ -401,6 +403,7 @@ function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [activeSpeakerUserId, setActiveSpeakerUserId] = useState<string | null>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -429,6 +432,8 @@ function ChatPanel({
   const isRemovedFromGroup = inputDisabled && inputDisabledReason?.toLowerCase().includes('bị xóa khỏi nhóm');
   const hasRemovedNoticeInMessages = messages.some((message) => message.content.toLowerCase().includes('bị xóa khỏi nhóm'));
   const isCallVisible = callStatus !== 'idle';
+  const isTerminalCallState = callStatus === 'ended' || callStatus === 'missed' || callStatus === 'rejected';
+  const shouldRenderCallMedia = callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected' || callStatus === 'incoming';
   const callStatusLabel: Record<Exclude<CallUiStatus, 'idle'>, string> = {
     outgoing: 'Đang đổ chuông...',
     incoming: 'Cuộc gọi đến',
@@ -438,6 +443,97 @@ function ChatPanel({
     missed: 'Nhỡ cuộc gọi',
     rejected: 'Đã từ chối',
   };
+
+  useEffect(() => {
+    if (!isGroupCallActive || callStatus !== 'connected' || remoteParticipantVideos.length === 0) {
+      setActiveSpeakerUserId(null);
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const AudioContextClass = window.AudioContext
+      ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) {
+      return;
+    }
+
+    const audioContext = new AudioContextClass();
+    type AudioMeter = {
+      userId: string;
+      analyser: AnalyserNode;
+      data: Uint8Array<ArrayBuffer>;
+      source: MediaStreamAudioSourceNode;
+    };
+
+    const meters: AudioMeter[] = [];
+    remoteParticipantVideos.forEach((participant) => {
+      const audioTracks = participant.stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        return;
+      }
+
+      const audioOnlyStream = new MediaStream(audioTracks);
+      const source = audioContext.createMediaStreamSource(audioOnlyStream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      meters.push({
+        userId: participant.userId,
+        analyser,
+        data: new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>,
+        source,
+      });
+    });
+
+    if (meters.length === 0) {
+      setActiveSpeakerUserId(null);
+      void audioContext.close();
+      return;
+    }
+
+    const interval = setInterval(() => {
+      let maxVolume = 0;
+      let loudestUserId: string | null = null;
+
+      meters.forEach((meter) => {
+        meter.analyser.getByteTimeDomainData(meter.data);
+        let sum = 0;
+        for (const value of meter.data) {
+          const normalized = (value - 128) / 128;
+          sum += normalized * normalized;
+        }
+        const rms = Math.sqrt(sum / meter.data.length);
+        if (rms > maxVolume) {
+          maxVolume = rms;
+          loudestUserId = meter.userId;
+        }
+      });
+
+      if (maxVolume < 0.02) {
+        setActiveSpeakerUserId(null);
+        return;
+      }
+
+      setActiveSpeakerUserId(loudestUserId);
+    }, 220);
+
+    return () => {
+      clearInterval(interval);
+      meters.forEach((meter) => {
+        meter.source.disconnect();
+        meter.analyser.disconnect();
+      });
+      void audioContext.close();
+    };
+  }, [callStatus, isGroupCallActive, remoteParticipantVideos]);
+
+  const activeSpeakerName = activeSpeakerUserId
+    ? remoteParticipantVideos.find((participant) => participant.userId === activeSpeakerUserId)?.displayName
+    : null;
   // Report message
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const handleReportMessage = useCallback(async (messageId: string) => {
@@ -461,7 +557,7 @@ function ChatPanel({
   }, []);
 
   return (
-    <article className="zync-glass-panel zync-glass-panel-strong grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
+    <article className="zync-glass-panel zync-glass-panel-strong relative grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
       {/* Header */}
       <header className="zync-glass-subtle flex items-center justify-between border-b zync-glass-divider px-5 py-3 bg-[#06271f]/42">
         <div className="flex items-center gap-3">
@@ -549,8 +645,18 @@ function ChatPanel({
       )}
 
       {isCallVisible && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#010d0ad4] px-4 py-6 backdrop-blur-sm">
-          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[#2f6b58] bg-[linear-gradient(180deg,#04241c_0%,#031912_100%)] text-[#d9fff1] shadow-[0_28px_80px_rgba(0,0,0,0.55)]">
+        <div
+          className={`absolute inset-0 z-[40] flex px-3 py-3 sm:px-5 sm:py-4 ${
+            isTerminalCallState
+              ? 'items-start justify-center bg-transparent pointer-events-none'
+              : 'items-center justify-center bg-[#010d0ab8] backdrop-blur-[2px]'
+          }`}
+        >
+          <div
+            className={`pointer-events-auto w-full overflow-hidden rounded-2xl border border-[#2f6b58] bg-[linear-gradient(180deg,#04241c_0%,#031912_100%)] text-[#d9fff1] shadow-[0_20px_46px_rgba(0,0,0,0.48)] ${
+              isTerminalCallState ? 'max-w-xl' : 'max-w-3xl'
+            }`}
+          >
             <div className="border-b border-[#245b4b] px-5 py-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -567,10 +673,26 @@ function ChatPanel({
                       Thành viên: {callParticipantNames.join(', ')}
                     </p>
                   )}
+                  {isGroupCallActive && activeSpeakerName && callStatus === 'connected' && (
+                    <p className="mt-1 text-xs font-semibold text-[#7cf1c5]">
+                      Đang nói: {activeSpeakerName}
+                    </p>
+                  )}
                   {callError && <p className="mt-1 text-xs text-[#ff9f9f]">{callError}</p>}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {isTerminalCallState && (
+                    <button
+                      type="button"
+                      onClick={onDismissCallBanner}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                    >
+                      <CloseIcon className="h-3.5 w-3.5" />
+                      Đóng
+                    </button>
+                  )}
+
                   {callStatus === 'incoming' && (
                     <>
                       <button
@@ -637,7 +759,7 @@ function ChatPanel({
               </div>
             </div>
 
-            {(callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected' || callStatus === 'incoming') && (
+            {shouldRenderCallMedia && (
               <div className="grid gap-3 p-4 sm:grid-cols-[240px_minmax(0,1fr)]">
                 <div className="overflow-hidden rounded-xl border border-[#235747] bg-[#031b15]">
                   <video
@@ -658,7 +780,14 @@ function ChatPanel({
                       </div>
                     )}
                     {remoteParticipantVideos.map((participant) => (
-                      <div key={participant.userId} className="overflow-hidden rounded-lg border border-[#2c6755] bg-[#032019]">
+                      <div
+                        key={participant.userId}
+                        className={`overflow-hidden rounded-lg border bg-[#032019] ${
+                          activeSpeakerUserId === participant.userId
+                            ? 'border-[#4dffd2] shadow-[0_0_0_1px_rgba(77,255,210,0.6)]'
+                            : 'border-[#2c6755]'
+                        }`}
+                      >
                         <video
                           autoPlay
                           playsInline
@@ -672,7 +801,10 @@ function ChatPanel({
                             }
                           }}
                         />
-                        <p className="border-t border-[#1a4a3b] px-2 py-1 text-[11px] text-[#8cc4b0]">{participant.displayName}</p>
+                        <p className="border-t border-[#1a4a3b] px-2 py-1 text-[11px] text-[#8cc4b0]">
+                          {participant.displayName}
+                          {activeSpeakerUserId === participant.userId ? ' - đang nói' : ''}
+                        </p>
                       </div>
                     ))}
                   </div>

@@ -294,11 +294,13 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 - Luồng nhận cuộc gọi có fallback audio-only nếu camera bị chặn, giúp thao tác `Nhan` ổn định hơn trong môi trường browser.
 - Call UI da duoc Viet hoa co dau tren modal va them icon cho toan bo thao tac chinh (nhan/tu choi, mic, camera, chia se man hinh, ket thuc).
 - Web da co baseline group call theo mesh WebRTC: tao peer connection theo tung participant, render luoi remote video, va dong bo participant join/leave theo event realtime.
+- Grid group call co active-speaker highlight (audio RMS) va hien thi nhan "Dang noi" de theo doi nguoi dang phat bieu.
 - Khi `call_end`, server chấp nhận call token đã hết hạn (vẫn kiểm tra chữ ký + đúng session/user) để tránh lỗi end-call khi cuộc gọi kéo dài.
 - Khi kết thúc cuộc gọi, server ghi một message text tóm tắt vào conversation (`Cuoc goi da ket thuc`, kèm thời lượng nếu có) để chat history hiển thị ngay.
 - Với case `missed` và `rejected`, server cũng ghi message tóm tắt vào conversation và dedupe theo key `sessionId+status` để tránh tạo trùng lịch sử.
 - Trước khi tạo `call_invite` mới, server tự dọn session `ringing` đã quá hạn (`timeoutAt`) bằng cách chuyển sang `missed`, tránh kẹt conflict `A call between these users is already active` sau khi restart process.
 - Trước khi tạo `call_invite` mới, server cũng tự đóng session `connected` bị kẹt khi vượt ngưỡng `CALL_CONNECTED_STALE_MS` (mặc định 180000ms) với reason `superseded_reinvite` để tránh block cuộc gọi mới.
+- Group call lifecycle hardening: participant `call_reject`/`call_end` chi danh dau user do roi room; room chi ket thuc khi host end call hoac khong con active participant.
 
 ### Local TURN (coturn)
 - Service: `coturn` trong `infra/docker-compose.yml`
@@ -370,7 +372,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `call_incoming` | `{sessionId, conversationId?, fromUserId, isGroupCall?, participantIds?, callType, callToken, callTokenExpiresInSeconds}` | Sự kiện có cuộc gọi đến + token ngắn hạn |
 | `call_status` | `{sessionId, status, reason?}` | Đồng bộ trạng thái call: ringing/connected/rejected/missed/ended |
 | `call_participant_joined` | `{sessionId, userId, joinedParticipantIds?}` | Participant vào phiên gọi (co danh sach participant da joined de client canh mesh) |
-| `call_participant_left` | `{sessionId, userId}` | Participant rời phiên gọi |
+| `call_participant_left` | `{sessionId, userId, reason?}` | Participant rời phiên gọi (member leave/reject khong bat buoc ket thuc room) |
 | `webrtc_offer` | `{sessionId, fromUserId, sdp}` | Forward offer cho peer mục tiêu |
 | `webrtc_answer` | `{sessionId, fromUserId, sdp}` | Forward answer cho peer mục tiêu |
 | `webrtc_ice_candidate` | `{sessionId, fromUserId, candidate}` | Forward ICE candidate cho peer mục tiêu |
