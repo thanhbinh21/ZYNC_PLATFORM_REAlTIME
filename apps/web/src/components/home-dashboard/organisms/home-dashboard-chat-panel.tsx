@@ -39,6 +39,25 @@ function SearchIcon() {
   );
 }
 
+function BellOffMiniIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M3 3l18 18" strokeLinecap="round" />
+      <path d="M10.58 6.53A5 5 0 0 1 17 11v3l2 2H7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 18a3 3 0 0 0 6 0" strokeLinecap="round" />
+      <path d="M4 16h1l2-2v-3a5 5 0 0 1 .58-2.35" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PinMiniIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M15 3l6 6-2 2-3-3-3 3v4l-2 2v-6l-5 5-2-2 5-5H3l2-2h4l3-3-3-3 2-2 6 6z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // ==================== TYPES ====================
 
 interface ChatPanelProps {
@@ -84,8 +103,11 @@ interface ConversationItem {
   name: string;
   preview: string;
   time: string;
+  timestamp?: number;
   avatar: string;
   avatarUrl?: string;
+  isPinned?: boolean;
+  mutedUntil?: Date | null;
   isGroup?: boolean;
   createdBy?: string;
   adminIds?: string[];
@@ -109,13 +131,49 @@ interface ConversationListProps {
   conversations?: ConversationItem[];
   selectedId?: string;
   onSelectConversation?: (id: string) => void;
+  searchTargets?: ConversationSearchTarget[];
+  onSelectSearchTarget?: (target: ConversationSearchTarget) => void;
+}
+
+interface ConversationSearchTarget {
+  id: string;
+  type: 'friend' | 'group';
+  name: string;
+  avatar?: string;
+  conversationId?: string;
 }
 
 function ConversationList({
   conversations = [],
   selectedId,
   onSelectConversation = () => {},
+  searchTargets = [],
+  onSelectSearchTarget = () => {},
 }: ConversationListProps) {
+  const getMuteTimeLabel = (mutedUntil: Date | null | undefined): string => {
+    if (!mutedUntil) {
+      return '';
+    }
+
+    const remainingMs = new Date(mutedUntil).getTime() - Date.now();
+    if (remainingMs <= 0) {
+      return '';
+    }
+
+    const minutes = Math.ceil(remainingMs / (60 * 1000));
+    if (minutes < 60) {
+      return `${minutes} phút`;
+    }
+
+    const hours = Math.ceil(minutes / 60);
+    if (hours < 24) {
+      return `${hours} giờ`;
+    }
+
+    const days = Math.ceil(hours / 24);
+    return `${days} ngày`;
+  };
+
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
   const filteredConversations = normalizedQuery
@@ -124,6 +182,10 @@ function ConversationList({
         || item.preview.toLowerCase().includes(normalizedQuery);
     })
     : conversations;
+
+  const filteredSearchTargets = normalizedQuery
+    ? searchTargets.filter((target) => target.name.toLowerCase().includes(normalizedQuery))
+    : [];
 
   return (
     <aside className="zync-glass-panel zync-glass-panel-strong h-full min-h-0 overflow-y-auto border-r zync-glass-divider p-4">
@@ -141,6 +203,36 @@ function ConversationList({
         />
       </label>
 
+      {/* Search Results */}
+      {normalizedQuery && (
+        <div className="mb-4 space-y-2 rounded-2xl border border-[#1f5e4b] bg-[#0a3128] p-2">
+          <p className="px-2 text-xs font-semibold uppercase tracking-wide text-[#8cc4b0]">Kết quả tìm kiếm</p>
+          {filteredSearchTargets.length === 0 ? (
+            <p className="px-2 py-2 text-sm text-[#99c2b3]">Không có bạn bè hoặc nhóm phù hợp.</p>
+          ) : (
+            filteredSearchTargets.map((target) => (
+              <button
+                key={`${target.type}-${target.id}`}
+                type="button"
+                onClick={() => {
+                  onSelectSearchTarget(target);
+                  setQuery('');
+                }}
+                className="flex w-full items-center justify-between rounded-xl bg-[#0f3a2f] px-3 py-2 text-left hover:bg-[#145141]"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#e6fff5]">{target.name}</p>
+                  <p className="text-xs text-[#8cc4b0]">{target.type === 'group' ? 'Nhóm' : 'Bạn bè'}</p>
+                </div>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#235646] text-xs font-semibold text-[#d8fbed]">
+                  {(target.avatar || target.name).substring(0, 2).toUpperCase()}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Conversations */}
       {filteredConversations.length === 0 ? (
         <div className="flex items-center justify-center h-40 text-[#99c2b3] text-center">
@@ -149,6 +241,10 @@ function ConversationList({
       ) : (
         <div className="space-y-2">
           {filteredConversations.map((item) => (
+            (() => {
+              const isMuted = Boolean(item.mutedUntil && new Date(item.mutedUntil) > new Date());
+
+              return (
             <button
               key={item.id}
               onClick={() => onSelectConversation(item.id)}
@@ -170,12 +266,28 @@ function ConversationList({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <p className="truncate text-base font-semibold text-[#e6fff6]">{item.name}</p>
-                    <p className="text-xs uppercase tracking-wide text-[#9ac7b7] whitespace-nowrap">{item.time}</p>
+                    <div className="flex items-center gap-2">
+                      {isMuted && (
+                        <span className="inline-flex items-center text-[#ffd8a8]" aria-label="Đã tắt thông báo" title="Đã tắt thông báo">
+                          <BellOffMiniIcon />
+                        </span>
+                      )}
+                      <p className="text-xs uppercase tracking-wide text-[#9ac7b7] whitespace-nowrap">{item.time}</p>
+                    </div>
                   </div>
-                  <p className="truncate text-sm text-[#9fc6b8]">{item.preview}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="truncate text-sm text-[#9fc6b8]">{item.preview}</p>
+                    {item.isPinned && (
+                      <span className="inline-flex items-center text-[#b5f8e2]" aria-label="Đã ghim" title="Đã ghim">
+                        <PinMiniIcon />
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>
+              );
+            })()
           ))}
         </div>
       )}
@@ -463,6 +575,13 @@ interface HomeDashboardChatPanelProps {
   conversations?: ConversationItem[];
   selectedConversationId?: string;
   onSelectConversation?: (id: string) => void;
+  searchTargets?: ConversationSearchTarget[];
+  onSelectSearchTarget?: (target: ConversationSearchTarget) => void;
+  onToggleConversationPin?: (conversationId: string, shouldPin: boolean) => Promise<void>;
+  onMuteConversation?: (conversationId: string, duration: '1h' | '4h' | '8h' | 'until_enabled') => Promise<void>;
+  onUnmuteConversation?: (conversationId: string) => Promise<void>;
+  isConversationPinned?: boolean;
+  conversationMutedUntil?: Date | null;
   friends?: GroupFriendOption[];
   onCreateGroup?: (name: string, memberIds: string[]) => Promise<{ _id: string }>;
   onUpdateGroup?: (groupId: string, payload: { name?: string; avatarUrl?: string | null }) => Promise<void>;
@@ -471,6 +590,7 @@ interface HomeDashboardChatPanelProps {
   onUpdateGroupMemberApproval?: (groupId: string, memberApprovalEnabled: boolean) => Promise<void>;
   onRemoveGroupMember?: (groupId: string, targetUserId: string) => Promise<void>;
   onDisbandGroup?: (groupId: string) => Promise<void>;
+  onLeaveGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
   onLoadMore?: () => Promise<void>;
   chatPanelProps?: Partial<ChatPanelProps>;
@@ -911,6 +1031,13 @@ export function HomeDashboardChatPanel({
   conversations,
   selectedConversationId = 'c1',
   onSelectConversation = () => {},
+  searchTargets = [],
+  onSelectSearchTarget = () => {},
+  onToggleConversationPin,
+  onMuteConversation,
+  onUnmuteConversation,
+  isConversationPinned = false,
+  conversationMutedUntil = null,
   friends = [],
   onCreateGroup,
   onUpdateGroup,
@@ -919,6 +1046,7 @@ export function HomeDashboardChatPanel({
   onUpdateGroupMemberApproval,
   onRemoveGroupMember,
   onDisbandGroup,
+  onLeaveGroup,
   isCreatingGroup = false,
   onLoadMore,
   chatPanelProps = {},
@@ -927,6 +1055,13 @@ export function HomeDashboardChatPanel({
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
   const [isManageGroupOpen, setIsManageGroupOpen] = useState(false);
+  const [isRenameGroupOpen, setIsRenameGroupOpen] = useState(false);
+  const [renameGroupDraft, setRenameGroupDraft] = useState('');
+  const [isMuteModalOpen, setIsMuteModalOpen] = useState(false);
+  const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [isMembersViewOpen, setIsMembersViewOpen] = useState(false);
+  const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
   const [groupManageError, setGroupManageError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState('');
   const [groupQuery, setGroupQuery] = useState('');
@@ -940,6 +1075,8 @@ export function HomeDashboardChatPanel({
   useEffect(() => {
     setIsManageGroupOpen(false);
     setGroupManageError(null);
+    setIsArchiveOpen(false);
+    setIsMembersViewOpen(false);
   }, [selectedConversationId]);
 
   const selectedConversation = (conversations ?? []).find((item) => item.id === selectedConversationId);
@@ -1010,18 +1147,22 @@ export function HomeDashboardChatPanel({
     }
   };
 
-  const handleChangeGroupName = async () => {
+  const handleChangeGroupName = () => {
+    if (!isGroupConversation || !selectedConversationId || !onUpdateGroup || isCreatingGroup) {
+      return;
+    }
+
+    setRenameGroupDraft(selectedConversation?.name ?? 'Nhóm');
+    setIsRenameGroupOpen(true);
+  };
+
+  const handleSubmitGroupNameChange = async () => {
     if (!isGroupConversation || !selectedConversationId || !onUpdateGroup || isCreatingGroup) {
       return;
     }
 
     const suggestedName = selectedConversation?.name ?? 'Nhóm';
-    const nextName = globalThis.prompt('Nhập tên nhóm mới', suggestedName);
-    if (nextName === null) {
-      return;
-    }
-
-    const trimmedName = nextName.trim();
+    const trimmedName = renameGroupDraft.trim();
     if (!trimmedName) {
       setGroupManageError('Tên nhóm không được để trống.');
       return;
@@ -1034,6 +1175,7 @@ export function HomeDashboardChatPanel({
     try {
       setGroupManageError(null);
       await onUpdateGroup(selectedConversationId, { name: trimmedName });
+      setIsRenameGroupOpen(false);
     } catch {
       setGroupManageError('Không thể cập nhật tên nhóm. Vui lòng thử lại.');
     }
@@ -1167,6 +1309,98 @@ export function HomeDashboardChatPanel({
     }
   };
 
+  const handleLeaveGroup = async () => {
+    if (!onLeaveGroup || !selectedConversationId || !isGroupConversation) {
+      return;
+    }
+
+    setIsLeaveGroupModalOpen(true);
+  };
+
+  const handleConfirmLeaveGroup = async () => {
+    if (!onLeaveGroup || !selectedConversationId || !isGroupConversation) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onLeaveGroup(selectedConversationId);
+      setIsLeaveGroupModalOpen(false);
+      setIsInfoOpen(false);
+      setIsManageGroupOpen(false);
+    } catch {
+      setGroupManageError('Không thể rời nhóm. Vui lòng thử lại.');
+    }
+  };
+
+  const handleTogglePinConversation = async () => {
+    if (!selectedConversationId || !onToggleConversationPin) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onToggleConversationPin(selectedConversationId, !isConversationPinned);
+    } catch {
+      setGroupManageError('Không thể cập nhật ghim hội thoại. Vui lòng thử lại.');
+    }
+  };
+
+  const handleMuteConversation = async (duration: '1h' | '4h' | '8h' | 'until_enabled') => {
+    if (!selectedConversationId || !onMuteConversation) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onMuteConversation(selectedConversationId, duration);
+      setIsMuteModalOpen(false);
+    } catch {
+      setGroupManageError('Không thể tắt thông báo. Vui lòng thử lại.');
+    }
+  };
+
+  const handleUnmuteConversation = async () => {
+    if (!selectedConversationId || !onUnmuteConversation) {
+      return;
+    }
+
+    try {
+      setGroupManageError(null);
+      await onUnmuteConversation(selectedConversationId);
+    } catch {
+      setGroupManageError('Không thể bật lại thông báo. Vui lòng thử lại.');
+    }
+  };
+
+  const handleCloseInfoPanel = () => {
+    setIsInfoOpen(false);
+    setIsArchiveOpen(false);
+    setIsMembersViewOpen(false);
+  };
+
+  const handleToggleInfoPanel = () => {
+    setIsInfoOpen((prev) => {
+      const next = !prev;
+      if (!next) {
+        setIsArchiveOpen(false);
+        setIsMembersViewOpen(false);
+      }
+      return next;
+    });
+  };
+
+  const openArchiveView = (tab: 'media' | 'files' | 'links') => {
+    setArchiveTab(tab);
+    setIsMembersViewOpen(false);
+    setIsArchiveOpen(true);
+  };
+
+  const openMembersView = () => {
+    setIsArchiveOpen(false);
+    setIsMembersViewOpen(true);
+  };
+
   const groupMemberPreview = selectedConversation?.members ?? [];
   const groupAdminIds = selectedConversation?.adminIds ?? [];
   const existingMemberIds = groupMemberPreview.map((member) => member._id);
@@ -1187,10 +1421,17 @@ export function HomeDashboardChatPanel({
   );
   const canManageGroup = isCurrentUserGroupCreator || isCurrentUserGroupAdmin;
   const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
+  const isConversationMuted = Boolean(conversationMutedUntil && new Date(conversationMutedUntil) > new Date());
 
   const allMessages = chatPanelProps.messages || [];
-  const mediaItems = allMessages.filter((m) => m.type === 'image' || m.type === 'video').slice(0, 8);
-  const fileItems = allMessages.filter((m) => String(m.type).startsWith('file/') || m.type === 'audio').slice(0, 5);
+  const allMediaItems = allMessages.filter((m) => m.type === 'image' || m.type === 'video');
+  const allFileItems = allMessages.filter((m) => String(m.type).startsWith('file/') || m.type === 'audio');
+  const allLinkItems = allMessages.filter((m) => {
+    const content = typeof m.content === 'string' ? m.content : '';
+    return /(https?:\/\/|www\.)/i.test(content);
+  });
+  const mediaItems = allMediaItems.slice(0, 8);
+  const fileItems = allFileItems.slice(0, 5);
 
   return (
     <>
@@ -1210,6 +1451,8 @@ export function HomeDashboardChatPanel({
             conversations={conversations}
             selectedId={selectedConversationId}
             onSelectConversation={onSelectConversation}
+            searchTargets={searchTargets}
+            onSelectSearchTarget={onSelectSearchTarget}
           />
         </div>
 
@@ -1220,7 +1463,7 @@ export function HomeDashboardChatPanel({
             onLoadMore={onLoadMore}
             inputDisabled={isRemovedFromGroup}
             inputDisabledReason={isRemovedFromGroup ? 'Bạn đã bị xóa khỏi nhóm' : undefined}
-            onInfoClick={() => setIsInfoOpen((prev) => !prev)}
+            onInfoClick={handleToggleInfoPanel}
             onAvatarClick={handleOpenGroupAvatarPicker}
             onNameClick={() => {
               void handleChangeGroupName();
@@ -1229,12 +1472,12 @@ export function HomeDashboardChatPanel({
         </div>
 
           {isInfoOpen && (
-            <aside className="zync-glass-panel zync-glass-panel-strong hidden h-full w-[320px] shrink-0 border-l zync-glass-divider bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
+            <aside className="zync-glass-panel zync-glass-panel-strong relative hidden h-full w-[320px] shrink-0 border-l zync-glass-divider bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] xl:flex xl:flex-col">
               <div className="border-b zync-glass-divider px-5 py-4">
-                <h3 className="text-xl font-semibold text-[#e2fff4]">{infoTitle}</h3>
+                <h3 className="text-xl font-semibold text-[#e2fff4]">{isMembersViewOpen ? 'Thành viên' : isArchiveOpen ? 'Kho lưu trữ' : infoTitle}</h3>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 py-5">
+              <div className={`flex-1 overflow-y-auto px-5 py-5 ${(isArchiveOpen || isMembersViewOpen) ? 'hidden' : ''}`}>
                 <div className="mb-6 flex flex-col items-center text-center">
                   <button
                     type="button"
@@ -1266,8 +1509,24 @@ export function HomeDashboardChatPanel({
                 </div>
 
                 <div className="mb-5 grid grid-cols-3 gap-2">
-                  <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Tắt thông báo</button>
-                  <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
+                  <button
+                    type="button"
+                    onClick={isConversationMuted ? () => { void handleUnmuteConversation(); } : () => setIsMuteModalOpen(true)}
+                    className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isConversationMuted
+                      ? 'border-[#ffcf99]/35 bg-[#4a3417] text-[#ffe2bd]'
+                      : 'border-transparent bg-[#0d3b2f] text-[#c7f4e6]'}`}
+                  >
+                    {isConversationMuted ? 'Bật thông báo' : 'Tắt thông báo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void handleTogglePinConversation(); }}
+                    className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isConversationPinned
+                      ? 'border-[#89f7d7]/35 bg-[#165542] text-[#d6fff0]'
+                      : 'border-transparent bg-[#0d3b2f] text-[#c7f4e6]'}`}
+                  >
+                    {isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}
+                  </button>
                   {isGroupConversation ? (
                     <>
                       <button
@@ -1302,6 +1561,13 @@ export function HomeDashboardChatPanel({
                   )}
                 </div>
 
+                {(isConversationMuted || isConversationPinned) && (
+                  <p className="mb-5 rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-3 py-2 text-xs text-[#bfead9]">
+                    {isConversationPinned ? 'Đã ghim hội thoại. ' : ''}
+                    {isConversationMuted ? 'Đang tắt thông báo cho hội thoại này.' : ''}
+                  </p>
+                )}
+
                 {!isGroupConversation && (
                   <>
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
@@ -1332,7 +1598,7 @@ export function HomeDashboardChatPanel({
                           <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
                         )}
                       </div>
-                      <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                      <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
                     <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
@@ -1354,7 +1620,7 @@ export function HomeDashboardChatPanel({
                       ) : (
                         <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
                       )}
-                      <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                      <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
                   </>
                 )}
@@ -1385,11 +1651,13 @@ export function HomeDashboardChatPanel({
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
                       <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
-                      <GroupMembersPreview
-                        members={groupMemberPreview}
-                        adminIds={groupAdminIds}
-                        creatorId={groupCreatorId}
-                      />
+                      <button
+                        type="button"
+                        onClick={openMembersView}
+                        className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]"
+                      >
+                        Xem thành viên
+                      </button>
                     </div>
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
@@ -1419,7 +1687,7 @@ export function HomeDashboardChatPanel({
                           <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
                         )}
                       </div>
-                      <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                      <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
                     {/* File section for group */}
                     <div className="mt-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
@@ -1442,29 +1710,133 @@ export function HomeDashboardChatPanel({
                       ) : (
                         <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
                       )}
-                      <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                      <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => { void handleLeaveGroup(); }}
+                      className="mt-4 w-full rounded-xl border border-[#7a3131] bg-[#4a1e1e] px-3 py-2 text-sm font-semibold text-[#ffd5d5] hover:bg-[#5d2525]"
+                    >
+                      Rời nhóm
+                    </button>
                   </>
                 )}
               </div>
+
+              {isArchiveOpen && (
+                <div className="absolute inset-0 z-10 flex flex-col bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)]">
+                  <div className="flex items-center justify-between border-b border-[#1d5a48] px-4 py-3">
+                    <button type="button" onClick={() => setIsArchiveOpen(false)} className="rounded-lg bg-[#0f4335] px-3 py-1.5 text-sm text-[#c7f4e6]">Quay lại</button>
+                    <h4 className="text-base font-semibold text-[#e2fff4]">Kho lưu trữ</h4>
+                    <span className="w-16" />
+                  </div>
+                  <div className="flex gap-2 border-b border-[#1d5a48] px-4 py-3 text-sm">
+                    <button type="button" onClick={() => setArchiveTab('media')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'media' ? 'bg-[#1f7a60] text-[#e6fff5]' : 'bg-[#0f4335] text-[#a6e3cf]'}`}>Ảnh/Video</button>
+                    <button type="button" onClick={() => setArchiveTab('files')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'files' ? 'bg-[#1f7a60] text-[#e6fff5]' : 'bg-[#0f4335] text-[#a6e3cf]'}`}>Files</button>
+                    <button type="button" onClick={() => setArchiveTab('links')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'links' ? 'bg-[#1f7a60] text-[#e6fff5]' : 'bg-[#0f4335] text-[#a6e3cf]'}`}>Links</button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {archiveTab === 'media' && (
+                      <div className="grid grid-cols-3 gap-3">
+                        {allMediaItems.length === 0 && <p className="col-span-full text-sm text-[#8abfab]">Chưa có ảnh/video nào.</p>}
+                        {allMediaItems.map((media) => (
+                          <a key={media._id} href={media.mediaUrl} target="_blank" rel="noreferrer" className="block h-24 overflow-hidden rounded-lg bg-[#0d3b2f]">
+                            {media.type === 'image' ? (
+                              <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs text-[#d6f8ec]">▶ Video</div>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {archiveTab === 'files' && (
+                      <div className="space-y-2">
+                        {allFileItems.length === 0 && <p className="text-sm text-[#8abfab]">Chưa có file nào.</p>}
+                        {allFileItems.map((file) => (
+                          <a key={file._id} href={file.mediaUrl} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#d6f8ec] hover:text-[#46e6b8]">
+                            {typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm'}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {archiveTab === 'links' && (
+                      <div className="space-y-2">
+                        {allLinkItems.length === 0 && <p className="text-sm text-[#8abfab]">Chưa có link nào.</p>}
+                        {allLinkItems.map((msg) => {
+                          const content = typeof msg.content === 'string' ? msg.content : '';
+                          return (
+                            <a key={msg._id} href={content.startsWith('http') ? content : `https://${content}`} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#b9f0df] hover:text-[#46e6b8]">
+                              {content}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isMembersViewOpen && (
+                <div className="absolute inset-0 z-10 flex flex-col bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)]">
+                  <div className="flex items-center justify-between border-b border-[#1d5a48] px-4 py-3">
+                    <button type="button" onClick={() => setIsMembersViewOpen(false)} className="rounded-lg bg-[#0f4335] px-3 py-1.5 text-sm text-[#c7f4e6]">Quay lại</button>
+                    <h4 className="text-base font-semibold text-[#e2fff4]">Thành viên</h4>
+                    <span className="w-16" />
+                  </div>
+
+                  <div className="border-b border-[#1d5a48] px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={openAddMembersModal}
+                      className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]"
+                    >
+                      + Thêm thành viên
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-4 py-3">
+                    <p className="mb-3 text-sm font-semibold text-[#d6f8ec]">Danh sách thành viên ({groupMemberPreview.length})</p>
+                    <div className="space-y-2">
+                      {groupMemberPreview.map((member) => {
+                        const isCreator = groupCreatorId === member._id;
+                        const isAdmin = groupAdminIds.includes(member._id);
+                        const isMe = chatPanelProps.currentUserId === member._id;
+
+                        return (
+                          <div key={member._id} className="flex items-center justify-between rounded-xl bg-[#0d3a2f] px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-[#e6fff5]">{member.displayName} {isMe ? '(Bạn)' : ''}</p>
+                              <p className="text-xs text-[#8cc4b0]">
+                                {isCreator ? 'Trưởng nhóm' : isAdmin ? 'Quản trị viên' : 'Thành viên'}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </aside>
           )}
       </section>
 
       {isInfoOpen && (
         <div className="fixed inset-0 z-40 bg-black/45 xl:hidden">
-          <aside className="zync-glass-panel zync-glass-panel-strong ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
+          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[#e2fff4]">{infoTitle}</h3>
+              <h3 className="text-lg font-semibold text-[#e2fff4]">{isMembersViewOpen ? 'Thành viên' : isArchiveOpen ? 'Kho lưu trữ' : infoTitle}</h3>
               <button
                 type="button"
                 className="rounded-full bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf]"
-                onClick={() => setIsInfoOpen(false)}
+                onClick={handleCloseInfoPanel}
               >
                 Đóng
               </button>
             </div>
 
+            <div className={(isArchiveOpen || isMembersViewOpen) ? 'hidden' : ''}>
             <div className="mb-5 flex flex-col items-center text-center">
               <button
                 type="button"
@@ -1496,8 +1868,24 @@ export function HomeDashboardChatPanel({
             </div>
 
             <div className="mb-5 grid grid-cols-3 gap-2">
-              <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Tắt thông báo</button>
-              <button type="button" className="rounded-xl bg-[#0d3b2f] px-2 py-2 text-xs font-medium text-[#c7f4e6]">Ghim hội thoại</button>
+              <button
+                type="button"
+                onClick={isConversationMuted ? () => { void handleUnmuteConversation(); } : () => setIsMuteModalOpen(true)}
+                className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isConversationMuted
+                  ? 'border-[#ffcf99]/35 bg-[#4a3417] text-[#ffe2bd]'
+                  : 'border-transparent bg-[#0d3b2f] text-[#c7f4e6]'}`}
+              >
+                {isConversationMuted ? 'Bật thông báo' : 'Tắt thông báo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleTogglePinConversation(); }}
+                className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isConversationPinned
+                  ? 'border-[#89f7d7]/35 bg-[#165542] text-[#d6fff0]'
+                  : 'border-transparent bg-[#0d3b2f] text-[#c7f4e6]'}`}
+              >
+                {isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}
+              </button>
               {isGroupConversation ? (
                 <>
                   <button
@@ -1532,6 +1920,13 @@ export function HomeDashboardChatPanel({
               )}
             </div>
 
+            {(isConversationMuted || isConversationPinned) && (
+              <p className="mb-5 rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-3 py-2 text-xs text-[#bfead9]">
+                {isConversationPinned ? 'Đã ghim hội thoại. ' : ''}
+                {isConversationMuted ? 'Đang tắt thông báo cho hội thoại này.' : ''}
+              </p>
+            )}
+
             {!isGroupConversation && (
               <>
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
@@ -1562,7 +1957,7 @@ export function HomeDashboardChatPanel({
                       <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
                     )}
                   </div>
-                  <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                  <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
                 <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
@@ -1584,7 +1979,7 @@ export function HomeDashboardChatPanel({
                   ) : (
                     <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
                   )}
-                  <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                  <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
               </>
             )}
@@ -1615,11 +2010,13 @@ export function HomeDashboardChatPanel({
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Thành viên nhóm</p>
                   <p className="text-sm text-[#d6f8ec]">{selectedConversation?.memberCount ?? 0} thành viên</p>
-                  <GroupMembersPreview
-                    members={groupMemberPreview}
-                    adminIds={groupAdminIds}
-                    creatorId={groupCreatorId}
-                  />
+                  <button
+                    type="button"
+                    onClick={openMembersView}
+                    className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]"
+                  >
+                    Xem thành viên
+                  </button>
                 </div>
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
@@ -1649,7 +2046,7 @@ export function HomeDashboardChatPanel({
                       <p className="col-span-4 text-xs text-[#8abfab]">Chưa có ảnh/video nào</p>
                     )}
                   </div>
-                  <button type="button" className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                  <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
                 {/* File section for group (mobile view) */}
                 <div className="mt-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
@@ -1672,11 +2069,170 @@ export function HomeDashboardChatPanel({
                   ) : (
                     <p className="text-xs text-[#8abfab]">Chưa có file nào</p>
                   )}
-                  <button type="button" className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
+                  <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]">Xem tất cả</button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => { void handleLeaveGroup(); }}
+                  className="mt-4 w-full rounded-xl border border-[#7a3131] bg-[#4a1e1e] px-3 py-2 text-sm font-semibold text-[#ffd5d5]"
+                >
+                  Rời nhóm
+                </button>
               </>
             )}
+            </div>
+
+            {isArchiveOpen && (
+              <div className="absolute inset-0 z-10 flex flex-col bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <button type="button" onClick={() => setIsArchiveOpen(false)} className="rounded-lg bg-[#0f4335] px-3 py-1.5 text-sm text-[#c7f4e6]">Quay lại</button>
+                  <h4 className="text-base font-semibold text-[#e2fff4]">Kho lưu trữ</h4>
+                  <span className="w-16" />
+                </div>
+                <div className="mb-3 flex gap-2 text-sm">
+                  <button type="button" onClick={() => setArchiveTab('media')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'media' ? 'bg-[#1f7a60] text-[#e6fff5]' : 'bg-[#0f4335] text-[#a6e3cf]'}`}>Ảnh/Video</button>
+                  <button type="button" onClick={() => setArchiveTab('files')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'files' ? 'bg-[#1f7a60] text-[#e6fff5]' : 'bg-[#0f4335] text-[#a6e3cf]'}`}>Files</button>
+                  <button type="button" onClick={() => setArchiveTab('links')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'links' ? 'bg-[#1f7a60] text-[#e6fff5]' : 'bg-[#0f4335] text-[#a6e3cf]'}`}>Links</button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {archiveTab === 'media' && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {allMediaItems.length === 0 && <p className="col-span-full text-sm text-[#8abfab]">Chưa có ảnh/video nào.</p>}
+                      {allMediaItems.map((media) => (
+                        <a key={media._id} href={media.mediaUrl} target="_blank" rel="noreferrer" className="block h-24 overflow-hidden rounded-lg bg-[#0d3b2f]">
+                          {media.type === 'image' ? (
+                            <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs text-[#d6f8ec]">▶ Video</div>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {archiveTab === 'files' && (
+                    <div className="space-y-2">
+                      {allFileItems.length === 0 && <p className="text-sm text-[#8abfab]">Chưa có file nào.</p>}
+                      {allFileItems.map((file) => (
+                        <a key={file._id} href={file.mediaUrl} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#d6f8ec] hover:text-[#46e6b8]">
+                          {typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm'}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {archiveTab === 'links' && (
+                    <div className="space-y-2">
+                      {allLinkItems.length === 0 && <p className="text-sm text-[#8abfab]">Chưa có link nào.</p>}
+                      {allLinkItems.map((msg) => {
+                        const content = typeof msg.content === 'string' ? msg.content : '';
+                        return (
+                          <a key={msg._id} href={content.startsWith('http') ? content : `https://${content}`} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#b9f0df] hover:text-[#46e6b8]">
+                            {content}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isMembersViewOpen && (
+              <div className="absolute inset-0 z-10 flex flex-col bg-[linear-gradient(180deg,#05261e_0%,#031912_100%)] p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <button type="button" onClick={() => setIsMembersViewOpen(false)} className="rounded-lg bg-[#0f4335] px-3 py-1.5 text-sm text-[#c7f4e6]">Quay lại</button>
+                  <h4 className="text-base font-semibold text-[#e2fff4]">Thành viên</h4>
+                  <span className="w-16" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openAddMembersModal}
+                  className="mb-4 w-full rounded-lg bg-[#0f4335] px-3 py-2 text-sm font-semibold text-[#c7f4e6]"
+                >
+                  + Thêm thành viên
+                </button>
+
+                <div className="flex-1 overflow-y-auto">
+                  <p className="mb-3 text-sm font-semibold text-[#d6f8ec]">Danh sách thành viên ({groupMemberPreview.length})</p>
+                  <div className="space-y-2">
+                    {groupMemberPreview.map((member) => {
+                      const isCreator = groupCreatorId === member._id;
+                      const isAdmin = groupAdminIds.includes(member._id);
+                      const isMe = chatPanelProps.currentUserId === member._id;
+
+                      return (
+                        <div key={member._id} className="rounded-xl bg-[#0d3a2f] px-3 py-2">
+                          <p className="truncate text-sm font-medium text-[#e6fff5]">{member.displayName} {isMe ? '(Bạn)' : ''}</p>
+                          <p className="text-xs text-[#8cc4b0]">
+                            {isCreator ? 'Trưởng nhóm' : isAdmin ? 'Quản trị viên' : 'Thành viên'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </aside>
+        </div>
+      )}
+
+      {isRenameGroupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#1d5a48] bg-[#06271f] p-5">
+            <h4 className="text-lg font-semibold text-[#e2fff4]">Đổi tên nhóm</h4>
+            <input
+              value={renameGroupDraft}
+              onChange={(e) => setRenameGroupDraft(e.target.value)}
+              className="mt-3 w-full rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-3 py-2 text-sm text-[#d8f7ec] outline-none"
+              placeholder="Nhập tên nhóm mới"
+              maxLength={100}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setIsRenameGroupOpen(false)} className="rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#b8ebdb]">Hủy</button>
+              <button type="button" onClick={() => { void handleSubmitGroupNameChange(); }} className="rounded-lg bg-[#1f7a60] px-3 py-2 text-sm font-semibold text-[#e6fff5]">Lưu</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMuteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#1d5a48] bg-[#06271f] p-5">
+            <h4 className="text-lg font-semibold text-[#e2fff4]">Tắt thông báo</h4>
+            <div className="mt-3 space-y-2">
+              <button type="button" onClick={() => { void handleMuteConversation('1h'); }} className="w-full rounded-xl bg-[#0f4335] px-3 py-2 text-left text-sm text-[#d6f8ec]">Trong 1 giờ</button>
+              <button type="button" onClick={() => { void handleMuteConversation('4h'); }} className="w-full rounded-xl bg-[#0f4335] px-3 py-2 text-left text-sm text-[#d6f8ec]">Trong 4 giờ</button>
+              <button type="button" onClick={() => { void handleMuteConversation('8h'); }} className="w-full rounded-xl bg-[#0f4335] px-3 py-2 text-left text-sm text-[#d6f8ec]">Trong 8 giờ</button>
+              <button type="button" onClick={() => { void handleMuteConversation('until_enabled'); }} className="w-full rounded-xl bg-[#0f4335] px-3 py-2 text-left text-sm text-[#d6f8ec]">Cho đến khi tôi bật lại</button>
+            </div>
+            <button type="button" onClick={() => setIsMuteModalOpen(false)} className="mt-4 w-full rounded-lg bg-[#12392f] px-3 py-2 text-sm text-[#b8ebdb]">Đóng</button>
+          </div>
+        </div>
+      )}
+
+      {isLeaveGroupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#6d2f2f] bg-[#2a1515] p-5">
+            <h4 className="text-lg font-semibold text-[#ffe4e4]">Rời nhóm</h4>
+            <p className="mt-2 text-sm text-[#ffc7c7]">Bạn có chắc muốn rời nhóm này?</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsLeaveGroupModalOpen(false)}
+                className="rounded-lg bg-[#3a2323] px-3 py-2 text-sm text-[#ffd7d7]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleConfirmLeaveGroup(); }}
+                className="rounded-lg bg-[#8b3535] px-3 py-2 text-sm font-semibold text-[#ffe9e9]"
+              >
+                Rời nhóm
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

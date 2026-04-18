@@ -30,7 +30,14 @@ export const MuteConversationSchema = z.object({
 
 export type MuteConversationDto = z.infer<typeof MuteConversationSchema>;
 
-// C2.4 – Validate Web Push subscription body
+// C2.4 - Validate pin conversation request body
+export const PinConversationSchema = z.object({
+  pin: z.boolean().optional(),
+});
+
+export type PinConversationDto = z.infer<typeof PinConversationSchema>;
+
+// C2.5 – Validate Web Push subscription body
 export const WebPushSubscribeSchema = z.object({
   endpoint: z.string().url('Invalid endpoint URL'),
   keys: z.object({
@@ -41,7 +48,7 @@ export const WebPushSubscribeSchema = z.object({
 
 export type WebPushSubscribeDto = z.infer<typeof WebPushSubscribeSchema>;
 
-// C2.5 – Validate get notifications query params
+// C2.6 – Validate get notifications query params
 export const GetNotificationsQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z

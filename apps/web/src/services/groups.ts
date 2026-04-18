@@ -89,3 +89,10 @@ export async function updateGroupMemberApproval(
 export async function disbandGroup(groupId: string): Promise<void> {
   await apiClient.delete(`/api/groups/${groupId}`);
 }
+
+export async function leaveGroup(groupId: string): Promise<{ disbanded: boolean; groupId: string }> {
+  const { data } = await apiClient.delete<{ success: boolean; disbanded: boolean; groupId: string }>(
+    `/api/groups/${groupId}/members/me`,
+  );
+  return { disbanded: data.disbanded, groupId: data.groupId };
+}

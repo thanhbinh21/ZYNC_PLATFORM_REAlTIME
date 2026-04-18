@@ -35,6 +35,8 @@ export default function HomePage() {
     conversations,
     selectedConversationId,
     onSelectConversation,
+    searchTargets,
+    onSelectSearchTarget,
     messages,
     messagesLoading,
     messageStatus,
@@ -49,6 +51,12 @@ export default function HomePage() {
     onUpdateGroupMemberApproval,
     onRemoveGroupMember,
     onDisbandGroup,
+    onLeaveGroup,
+    onToggleConversationPin,
+    onMuteConversation,
+    onUnmuteConversation,
+    isSelectedConversationPinned,
+    selectedConversationMutedUntil,
     onSendMessage,
     onCancelPendingMessage,
     onStartTyping,
@@ -257,6 +265,8 @@ export default function HomePage() {
               conversations={conversations}
               selectedConversationId={selectedConversationId}
               onSelectConversation={onSelectConversation}
+              searchTargets={searchTargets}
+              onSelectSearchTarget={onSelectSearchTarget}
               friends={friendsForGroup}
               onCreateGroup={onCreateGroup}
               onUpdateGroup={onUpdateGroup}
@@ -265,6 +275,12 @@ export default function HomePage() {
               onUpdateGroupMemberApproval={onUpdateGroupMemberApproval}
               onRemoveGroupMember={onRemoveGroupMember}
               onDisbandGroup={onDisbandGroup}
+              onLeaveGroup={onLeaveGroup}
+              onToggleConversationPin={onToggleConversationPin}
+              onMuteConversation={onMuteConversation}
+              onUnmuteConversation={onUnmuteConversation}
+              isConversationPinned={isSelectedConversationPinned}
+              conversationMutedUntil={selectedConversationMutedUntil}
               isCreatingGroup={groupActionLoading}
               onLoadMore={onLoadMore}
               chatPanelProps={{
