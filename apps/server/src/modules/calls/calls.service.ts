@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/errors';
 import { FriendshipModel } from '../friends/friendship.model';
 import { UserModel } from '../users/user.model';
+import { ConversationModel } from '../conversations/conversation.model';
+import { ConversationMemberModel } from '../conversations/conversation-member.model';
 import {
   CallEventModel,
   CallParticipantModel,
@@ -23,6 +25,11 @@ const ACTIVE_SESSION_STATUSES: CallSessionStatus[] = ['ringing', 'connecting', '
 interface CreateOneToOneCallInput {
   targetUserId: string;
   conversationId?: string;
+  callType: 'video';
+}
+
+interface CreateGroupCallInput {
+  conversationId: string;
   callType: 'video';
 }
 
@@ -72,6 +79,15 @@ function getCallConnectedStaleMs(): number {
   const parsed = Number.parseInt(raw ?? '180000', 10);
   if (Number.isNaN(parsed) || parsed < 60_000) {
     return 180_000;
+  }
+  return parsed;
+}
+
+function getCallGroupMaxParticipants(): number {
+  const raw = process.env['CALL_GROUP_MAX_PARTICIPANTS'];
+  const parsed = Number.parseInt(raw ?? '10', 10);
+  if (Number.isNaN(parsed) || parsed < 3) {
+    return 10;
   }
   return parsed;
 }
@@ -190,6 +206,13 @@ async function appendCallEvent(
   });
 }
 
+async function countActiveParticipants(sessionId: string): Promise<number> {
+  return CallParticipantModel.countDocuments({
+    sessionId,
+    status: { $in: ['joined', 'invited'] },
+  });
+}
+
 export class CallsService {
   private static async cleanupExpiredRingingSessionsForPair(
     callerUserId: string,
@@ -199,6 +222,24 @@ export class CallsService {
     const expiredSessionIds = await CallSessionModel.find({
       mode: 'p2p',
       participantIds: { $all: [callerUserId, calleeUserId], $size: 2 },
+      status: 'ringing',
+      timeoutAt: { $lte: now },
+    })
+      .select('_id')
+      .lean();
+
+    for (const session of expiredSessionIds) {
+      await this.markMissedIfNoAnswer(session._id.toString());
+    }
+  }
+
+  private static async cleanupExpiredRingingSessionsForConversation(
+    conversationId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const expiredSessionIds = await CallSessionModel.find({
+      mode: 'sfu',
+      conversationId,
       status: 'ringing',
       timeoutAt: { $lte: now },
     })
@@ -399,6 +440,109 @@ export class CallsService {
     return buildCallSessionDetail(session._id.toString());
   }
 
+  static async createGroupSession(
+    callerUserId: string,
+    input: CreateGroupCallInput,
+  ): Promise<CallSessionDetail> {
+    assertObjectId(input.conversationId, 'conversationId');
+    await ensureUserExists(callerUserId);
+
+    const conversation = await ConversationModel.findById(input.conversationId)
+      .select('type')
+      .lean();
+    if (!conversation || conversation.type !== 'group') {
+      throw new NotFoundError('Group conversation not found');
+    }
+
+    const members = await ConversationMemberModel.find({
+      conversationId: input.conversationId,
+    })
+      .select('userId')
+      .lean();
+
+    const participantIds = Array.from(new Set(members.map((member) => member.userId)));
+    if (!participantIds.includes(callerUserId)) {
+      throw new ForbiddenError('Only conversation members can start a group call');
+    }
+
+    if (participantIds.length < 2) {
+      throw new BadRequestError('Group call requires at least 2 participants');
+    }
+
+    if (participantIds.length > getCallGroupMaxParticipants()) {
+      throw new ConflictError('Group call participant limit exceeded');
+    }
+
+    await this.cleanupExpiredRingingSessionsForConversation(input.conversationId);
+
+    let activeSession = await CallSessionModel.findOne({
+      mode: 'sfu',
+      conversationId: input.conversationId,
+      status: { $in: ACTIVE_SESSION_STATUSES },
+    }).lean();
+
+    if (
+      activeSession
+      && this.shouldAutoResolveSessionForReinvite({
+        status: activeSession.status,
+        timeoutAt: activeSession.timeoutAt,
+        createdAt: activeSession.createdAt,
+        startedAt: activeSession.startedAt,
+      })
+    ) {
+      await this.forceEndSessionForReinvite(activeSession._id.toString());
+      activeSession = await CallSessionModel.findOne({
+        mode: 'sfu',
+        conversationId: input.conversationId,
+        status: { $in: ACTIVE_SESSION_STATUSES },
+      }).lean();
+    }
+
+    if (activeSession) {
+      throw new ConflictError('A group call is already active in this conversation');
+    }
+
+    const timeoutAt = new Date(Date.now() + getCallRingTimeoutMs());
+    const session = await CallSessionModel.create({
+      conversationId: input.conversationId,
+      callType: input.callType,
+      mode: 'sfu',
+      status: 'ringing',
+      initiatedBy: callerUserId,
+      participantIds,
+      timeoutAt,
+    });
+
+    await CallParticipantModel.insertMany(
+      participantIds.map((participantId) => {
+        if (participantId === callerUserId) {
+          return {
+            sessionId: session._id.toString(),
+            userId: participantId,
+            role: 'caller',
+            status: 'joined' as const,
+            joinedAt: new Date(),
+          };
+        }
+
+        return {
+          sessionId: session._id.toString(),
+          userId: participantId,
+          role: 'participant' as const,
+          status: 'invited' as const,
+        };
+      }),
+    );
+
+    await appendCallEvent(session._id.toString(), 'call_group_invited', callerUserId, {
+      conversationId: input.conversationId,
+      participantCount: participantIds.length,
+    });
+    recordCallInvite();
+
+    return buildCallSessionDetail(session._id.toString());
+  }
+
   static async getSessionForUser(sessionId: string, userId: string): Promise<CallSessionDetail> {
     assertObjectId(sessionId, 'sessionId');
     await ensureParticipant(sessionId, userId);
@@ -463,14 +607,28 @@ export class CallsService {
       },
     );
 
+    await appendCallEvent(sessionId, 'call_rejected', userId, { reason });
+    recordCallRejected(reason);
+
+    if (session.mode === 'sfu') {
+      const remainingActive = await countActiveParticipants(sessionId);
+      if (remainingActive <= 0) {
+        session.status = 'rejected';
+        session.endedAt = new Date();
+        session.endedReason = reason;
+        await session.save();
+        recordCallEnded(reason);
+      }
+
+      return buildCallSessionDetail(sessionId);
+    }
+
     session.status = 'rejected';
     session.endedAt = new Date();
     session.endedReason = reason;
     await session.save();
-    recordCallRejected(reason);
     recordCallEnded(reason);
 
-    await appendCallEvent(sessionId, 'call_rejected', userId, { reason });
     return buildCallSessionDetail(sessionId);
   }
 
@@ -514,6 +672,38 @@ export class CallsService {
     await ensureParticipant(sessionId, userId);
 
     if (session.status === 'ended' || session.status === 'missed' || session.status === 'rejected') {
+      return buildCallSessionDetail(sessionId);
+    }
+
+    if (session.mode === 'sfu' && session.initiatedBy !== userId) {
+      await CallParticipantModel.updateOne(
+        {
+          sessionId,
+          userId,
+        },
+        {
+          $set: {
+            status: 'left',
+            leftAt: new Date(),
+          },
+        },
+      );
+
+      await appendCallEvent(sessionId, 'call_left', userId, { reason: reason ?? 'left' });
+
+      const remainingActive = await countActiveParticipants(sessionId);
+      if (remainingActive <= 0) {
+        session.status = 'ended';
+        session.endedAt = new Date();
+        session.endedReason = reason ?? 'ended';
+        await session.save();
+        const durationSeconds = session.startedAt
+          ? (session.endedAt.getTime() - session.startedAt.getTime()) / 1000
+          : undefined;
+        recordCallEnded(session.endedReason, durationSeconds);
+        await appendCallEvent(sessionId, 'call_ended', userId, { reason: session.endedReason });
+      }
+
       return buildCallSessionDetail(sessionId);
     }
 
@@ -597,6 +787,16 @@ export class CallsService {
 
   static async listParticipantIds(sessionId: string): Promise<string[]> {
     const participants = await CallParticipantModel.find({ sessionId }).select('userId').lean();
+    return participants.map((participant) => participant.userId);
+  }
+
+  static async listJoinedParticipantIds(sessionId: string): Promise<string[]> {
+    const participants = await CallParticipantModel.find({
+      sessionId,
+      status: 'joined',
+    })
+      .select('userId')
+      .lean();
     return participants.map((participant) => participant.userId);
   }
 }

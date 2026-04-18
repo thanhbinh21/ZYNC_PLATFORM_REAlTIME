@@ -5,6 +5,7 @@ import { fetchFriends, type FriendUser } from '@/services/friends';
 import {
   emitCallAccept,
   emitCallEnd,
+  emitCallGroupInvite,
   emitCallInvite,
   emitCallReject,
   emitWebRtcAnswer,
@@ -132,11 +133,20 @@ interface PendingReactionRequest {
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
 
+interface CallParticipantVideo {
+  userId: string;
+  displayName: string;
+  stream: MediaStream;
+}
+
 interface ActiveCallState {
   sessionId: string;
   conversationId?: string;
-  peerUserId: string;
-  peerDisplayName: string;
+  isGroupCall: boolean;
+  initiatedBy: string;
+  participantIds: string[];
+  joinedParticipantIds: string[];
+  participantDisplayNames: Record<string, string>;
   direction: 'incoming' | 'outgoing';
   status: CallUiStatus;
   callToken: string;
@@ -169,15 +179,53 @@ export function useHomeDashboard() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const pendingRemoteCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const [remoteParticipantVideos, setRemoteParticipantVideos] = useState<CallParticipantVideo[]>([]);
+  const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pendingRemoteCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const autoResetCallTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingOutgoingCallRef = useRef<{
-    peerUserId: string;
-    peerDisplayName: string;
     conversationId?: string;
+    isGroupCall: boolean;
+    initiatedBy: string;
+    participantIds: string[];
+    participantDisplayNames: Record<string, string>;
   } | null>(null);
+
+  const resolvePeerInfo = useCallback((peerUserId: string): { displayName: string; conversationId?: string } => {
+    const matchedConversation = conversations.find((conversation) => {
+      if (conversation.type !== 'direct') {
+        return false;
+      }
+
+      return conversation.users.some((member) => member._id === peerUserId);
+    });
+
+    const matchedUser = matchedConversation?.users.find((member) => member._id === peerUserId);
+    return {
+      displayName: matchedUser?.displayName ?? 'Người dùng',
+      conversationId: matchedConversation?._id,
+    };
+  }, [conversations]);
+
+  const resolveParticipantDisplayNames = useCallback((participantIds: string[]): Record<string, string> => {
+    const names: Record<string, string> = {};
+
+    participantIds.forEach((participantId) => {
+      if (participantId === userId) {
+        names[participantId] = data.user.displayName || 'Bạn';
+        return;
+      }
+
+      const matchedConversation = conversations.find((conversation) =>
+        conversation.users.some((member) => member._id === participantId),
+      );
+      const matchedUser = matchedConversation?.users.find((member) => member._id === participantId);
+      names[participantId] = matchedUser?.displayName ?? 'Người dùng';
+    });
+
+    return names;
+  }, [conversations, data.user.displayName, userId]);
 
   const syncLocalPreview = useCallback(() => {
     if (!localVideoRef.current || !localStreamRef.current) {
@@ -189,15 +237,26 @@ export function useHomeDashboard() {
     }
   }, []);
 
-  const syncRemotePreview = useCallback(() => {
-    if (!remoteVideoRef.current || !remoteStreamRef.current) {
-      return;
-    }
+  const syncRemoteParticipantsPreview = useCallback((nextCall?: ActiveCallState | null) => {
+    const callContext = nextCall ?? activeCallRef.current;
+    const streams = Array.from(remoteStreamsRef.current.entries())
+      .filter(([, stream]) => stream.getTracks().length > 0)
+      .map(([participantId, stream]) => ({
+        userId: participantId,
+        displayName: callContext?.participantDisplayNames[participantId] ?? resolvePeerInfo(participantId).displayName,
+        stream,
+      }));
 
-    if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    streams.sort((a, b) => a.displayName.localeCompare(b.displayName, 'vi'));
+    setRemoteParticipantVideos(streams);
+
+    if (!callContext?.isGroupCall && remoteVideoRef.current) {
+      const primaryStream = streams[0]?.stream ?? null;
+      if (remoteVideoRef.current.srcObject !== primaryStream) {
+        remoteVideoRef.current.srcObject = primaryStream;
+      }
     }
-  }, []);
+  }, [resolvePeerInfo]);
 
   const getRtcConfiguration = useCallback((): RTCConfiguration => {
     const stunServers: RTCIceServer = {
@@ -240,27 +299,44 @@ export function useHomeDashboard() {
   }, []);
 
   const stopRemoteMedia = useCallback(() => {
-    if (remoteStreamRef.current) {
-      remoteStreamRef.current.getTracks().forEach((track) => track.stop());
-      remoteStreamRef.current = null;
-    }
+    remoteStreamsRef.current.forEach((stream) => {
+      stream.getTracks().forEach((track) => track.stop());
+    });
+    remoteStreamsRef.current.clear();
+    setRemoteParticipantVideos([]);
 
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
   }, []);
 
-  const closePeerConnection = useCallback(() => {
-    const connection = peerConnectionRef.current;
-    if (connection) {
+  const closePeerConnection = useCallback((peerUserId?: string) => {
+    if (peerUserId) {
+      const connection = peerConnectionsRef.current.get(peerUserId);
+      if (connection) {
+        connection.onicecandidate = null;
+        connection.ontrack = null;
+        connection.onconnectionstatechange = null;
+        connection.close();
+        peerConnectionsRef.current.delete(peerUserId);
+      }
+      pendingRemoteCandidatesRef.current.delete(peerUserId);
+      remoteStreamsRef.current.delete(peerUserId);
+      syncRemoteParticipantsPreview();
+      return;
+    }
+
+    peerConnectionsRef.current.forEach((connection) => {
       connection.onicecandidate = null;
       connection.ontrack = null;
       connection.onconnectionstatechange = null;
       connection.close();
-      peerConnectionRef.current = null;
-    }
-    pendingRemoteCandidatesRef.current = [];
-  }, []);
+    });
+    peerConnectionsRef.current.clear();
+    pendingRemoteCandidatesRef.current.clear();
+    remoteStreamsRef.current.clear();
+    syncRemoteParticipantsPreview();
+  }, [syncRemoteParticipantsPreview]);
 
   const attachLocalTracksToPeer = useCallback((connection: RTCPeerConnection) => {
     const stream = localStreamRef.current;
@@ -283,45 +359,42 @@ export function useHomeDashboard() {
   }, []);
 
   const replacePeerVideoTrack = useCallback((videoTrack: MediaStreamTrack | null) => {
-    const connection = peerConnectionRef.current;
-    if (!connection) {
-      return;
-    }
-
-    const videoSender = connection.getSenders().find((sender) => sender.track?.kind === 'video');
-    if (!videoSender) {
-      if (videoTrack && localStreamRef.current) {
-        connection.addTrack(videoTrack, localStreamRef.current);
+    peerConnectionsRef.current.forEach((connection) => {
+      const videoSender = connection.getSenders().find((sender) => sender.track?.kind === 'video');
+      if (!videoSender) {
+        if (videoTrack && localStreamRef.current) {
+          connection.addTrack(videoTrack, localStreamRef.current);
+        }
+        return;
       }
-      return;
-    }
 
-    void videoSender.replaceTrack(videoTrack);
+      void videoSender.replaceTrack(videoTrack);
+    });
   }, []);
 
-  const flushPendingRemoteCandidates = useCallback(async (connection: RTCPeerConnection) => {
-    if (!connection.remoteDescription || pendingRemoteCandidatesRef.current.length === 0) {
+  const flushPendingRemoteCandidates = useCallback(async (peerUserId: string, connection: RTCPeerConnection) => {
+    const queuedCandidates = pendingRemoteCandidatesRef.current.get(peerUserId) ?? [];
+    if (!connection.remoteDescription || queuedCandidates.length === 0) {
       return;
     }
 
-    const candidates = [...pendingRemoteCandidatesRef.current];
-    pendingRemoteCandidatesRef.current = [];
+    pendingRemoteCandidatesRef.current.delete(peerUserId);
 
-    for (const candidate of candidates) {
+    for (const candidate of queuedCandidates) {
       try {
         await connection.addIceCandidate(candidate);
       } catch {
-        setCallError('Khong the dong bo ICE candidate cho cuoc goi.');
+        setCallError('Không thể đồng bộ ICE candidate cho cuộc gọi.');
       }
     }
   }, []);
 
-  const ensurePeerConnection = useCallback((currentCall: ActiveCallState): RTCPeerConnection | null => {
+  const ensurePeerConnection = useCallback((currentCall: ActiveCallState, peerUserId: string): RTCPeerConnection | null => {
     if (typeof RTCPeerConnection === 'undefined') {
       return null;
     }
 
-    const existing = peerConnectionRef.current;
+    const existing = peerConnectionsRef.current.get(peerUserId);
     if (existing) {
       attachLocalTracksToPeer(existing);
       return existing;
@@ -331,46 +404,83 @@ export function useHomeDashboard() {
 
     connection.onicecandidate = (event) => {
       const latestCall = activeCallRef.current;
-      if (!event.candidate || !latestCall || !latestCall.sessionId || !latestCall.callToken) {
+      if (!event.candidate || !latestCall || !latestCall.sessionId || !latestCall.callToken || !peerUserId) {
         return;
       }
 
       try {
         emitWebRtcIceCandidate(
           latestCall.sessionId,
-          latestCall.peerUserId,
+          peerUserId,
           latestCall.callToken,
           event.candidate.toJSON(),
         );
       } catch {
-        setCallError('Khong the gui ICE candidate.');
+        setCallError('Không thể gửi ICE candidate.');
       }
     };
 
     connection.ontrack = (event) => {
-      if (!remoteStreamRef.current) {
-        remoteStreamRef.current = new MediaStream();
-      }
+      const existingStream = remoteStreamsRef.current.get(peerUserId) ?? new MediaStream();
 
       event.streams[0]?.getTracks().forEach((track) => {
-        if (!remoteStreamRef.current?.getTracks().some((currentTrack) => currentTrack.id === track.id)) {
-          remoteStreamRef.current?.addTrack(track);
+        if (!existingStream.getTracks().some((currentTrack) => currentTrack.id === track.id)) {
+          existingStream.addTrack(track);
         }
       });
 
-      syncRemotePreview();
+      remoteStreamsRef.current.set(peerUserId, existingStream);
+      syncRemoteParticipantsPreview(latestCallWithFallback(currentCall));
     };
 
-    peerConnectionRef.current = connection;
-    pendingRemoteCandidatesRef.current = [];
+    connection.onconnectionstatechange = () => {
+      if (connection.connectionState === 'failed' || connection.connectionState === 'closed') {
+        closePeerConnection(peerUserId);
+      }
+    };
+
+    peerConnectionsRef.current.set(peerUserId, connection);
+    pendingRemoteCandidatesRef.current.set(peerUserId, []);
     attachLocalTracksToPeer(connection);
 
     if (currentCall.status === 'connected') {
-      void flushPendingRemoteCandidates(connection);
+      void flushPendingRemoteCandidates(peerUserId, connection);
     }
 
     return connection;
-  }, [attachLocalTracksToPeer, flushPendingRemoteCandidates, getRtcConfiguration, syncRemotePreview]);
+  }, [attachLocalTracksToPeer, closePeerConnection, flushPendingRemoteCandidates, getRtcConfiguration, syncRemoteParticipantsPreview]);
+
+  const latestCallWithFallback = useCallback((fallback: ActiveCallState): ActiveCallState => {
+    return activeCallRef.current ?? fallback;
+  }, []);
+
+  const shouldCreateOfferForPeer = useCallback((callState: ActiveCallState, peerUserId: string): boolean => {
+    if (!callState.isGroupCall) {
+      return callState.direction === 'outgoing';
+    }
+
+    return userId.localeCompare(peerUserId) < 0;
+  }, [userId]);
+
+  const createOfferForPeer = useCallback(async (callState: ActiveCallState, peerUserId: string) => {
+    if (!callState.callToken || !callState.sessionId || !peerUserId || peerUserId === userId) {
+      return;
+    }
+
+    const connection = ensurePeerConnection(callState, peerUserId);
+    if (!connection) {
+      setCallError('Trình duyệt không hỗ trợ WebRTC.');
+      return;
+    }
+
+    if (connection.signalingState !== 'stable') {
+      return;
+    }
+
+    const offer = await connection.createOffer();
+    await connection.setLocalDescription(offer);
+    emitWebRtcOffer(callState.sessionId, peerUserId, callState.callToken, offer);
+  }, [ensurePeerConnection, userId]);
 
   const ensureLocalMedia = useCallback(async (cameraEnabled: boolean = true) => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -401,20 +511,25 @@ export function useHomeDashboard() {
     syncLocalPreview();
   }, [isMicMuted, replacePeerVideoTrack, syncLocalPreview]);
 
+  const resetCallUi = useCallback(() => {
+    setActiveCall(null);
+    setCallError(null);
+    pendingOutgoingCallRef.current = null;
+    closePeerConnection();
+    stopLocalMedia();
+    stopRemoteMedia();
+  }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+
   const scheduleCallReset = useCallback((delayMs: number = 2500) => {
     if (autoResetCallTimeoutRef.current) {
       clearTimeout(autoResetCallTimeoutRef.current);
     }
 
     autoResetCallTimeoutRef.current = setTimeout(() => {
-      setActiveCall(null);
-      setCallError(null);
-      pendingOutgoingCallRef.current = null;
-      closePeerConnection();
-      stopLocalMedia();
-      stopRemoteMedia();
+      autoResetCallTimeoutRef.current = null;
+      resetCallUi();
     }, delayMs);
-  }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+  }, [resetCallUi]);
 
   const clearCallResetTimer = useCallback(() => {
     if (autoResetCallTimeoutRef.current) {
@@ -423,30 +538,36 @@ export function useHomeDashboard() {
     }
   }, []);
 
-  const resolvePeerInfo = useCallback((peerUserId: string): { displayName: string; conversationId?: string } => {
-    const matchedConversation = conversations.find((conversation) => {
-      if (conversation.type !== 'direct') {
-        return false;
-      }
-
-      return conversation.users.some((member) => member._id === peerUserId);
-    });
-
-    const matchedUser = matchedConversation?.users.find((member) => member._id === peerUserId);
-    return {
-      displayName: matchedUser?.displayName ?? 'Người dùng',
-      conversationId: matchedConversation?._id,
-    };
-  }, [conversations]);
-
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
 
   useEffect(() => {
+    const callStatus = activeCall?.status;
+    if (!activeCall || (callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected')) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      const latestCall = activeCallRef.current;
+      if (!latestCall || latestCall.sessionId !== activeCall.sessionId) {
+        return;
+      }
+
+      if (latestCall.status === 'ended' || latestCall.status === 'missed' || latestCall.status === 'rejected') {
+        resetCallUi();
+      }
+    }, 1600);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [activeCall?.sessionId, activeCall?.status, resetCallUi]);
+
+  useEffect(() => {
     syncLocalPreview();
-    syncRemotePreview();
-  }, [activeCall, syncLocalPreview, syncRemotePreview]);
+    syncRemoteParticipantsPreview(activeCall);
+  }, [activeCall, syncLocalPreview, syncRemoteParticipantsPreview]);
 
   // Initialize chat hook for real-time messaging
   const {
@@ -1507,7 +1628,13 @@ export function useHomeDashboard() {
 
     const handleCallInvited = (payload: CallInvitedPayload) => {
       const pendingOutgoing = pendingOutgoingCallRef.current;
-      const peerInfo = resolvePeerInfo(payload.targetUserId);
+      const isGroupCall = payload.isGroupCall === true;
+      const participantIds = payload.participantIds && payload.participantIds.length > 0
+        ? payload.participantIds
+        : pendingOutgoing?.participantIds ?? [userId, payload.targetUserId ?? ''].filter((id) => id.length > 0);
+
+      const participantDisplayNames = pendingOutgoing?.participantDisplayNames
+        ?? resolveParticipantDisplayNames(participantIds);
 
       clearCallResetTimer();
       closePeerConnection();
@@ -1516,8 +1643,11 @@ export function useHomeDashboard() {
       setActiveCall({
         sessionId: payload.sessionId,
         conversationId: payload.conversationId ?? pendingOutgoing?.conversationId,
-        peerUserId: payload.targetUserId,
-        peerDisplayName: pendingOutgoing?.peerDisplayName ?? peerInfo.displayName,
+        isGroupCall,
+        initiatedBy: pendingOutgoing?.initiatedBy ?? userId,
+        participantIds,
+        joinedParticipantIds: [userId],
+        participantDisplayNames,
         direction: 'outgoing',
         status: 'outgoing',
         callToken: payload.callToken,
@@ -1526,6 +1656,11 @@ export function useHomeDashboard() {
 
     const handleCallIncoming = (payload: CallIncomingPayload) => {
       const peerInfo = resolvePeerInfo(payload.fromUserId);
+      const isGroupCall = payload.isGroupCall === true;
+      const participantIds = payload.participantIds && payload.participantIds.length > 0
+        ? payload.participantIds
+        : [userId, payload.fromUserId];
+      const participantDisplayNames = resolveParticipantDisplayNames(participantIds);
 
       clearCallResetTimer();
       closePeerConnection();
@@ -1534,14 +1669,19 @@ export function useHomeDashboard() {
       setActiveCall({
         sessionId: payload.sessionId,
         conversationId: payload.conversationId ?? peerInfo.conversationId,
-        peerUserId: payload.fromUserId,
-        peerDisplayName: peerInfo.displayName,
+        isGroupCall,
+        initiatedBy: payload.fromUserId,
+        participantIds,
+        joinedParticipantIds: [payload.fromUserId],
+        participantDisplayNames,
         direction: 'incoming',
         status: 'incoming',
         callToken: payload.callToken,
       });
 
-      if (peerInfo.conversationId) {
+      if (payload.conversationId) {
+        setSelectedConversationId(payload.conversationId);
+      } else if (peerInfo.conversationId) {
         setSelectedConversationId(peerInfo.conversationId);
       }
     };
@@ -1571,26 +1711,28 @@ export function useHomeDashboard() {
 
       if (payload.status === 'connected') {
         void ensureLocalMedia(isCameraEnabled)
-          .then(() => {
+          .then(async () => {
             const latestCall = activeCallRef.current;
             if (!latestCall || latestCall.sessionId !== payload.sessionId) {
               return;
             }
 
-            const connection = ensurePeerConnection(latestCall);
-            if (!connection) {
-              setCallError('Trinh duyet khong ho tro WebRTC.');
-              return;
-            }
-
-            void flushPendingRemoteCandidates(connection);
+            const joinedPeers = latestCall.joinedParticipantIds.filter((participantId) => participantId !== userId);
+            await Promise.all(joinedPeers.map(async (peerUserId) => {
+              const connection = ensurePeerConnection(latestCall, peerUserId);
+              if (!connection) {
+                return;
+              }
+              await flushPendingRemoteCandidates(peerUserId, connection);
+            }));
           })
           .catch(() => {
-            setCallError('Khong the truy cap camera/microphone.');
+            setCallError('Không thể truy cập camera hoặc microphone.');
           });
       }
 
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
+        setCallError(null);
         scheduleCallReset();
       }
     };
@@ -1601,45 +1743,51 @@ export function useHomeDashboard() {
         return;
       }
 
-      if (payload.userId === userId) {
-        return;
-      }
+      const joinedParticipantIds = payload.joinedParticipantIds && payload.joinedParticipantIds.length > 0
+        ? Array.from(new Set(payload.joinedParticipantIds))
+        : Array.from(new Set([...current.joinedParticipantIds, payload.userId]));
+
+      const participantIds = Array.from(new Set([...current.participantIds, ...joinedParticipantIds]));
+      const participantDisplayNames = {
+        ...current.participantDisplayNames,
+        ...resolveParticipantDisplayNames(participantIds),
+      };
 
       setActiveCall((prev) => {
         if (!prev || prev.sessionId !== payload.sessionId) {
           return prev;
         }
 
-        if (prev.status === 'connected') {
-          return prev;
-        }
-
         return {
           ...prev,
-          status: 'connecting',
+          status: prev.status === 'connected' ? prev.status : 'connecting',
+          participantIds,
+          joinedParticipantIds,
+          participantDisplayNames,
         };
       });
 
-      if (current.direction === 'outgoing' && current.callToken) {
-        try {
-          const connection = ensurePeerConnection(current);
-          if (!connection) {
-            setCallError('Trinh duyet khong ho tro WebRTC.');
-            return;
-          }
+      const latestCall = activeCallRef.current;
+      if (!latestCall || latestCall.sessionId !== payload.sessionId) {
+        return;
+      }
 
-          const offer = await connection.createOffer();
-          await connection.setLocalDescription(offer);
+      const peersToOffer = (payload.userId === userId
+        ? joinedParticipantIds.filter((participantId) => participantId !== userId)
+        : [payload.userId]
+      ).filter((peerUserId) => shouldCreateOfferForPeer(latestCall, peerUserId));
 
-          emitWebRtcOffer(
-            current.sessionId,
-            current.peerUserId,
-            current.callToken,
-            offer,
-          );
-        } catch {
-          setCallError('Khong the gui yeu cau ket noi WebRTC.');
+      if (peersToOffer.length === 0) {
+        return;
+      }
+
+      try {
+        await ensureLocalMedia(isCameraEnabled);
+        for (const peerUserId of peersToOffer) {
+          await createOfferForPeer(latestCall, peerUserId);
         }
+      } catch {
+        setCallError('Không thể tạo kết nối WebRTC cho cuộc gọi.');
       }
     };
 
@@ -1649,8 +1797,8 @@ export function useHomeDashboard() {
         return;
       }
 
-      if (payload.userId === userId) {
-        return;
+      if (payload.userId !== userId) {
+        closePeerConnection(payload.userId);
       }
 
       setActiveCall((prev) => {
@@ -1658,35 +1806,56 @@ export function useHomeDashboard() {
           return prev;
         }
 
+        const nextJoined = prev.joinedParticipantIds.filter((participantId) => participantId !== payload.userId);
+        const remainingPeers = nextJoined.filter((participantId) => participantId !== userId);
+        const shouldEnd = remainingPeers.length === 0;
+
+        if (!shouldEnd) {
+          return {
+            ...prev,
+            joinedParticipantIds: nextJoined,
+          };
+        }
+
         return {
           ...prev,
+          joinedParticipantIds: nextJoined,
           status: 'ended',
           reason: payload.reason ?? 'ended',
         };
       });
 
-      scheduleCallReset();
+      const latestCall = activeCallRef.current;
+      if (latestCall && latestCall.sessionId === payload.sessionId) {
+        if (payload.userId === userId) {
+          scheduleCallReset(500);
+          return;
+        }
+
+        const remainingPeers = latestCall.joinedParticipantIds
+          .filter((participantId) => participantId !== payload.userId)
+          .filter((participantId) => participantId !== userId);
+        if (remainingPeers.length === 0) {
+          scheduleCallReset();
+        }
+      }
     };
 
     const handleWebRtcOffer = async (payload: WebRtcOfferPayload) => {
       const current = activeCallRef.current;
-      if (!current || current.sessionId !== payload.sessionId) {
-        return;
-      }
-
-      if (!current.callToken || payload.fromUserId !== current.peerUserId) {
+      if (!current || current.sessionId !== payload.sessionId || !current.callToken) {
         return;
       }
 
       try {
-        const connection = ensurePeerConnection(current);
+        const connection = ensurePeerConnection(current, payload.fromUserId);
         if (!connection) {
-          setCallError('Trinh duyet khong ho tro WebRTC.');
+          setCallError('Trình duyệt không hỗ trợ WebRTC.');
           return;
         }
 
         await connection.setRemoteDescription(payload.sdp as RTCSessionDescriptionInit);
-        await flushPendingRemoteCandidates(connection);
+        await flushPendingRemoteCandidates(payload.fromUserId, connection);
 
         const answer = await connection.createAnswer();
         await connection.setLocalDescription(answer);
@@ -1698,49 +1867,51 @@ export function useHomeDashboard() {
           answer,
         );
       } catch {
-        setCallError('Khong the gui phan hoi ket noi WebRTC.');
+        setCallError('Không thể gửi phản hồi kết nối WebRTC.');
       }
     };
 
     const handleWebRtcAnswer = async (payload: WebRtcAnswerPayload) => {
       const current = activeCallRef.current;
-      if (!current || current.sessionId !== payload.sessionId || payload.fromUserId !== current.peerUserId) {
+      if (!current || current.sessionId !== payload.sessionId) {
         return;
       }
 
-      const connection = peerConnectionRef.current;
+      const connection = peerConnectionsRef.current.get(payload.fromUserId) ?? ensurePeerConnection(current, payload.fromUserId);
       if (!connection) {
         return;
       }
 
       try {
         await connection.setRemoteDescription(payload.sdp as RTCSessionDescriptionInit);
-        await flushPendingRemoteCandidates(connection);
+        await flushPendingRemoteCandidates(payload.fromUserId, connection);
       } catch {
-        setCallError('Khong the dong bo phan hoi WebRTC.');
+        setCallError('Không thể đồng bộ phản hồi WebRTC.');
       }
     };
 
     const handleWebRtcIceCandidate = async (payload: WebRtcIceCandidatePayload) => {
       const current = activeCallRef.current;
-      if (!current || current.sessionId !== payload.sessionId || payload.fromUserId !== current.peerUserId) {
+      if (!current || current.sessionId !== payload.sessionId) {
         return;
       }
 
-      const connection = peerConnectionRef.current ?? ensurePeerConnection(current);
+      const connection = peerConnectionsRef.current.get(payload.fromUserId) ?? ensurePeerConnection(current, payload.fromUserId);
       if (!connection) {
         return;
       }
 
       if (!connection.remoteDescription) {
-        pendingRemoteCandidatesRef.current.push(payload.candidate);
+        const queued = pendingRemoteCandidatesRef.current.get(payload.fromUserId) ?? [];
+        queued.push(payload.candidate);
+        pendingRemoteCandidatesRef.current.set(payload.fromUserId, queued);
         return;
       }
 
       try {
         await connection.addIceCandidate(payload.candidate);
       } catch {
-        setCallError('Khong the nhan ICE candidate.');
+        setCallError('Không thể nhận ICE candidate.');
       }
     };
 
@@ -1774,13 +1945,16 @@ export function useHomeDashboard() {
     };
   }, [
     closePeerConnection,
+    createOfferForPeer,
     clearCallResetTimer,
     ensureLocalMedia,
     ensurePeerConnection,
     flushPendingRemoteCandidates,
     isCameraEnabled,
+    resolveParticipantDisplayNames,
     resolvePeerInfo,
     scheduleCallReset,
+    shouldCreateOfferForPeer,
     stopRemoteMedia,
     userId,
   ]);
@@ -1791,12 +1965,7 @@ export function useHomeDashboard() {
     }
 
     const selectedConversation = conversations.find((conversation) => conversation._id === selectedConversationId);
-    if (!selectedConversation || selectedConversation.type !== 'direct') {
-      return;
-    }
-
-    const peer = selectedConversation.users.find((member) => member._id !== userId);
-    if (!peer) {
+    if (!selectedConversation) {
       return;
     }
 
@@ -1807,17 +1976,49 @@ export function useHomeDashboard() {
     setIsMicMuted(false);
     setIsCameraEnabled(true);
 
+    const participantIds = Array.from(new Set(selectedConversation.users.map((member) => member._id)));
+    if (!participantIds.includes(userId)) {
+      participantIds.push(userId);
+    }
+
+    let isGroupCall = selectedConversation.type === 'group';
+    let emitInvite: () => void;
+
+    if (selectedConversation.type === 'direct') {
+      const peer = selectedConversation.users.find((member) => member._id !== userId);
+      if (!peer) {
+        return;
+      }
+
+      emitInvite = () => {
+        emitCallInvite(peer._id, selectedConversation._id);
+      };
+      isGroupCall = false;
+    } else {
+      emitInvite = () => {
+        emitCallGroupInvite(selectedConversation._id);
+      };
+      isGroupCall = true;
+    }
+
+    const participantDisplayNames = resolveParticipantDisplayNames(participantIds);
+
     pendingOutgoingCallRef.current = {
-      peerUserId: peer._id,
-      peerDisplayName: peer.displayName,
       conversationId: selectedConversation._id,
+      isGroupCall,
+      initiatedBy: userId,
+      participantIds,
+      participantDisplayNames,
     };
 
     setActiveCall({
       sessionId: '',
       conversationId: selectedConversation._id,
-      peerUserId: peer._id,
-      peerDisplayName: peer.displayName,
+      isGroupCall,
+      initiatedBy: userId,
+      participantIds,
+      joinedParticipantIds: [userId],
+      participantDisplayNames,
       direction: 'outgoing',
       status: 'outgoing',
       callToken: '',
@@ -1825,9 +2026,9 @@ export function useHomeDashboard() {
 
     try {
       await ensureLocalMedia(true);
-      emitCallInvite(peer._id, selectedConversation._id);
+      emitInvite();
     } catch {
-      setCallError('Khong the bat dau cuoc goi. Vui long kiem tra camera/microphone.');
+      setCallError('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra camera và microphone.');
       setActiveCall(null);
       pendingOutgoingCallRef.current = null;
       stopLocalMedia();
@@ -1837,6 +2038,7 @@ export function useHomeDashboard() {
     clearCallResetTimer,
     conversations,
     ensureLocalMedia,
+    resolveParticipantDisplayNames,
     selectedConversationId,
     stopRemoteMedia,
     stopLocalMedia,
@@ -1857,17 +2059,28 @@ export function useHomeDashboard() {
         await ensureLocalMedia(isCameraEnabled);
       } catch {
         await ensureLocalMedia(false);
-        setCallError('Khong truy cap duoc camera, tiep tuc cuoc goi voi audio.');
+        setCallError('Không truy cập được camera, tiếp tục cuộc gọi với audio.');
       }
 
-      const connection = ensurePeerConnection(current);
-      if (!connection) {
-        setCallError('Trinh duyet khong ho tro WebRTC.');
-        return;
+      const joinedPeers = current.joinedParticipantIds.filter((participantId) => participantId !== userId);
+      for (const peerUserId of joinedPeers) {
+        const connection = ensurePeerConnection(current, peerUserId);
+        if (!connection) {
+          setCallError('Trình duyệt không hỗ trợ WebRTC.');
+          return;
+        }
+
+        attachLocalTracksToPeer(connection);
       }
 
-      attachLocalTracksToPeer(connection);
       emitCallAccept(current.sessionId, current.callToken);
+
+      for (const peerUserId of joinedPeers) {
+        if (shouldCreateOfferForPeer(current, peerUserId)) {
+          await createOfferForPeer(current, peerUserId);
+        }
+      }
+
       setActiveCall((prev) => {
         if (!prev) {
           return prev;
@@ -1878,9 +2091,18 @@ export function useHomeDashboard() {
         };
       });
     } catch {
-      setCallError('Khong the chap nhan cuoc goi. Vui long thu lai.');
+      setCallError('Không thể chấp nhận cuộc gọi. Vui lòng thử lại.');
     }
-  }, [attachLocalTracksToPeer, clearCallResetTimer, ensureLocalMedia, ensurePeerConnection, isCameraEnabled]);
+  }, [
+    attachLocalTracksToPeer,
+    clearCallResetTimer,
+    createOfferForPeer,
+    ensureLocalMedia,
+    ensurePeerConnection,
+    isCameraEnabled,
+    shouldCreateOfferForPeer,
+    userId,
+  ]);
 
   const handleRejectIncomingCall = useCallback(() => {
     const current = activeCallRef.current;
@@ -1891,7 +2113,7 @@ export function useHomeDashboard() {
     try {
       emitCallReject(current.sessionId, current.callToken, 'rejected');
     } catch {
-      setCallError('Khong the tu choi cuoc goi luc nay.');
+      setCallError('Không thể từ chối cuộc gọi lúc này.');
     }
 
     setActiveCall((prev) => {
@@ -1904,6 +2126,7 @@ export function useHomeDashboard() {
         reason: 'rejected',
       };
     });
+    setCallError(null);
     scheduleCallReset(1200);
   }, [scheduleCallReset]);
 
@@ -1917,7 +2140,7 @@ export function useHomeDashboard() {
       try {
         emitCallEnd(current.sessionId, current.callToken, 'ended');
       } catch {
-        setCallError('Khong the ket thuc cuoc goi tu server.');
+        setCallError('Không thể kết thúc cuộc gọi từ server.');
       }
     }
 
@@ -1931,8 +2154,14 @@ export function useHomeDashboard() {
         reason: 'ended',
       };
     });
+    setCallError(null);
     scheduleCallReset(1200);
   }, [scheduleCallReset]);
+
+  const handleDismissCallUi = useCallback(() => {
+    clearCallResetTimer();
+    resetCallUi();
+  }, [clearCallResetTimer, resetCallUi]);
 
   const handleToggleMic = useCallback(() => {
     setIsMicMuted((prev) => {
@@ -1956,7 +2185,7 @@ export function useHomeDashboard() {
 
   const handleToggleScreenShare = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
-      setCallError('Trinh duyet khong ho tro chia se man hinh.');
+      setCallError('Trình duyệt không hỗ trợ chia sẻ màn hình.');
       return;
     }
 
@@ -1983,11 +2212,11 @@ export function useHomeDashboard() {
 
       displayTrack.onended = () => {
         void ensureLocalMedia(isCameraEnabled).catch(() => {
-          setCallError('Khong the quay lai camera sau khi dung chia se man hinh.');
+          setCallError('Không thể quay lại camera sau khi dừng chia sẻ màn hình.');
         });
       };
     } catch {
-      setCallError('Khong the bat chia se man hinh.');
+      setCallError('Không thể bật chia sẻ màn hình.');
     }
   }, [ensureLocalMedia, isCameraEnabled, isScreenSharing, replacePeerVideoTrack, syncLocalPreview]);
 
@@ -2422,9 +2651,17 @@ export function useHomeDashboard() {
   }, [forwardingMessage]);
 
   const selectedConversationRaw = conversations.find((conversation) => conversation._id === selectedConversationId);
-  const isOneToOneConversationSelected = Boolean(
-    selectedConversationRaw && selectedConversationRaw.type === 'direct',
+  const isCallConversationSelected = Boolean(
+    selectedConversationRaw && (selectedConversationRaw.type === 'direct' || selectedConversationRaw.type === 'group'),
   );
+  const activeCallParticipantNames = activeCall
+    ? activeCall.participantIds
+      .filter((participantId) => participantId !== userId)
+      .map((participantId) => activeCall.participantDisplayNames[participantId] ?? resolvePeerInfo(participantId).displayName)
+    : [];
+  const callPeerName = activeCall?.isGroupCall
+    ? (selectedConversationRaw?.name ?? 'Nhóm gọi')
+    : activeCallParticipantNames[0];
 
   // Cleanup typing timeout on unmount
   useEffect(() => {
@@ -2434,9 +2671,7 @@ export function useHomeDashboard() {
       }
 
       clearCallResetTimer();
-      closePeerConnection();
-      stopLocalMedia();
-      stopRemoteMedia();
+      resetCallUi();
 
       pendingReactionRequestsRef.current.forEach((pending) => {
         if (pending.ackTimeout) {
@@ -2445,7 +2680,7 @@ export function useHomeDashboard() {
       });
       pendingReactionRequestsRef.current.clear();
     };
-  }, [clearCallResetTimer, closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+  }, [clearCallResetTimer, resetCallUi]);
 
   return {
     data,
@@ -2488,18 +2723,22 @@ export function useHomeDashboard() {
     onFetchReactionDetails: handleFetchReactionDetails,
     reactionUserStateByMessage,
     callStatus: activeCall?.status ?? 'idle',
-    callPeerName: activeCall?.peerDisplayName,
+    callPeerName,
+    callParticipantNames: activeCallParticipantNames,
+    isGroupCallActive: activeCall?.isGroupCall ?? false,
     callError,
     isMicMuted,
     isCameraEnabled,
     isScreenSharing,
     localVideoRef,
     remoteVideoRef,
-    isCallingAvailable: isOneToOneConversationSelected,
+    remoteParticipantVideos,
+    isCallingAvailable: isCallConversationSelected,
     onStartVideoCall: handleStartVideoCall,
     onAcceptIncomingCall: handleAcceptIncomingCall,
     onRejectIncomingCall: handleRejectIncomingCall,
     onEndCall: handleEndCall,
+    onDismissCallUi: handleDismissCallUi,
     onToggleMic: handleToggleMic,
     onToggleCamera: handleToggleCamera,
     onToggleScreenShare: handleToggleScreenShare,

@@ -313,7 +313,9 @@ export function unlistenToTypingIndicators(): void {
 export interface CallInvitedPayload {
   sessionId: string;
   conversationId?: string;
-  targetUserId: string;
+  targetUserId?: string;
+  isGroupCall?: boolean;
+  participantIds?: string[];
   callType: 'video';
   timeoutAt?: string;
   callToken: string;
@@ -324,6 +326,8 @@ export interface CallIncomingPayload {
   sessionId: string;
   conversationId?: string;
   fromUserId: string;
+  isGroupCall?: boolean;
+  participantIds?: string[];
   callType: 'video';
   timeoutAt?: string;
   callToken: string;
@@ -340,6 +344,7 @@ export interface CallParticipantPayload {
   sessionId: string;
   userId: string;
   reason?: string;
+  joinedParticipantIds?: string[];
 }
 
 export interface WebRtcOfferPayload {
@@ -367,6 +372,16 @@ export function emitCallInvite(targetUserId: string, conversationId?: string): v
 
   socket.emit('call_invite', {
     targetUserId,
+    conversationId,
+  });
+}
+
+export function emitCallGroupInvite(conversationId: string): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('call_group_invite', {
     conversationId,
   });
 }
@@ -972,6 +987,7 @@ export const socketService = {
   listenToTypingIndicators,
   unlistenToTypingIndicators,
   emitCallInvite,
+  emitCallGroupInvite,
   emitCallAccept,
   emitCallReject,
   emitCallEnd,
