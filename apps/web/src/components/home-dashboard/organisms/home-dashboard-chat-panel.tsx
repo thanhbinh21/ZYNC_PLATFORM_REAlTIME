@@ -1,6 +1,6 @@
 'use client';
 
-import { type ChangeEvent, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
@@ -429,6 +429,40 @@ function ChatPanel({
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
   const [jumpStatus, setJumpStatus] = useState<string | null>(null);
+
+  const getMessageSenderId = useCallback((message: Message) => {
+    const sender = message.senderId as unknown;
+    if (sender && typeof sender === 'object') {
+      return String((sender as { _id?: string })._id || '');
+    }
+    return String(message.senderId || '');
+  }, []);
+
+  const messagesForDisplay = useMemo(() => {
+    const lastMessageIndex = messages.length - 1;
+
+    return messages.map((message, index) => {
+      const isBottomMessage = index === lastMessageIndex;
+      const isOwnBottomMessage = isBottomMessage && getMessageSenderId(message) === String(currentUserId);
+
+      if (isOwnBottomMessage) {
+        return message;
+      }
+
+      const hasReadPreview = Array.isArray(message.readByPreview) && message.readByPreview.length > 0;
+      const hasReadBy = Array.isArray(message.readBy) && message.readBy.length > 0;
+
+      if (!hasReadPreview && !hasReadBy) {
+        return message;
+      }
+
+      return {
+        ...message,
+        readByPreview: [],
+        readBy: [],
+      };
+    });
+  }, [currentUserId, getMessageSenderId, messages]);
 
   messagesRef.current = messages;
 
@@ -1013,7 +1047,7 @@ function ChatPanel({
               </div>
             )}
 
-            {messages.map((message) => (
+            {messagesForDisplay.map((message) => (
               <div
                 key={message._id}
                 ref={(node) => {
