@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Notification } from '@/services/notifications';
 
 interface NotificationPanelProps {
@@ -50,17 +51,13 @@ export function NotificationPanel({
 }: NotificationPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // J2.9 – Close on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
+    setMounted(true);
+  }, []);
+
+  // J2.9 – Close on outside click is handled by the overlay's onClick
 
   // J2.6 – Infinite scroll
   const handleScroll = useCallback(() => {
@@ -78,41 +75,56 @@ export function NotificationPanel({
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      ref={panelRef}
-      className="absolute right-0 top-[calc(100%+8px)] z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-[#104638] bg-[#051f19] shadow-[0_16px_48px_rgba(0,0,0,0.55)]"
-      style={{ animation: 'panelSlide 0.2s ease-out' }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#021612]/80 px-4 backdrop-blur-sm"
+      onClick={onClose}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#0d3228] px-4 py-3">
-        <h3 className="font-ui-title text-base text-[#e4fff5]">Thông báo</h3>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
+      <div
+        ref={panelRef}
+        className="relative flex w-[500px] max-w-full flex-col overflow-hidden rounded-3xl border border-[#1a5444] bg-[#051f19] shadow-[0_16px_60px_rgba(0,0,0,0.6)]"
+        onClick={(e) => e.stopPropagation()}
+        style={{ animation: 'revealUp 0.3s ease-out' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-[#0d3228] px-5 py-4">
+          <h3 className="font-ui-title text-lg text-[#e4fff5]">Trung tâm thông báo</h3>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={onMarkAllRead}
+                className="font-ui-content rounded-lg px-2.5 py-1.5 text-xs text-[#43e6b8] transition hover:bg-[#0d3228]"
+              >
+                Đánh dấu tất cả đã đọc
+              </button>
+            )}
             <button
               type="button"
-              onClick={onMarkAllRead}
-              className="font-ui-content rounded-lg px-2.5 py-1 text-xs text-[#43e6b8] transition hover:bg-[#0d3228]"
+              onClick={onOpenSettings}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#7cb3a1] transition hover:bg-[#0d3228] hover:text-[#cdece0]"
+              aria-label="Cài đặt thông báo"
             >
-              Đánh dấu tất cả đã đọc
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+                <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M12 4.5v2.1M12 17.4v2.1M4.5 12h2.1M17.4 12h2.1M6.8 6.8l1.5 1.5M15.7 15.7l1.5 1.5M17.2 6.8l-1.5 1.5M8.3 15.7l-1.5 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#7cb3a1] transition hover:bg-[#0d3228] hover:text-[#cdece0]"
-            aria-label="Cài đặt thông báo"
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
-              <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M12 4.5v2.1M12 17.4v2.1M4.5 12h2.1M17.4 12h2.1M6.8 6.8l1.5 1.5M15.7 15.7l1.5 1.5M17.2 6.8l-1.5 1.5M8.3 15.7l-1.5 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#7cb3a1] transition hover:bg-[#0d3228] hover:text-[#ffb3b8]"
+              aria-label="Đóng"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+            </button>
+          </div>
         </div>
-      </div>
 
       {/* List */}
-      <div ref={scrollRef} onScroll={handleScroll} className="max-h-[420px] overflow-y-auto">
+      <div ref={scrollRef} onScroll={handleScroll} className="max-h-[60vh] overflow-y-auto w-full">
         {notifications.length === 0 && !isLoading && (
           <div className="flex flex-col items-center gap-2 px-4 py-10">
             <span className="text-3xl opacity-40">🔔</span>
@@ -177,6 +189,8 @@ export function NotificationPanel({
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    </div>
+      </div>
+    </div>,
+    document.body
   );
 }
