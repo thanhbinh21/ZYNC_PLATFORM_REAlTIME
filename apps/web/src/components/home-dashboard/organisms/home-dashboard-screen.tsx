@@ -200,7 +200,7 @@ export function HomeDashboardScreen({
 
         <section className={`${sectionClassName} zync-glass-panel rounded-3xl border-none shadow-xl`}>
           {selectedNavId === 'home' && (
-            <header className="zync-glass-panel zync-glass-floating flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3">
+            <header className="zync-glass-panel zync-glass-floating relative z-20 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3 !overflow-visible">
               <h1 className="font-ui-title text-[clamp(1.3rem,2.3vw,2rem)] text-[#e4fff5]">{data.greeting}</h1>
               <div className="flex items-center gap-3">
                 {/* Search bar removed from Trang chủ as requested */}

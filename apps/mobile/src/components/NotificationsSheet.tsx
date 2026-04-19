@@ -16,8 +16,11 @@ import type { AppNotification, NotificationAnchorRect } from '../services/notifi
 import { colors } from '../theme/colors';
 
 const SCREEN = Dimensions.get('window');
-const PANEL_MAX_W = 380;
+const PANEL_MAX_W = 360;
 const GAP = 8;
+const HEADER_H = 44;
+const PANEL_MARGIN = 12;
+const LIST_MAX_CAP = 320;
 
 const TYPE_ICONS: Record<AppNotification['type'], string> = {
   new_message: '💬',
@@ -57,23 +60,40 @@ function computeDropdownLayout(
   anchor: NotificationAnchorRect | null,
   insets: { top: number; bottom: number },
 ): { top: number; left: number; width: number; listMaxHeight: number } {
-  const margin = 12;
-  const panelW = Math.min(PANEL_MAX_W, SCREEN.width - margin * 2);
+  const panelW = Math.min(PANEL_MAX_W, SCREEN.width - PANEL_MARGIN * 2);
 
-  if (anchor) {
-    const top = anchor.pageY + anchor.height + GAP;
-    let left = anchor.pageX + anchor.width - panelW;
-    left = Math.max(margin, Math.min(left, SCREEN.width - margin - panelW));
-    const availableBelow = SCREEN.height - top - insets.bottom - margin;
-    const listMaxHeight = Math.min(420, Math.max(160, availableBelow - 52));
+  const clampLeft = (left: number) =>
+    Math.max(PANEL_MARGIN, Math.min(left, SCREEN.width - PANEL_MARGIN - panelW));
+
+  // Fallback (không có anchor): đặt góc phải phía trên
+  if (!anchor) {
+    const top = insets.top + PANEL_MARGIN + 44;
+    const left = clampLeft(SCREEN.width - PANEL_MARGIN - panelW);
+    const availableBelow = SCREEN.height - top - insets.bottom - PANEL_MARGIN;
+    const listMaxHeight = Math.min(LIST_MAX_CAP, Math.max(160, availableBelow - HEADER_H));
     return { top, left, width: panelW, listMaxHeight };
   }
 
-  const top = insets.top + margin + 44;
-  const left = SCREEN.width - margin - panelW;
-  const availableBelow = SCREEN.height - top - insets.bottom - margin;
-  const listMaxHeight = Math.min(420, Math.max(160, availableBelow - 52));
-  return { top, left, width: panelW, listMaxHeight };
+  // Anchor: căn phải theo chuông (giống web)
+  const desiredLeft = anchor.pageX + anchor.width - panelW;
+  const left = clampLeft(desiredLeft);
+
+  const topDown = anchor.pageY + anchor.height + GAP;
+  const availableBelow = SCREEN.height - topDown - insets.bottom - PANEL_MARGIN;
+
+  // Nếu dưới không đủ chỗ, xổ lên trên (popover)
+  const availableAbove = anchor.pageY - insets.top - PANEL_MARGIN - GAP;
+  const preferUp = availableBelow < 220 && availableAbove > availableBelow;
+
+  if (preferUp) {
+    const listMaxHeight = Math.min(LIST_MAX_CAP, Math.max(160, availableAbove - HEADER_H));
+    const panelH = HEADER_H + listMaxHeight;
+    const top = Math.max(insets.top + PANEL_MARGIN, anchor.pageY - GAP - panelH);
+    return { top, left, width: panelW, listMaxHeight };
+  }
+
+  const listMaxHeight = Math.min(LIST_MAX_CAP, Math.max(160, availableBelow - HEADER_H));
+  return { top: topDown, left, width: panelW, listMaxHeight };
 }
 
 export function NotificationsSheet({
@@ -159,7 +179,7 @@ export function NotificationsSheet({
               top: layout.top,
               left: layout.left,
               width: layout.width,
-              maxHeight: layout.listMaxHeight + 52 + 12,
+              maxHeight: layout.listMaxHeight + HEADER_H + 8,
             },
           ]}
           pointerEvents="auto"
