@@ -784,12 +784,31 @@ export function useHomeDashboard() {
           return;
         }
 
+        const existingIsRecalled = existing.type === 'system-recall';
+        const incomingIsRecalled = msg.type === 'system-recall';
+
+        if (existingIsRecalled && !incomingIsRecalled) {
+          // Once recalled, keep placeholder content/media cleared.
+          merged.set(key, {
+            ...msg,
+            ...existing,
+            _id: existing._id || msg._id,
+            idempotencyKey: existing.idempotencyKey || msg.idempotencyKey,
+            createdAt: msg.createdAt || existing.createdAt,
+            type: 'system-recall',
+            content: existing.content || '[Tin nhắn đã được thu hồi]',
+            mediaUrl: undefined,
+          });
+          return;
+        }
+
         merged.set(key, {
           ...existing,
           ...msg,
           _id: msg._id || existing._id,
           idempotencyKey: msg.idempotencyKey || existing.idempotencyKey,
           createdAt: msg.createdAt || existing.createdAt,
+          mediaUrl: incomingIsRecalled ? undefined : (msg.mediaUrl ?? existing.mediaUrl),
         });
       });
 

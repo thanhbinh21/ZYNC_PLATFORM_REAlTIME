@@ -621,14 +621,29 @@ export function useChat({
       messageId: string;
       conversationId: string;
       deletedAt: string;
+      idempotencyKey?: string;
     }) => {
       // Only process if this is the right conversation
       if (data.conversationId !== conversationId) return;
+
+      // Remove from realtime message state so merge layer cannot resurrect it.
+      setMessages((prev) =>
+        prev.filter((msg) => {
+          const matchesById = msg._id === data.messageId || msg.idempotencyKey === data.messageId;
+          const matchesByKey = Boolean(data.idempotencyKey)
+            && (msg._id === data.idempotencyKey || msg.idempotencyKey === data.idempotencyKey);
+
+          return !(matchesById || matchesByKey);
+        }),
+      );
 
       // Remove from status map
       setMessageStatus((prev) => {
         const newStatus = { ...prev };
         delete newStatus[data.messageId];
+        if (data.idempotencyKey) {
+          delete newStatus[data.idempotencyKey];
+        }
         return newStatus;
       });
     };
@@ -642,6 +657,28 @@ export function useChat({
     }) => {
       // Only process if this is the right conversation
       if (data.conversationId !== conversationId) return;
+
+      // Keep message body in recalled state so later realtime merges cannot resurrect content.
+      setMessages((prev) =>
+        prev.map((msg) => {
+          const matches =
+            msg._id === data.messageId
+            || msg.idempotencyKey === data.idempotencyKey
+            || msg._id === data.idempotencyKey
+            || msg.idempotencyKey === data.messageId;
+
+          if (!matches) {
+            return msg;
+          }
+
+          return {
+            ...msg,
+            content: data.recalledBy === 'system' ? '[Bị chặn bởi AI Moderator]' : '[Tin nhắn đã được thu hồi]',
+            mediaUrl: undefined,
+            type: 'system-recall' as Message['type'],
+          };
+        }),
+      );
 
       // Update status
       setMessageStatus((prev) => ({
@@ -677,6 +714,23 @@ export function useChat({
       }
 
       try {
+        // Optimistic remove to avoid temporary resurrection while waiting server ack.
+        setMessages((prev) =>
+          prev.filter((msg) => (
+            msg._id !== messageId
+            && msg.idempotencyKey !== messageId
+            && msg._id !== idempotencyKey
+            && msg.idempotencyKey !== idempotencyKey
+          )),
+        );
+
+        setMessageStatus((prev) => {
+          const next = { ...prev };
+          delete next[messageId];
+          delete next[idempotencyKey];
+          return next;
+        });
+
         deleteMessageForMe(conversationId, messageId, idempotencyKey);
       } catch (err) {
         console.error('Failed to delete message:', err);
@@ -814,13 +868,20 @@ export function useMessageHistory({
       messageId: string;
       conversationId: string;
       deletedAt: string;
+      idempotencyKey?: string;
     }) => {
       // Only process if this is the right conversation
       if (data.conversationId !== conversationId) return;
 
       // Remove from messages state
       setMessages((prev) =>
-        prev.filter((msg) => msg._id !== data.messageId)
+        prev.filter((msg) => {
+          const matchesById = msg._id === data.messageId || msg.idempotencyKey === data.messageId;
+          const matchesByKey = Boolean(data.idempotencyKey)
+            && (msg._id === data.idempotencyKey || msg.idempotencyKey === data.idempotencyKey);
+
+          return !(matchesById || matchesByKey);
+        }),
       );
     };
 
@@ -838,6 +899,9 @@ export function useMessageHistory({
       setMessages((prev) =>
         prev.map((msg) =>
           msg.idempotencyKey === data.idempotencyKey
+            || msg._id === data.messageId
+            || msg._id === data.idempotencyKey
+            || msg.idempotencyKey === data.messageId
             ? {
                 ...msg,
                 content: data.recalledBy === 'system' ? '[Bị chặn bởi AI Moderator]' : '[Tin nhắn đã được thu hồi]',
