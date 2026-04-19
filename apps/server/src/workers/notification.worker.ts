@@ -65,11 +65,11 @@ export async function stopNotificationWorker(): Promise<void> {
 
 async function processNotification(payload: NotificationPayload): Promise<void> {
   const { userId, type, title, body, data, conversationId, fromUserId } = payload;
+  const pref = await NotificationPreferenceModel.findOne({ userId }).lean();
 
   // E1.2 – Check mute
   let isMuted = false;
   if (conversationId) {
-    const pref = await NotificationPreferenceModel.findOne({ userId }).lean();
     if (pref?.mutedConversations?.includes(conversationId)) {
       const mutedUntilMap = pref.mutedUntil as unknown as Record<string, Date> | undefined;
       if (mutedUntilMap) {
@@ -94,13 +94,17 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   // E1.3 – Check master toggle
   let pushEnabled = true;
   if (!isMuted) {
-    const pref = await NotificationPreferenceModel.findOne({ userId }).lean();
     if (pref && pref.enablePush === false) {
       pushEnabled = false;
     }
   }
 
-  // E1.6 – Save notification history (always, even if muted/push disabled)
+  if (isMuted) {
+    logger.debug(`Notification skipped (muted) for user ${userId}, conversation ${conversationId}`);
+    return;
+  }
+
+  // E1.6 – Save notification history (except muted conversation)
   const notificationDoc = await NotificationModel.create({
     userId,
     type,
@@ -112,15 +116,13 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
     read: false,
   });
 
-  // E1.7 – Emit Socket.IO for real-time UI update (always, regardless of mute/push)
-  emitNotification(userId, notificationDoc.toObject() as unknown as Record<string, unknown>);
-
-  // Skip push if muted or push disabled
-  if (isMuted) {
-    logger.debug(`Notification skipped (muted) for user ${userId}, conversation ${conversationId}`);
-    return;
+  // E1.7 – Emit Socket.IO only when notifications are effectively enabled.
+  // This keeps in-app behavior consistent with mute/disable-push settings.
+  if (!isMuted && pushEnabled) {
+    emitNotification(userId, notificationDoc.toObject() as unknown as Record<string, unknown>);
   }
 
+  // Skip push if push disabled
   if (!pushEnabled) {
     logger.debug(`Push disabled for user ${userId}`);
     return;

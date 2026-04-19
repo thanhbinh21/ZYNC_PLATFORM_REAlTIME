@@ -27,6 +27,7 @@ interface UseMessagePreviewOptions {
     name: string;
     avatarUrl?: string;
     isGroup?: boolean;
+    mutedUntil?: Date | string | null;
     members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   }>;
 }
@@ -112,6 +113,14 @@ export function useMessagePreview({
       const conv = conversations.find(
         (c) => c.id === notification.conversationId,
       );
+
+      const mutedUntil = conv?.mutedUntil ? new Date(conv.mutedUntil) : null;
+      const isConversationMuted = Boolean(
+        mutedUntil && !Number.isNaN(mutedUntil.getTime()) && mutedUntil.getTime() > Date.now(),
+      );
+      if (isConversationMuted) {
+        return;
+      }
 
       let senderName = 'Người dùng';
       let avatarInitials = 'ND';
