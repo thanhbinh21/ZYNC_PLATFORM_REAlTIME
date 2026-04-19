@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { Message, MessageType } from '@zync/shared-types';
+import { StickerPicker } from './sticker-picker';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
@@ -28,7 +29,19 @@ return (
       <circle cx="15" cy="10" r="1" fill="currentColor" />
       <path d="M8.3 14.2c.8 1.2 2 1.8 3.7 1.8s3-.6 3.7-1.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
-  );}
+  );
+}
+
+function StickerIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <circle cx="9" cy="9" r="1.5" fill="currentColor" />
+      <circle cx="15" cy="9" r="1.5" fill="currentColor" />
+      <path d="M8 15c0 1 2 2 4 2s4-1 4-2" />
+    </svg>
+  );
+}
 
 interface UploadedMedia {
   file: File;
@@ -79,6 +92,7 @@ export function MessageInput({
   const [queuedMediaSend, setQueuedMediaSend] = useState<QueuedMediaSend | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const uploadedMediaRef = useRef<UploadedMedia | null>(null);
@@ -398,8 +412,23 @@ export function MessageInput({
     onCancelReply?.();
   };
 
+  const handleSendSticker = async (mediaUrl: string) => {
+    if (disabled || isLoading || isSending) {
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      await onSend('', 'sticker', mediaUrl, { replyTo: replyingTo ?? undefined });
+      setShowStickerPicker(false);
+      onCancelReply?.();
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
-    <div className="zync-glass-subtle border-t zync-glass-divider bg-[#0d2c24]/44 p-4">
+    <div className="relative zync-glass-subtle border-t zync-glass-divider bg-[#0d2c24]/44 p-4">
       {replyingTo && (
         <div className="mb-3 flex items-center justify-between rounded-lg border border-[#2d6a58] bg-[#0f3a2f]/75 px-3 py-2">
           <div className="min-w-0">
@@ -445,6 +474,15 @@ export function MessageInput({
           <EmojiIcon className="w-5 h-5 text-[#96c5b5]" />
         </button>
 
+        <button
+          onClick={() => setShowStickerPicker(true)}
+          disabled={disabled || isLoading || isSending}
+          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
+          title="Sticker"
+        >
+          <StickerIcon className="w-5 h-5 text-[#96c5b5]" />
+        </button>
+
         <input
           type="file"
           ref={fileInputRef}
@@ -467,6 +505,14 @@ export function MessageInput({
             </button>
           ))}
         </div>
+      )}
+
+      {showStickerPicker && (
+        <StickerPicker
+          isOpen={showStickerPicker}
+          onClose={() => setShowStickerPicker(false)}
+          onSelectSticker={handleSendSticker}
+        />
       )}
 
       {/* Input Area */}

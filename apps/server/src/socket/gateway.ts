@@ -12,6 +12,7 @@ import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
 import { UserModel } from '../modules/users/user.model';
+import { stickerService } from '../modules/stickers/sticker.service';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
 import { produceNotificationEvent } from '../modules/notifications/notifications.service';
 import { MessageType } from '../modules/messages/message.model';
@@ -1132,6 +1133,20 @@ async function handleSendMessage(
   await socket.join(`conv:${conversationId as string}`);
 
   let moderationWarning = false;
+
+  // ─── Sticker URL Validation ───
+  if (normalizedType === 'sticker') {
+    if (!mediaUrl || typeof mediaUrl !== 'string') {
+      socket.emit('error', { message: 'Sticker mediaUrl is required' });
+      return;
+    }
+    if (!stickerService.validateStickerUrl(mediaUrl)) {
+      socket.emit('error', { message: 'Invalid sticker URL' });
+      return;
+    }
+    // Clear content for sticker messages
+    content = '';
+  }
 
   // ─── Fast moderation gate (sync) ───
   // Blocks obvious text violations before publishing to Kafka/socket recipients.

@@ -527,7 +527,7 @@ export function MessageItem({
           {!isRecalled && (
             <button
               onClick={() => setShowMenu((prev) => !prev)}
-              className={`absolute top-1 ${isSender ? '-left-7' : '-right-7'} inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1a4a3e]/90 hover:bg-[#1f5946] transition-colors z-30`}
+              className={`absolute top-1 ${isSender ? '-left-7' : '-right-7'} inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1a4a3e]/90 hover:bg-[#1f5946] transition-colors z-2`}
               title="Them tuy chon"
             >
               <EllipsisVerticalIcon className="h-3.5 w-3.5 text-[#88b8a7]" />
@@ -536,7 +536,7 @@ export function MessageItem({
 
           {!isRecalled && (
             <div
-              className={`absolute -top-2 z-30 flex items-center gap-1 ${isSender ? '-right-1' : 'left-10'}`}
+              className={`absolute -top-2 z-2 flex items-center gap-1 ${isSender ? '-right-1' : 'left-10'}`}
               onMouseEnter={showReactionPickerNow}
               onMouseLeave={hideReactionPickerDelayed}
             >

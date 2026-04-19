@@ -184,6 +184,26 @@ export interface GroupUpdatedPayload {
   data: Record<string, unknown>;
 }
 
+// Kiểu dữ liệu Sticker
+export interface ISticker {
+  stickerId: string;
+  mediaUrl: string;
+  alt?: string;
+  category?: string;
+}
+
+export interface IStickerPack {
+  _id?: string;
+  packId: string;
+  packName: string;
+  packDescription?: string;
+  stickers: ISticker[];
+  icon?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Wrapper Response chuẩn cho REST API
 export interface ApiResponse<T = unknown> {
   success: boolean;

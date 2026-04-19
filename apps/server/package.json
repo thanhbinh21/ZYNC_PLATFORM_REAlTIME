@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "seed:friends:test": "ts-node-dev --transpile-only scripts/seed-friend-test-data.ts",
     "seed:qa": "ts-node-dev --transpile-only scripts/seed-friend-test-data.ts",
+    "seed:stickers": "ts-node-dev --transpile-only scripts/seed-stickers.ts",
     "build": "tsc",
     "start": "node dist/main.js",
     "seed:users:4": "ts-node-dev --transpile-only scripts/seed.ts",

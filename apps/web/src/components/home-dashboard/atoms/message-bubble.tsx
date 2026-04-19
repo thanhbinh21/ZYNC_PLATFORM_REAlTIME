@@ -122,7 +122,7 @@ export function MessageBubble({
         )}
 
         {/* Media */}
-        {mediaUrl && (type === 'image' || type === 'video' || type?.startsWith('file/')) && (
+        {mediaUrl && (type === 'image' || type === 'video' || type?.startsWith('file/') || type === 'sticker') && (
           <div className="mb-1 rounded-lg overflow-hidden relative">
             {type === 'image' && (
               isPendingLocalMedia ? (
@@ -147,6 +147,24 @@ export function MessageBubble({
                 controls={!isPendingLocalMedia}
                 className="max-w-xs max-h-80"
               />
+            )}
+            {type === 'sticker' && (
+              isPendingLocalMedia ? (
+                <img
+                  src={mediaUrl}
+                  alt="sticker"
+                  className="h-[100px] object-contain"
+                />
+              ) : (
+                <Image
+                  src={mediaUrl}
+                  alt="sticker"
+                  width={100}
+                  height={100}
+                  className="h-[100px] w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => window.open(mediaUrl, '_blank')}
+                />
+              )
             )}
             {type?.startsWith('file/') && (
               <FileMessagePreview

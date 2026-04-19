@@ -34,6 +34,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
 import { MessagePreviewOverlay } from '../src/components/MessagePreviewOverlay';
+import { StickerPicker } from '../src/components/StickerPicker';
 
 interface MessageReadParticipant {
   userId: string;
@@ -144,6 +145,9 @@ interface ReactionDetailsResponse {
 }
 
 const REACTION_EMOJIS = ['👍', '❤️', '🤣', '😳', '😭', '😡'] as const;
+const QUICK_EMOJIS = ['😀', '😂', '😍', '🥰', '😭', '😎', '🤔', '👍', '❤️', '🔥', '🎉', '🙏'] as const;
+
+type ComposerPickerTab = 'emoji' | 'sticker';
 
 const FILE_PREFIX = 'file/';
 
@@ -646,6 +650,8 @@ export default function ChatRoomScreen() {
   const [statusDetailsVisible, setStatusDetailsVisible] = useState(false);
   const [statusDetailsMessage, setStatusDetailsMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
+  const [showComposerPicker, setShowComposerPicker] = useState(false);
+  const [composerPickerTab, setComposerPickerTab] = useState<ComposerPickerTab>('emoji');
 
   const {
     previews,
@@ -2014,6 +2020,29 @@ export default function ChatRoomScreen() {
     handleSend(undefined, 'text', undefined, { replyTo: replyingTo ?? undefined });
   }, [handleSend, inputText, isUploadingMedia, pendingMediaDraft, pendingMediaSend, replyingTo, uploadAssetToCloudinary]);
 
+  const handleToggleComposerPicker = useCallback(() => {
+    setShowComposerPicker((prev) => !prev);
+    setComposerPickerTab('emoji');
+  }, []);
+
+  const handleSendComposerEmoji = useCallback((emoji: string) => {
+    if (Boolean(pendingMediaSend) || isUploadingMedia) {
+      return;
+    }
+
+    handleSend(emoji, 'text', undefined, { replyTo: replyingTo ?? undefined });
+    setShowComposerPicker(false);
+  }, [handleSend, isUploadingMedia, pendingMediaSend, replyingTo]);
+
+  const handleSendComposerSticker = useCallback((mediaUrl: string) => {
+    if (Boolean(pendingMediaSend) || isUploadingMedia) {
+      return;
+    }
+
+    handleSend('', 'sticker', mediaUrl, { replyTo: replyingTo ?? undefined });
+    setShowComposerPicker(false);
+  }, [handleSend, isUploadingMedia, pendingMediaSend, replyingTo]);
+
   const handleRecall = async (messageId: string, idempotencyKey?: string) => {
     try {
       const socket = socketService.getSocket();
@@ -2134,7 +2163,13 @@ export default function ChatRoomScreen() {
               ) : message.type === 'text' && message.content ? (
                 <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
               ) : message.type === 'sticker' ? (
-                <Text style={bubbleStyles.stickerText}>{message.content || ':)'}</Text>
+                message.mediaUrl ? (
+                  <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
+                    <Image source={{ uri: message.mediaUrl }} style={bubbleStyles.stickerImage} resizeMode="contain" />
+                  </Pressable>
+                ) : (
+                  <Text style={bubbleStyles.stickerText}>{message.content || ':)'}</Text>
+                )
               ) : message.type === 'image' ? (
                 message.mediaUrl ? (
                   <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
@@ -2776,7 +2811,66 @@ export default function ChatRoomScreen() {
               </View>
             )}
 
-            <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            {showComposerPicker && (
+              <View style={[styles.composerPickerWrap, { marginBottom: 16 }]}>
+                <View style={styles.composerPickerTabs}>
+                  <TouchableOpacity
+                    style={[
+                      styles.composerPickerTab,
+                      composerPickerTab === 'emoji' ? styles.composerPickerTabActive : null,
+                    ]}
+                    onPress={() => setComposerPickerTab('emoji')}
+                  >
+                    <Text
+                      style={[
+                        styles.composerPickerTabText,
+                        composerPickerTab === 'emoji' ? styles.composerPickerTabTextActive : null,
+                      ]}
+                    >
+                      Emoji
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.composerPickerTab,
+                      composerPickerTab === 'sticker' ? styles.composerPickerTabActive : null,
+                    ]}
+                    onPress={() => setComposerPickerTab('sticker')}
+                  >
+                    <Text
+                      style={[
+                        styles.composerPickerTabText,
+                        composerPickerTab === 'sticker' ? styles.composerPickerTabTextActive : null,
+                      ]}
+                    >
+                      Sticker
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {composerPickerTab === 'emoji' ? (
+                  <View style={styles.quickEmojiPanel}>
+                    {QUICK_EMOJIS.map((emoji) => (
+                      <TouchableOpacity
+                        key={emoji}
+                        style={styles.quickEmojiBtn}
+                        onPress={() => handleSendComposerEmoji(emoji)}
+                      >
+                        <Text style={styles.quickEmojiText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <StickerPicker
+                    isOpen={showComposerPicker && composerPickerTab === 'sticker'}
+                    onSelectSticker={handleSendComposerSticker}
+                  />
+                )}
+              </View>
+            )}
+
+            <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 14, 22) }]}>
               <TouchableOpacity
                 style={styles.inputAction}
                 onPress={() => {
@@ -2798,12 +2892,13 @@ export default function ChatRoomScreen() {
                   placeholderTextColor="#64748b"
                   value={inputText}
                   onChangeText={handleTextChange}
+                  onFocus={() => setShowComposerPicker(false)}
                   multiline
                   maxLength={2000}
                 />
                 <TouchableOpacity
                   style={styles.emojiBtn}
-                  onPress={() => handleSend(':)', 'sticker', undefined, { replyTo: replyingTo ?? undefined })}
+                  onPress={handleToggleComposerPicker}
                   disabled={Boolean(pendingMediaSend) || isUploadingMedia}
                 >
                   <Ionicons name="happy-outline" size={22} color="#64748b" />
@@ -3118,6 +3213,10 @@ const bubbleStyles = StyleSheet.create({
   stickerText: {
     fontSize: 28,
     lineHeight: 34,
+  },
+  stickerImage: {
+    width: 100,
+    height: 100,
   },
   mediaPlaceholder: {
     flexDirection: 'row',
@@ -3560,6 +3659,61 @@ const styles = StyleSheet.create({
   emojiBtn: {
     padding: 4,
     marginBottom: 2,
+  },
+  composerPickerWrap: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  composerPickerTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  composerPickerTab: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(100,116,139,0.45)',
+    backgroundColor: 'rgba(15,23,42,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  composerPickerTabActive: {
+    borderColor: 'rgba(16,185,129,0.75)',
+    backgroundColor: 'rgba(16,185,129,0.2)',
+  },
+  composerPickerTabText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_500Medium',
+  },
+  composerPickerTabTextActive: {
+    color: '#d1fae5',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  quickEmojiPanel: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(45,106,88,0.75)',
+    backgroundColor: 'rgba(2, 45, 35, 0.65)',
+    padding: 10,
+  },
+  quickEmojiBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15,23,42,0.5)',
+  },
+  quickEmojiText: {
+    fontSize: 22,
+    lineHeight: 26,
   },
   sendBtn: {
     width: 40,
