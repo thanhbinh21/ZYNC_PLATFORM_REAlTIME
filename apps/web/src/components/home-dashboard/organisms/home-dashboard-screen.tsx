@@ -45,9 +45,7 @@ export function HomeDashboardScreen({
 }: HomeDashboardScreenProps) {
   const selectedNavId = activeNavId ?? data.navItems.find((item) => item.active)?.id ?? data.navItems[0]?.id;
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const sectionClassName = selectedNavId === 'chat' || selectedNavId === 'friends'
-    ? 'flex h-screen min-h-0 flex-col overflow-hidden'
-    : 'flex h-screen flex-col overflow-y-auto px-4 py-5 sm:px-6 lg:px-8';
+  const sectionClassName = 'flex min-h-0 flex-1 flex-col overflow-hidden';
   const handleSelectNav = (id: string) => {
     if (id === 'logout') {
       onLogout?.();
@@ -194,8 +192,8 @@ export function HomeDashboardScreen({
         </div>
       )}
 
-      <div className="grid h-screen grid-cols-1 lg:grid-cols-[220px_1fr]">
-        <aside className="zync-glass-panel zync-glass-panel-strong sticky top-0 hidden h-screen flex-col overflow-y-auto border-r px-4 py-6 lg:flex">
+      <div className="flex h-screen overflow-hidden gap-3 p-3 lg:gap-5 lg:p-5">
+        <aside className="zync-glass-panel zync-glass-panel-strong hidden h-full w-[260px] flex-col overflow-y-auto rounded-3xl border-none px-4 py-6 shadow-2xl lg:flex">
           <div className="flex items-center gap-3 px-2">
             <span className="relative block h-10 w-10 overflow-hidden rounded-xl bg-[#0a3e31] ring-1 ring-[#57d2a5]/35">
               <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
@@ -253,111 +251,12 @@ export function HomeDashboardScreen({
           </div>
         </aside>
 
-        <section className={sectionClassName}>
+        <section className={`${sectionClassName} zync-glass-panel rounded-3xl border-none shadow-xl`}>
           {selectedNavId === 'home' && (
             <header className="zync-glass-panel zync-glass-floating shrink-0 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3">
               <h1 className="font-ui-title text-[clamp(1.3rem,2.3vw,2rem)] text-[#e4fff5]">{data.greeting}</h1>
               <div className="flex items-center gap-3">
-                {/* ─── Search bar with live results ─── */}
-                <div ref={searchContainerRef} className="relative hidden sm:block">
-                  <div
-                    onClick={() => setSearchOpen(true)}
-                    className="zync-glass-subtle relative flex h-11 w-[320px] cursor-text items-center rounded-full border-[#85f6ce]/24 bg-[#0f2f27]/52 pl-10 pr-4 transition hover:bg-[#153e34]/70"
-                  >
-                    <span className="absolute left-4 text-[#6cb9a2]">
-                      <DashboardIcon name="search" className="h-4 w-4" />
-                    </span>
-                    <span className="font-ui-content select-none text-sm text-[#739f91]">
-                      Tìm bạn theo @username hoặc email...
-                    </span>
-                  </div>
-
-                  {/* Dropdown results -> Modal via Portal */}
-                  {searchOpen && typeof document !== 'undefined' && createPortal(
-                    <div className="fixed inset-0 z-[100] flex flex-col items-center pt-[12vh] bg-[#021612]/80 backdrop-blur-sm px-4" onClick={() => setSearchOpen(false)}>
-                      <div className="w-full max-w-[600px] overflow-hidden rounded-3xl border border-[#1a5444] bg-[#051f19] shadow-[0_16px_60px_rgba(0,0,0,0.6)]" onClick={(e) => e.stopPropagation()} style={{ animation: 'revealUp 0.2s ease-out' }}>
-                        {/* Modal Search Input */}
-                        <div className="border-b border-[#0d3228] bg-[#031612] p-2">
-                          <label className="relative flex h-14 w-full items-center rounded-2xl bg-[#0a2a22] px-4">
-                            <span className="text-[#6cb9a2]">
-                              <DashboardIcon name="search" className="h-5 w-5" />
-                            </span>
-                            <input
-                              type="text"
-                              autoFocus
-                              value={searchQuery}
-                              onChange={(e) => handleSearchChange(e.target.value)}
-                              placeholder="Tìm bạn bè..."
-                              className="font-ui-content ml-3 w-full bg-transparent text-[1.05rem] text-[#defaee] outline-none placeholder:text-[#5d8a7c]"
-                            />
-                            {searchLoading && (
-                              <span className="ml-3 h-5 w-5 animate-spin rounded-full border-2 border-[#30d7ab] border-t-transparent" />
-                            )}
-                            <button type="button" onClick={() => setSearchOpen(false)} className="font-ui-title ml-3 rounded-xl border border-[#1a5444] px-4 py-1.5 text-xs text-[#a4d4c3] hover:bg-[#10382d]">
-                              Đóng
-                            </button>
-                          </label>
-                        </div>
-                        
-                        {/* Search Results */}
-                        {searchResults.length > 0 ? (
-                          <div className="max-h-[60vh] overflow-y-auto p-2">
-                            {searchResults.map((user) => (
-                              <div
-                                key={user.id}
-                                className="flex items-center gap-4 rounded-2xl px-4 py-3 transition hover:bg-[#0d3228]/70"
-                              >
-                                <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-[#b0e4d2]">
-                                  {user.avatarUrl ? (
-                                    <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-xs font-bold text-[#0a2a22]">
-                                      {user.displayName.slice(0, 2).toUpperCase()}
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-ui-title truncate text-sm text-[#e4fff5]">{user.displayName}</p>
-                                  {user.username && <p className="font-ui-content truncate text-[0.7rem] text-[#8fd0bc]">@{user.username}</p>}
-                                  {user.email && <p className="font-ui-content mt-0.5 truncate text-xs text-[#79b4a2]">{user.email}</p>}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => { onViewUserProfile?.(user.id); setSearchOpen(false); }}
-                                    className="font-ui-title h-8 rounded-lg border border-[#1a5444] px-3 text-xs text-[#bbebdc] hover:bg-[#10382d] transition"
-                                  >
-                                    Xem
-                                  </button>
-                                  {sentRequests.has(user.id) ? (
-                                    <span className="font-ui-content text-xs text-[#4cf0bf]">Đã gửi</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSendFriendRequest(user.id)}
-                                      className="font-ui-title h-8 rounded-lg bg-[#2fe0b4] px-3 text-xs text-[#04342a] hover:brightness-110 transition"
-                                    >
-                                      Kết bạn
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : searchQuery.trim().length >= 2 && !searchLoading ? (
-                          <div className="px-5 py-10 text-center">
-                            <p className="font-ui-content text-sm text-[#7cb3a1]">Không tìm thấy người dùng nào phù hợp.</p>
-                          </div>
-                        ) : (
-                          <div className="px-5 py-8 text-center opacity-70">
-                            <p className="font-ui-meta text-xs text-[#7cb3a1]">Nhập ít nhất 2 ký tự để tìm kiếm người dùng</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>,
-                    document.body
-                  )}
-                </div>
+                {/* Search bar removed from Trang chủ as requested */}
 
                 {notificationSlot ?? (
                   <button type="button" className="zync-glass-subtle inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0d3128]/62 text-[#e5fff4] transition hover:bg-[#14463a]/72">
@@ -371,15 +270,17 @@ export function HomeDashboardScreen({
             </header>
           )}
 
-          {selectedNavId === 'chat' ? (
-            <div className="mt-1 flex min-h-0 w-full flex-1">{chatSlot}</div>
-          ) : selectedNavId === 'settings' ? (
-            <div className="mt-1">{settingsSlot}</div>
-          ) : selectedNavId === 'profile' ? (
-            <div className="mt-5">{profileSlot}</div>
-          ) : selectedNavId === 'friends' ? (
-            <div className="flex min-h-0 w-full flex-1">{friendsSlot}</div>
-          ) : (
+          {/* Scrollable Content Wrapper */}
+          <div className={`flex-1 ${selectedNavId === 'chat' || selectedNavId === 'friends' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-3 pb-20 sm:px-6'}`}>
+            {selectedNavId === 'chat' ? (
+              <div className="flex h-full w-full">{chatSlot}</div>
+            ) : selectedNavId === 'settings' ? (
+              <div>{settingsSlot}</div>
+            ) : selectedNavId === 'profile' ? (
+              <div className="mt-5">{profileSlot}</div>
+            ) : selectedNavId === 'friends' ? (
+              <div className="flex h-full w-full">{friendsSlot}</div>
+            ) : (
             <>
               <div className="mt-5 shrink-0">
                 {storySlot ?? (
@@ -391,7 +292,7 @@ export function HomeDashboardScreen({
                 )}
               </div>
 
-              <div className="mt-6 grid gap-4 shrink-0 xl:grid-cols-3">
+              <div className="mt-6 grid gap-4 shrink-0 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {data.stats.map((item) => (
                   <DashboardStatCard key={item.id} item={item} />
                 ))}
@@ -415,8 +316,10 @@ export function HomeDashboardScreen({
                   ))}
                 </div>
               </section>
-            </>
-          )}
+                <div className="h-10 shrink-0" tabIndex={-1} />
+              </>
+            )}
+          </div>
 
         </section>
       </div>
