@@ -224,6 +224,28 @@ describe('mute/unmute', () => {
     const muted = await isConversationMuted(TEST_USER, TEST_CONV);
     expect(muted).toBe(false);
   });
+
+  it('muteConversation() should mark existing notifications in that conversation as read', async () => {
+    await createNotification(TEST_USER, 'new_message', 'T1', 'B1', undefined, TEST_CONV);
+    await createNotification(TEST_USER, 'new_message', 'T2', 'B2', undefined, TEST_CONV);
+    await createNotification(TEST_USER, 'new_message', 'T3', 'B3', undefined, 'conv-other');
+
+    await muteConversation(TEST_USER, TEST_CONV);
+
+    const unreadInMutedConv = await NotificationModel.countDocuments({
+      userId: TEST_USER,
+      conversationId: TEST_CONV,
+      read: false,
+    });
+    const unreadOtherConv = await NotificationModel.countDocuments({
+      userId: TEST_USER,
+      conversationId: 'conv-other',
+      read: false,
+    });
+
+    expect(unreadInMutedConv).toBe(0);
+    expect(unreadOtherConv).toBe(1);
+  });
 });
 
 // ─── getPreferences / updatePreferences ─────────────────────────────────────
