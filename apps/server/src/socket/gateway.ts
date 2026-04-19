@@ -124,9 +124,17 @@ export function emitNotification(
 }
 
 export function initSocketGateway(httpServer: HttpServer): Server {
+  const configuredCorsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const isLanMode = process.env['NODE_ENV'] !== 'production'
+    && process.env['HOST'] === '0.0.0.0';
+  const socketCorsOrigin = isLanMode ? true : configuredCorsOrigins;
+
   const io = new Server(httpServer, {
     cors: {
-      origin: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001').split(','),
+      origin: socketCorsOrigin,
       credentials: true,
     },
     transports: ['websocket', 'polling'],

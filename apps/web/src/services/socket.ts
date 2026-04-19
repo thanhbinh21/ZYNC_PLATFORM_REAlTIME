@@ -4,6 +4,39 @@ import { io, type Socket } from 'socket.io-client';
 let socket: Socket | null = null;
 let currentToken: string | null = null;
 
+function resolveWebSocketUrl(): string {
+  const explicitUrl = process.env['NEXT_PUBLIC_WS_URL'];
+  if (explicitUrl && typeof window === 'undefined') {
+    return explicitUrl;
+  }
+
+  if (typeof window !== 'undefined') {
+    if (explicitUrl) {
+      try {
+        const explicit = new URL(explicitUrl);
+        const currentHost = window.location.hostname;
+        const isExplicitLocal = explicit.hostname === 'localhost' || explicit.hostname === '127.0.0.1';
+        const isCurrentLocal = currentHost === 'localhost' || currentHost === '127.0.0.1';
+
+        if (!isExplicitLocal || isCurrentLocal) {
+          return explicitUrl;
+        }
+
+        const protocol = explicit.protocol === 'wss:' ? 'wss:' : 'ws:';
+        const port = explicit.port || '3000';
+        return `${protocol}//${currentHost}:${port}`;
+      } catch {
+        return explicitUrl;
+      }
+    }
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}//${window.location.hostname}:3000`;
+  }
+
+  return 'ws://localhost:3000';
+}
+
 /**
  * Task 10.1: Initialize Socket.IO client with JWT auth
  * Auto-reconnect with exponential backoff
@@ -31,7 +64,7 @@ export function getSocket(token: string): Socket {
 
   currentToken = token;
 
-  socket = io(process.env['NEXT_PUBLIC_WS_URL'] ?? 'ws://localhost:3000', {
+  socket = io(resolveWebSocketUrl(), {
     auth: { token },
     transports: ['websocket', 'polling'],
     autoConnect: true,

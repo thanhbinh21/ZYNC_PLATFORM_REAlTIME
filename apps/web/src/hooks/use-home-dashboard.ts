@@ -154,6 +154,34 @@ function formatConversationPreview(lastMessage?: Conversation['lastMessage']): s
 }
 
 const REACTION_ACK_TIMEOUT_MS = 8000;
+const WEBRTC_INSECURE_CONTEXT_MESSAGE = 'Khong the chia se camera/man hinh va dong bo WebRTC khi truy cap bang HTTP LAN. Vui long dung https:// hoac localhost.';
+const LAN_DEMO_WARN_ENABLED = process.env['NEXT_PUBLIC_LAN_DEMO_WARN'] === 'true';
+
+function getWebRtcInsecureContextMessage(): string | null {
+  if (!LAN_DEMO_WARN_ENABLED) {
+    return null;
+  }
+
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const host = window.location.hostname;
+  const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  if (window.isSecureContext || isLocalhost) {
+    return null;
+  }
+
+  return WEBRTC_INSECURE_CONTEXT_MESSAGE;
+}
+
+function resolveCallMediaErrorMessage(error: unknown, fallbackMessage: string): string {
+  if (error instanceof Error && error.message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
+    return WEBRTC_INSECURE_CONTEXT_MESSAGE;
+  }
+
+  return fallbackMessage;
+}
 
 interface PendingReactionRequest {
   requestId: string;
@@ -224,6 +252,13 @@ export function useHomeDashboard() {
     participantIds: string[];
     participantDisplayNames: Record<string, string>;
   } | null>(null);
+
+  const notifyCallBlockingIssue = useCallback((message: string) => {
+    setCallError(message);
+    if (typeof window !== 'undefined') {
+      window.alert(message);
+    }
+  }, []);
 
   const resolvePeerInfo = useCallback((peerUserId: string): { displayName: string; conversationId?: string } => {
     const matchedConversation = conversations.find((conversation) => {
@@ -516,6 +551,11 @@ export function useHomeDashboard() {
   }, [ensurePeerConnection, userId]);
 
   const ensureLocalMedia = useCallback(async (cameraEnabled: boolean = true) => {
+    const insecureContextMessage = getWebRtcInsecureContextMessage();
+    if (insecureContextMessage) {
+      throw new Error(insecureContextMessage);
+    }
+
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       return;
     }
@@ -1857,8 +1897,8 @@ export function useHomeDashboard() {
               await flushPendingRemoteCandidates(peerUserId, connection);
             }));
           })
-          .catch(() => {
-            setCallError('Không thể truy cập camera hoặc microphone.');
+          .catch((error: unknown) => {
+            setCallError(resolveCallMediaErrorMessage(error, 'Khong the truy cap camera hoac microphone.'));
           });
       }
 
@@ -2100,6 +2140,12 @@ export function useHomeDashboard() {
       return;
     }
 
+    const insecureContextMessage = getWebRtcInsecureContextMessage();
+    if (insecureContextMessage) {
+      notifyCallBlockingIssue(insecureContextMessage);
+      return;
+    }
+
     clearCallResetTimer();
     closePeerConnection();
     stopRemoteMedia();
@@ -2158,8 +2204,16 @@ export function useHomeDashboard() {
     try {
       await ensureLocalMedia(true);
       emitInvite();
-    } catch {
-      setCallError('Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra camera và microphone.');
+    } catch (error: unknown) {
+      const message = resolveCallMediaErrorMessage(
+        error,
+        'Khong the bat dau cuoc goi. Vui long kiem tra camera va microphone.',
+      );
+      if (message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
+        notifyCallBlockingIssue(message);
+      } else {
+        setCallError(message);
+      }
       setActiveCall(null);
       pendingOutgoingCallRef.current = null;
       stopLocalMedia();
@@ -2169,6 +2223,7 @@ export function useHomeDashboard() {
     clearCallResetTimer,
     conversations,
     ensureLocalMedia,
+    notifyCallBlockingIssue,
     resolveParticipantDisplayNames,
     selectedConversationId,
     stopRemoteMedia,
@@ -2179,6 +2234,12 @@ export function useHomeDashboard() {
   const handleAcceptIncomingCall = useCallback(async () => {
     const current = activeCallRef.current;
     if (!current || current.direction !== 'incoming') {
+      return;
+    }
+
+    const insecureContextMessage = getWebRtcInsecureContextMessage();
+    if (insecureContextMessage) {
+      notifyCallBlockingIssue(insecureContextMessage);
       return;
     }
 
@@ -2221,8 +2282,13 @@ export function useHomeDashboard() {
           status: 'connecting',
         };
       });
-    } catch {
-      setCallError('Không thể chấp nhận cuộc gọi. Vui lòng thử lại.');
+    } catch (error: unknown) {
+      const message = resolveCallMediaErrorMessage(error, 'Khong the chap nhan cuoc goi. Vui long thu lai.');
+      if (message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
+        notifyCallBlockingIssue(message);
+      } else {
+        setCallError(message);
+      }
     }
   }, [
     attachLocalTracksToPeer,
@@ -2231,6 +2297,7 @@ export function useHomeDashboard() {
     ensureLocalMedia,
     ensurePeerConnection,
     isCameraEnabled,
+    notifyCallBlockingIssue,
     shouldCreateOfferForPeer,
     userId,
   ]);
@@ -2315,8 +2382,14 @@ export function useHomeDashboard() {
   }, []);
 
   const handleToggleScreenShare = useCallback(async () => {
+    const insecureContextMessage = getWebRtcInsecureContextMessage();
+    if (insecureContextMessage) {
+      notifyCallBlockingIssue(insecureContextMessage);
+      return;
+    }
+
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
-      setCallError('Trình duyệt không hỗ trợ chia sẻ màn hình.');
+      setCallError('Khong the chia se man hinh tren trinh duyet hien tai.');
       return;
     }
 
@@ -2342,14 +2415,19 @@ export function useHomeDashboard() {
       syncLocalPreview();
 
       displayTrack.onended = () => {
-        void ensureLocalMedia(isCameraEnabled).catch(() => {
-          setCallError('Không thể quay lại camera sau khi dừng chia sẻ màn hình.');
+        void ensureLocalMedia(isCameraEnabled).catch((error: unknown) => {
+          setCallError(resolveCallMediaErrorMessage(error, 'Khong the quay lai camera sau khi dung chia se man hinh.'));
         });
       };
-    } catch {
-      setCallError('Không thể bật chia sẻ màn hình.');
+    } catch (error: unknown) {
+      const message = resolveCallMediaErrorMessage(error, 'Khong the bat chia se man hinh.');
+      if (message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
+        notifyCallBlockingIssue(message);
+      } else {
+        setCallError(message);
+      }
     }
-  }, [ensureLocalMedia, isCameraEnabled, isScreenSharing, replacePeerVideoTrack, syncLocalPreview]);
+  }, [ensureLocalMedia, isCameraEnabled, isScreenSharing, notifyCallBlockingIssue, replacePeerVideoTrack, syncLocalPreview]);
 
   const disbandGroupConversation = useCallback(
     async (groupId: string) => {

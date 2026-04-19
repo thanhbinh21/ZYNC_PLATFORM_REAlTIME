@@ -133,6 +133,21 @@ npm run dev:server
 npm run dev:web
 ```
 
+For LAN demo (same Wi-Fi, keep local mode unchanged):
+
+```bash
+# Backend bind to LAN
+npm run dev:server:lan
+
+# Web bind to LAN
+npm run dev:web:lan
+
+# Mobile Expo over LAN
+npm run dev:mobile:lan
+```
+
+Then open web from another device via: `http://<YOUR_LAN_IP>:3001`.
+
 ### 6. Verify
 
 ```bash
@@ -227,7 +242,10 @@ Run from the monorepo root:
 | Script | Description |
 |--------|-------------|
 | `npm run dev:server` | Start backend in watch mode |
+| `npm run dev:server:lan` | Start backend for LAN demo (`HOST=0.0.0.0`) |
 | `npm run dev:web` | Start Next.js in dev mode |
+| `npm run dev:web:lan` | Start Next.js bound to LAN (`0.0.0.0:3001`) |
+| `npm run dev:mobile:lan` | Start Expo in LAN mode |
 | `npm run build` | Build all packages |
 | `npm run test` | Run tests across all workspaces |
 | `npm run typecheck` | TypeScript check across all workspaces |
