@@ -392,13 +392,13 @@ function getFileName(type: Message['type'], content?: string): string {
   if (isFileType(type)) {
     const encodedName = type.slice(FILE_PREFIX.length);
     try {
-      return decodeURIComponent(encodedName) || 'Tep dinh kem';
+      return decodeURIComponent(encodedName) || 'Tệp đính kèm';
     } catch {
-      return encodedName || 'Tep dinh kem';
+      return encodedName || 'Tệp đính kèm';
     }
   }
 
-  return content?.trim() || 'Tep dinh kem';
+  return content?.trim() || 'Tệp đính kèm';
 }
 
 function formatTime(dateStr: string): string {
@@ -514,7 +514,7 @@ function TypingIndicator({ typingUsers }: { typingUsers: string[] }) {
         <Animated.View style={[typingStyles.dot, { transform: [{ translateY: dot3 }] }]} />
       </View>
       <Text style={typingStyles.text}>
-        {typingUsers.length === 1 ? 'dang nhap...' : `${typingUsers.length} nguoi dang nhap...`}
+        {typingUsers.length === 1 ? 'đang nhập...' : `${typingUsers.length} người đang nhập...`}
       </Text>
     </View>
   );
@@ -540,7 +540,7 @@ function VideoMessage({
         <Ionicons name="videocam-outline" size={22} color={isMe ? '#0f172a' : '#94a3b8'} />
         <View style={bubbleStyles.fileMeta}>
           <Text style={[bubbleStyles.fileTitle, isMe && bubbleStyles.fileTitleMe]}>Video</Text>
-          <Text style={[bubbleStyles.fileAction, isMe && bubbleStyles.fileActionMe]}>Khong co lien ket</Text>
+          <Text style={[bubbleStyles.fileAction, isMe && bubbleStyles.fileActionMe]}>Không có liên kết</Text>
         </View>
       </View>
     );
@@ -574,7 +574,7 @@ function VideoMessage({
         style={[bubbleStyles.videoOpenBtn, isMe && bubbleStyles.videoOpenBtnMe]}
       >
         <Ionicons name="open-outline" size={14} color={isMe ? '#0f172a' : '#a5f3fc'} />
-        <Text style={[bubbleStyles.videoOpenText, isMe && bubbleStyles.videoOpenTextMe]}>Mo toan man hinh</Text>
+        <Text style={[bubbleStyles.videoOpenText, isMe && bubbleStyles.videoOpenTextMe]}>Mở toàn màn hình</Text>
       </TouchableOpacity>
     </View>
   );
@@ -908,7 +908,7 @@ export default function ChatRoomScreen() {
       }
     } catch (err) {
       console.error('Upload group avatar failed:', err);
-      openInfoDialog('Thong bao', 'Khong the tai len anh nhom. Vui long thu lai.', 'error');
+      openInfoDialog('Thông báo', 'Không thể tải lên ảnh nhóm. Vui lòng thử lại.', 'error');
     } finally {
       setIsUploadingGroupAvatar(false);
     }
@@ -946,7 +946,7 @@ export default function ChatRoomScreen() {
       router.setParams({ avatarUrl: updatedAvatar });
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      openInfoDialog('Khong the cap nhat anh nhom', typeof message === 'string' ? message : 'Vui long thu lai.', 'error');
+      openInfoDialog('Không thể cập nhật ảnh nhóm', typeof message === 'string' ? message : 'Vui lòng thử lại.', 'error');
     } finally {
       setIsUploadingGroupAvatar(false);
     }
@@ -990,7 +990,7 @@ export default function ChatRoomScreen() {
       router.setParams({ name: nextName, avatarUrl: nextAvatar || '' });
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      openInfoDialog('Khong the cap nhat nhom', typeof message === 'string' ? message : 'Vui long thu lai.', 'error');
+      openInfoDialog('Không thể cập nhật nhóm', typeof message === 'string' ? message : 'Vui lòng thử lại.', 'error');
     } finally {
       setIsSavingGroupInfo(false);
     }
@@ -1021,7 +1021,7 @@ export default function ChatRoomScreen() {
     } catch (err: any) {
       setIsConversationPinned(!nextPinned);
       const message = err?.response?.data?.message;
-      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat ghim hoi thoai.', 'error');
+      openInfoDialog('Thông báo', typeof message === 'string' ? message : 'Không thể cập nhật ghim hội thoại.', 'error');
     }
   }, [conversationId, isConversationPinned]);
 
@@ -1042,10 +1042,10 @@ export default function ChatRoomScreen() {
     try {
       await api.post(`/notifications/mute/${conversationId}`, { until: untilDate.toISOString() });
       setConversationMutedUntil(untilDate);
-      openInfoDialog('Thong bao', 'Da tat thong bao hoi thoai.');
+      openInfoDialog('Thông báo', 'Đã tắt thông báo hội thoại.');
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the tat thong bao hoi thoai.', 'error');
+      openInfoDialog('Thông báo', typeof message === 'string' ? message : 'Không thể tắt thông báo hội thoại.', 'error');
     }
   }, [conversationId]);
 
@@ -1061,10 +1061,10 @@ export default function ChatRoomScreen() {
     try {
       await api.delete(`/notifications/mute/${conversationId}`);
       setConversationMutedUntil(null);
-      openInfoDialog('Thong bao', 'Da bat lai thong bao.');
+      openInfoDialog('Thông báo', 'Đã bật lại thông báo.');
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the bat thong bao.', 'error');
+      openInfoDialog('Thông báo', typeof message === 'string' ? message : 'Không thể bật thông báo.', 'error');
     }
   }, [conversationId]);
 
@@ -1074,8 +1074,8 @@ export default function ChatRoomScreen() {
     }
 
     openConfirmDialog(
-      'Roi nhom',
-      'Ban co chac muon roi nhom nay?',
+      'Rời nhóm',
+      'Bạn có chắc muốn rời nhóm này?',
       () => {
         void (async () => {
           try {
@@ -1084,11 +1084,11 @@ export default function ChatRoomScreen() {
             router.back();
           } catch (err: any) {
             const message = err?.response?.data?.message;
-            openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the roi nhom luc nay.', 'error');
+            openInfoDialog('Thông báo', typeof message === 'string' ? message : 'Không thể rời nhóm lúc này.', 'error');
           }
         })();
       },
-      'Roi nhom',
+      'Rời nhóm',
     );
   }, [conversationId, isGroupChat, router]);
 
@@ -1101,10 +1101,10 @@ export default function ChatRoomScreen() {
       setIsUpdatingMemberRole(true);
       const response = await api.patch(`/groups/${conversationId}/members/${memberId}/role`, { role });
       applyGroupMeta(response.data?.data);
-      openInfoDialog('Thong bao', role === 'admin' ? 'Da gan quyen quan tri vien.' : 'Da go quyen quan tri vien.');
+      openInfoDialog('Thông báo', role === 'admin' ? 'Đã gán quyền quản trị viên.' : 'Đã gỡ quyền quản trị viên.');
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat quyen thanh vien.', 'error');
+      openInfoDialog('Thông báo', typeof message === 'string' ? message : 'Không thể cập nhật quyền thành viên.', 'error');
     } finally {
       setIsUpdatingMemberRole(false);
     }
@@ -1116,24 +1116,24 @@ export default function ChatRoomScreen() {
     }
 
     openConfirmDialog(
-      'Xoa thanh vien',
-      `Ban co chac muon xoa ${memberDisplayName} khoi nhom?`,
+      'Xóa thành viên',
+      `Bạn có chắc muốn xóa ${memberDisplayName} khỏi nhóm?`,
       () => {
         void (async () => {
           try {
             setIsUpdatingMemberRole(true);
             const response = await api.delete(`/groups/${conversationId}/members/${memberId}`);
             applyGroupMeta(response.data?.data);
-            openInfoDialog('Thong bao', 'Da xoa thanh vien khoi nhom.');
+            openInfoDialog('Thông báo', 'Đã xóa thành viên khỏi nhóm.');
           } catch (err: any) {
             const message = err?.response?.data?.message;
-            openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the xoa thanh vien luc nay.', 'error');
+            openInfoDialog('Thông báo', typeof message === 'string' ? message : 'Không thể xóa thành viên lúc này.', 'error');
           } finally {
             setIsUpdatingMemberRole(false);
           }
         })();
       },
-      'Xoa',
+      'Xóa',
     );
   }, [applyGroupMeta, conversationId, isGroupChat]);
   const getReactionUserStateForMessage = useCallback((message: Message) => {
@@ -1766,14 +1766,14 @@ export default function ChatRoomScreen() {
       }
 
       if (payload.type === 'disbanded') {
-        openInfoDialog('Thong bao', 'Nhom da giai tan.', 'info', () => {
+        openInfoDialog('Thông báo', 'Nhóm đã giải tán.', 'info', () => {
           router.back();
         });
         return;
       }
 
       if (payload.type === 'member_removed' && payload.data?.userId === userId) {
-        openInfoDialog('Thong bao', 'Ban da roi khoi nhom nay.', 'info', () => {
+        openInfoDialog('Thông báo', 'Bạn đã rời khỏi nhóm này.', 'info', () => {
           router.back();
         });
         return;
@@ -2059,7 +2059,7 @@ export default function ChatRoomScreen() {
             ),
           );
           setPendingMediaSend(null);
-          openInfoDialog('Thong bao', 'Tai media that bai. Vui long thu lai.', 'error');
+          openInfoDialog('Thông báo', 'Tải media thất bại. Vui lòng thử lại.', 'error');
         } finally {
           setIsUploadingMedia(false);
         }
@@ -2213,7 +2213,7 @@ export default function ChatRoomScreen() {
 
               {isRecalled ? (
                 <Text style={[bubbleStyles.msgText, bubbleStyles.recallText, isMe && bubbleStyles.recallTextMe]}>
-                  {isMe ? 'Ban da thu hoi tin nhan' : 'Tin nhan da duoc thu hoi'}
+                  {isMe ? 'Bạn đã thu hồi tin nhắn' : 'Tin nhắn đã được thu hồi'}
                 </Text>
               ) : message.type === 'text' && message.content ? (
                 <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
@@ -2249,7 +2249,7 @@ export default function ChatRoomScreen() {
                       {fileName}
                     </Text>
                     <Text style={[bubbleStyles.fileAction, isMe && bubbleStyles.fileActionMe]}>
-                      {message.mediaUrl ? 'Mo tep' : 'Khong co lien ket'}
+                      {message.mediaUrl ? 'Mở tệp' : 'Không có liên kết'}
                     </Text>
                   </View>
                 </Pressable>
@@ -2379,9 +2379,13 @@ export default function ChatRoomScreen() {
               <TouchableOpacity
                 style={styles.headerAvatar}
                 onPress={() => {
-                  void handleHeaderAvatarPress();
+                  if (isGroupChat) {
+                    void handleHeaderAvatarPress();
+                    return;
+                  }
+                  openGroupInfoEditor();
                 }}
-                disabled={!isGroupChat || isSavingGroupInfo || isUploadingGroupAvatar}
+                disabled={isSavingGroupInfo || isUploadingGroupAvatar}
               >
                 {conversationAvatarUrl ? (
                   <Image source={{ uri: conversationAvatarUrl }} style={styles.headerAvatarImage} resizeMode="cover" />
@@ -2393,15 +2397,15 @@ export default function ChatRoomScreen() {
               </TouchableOpacity>
               <View>
                 <TouchableOpacity
-                  onPress={isGroupChat ? openGroupInfoEditor : undefined}
-                  disabled={!isGroupChat || isSavingGroupInfo}
+                  onPress={openGroupInfoEditor}
+                  disabled={isSavingGroupInfo}
                 >
                   <Text style={styles.headerName} numberOfLines={1}>
                     {conversationName || 'Chat'}
                   </Text>
                 </TouchableOpacity>
                 {typingUsers.length > 0 ? (
-                  <Text style={styles.headerStatus}>dang nhap...</Text>
+                  <Text style={styles.headerStatus}>đang nhập...</Text>
                 ) : (
                   <Text style={styles.headerStatus}>Online</Text>
                 )}
@@ -2416,8 +2420,7 @@ export default function ChatRoomScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionIcon}
-                onPress={isGroupChat ? openGroupInfoEditor : undefined}
-                disabled={!isGroupChat}
+                onPress={openGroupInfoEditor}
               >
                 <Ionicons name="information-circle-outline" size={22} color="#10b981" />
               </TouchableOpacity>
@@ -2427,7 +2430,7 @@ export default function ChatRoomScreen() {
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Dang tai tin nhan...</Text>
+              <Text style={styles.loadingText}>Đang tải tin nhắn...</Text>
             </View>
           ) : (
             <FlatList
@@ -2471,8 +2474,8 @@ export default function ChatRoomScreen() {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Ionicons name="chatbubble-ellipses-outline" size={64} color="#334155" />
-                  <Text style={styles.emptyText}>Chua co tin nhan nao</Text>
-                  <Text style={styles.emptySubtext}>Hay gui loi chao dau tien!</Text>
+                  <Text style={styles.emptyText}>Chưa có tin nhắn nào</Text>
+                  <Text style={styles.emptySubtext}>Hãy gửi lời chào đầu tiên!</Text>
                 </View>
               }
             />
@@ -2486,7 +2489,23 @@ export default function ChatRoomScreen() {
           >
             <View style={styles.groupModalOverlay}>
               <View style={styles.groupModalCard}>
-                <Text style={styles.groupModalTitle}>Cap nhat nhom</Text>
+                <Text style={styles.groupModalTitle}>{isGroupChat ? 'Thông tin nhóm' : 'Thông tin hội thoại'}</Text>
+
+                {!isGroupChat && (
+                  <View style={styles.directInfoCard}>
+                    <View style={styles.directInfoAvatarWrap}>
+                      {conversationAvatarUrl ? (
+                        <Image source={{ uri: conversationAvatarUrl }} style={styles.directInfoAvatar} resizeMode="cover" />
+                      ) : (
+                        <Text style={styles.directInfoAvatarText}>
+                          {(conversationName || 'C').charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.directInfoName} numberOfLines={1}>{conversationName || 'Hội thoại'}</Text>
+                    <Text style={styles.directInfoMeta}>Hội thoại cá nhân</Text>
+                  </View>
+                )}
 
                 <View style={styles.groupActionRow}>
                   <TouchableOpacity
@@ -2500,7 +2519,7 @@ export default function ChatRoomScreen() {
                     }}
                   >
                     <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#d1fae5" />
-                    <Text style={styles.groupActionText}>{conversationMutedUntil ? 'Bat thong bao' : 'Tat thong bao'}</Text>
+                    <Text style={styles.groupActionText}>{conversationMutedUntil ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -2510,7 +2529,7 @@ export default function ChatRoomScreen() {
                     }}
                   >
                     <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#d1fae5" />
-                    <Text style={styles.groupActionText}>{isConversationPinned ? 'Bo ghim' : 'Ghim hoi thoai'}</Text>
+                    <Text style={styles.groupActionText}>{isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -2523,7 +2542,7 @@ export default function ChatRoomScreen() {
                     }}
                   >
                     <Ionicons name="images-outline" size={18} color="#d1fae5" />
-                    <Text style={styles.groupActionText}>Anh/Video</Text>
+                    <Text style={styles.groupActionText}>Ảnh/Video</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -2534,46 +2553,50 @@ export default function ChatRoomScreen() {
                     }}
                   >
                     <Ionicons name="document-text-outline" size={18} color="#d1fae5" />
-                    <Text style={styles.groupActionText}>Files</Text>
+                    <Text style={styles.groupActionText}>File</Text>
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.groupAvatarPicker}
-                  onPress={() => {
-                    void handlePickGroupAvatar();
-                  }}
-                  disabled={isUploadingGroupAvatar || isSavingGroupInfo}
-                >
-                  {groupAvatarDraft ? (
-                    <Image source={{ uri: groupAvatarDraft }} style={styles.groupAvatarPreview} resizeMode="cover" />
-                  ) : (
-                    <Text style={styles.groupAvatarPlaceholder}>
-                      {(groupNameDraft || conversationName || 'N').charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                  <View style={styles.groupAvatarCameraBadge}>
-                    {isUploadingGroupAvatar ? (
-                      <ActivityIndicator size="small" color="#0f172a" />
-                    ) : (
-                      <Ionicons name="camera-outline" size={14} color="#0f172a" />
-                    )}
-                  </View>
-                </TouchableOpacity>
+                {isGroupChat && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.groupAvatarPicker}
+                      onPress={() => {
+                        void handlePickGroupAvatar();
+                      }}
+                      disabled={isUploadingGroupAvatar || isSavingGroupInfo}
+                    >
+                      {groupAvatarDraft ? (
+                        <Image source={{ uri: groupAvatarDraft }} style={styles.groupAvatarPreview} resizeMode="cover" />
+                      ) : (
+                        <Text style={styles.groupAvatarPlaceholder}>
+                          {(groupNameDraft || conversationName || 'N').charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                      <View style={styles.groupAvatarCameraBadge}>
+                        {isUploadingGroupAvatar ? (
+                          <ActivityIndicator size="small" color="#0f172a" />
+                        ) : (
+                          <Ionicons name="camera-outline" size={14} color="#0f172a" />
+                        )}
+                      </View>
+                    </TouchableOpacity>
 
-                <TextInput
-                  style={styles.groupNameInput}
-                  value={groupNameDraft}
-                  onChangeText={setGroupNameDraft}
-                  placeholder="Nhap ten nhom"
-                  placeholderTextColor="#6b7280"
-                  maxLength={100}
-                  editable={!isSavingGroupInfo}
-                />
+                    <TextInput
+                      style={styles.groupNameInput}
+                      value={groupNameDraft}
+                      onChangeText={setGroupNameDraft}
+                      placeholder="Nhập tên nhóm"
+                      placeholderTextColor="#7eb5a2"
+                      maxLength={100}
+                      editable={!isSavingGroupInfo}
+                    />
+                  </>
+                )}
 
                 {isGroupChat && (
                   <View style={styles.memberRoleSection}>
-                    <Text style={styles.memberRoleTitle}>Thanh vien nhom</Text>
+                    <Text style={styles.memberRoleTitle}>Thành viên nhóm</Text>
                     <ScrollView style={styles.memberRoleList} nestedScrollEnabled>
                       {groupMembers.map((member) => {
                         const isCreator = groupCreatorId === member._id;
@@ -2583,10 +2606,10 @@ export default function ChatRoomScreen() {
                           <View key={member._id} style={styles.memberRoleItem}>
                             <View style={styles.memberRoleInfo}>
                               <Text style={styles.memberRoleName} numberOfLines={1}>
-                                {member.displayName}{isMe ? ' (Ban)' : ''}
+                                {member.displayName}{isMe ? ' (Bạn)' : ''}
                               </Text>
                               <Text style={styles.memberRoleMeta}>
-                                {isCreator ? 'Truong nhom' : isAdmin ? 'Quan tri vien' : 'Thanh vien'}
+                                {isCreator ? 'Trưởng nhóm' : isAdmin ? 'Quản trị viên' : 'Thành viên'}
                               </Text>
                             </View>
                             {canManageMemberRoles && !isCreator && (
@@ -2598,7 +2621,7 @@ export default function ChatRoomScreen() {
                                   }}
                                   disabled={isUpdatingMemberRole}
                                 >
-                                  <Text style={styles.memberRoleActionText}>{isAdmin ? 'Go quyen' : 'Gan quyen'}</Text>
+                                  <Text style={styles.memberRoleActionText}>{isAdmin ? 'Gỡ quyền' : 'Gán quyền'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                   style={styles.memberRemoveAction}
@@ -2607,7 +2630,7 @@ export default function ChatRoomScreen() {
                                   }}
                                   disabled={isUpdatingMemberRole}
                                 >
-                                  <Text style={styles.memberRemoveActionText}>Xoa</Text>
+                                  <Text style={styles.memberRemoveActionText}>Xóa</Text>
                                 </TouchableOpacity>
                               </View>
                             )}
@@ -2624,26 +2647,28 @@ export default function ChatRoomScreen() {
                     onPress={() => setIsGroupInfoOpen(false)}
                     disabled={isSavingGroupInfo}
                   >
-                    <Text style={styles.groupModalCancelText}>Huy</Text>
+                    <Text style={styles.groupModalCancelText}>Đóng</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.groupModalButton, styles.groupModalSaveButton, isSavingGroupInfo && { opacity: 0.7 }]}
-                    onPress={() => {
-                      void handleSaveGroupInfo();
-                    }}
-                    disabled={isSavingGroupInfo || isUploadingGroupAvatar}
-                  >
-                    {isSavingGroupInfo ? (
-                      <ActivityIndicator size="small" color="#0f172a" />
-                    ) : (
-                      <Text style={styles.groupModalSaveText}>Luu</Text>
-                    )}
-                  </TouchableOpacity>
+                  {isGroupChat && (
+                    <TouchableOpacity
+                      style={[styles.groupModalButton, styles.groupModalSaveButton, isSavingGroupInfo && { opacity: 0.7 }]}
+                      onPress={() => {
+                        void handleSaveGroupInfo();
+                      }}
+                      disabled={isSavingGroupInfo || isUploadingGroupAvatar}
+                    >
+                      {isSavingGroupInfo ? (
+                        <ActivityIndicator size="small" color="#0f172a" />
+                      ) : (
+                        <Text style={styles.groupModalSaveText}>Lưu</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {isGroupChat && (
                   <TouchableOpacity style={styles.leaveGroupButton} onPress={() => { void handleLeaveGroup(); }}>
-                    <Text style={styles.leaveGroupText}>Roi nhom</Text>
+                    <Text style={styles.leaveGroupText}>Rời nhóm</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -2736,22 +2761,22 @@ export default function ChatRoomScreen() {
             <View style={styles.groupModalOverlay}>
               <View style={[styles.groupModalCard, styles.archiveModalCard]}>
                 <View style={styles.archiveHeaderRow}>
-                  <Text style={styles.groupModalTitle}>Kho luu tru</Text>
+                  <Text style={styles.groupModalTitle}>Kho lưu trữ</Text>
                   <TouchableOpacity onPress={() => setIsArchiveOpen(false)}>
-                    <Text style={styles.groupModalCancelText}>Dong</Text>
+                    <Text style={styles.groupModalCancelText}>Đóng</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.archiveTabRow}>
-                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'media' && styles.archiveTabActive]} onPress={() => setArchiveTab('media')}><Text style={styles.archiveTabText}>Anh/Video</Text></TouchableOpacity>
-                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'files' && styles.archiveTabActive]} onPress={() => setArchiveTab('files')}><Text style={styles.archiveTabText}>Files</Text></TouchableOpacity>
-                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'links' && styles.archiveTabActive]} onPress={() => setArchiveTab('links')}><Text style={styles.archiveTabText}>Links</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'media' && styles.archiveTabActive]} onPress={() => setArchiveTab('media')}><Text style={styles.archiveTabText}>Ảnh/Video</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'files' && styles.archiveTabActive]} onPress={() => setArchiveTab('files')}><Text style={styles.archiveTabText}>File</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.archiveTab, archiveTab === 'links' && styles.archiveTabActive]} onPress={() => setArchiveTab('links')}><Text style={styles.archiveTabText}>Liên kết</Text></TouchableOpacity>
                 </View>
 
                 <ScrollView style={styles.archiveBody}>
                   {archiveTab === 'media' && (
                     <View style={styles.archiveMediaGrid}>
-                      {allMediaItems.length === 0 && <Text style={styles.archiveEmptyText}>Chua co anh/video.</Text>}
+                      {allMediaItems.length === 0 && <Text style={styles.archiveEmptyText}>Chưa có ảnh/video.</Text>}
                       {allMediaItems.map((item) => (
                         <TouchableOpacity key={item._id} style={styles.archiveMediaItem} onPress={() => handleOpenMedia(item.mediaUrl)}>
                           {item.type === 'image' ? (
@@ -2766,10 +2791,10 @@ export default function ChatRoomScreen() {
 
                   {archiveTab === 'files' && (
                     <View style={styles.archiveList}>
-                      {allFileItems.length === 0 && <Text style={styles.archiveEmptyText}>Chua co file nao.</Text>}
+                      {allFileItems.length === 0 && <Text style={styles.archiveEmptyText}>Chưa có file nào.</Text>}
                       {allFileItems.map((item) => (
                         <TouchableOpacity key={item._id} style={styles.archiveListItem} onPress={() => handleOpenMedia(item.mediaUrl)}>
-                          <Text style={styles.archiveListText}>{item.content || 'Tep dinh kem'}</Text>
+                          <Text style={styles.archiveListText}>{getFileName(item.type, item.content)}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -2777,7 +2802,7 @@ export default function ChatRoomScreen() {
 
                   {archiveTab === 'links' && (
                     <View style={styles.archiveList}>
-                      {allLinkItems.length === 0 && <Text style={styles.archiveEmptyText}>Chua co link nao.</Text>}
+                      {allLinkItems.length === 0 && <Text style={styles.archiveEmptyText}>Chưa có liên kết nào.</Text>}
                       {allLinkItems.map((item) => (
                         <TouchableOpacity key={item._id} style={styles.archiveListItem} onPress={() => {
                           const content = item.content || '';
@@ -2801,8 +2826,8 @@ export default function ChatRoomScreen() {
           >
             <View style={styles.groupModalOverlay}>
               <View style={styles.dialogCard}>
-                <Text style={styles.dialogTitle}>Tat thong bao</Text>
-                <Text style={styles.dialogMessage}>Chon thoi gian tat thong bao hoi thoai:</Text>
+                <Text style={styles.dialogTitle}>Tắt thông báo</Text>
+                <Text style={styles.dialogMessage}>Chọn thời gian tắt thông báo hội thoại:</Text>
 
                 <View style={styles.dialogActionsColumn}>
                   <TouchableOpacity
@@ -2839,7 +2864,7 @@ export default function ChatRoomScreen() {
                       setIsMuteDurationModalOpen(false);
                     }}
                   >
-                    <Text style={styles.dialogOptionText}>Cho den khi toi bat lai</Text>
+                    <Text style={styles.dialogOptionText}>Cho đến khi tôi bật lại</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -2928,20 +2953,20 @@ export default function ChatRoomScreen() {
                 ) : (
                   <View style={styles.mediaDraftVideoCard}>
                     <Ionicons name="videocam-outline" size={18} color="#cbd5e1" />
-                    <Text style={styles.mediaDraftVideoText}>Video da chon</Text>
+                    <Text style={styles.mediaDraftVideoText}>Video đã chọn</Text>
                   </View>
                 )}
 
                 <View style={styles.mediaDraftMeta}>
                   <Text style={styles.mediaDraftTitle} numberOfLines={1}>
-                    {pendingMediaDraft.messageType === 'image' ? 'Anh dinh kem' : 'Video dinh kem'}
+                    {pendingMediaDraft.messageType === 'image' ? 'Ảnh đính kèm' : 'Video đính kèm'}
                   </Text>
                   <Text style={styles.mediaDraftStatus}>
                     {pendingMediaSend
                       ? isUploadingMedia
-                        ? 'Dang tai sau khi gui'
-                        : 'Dang gui tin nhan'
-                      : 'San sang gui'}
+                        ? 'Đang tải sau khi gửi'
+                        : 'Đang gửi tin nhắn'
+                      : 'Sẵn sàng gửi'}
                   </Text>
                 </View>
 
@@ -3035,7 +3060,7 @@ export default function ChatRoomScreen() {
               <View style={styles.inputWrapper}>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Nhap tin nhan..."
+                  placeholder="Nhập tin nhắn..."
                   placeholderTextColor={colors.textMuted}
                   value={inputText}
                   onChangeText={handleTextChange}
@@ -3892,9 +3917,9 @@ const styles = StyleSheet.create({
   groupModalCard: {
     width: '100%',
     borderRadius: 18,
-    backgroundColor: colors.glassPanelStrong,
+    backgroundColor: '#05261e',
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: '#1d5a48',
     padding: 18,
     alignItems: 'center',
   },
@@ -3908,7 +3933,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#24364b',
+    backgroundColor: '#245948',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -3938,22 +3963,63 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-    color: colors.text,
+    borderColor: '#1d5b4a',
+    color: '#d7f6eb',
     fontSize: 15,
     fontFamily: 'BeVietnamPro_500Medium',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
-    backgroundColor: colors.glassStrong,
+    backgroundColor: '#0b3b2f',
+  },
+  directInfoCard: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#175443',
+    backgroundColor: '#072d24',
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  directInfoAvatarWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#245948',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  directInfoAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  directInfoAvatarText: {
+    color: '#d6fbee',
+    fontSize: 24,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  directInfoName: {
+    color: '#e2fff4',
+    fontSize: 16,
+    fontFamily: 'BeVietnamPro_700Bold',
+    maxWidth: '90%',
+  },
+  directInfoMeta: {
+    marginTop: 2,
+    color: '#8abfab',
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_500Medium',
   },
   memberRoleSection: {
     width: '100%',
     marginBottom: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#23415f',
-    backgroundColor: '#0f1f30',
+    borderColor: '#175443',
+    backgroundColor: '#072d24',
     padding: 10,
   },
   memberRoleTitle: {
@@ -3971,8 +4037,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1f3a56',
-    backgroundColor: '#13263b',
+    borderColor: '#175443',
+    backgroundColor: '#0d3a2f',
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -3988,14 +4054,14 @@ const styles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   memberRoleMeta: {
-    color: '#94a3b8',
+    color: '#8cc4b0',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_500Medium',
     marginTop: 2,
   },
   memberRoleAction: {
     borderRadius: 8,
-    backgroundColor: '#1b7058',
+    backgroundColor: '#1f7a60',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -4005,13 +4071,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   memberRoleActionText: {
-    color: '#d1fae5',
+    color: '#e6fff5',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   memberRemoveAction: {
     borderRadius: 8,
-    backgroundColor: '#7f1d1d',
+    backgroundColor: '#4a1e1e',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -4033,13 +4099,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   groupModalCancelButton: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#0f4335',
   },
   groupModalSaveButton: {
-    backgroundColor: '#34d399',
+    backgroundColor: '#1f7a60',
   },
   groupModalCancelText: {
-    color: '#cbd5e1',
+    color: '#b8ebdb',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
@@ -4057,16 +4123,16 @@ const styles = StyleSheet.create({
   groupActionItem: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#13263b',
+    backgroundColor: '#0f4335',
     borderWidth: 1,
-    borderColor: '#23415f',
+    borderColor: '#175443',
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   groupActionText: {
-    color: colors.text,
+    color: '#c7f4e6',
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
     textAlign: 'center',
@@ -4178,12 +4244,12 @@ const styles = StyleSheet.create({
   archiveTab: {
     flex: 1,
     borderRadius: 10,
-    backgroundColor: '#13263b',
+    backgroundColor: '#0f4335',
     paddingVertical: 8,
     alignItems: 'center',
   },
   archiveTabActive: {
-    backgroundColor: '#1b7058',
+    backgroundColor: '#1f7a60',
   },
   archiveTabText: {
     color: '#d1fae5',
@@ -4219,19 +4285,19 @@ const styles = StyleSheet.create({
   },
   archiveListItem: {
     borderRadius: 8,
-    backgroundColor: '#13263b',
+    backgroundColor: '#0f4335',
     borderWidth: 1,
-    borderColor: '#23415f',
+    borderColor: '#175443',
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   archiveListText: {
-    color: '#d1fae5',
+    color: '#d6f8ec',
     fontSize: 13,
     fontFamily: 'BeVietnamPro_400Regular',
   },
   archiveEmptyText: {
-    color: '#94a3b8',
+    color: '#8abfab',
     fontSize: 13,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 6,

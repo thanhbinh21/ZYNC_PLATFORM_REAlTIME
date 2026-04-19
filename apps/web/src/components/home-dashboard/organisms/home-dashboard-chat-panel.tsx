@@ -176,6 +176,24 @@ interface GroupFriendOption {
   avatarUrl?: string;
 }
 
+function getDisplayFileName(message: Message): string {
+  const messageType = String(message.type || '');
+  if (messageType.startsWith('file/')) {
+    const encodedName = messageType.slice('file/'.length);
+    try {
+      return decodeURIComponent(encodedName) || 'Tệp đính kèm';
+    } catch {
+      return encodedName || 'Tệp đính kèm';
+    }
+  }
+
+  if (typeof message.content === 'string' && message.content.trim().length > 0) {
+    return message.content;
+  }
+
+  return 'Tệp đính kèm';
+}
+
 // ==================== CONVERSATION LIST ====================
 
 interface ConversationListProps {
@@ -2140,7 +2158,7 @@ export function HomeDashboardChatPanel({
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
                       {fileItems.length > 0 ? (
                         fileItems.map((file) => {
-                          const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                          const fileName = getDisplayFileName(file);
                           return (
                             <a
                               key={file._id}
@@ -2225,7 +2243,7 @@ export function HomeDashboardChatPanel({
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
                       {fileItems.length > 0 ? (
                         fileItems.map((file) => {
-                          const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                          const fileName = getDisplayFileName(file);
                           return (
                             <a
                               key={file._id}
@@ -2286,7 +2304,7 @@ export function HomeDashboardChatPanel({
                         {allFileItems.length === 0 && <p className="text-sm text-[#8abfab]">Chưa có file nào.</p>}
                         {allFileItems.map((file) => (
                           <a key={file._id} href={file.mediaUrl} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#d6f8ec] hover:text-[#46e6b8]">
-                            {typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm'}
+                            {getDisplayFileName(file)}
                           </a>
                         ))}
                       </div>
@@ -2482,7 +2500,7 @@ export function HomeDashboardChatPanel({
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
                   {fileItems.length > 0 ? (
                     fileItems.map((file) => {
-                      const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                      const fileName = getDisplayFileName(file);
                       return (
                         <a
                           key={file._id}
@@ -2567,7 +2585,7 @@ export function HomeDashboardChatPanel({
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">File</p>
                   {fileItems.length > 0 ? (
                     fileItems.map((file) => {
-                      const fileName = typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm';
+                      const fileName = getDisplayFileName(file);
                       return (
                         <a
                           key={file._id}
@@ -2628,7 +2646,7 @@ export function HomeDashboardChatPanel({
                       {allFileItems.length === 0 && <p className="text-sm text-[#8abfab]">Chưa có file nào.</p>}
                       {allFileItems.map((file) => (
                         <a key={file._id} href={file.mediaUrl} target="_blank" rel="noreferrer" className="block rounded-lg bg-[#0f4335] px-3 py-2 text-sm text-[#d6f8ec] hover:text-[#46e6b8]">
-                          {typeof file.content === 'string' && file.content.length > 0 ? file.content : 'Tệp đính kèm'}
+                          {getDisplayFileName(file)}
                         </a>
                       ))}
                     </div>
