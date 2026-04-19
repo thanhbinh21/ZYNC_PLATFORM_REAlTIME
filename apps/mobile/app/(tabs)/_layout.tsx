@@ -3,9 +3,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { colors } from '../../src/theme/colors';
+import { NotificationsProvider } from '../../src/context/notifications-context';
 
 export default function TabLayout() {
   return (
+    <NotificationsProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -78,5 +80,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </NotificationsProvider>
   );
 }
