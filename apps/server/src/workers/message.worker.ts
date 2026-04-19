@@ -1,6 +1,6 @@
 import type { Consumer, EachMessagePayload } from 'kafkajs';
 import { createConsumer, KAFKA_TOPICS } from '../infrastructure/kafka';
-import { MessageModel, MessageType } from '../modules/messages/message.model';
+import { MessageModel, MessageType, type IReplyTo } from '../modules/messages/message.model';
 import { MessagesService } from '../modules/messages/messages.service';
 import { logger } from '../shared/logger';
 
@@ -17,6 +17,7 @@ interface RawMessage {
   type: MessageType;
   mediaUrl?: string;
   moderationWarning?: boolean;
+  replyTo?: IReplyTo;
   idempotencyKey: string;
   createdAt: string;
 }
@@ -67,6 +68,7 @@ export async function startMessageWorker(): Promise<void> {
       type: string;
       mediaUrl?: string;
       moderationWarning?: boolean;
+      replyTo?: IReplyTo;
       idempotencyKey: string;
       createdAt: Date;
     }> = [];
@@ -96,6 +98,7 @@ export async function startMessageWorker(): Promise<void> {
               msg.mediaUrl,
               msg.mockId,
               Boolean(msg.moderationWarning),
+              msg.replyTo,
             );
             successCount++;
           } catch (err) {
@@ -163,6 +166,7 @@ export async function startMessageWorker(): Promise<void> {
             type: rawMessage.type,
             mediaUrl: rawMessage.mediaUrl,
             moderationWarning: rawMessage.moderationWarning,
+            replyTo: rawMessage.replyTo,
             idempotencyKey: rawMessage.idempotencyKey,
             createdAt: new Date(rawMessage.createdAt),
           });

@@ -110,6 +110,14 @@ export function sendMessage(
   type: MessageType,
   idempotencyKey: string,
   mediaUrl?: string,
+  replyTo?: {
+    messageRef: string;
+    messageId?: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    contentPreview?: string;
+    type?: string;
+  },
 ): void {
   if (!socket?.connected) {
     throw new Error('Socket not connected');
@@ -121,6 +129,12 @@ export function sendMessage(
     type,
     mediaUrl,
     idempotencyKey,
+    replyToMessageRef: replyTo?.messageRef,
+    replyToMessageId: replyTo?.messageId,
+    replyToSenderId: replyTo?.senderId,
+    replyToSenderDisplayName: replyTo?.senderDisplayName,
+    replyToPreview: replyTo?.contentPreview,
+    replyToType: replyTo?.type,
   });
 }
 
@@ -136,6 +150,15 @@ export function listenToMessages(
     content: string;
     type: string;
     mediaUrl?: string;
+      moderationWarning?: boolean;
+      replyTo?: {
+        messageRef: string;
+        messageId?: string;
+        senderId?: string;
+        contentPreview?: string;
+        type?: string;
+        isDeleted?: boolean;
+      };
     idempotencyKey: string;
     createdAt: string;
   }) => void,
@@ -201,9 +224,16 @@ export function listenToStatusUpdates(
     messageIds?: string[];
     messageId?: string;
     idempotencyKeys?: string[];
+    conversationId?: string;
     status: 'sent' | 'delivered' | 'read';
     userId: string;
     updatedAt: string;
+    reader?: {
+      userId: string;
+      displayName: string;
+      avatarUrl?: string;
+      readAt: string;
+    };
   }) => void,
 ): void {
   if (!socket) {
@@ -657,6 +687,18 @@ export function listenToMessageDeletion(
     messageId: string;
     conversationId: string;
     deletedAt: string;
+    effectiveLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
+    unreadCount?: number;
+    lastVisibleMessage?: {
+      content: string;
+      senderId: string;
+      senderDisplayName?: string;
+      sentAt: string;
+    } | null;
   }) => void,
 ): void {
   if (!socket) {
@@ -664,16 +706,33 @@ export function listenToMessageDeletion(
     return;
   }
 
-  socket.off('message_deleted_for_me'); // prevent duplicate listeners
   socket.on('message_deleted_for_me', callback);
 }
 
 /**
  * Stop listening to message deletion events
  */
-export function unlistenToMessageDeletion(): void {
+export function unlistenToMessageDeletion(
+  callback: (data: {
+    messageId: string;
+    conversationId: string;
+    deletedAt: string;
+    effectiveLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
+    unreadCount?: number;
+    lastVisibleMessage?: {
+      content: string;
+      senderId: string;
+      senderDisplayName?: string;
+      sentAt: string;
+    } | null;
+  }) => void,
+): void {
   if (socket) {
-    socket.off('message_deleted_for_me');
+    socket.off('message_deleted_for_me', callback);
   }
 }
 
@@ -688,6 +747,11 @@ export function listenToMessageRecall(
     conversationId: string;
     recalledBy: string;
     recalledAt: string;
+    conversationLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
   }) => void,
 ): void {
   if (!socket) {
@@ -695,16 +759,28 @@ export function listenToMessageRecall(
     return;
   }
 
-  socket.off('message_recalled'); // prevent duplicate listeners
   socket.on('message_recalled', callback);
 }
 
 /**
  * Stop listening to message recall events
  */
-export function unlistenToMessageRecall(): void {
+export function unlistenToMessageRecall(
+  callback: (data: {
+    messageId: string;
+    idempotencyKey: string;
+    conversationId: string;
+    recalledBy: string;
+    recalledAt: string;
+    conversationLastMessage?: {
+      content: string;
+      senderId: string;
+      sentAt: string;
+    } | null;
+  }) => void,
+): void {
   if (socket) {
-    socket.off('message_recalled');
+    socket.off('message_recalled', callback);
   }
 }
 

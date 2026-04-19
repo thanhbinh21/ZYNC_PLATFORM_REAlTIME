@@ -1,4 +1,4 @@
-import { MessageModel, MessageType, type IMessage } from './message.model';
+import { MessageModel, MessageType, type IMessage, type IReplyTo } from './message.model';
 import { MessageStatusModel, type IMessageStatus } from './message-status.model';
 import { checkIdempotencyKey, setIdempotencyKey } from '../../infrastructure/redis';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -9,6 +9,7 @@ import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
 import { getRedis } from '../../infrastructure/redis';
 import { v4 as uuidv4 } from 'uuid';
 import { MessageReactionsService } from './message-reaction.service';
+import { UserModel } from '../users/user.model';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -18,6 +19,37 @@ export interface PaginatedMessages {
 
 export interface MessageWithStatus extends IMessage {
   status?: string;
+}
+
+interface DeleteForMeSyncResult {
+  message: IMessage;
+  effectiveLastMessage: {
+    content: string;
+    senderId: string;
+    sentAt: Date;
+  } | null;
+  unreadCount: number;
+  lastVisibleMessage: {
+    content: string;
+    senderId: string;
+    senderDisplayName: string;
+    sentAt: Date;
+  } | null;
+}
+
+interface RecallSyncResult {
+  message: IMessage;
+  conversationLastMessage: {
+    content: string;
+    senderId: string;
+    sentAt: Date;
+  } | null;
+}
+
+interface ReadParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
 }
 
 export class MessagesService {
@@ -85,6 +117,7 @@ export class MessagesService {
     idempotencyKey: string,
     mediaUrl?: string,
     moderationWarning: boolean = false,
+    replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check idempotency cache
     const cachedMessage = await checkIdempotencyKey(idempotencyKey);
@@ -98,6 +131,7 @@ export class MessagesService {
         type: cachedMessage.type,
         mediaUrl: cachedMessage.mediaUrl,
         moderationWarning: Boolean(cachedMessage.moderationWarning),
+        replyTo: cachedMessage.replyTo as IReplyTo | undefined,
         idempotencyKey,
         createdAt: new Date(cachedMessage.createdAt as number),
       } as unknown as IMessage;
@@ -114,6 +148,7 @@ export class MessagesService {
       type,
       mediaUrl,
       moderationWarning,
+      replyTo,
       createdAt: now,
     });
 
@@ -127,6 +162,7 @@ export class MessagesService {
         type,
         mediaUrl,
         moderationWarning,
+        replyTo,
         idempotencyKey,
         createdAt: now,
       });
@@ -145,6 +181,7 @@ export class MessagesService {
       type,
       mediaUrl,
       moderationWarning,
+      replyTo,
       idempotencyKey,
       createdAt: now,
     } as unknown as IMessage;
@@ -166,6 +203,7 @@ export class MessagesService {
     mediaUrl?: string,
     mockId?: string,
     moderationWarning: boolean = false,
+    replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
     const existing = await MessageModel.findOne({ idempotencyKey }).lean();
@@ -182,6 +220,7 @@ export class MessagesService {
       type,
       mediaUrl,
       moderationWarning,
+      replyTo,
       idempotencyKey,
       createdAt: new Date(),
     });
@@ -256,6 +295,8 @@ export class MessagesService {
         senderId,
         sentAt: savedMessage.createdAt,
       });
+
+      await ConversationsService.clearConversationMemberOverrideOnNewMessage(conversationId);
     } catch (err) {
       logger.warn('[InsertMetadata] Failed to update conversation lastMessage', err);
     }
@@ -302,6 +343,8 @@ export class MessagesService {
       content: string;
       type: string;
       mediaUrl?: string;
+      moderationWarning?: boolean;
+      replyTo?: IReplyTo;
       idempotencyKey: string;
       createdAt: Date;
     }>
@@ -318,6 +361,8 @@ export class MessagesService {
           msg.idempotencyKey,
           msg.mediaUrl,
           msg.mockId,
+          Boolean(msg.moderationWarning),
+          msg.replyTo,
         );
       } catch (err) {
         logger.error(`[Fallback] Failed to insert message ${msg.idempotencyKey}`, err);
@@ -406,8 +451,28 @@ export class MessagesService {
         messageId: { $in: messageIds },
       }).lean();
 
+      const members = await ConversationMemberModel.find({ conversationId }).select('userId').lean();
+      const memberIds = Array.from(new Set(
+        members
+          .map((member: any) => String(member.userId || ''))
+          .filter((value: string) => value.length > 0),
+      ));
+
+      const users = memberIds.length > 0
+        ? await UserModel.find({ _id: { $in: memberIds } }).select('displayName avatarUrl').lean()
+        : [];
+
+      const participantByUserId = new Map<string, ReadParticipant>();
+      users.forEach((user: any) => {
+        participantByUserId.set(String(user._id), {
+          userId: String(user._id),
+          displayName: user.displayName || 'Nguoi dung',
+          avatarUrl: user.avatarUrl,
+        });
+      });
+
       // ─── Aggregate status ───
-      const statusByMessageId = new Map<string, Array<{ userId: string; status: string }>>();
+      const statusByMessageId = new Map<string, Array<{ userId: string; status: string; updatedAt: Date }>>();
       for (const status of allStatuses) {
         const msgId = status.messageId.toString();
         if (!statusByMessageId.has(msgId)) {
@@ -416,6 +481,7 @@ export class MessagesService {
         statusByMessageId.get(msgId)!.push({
           userId: status.userId,
           status: status.status,
+          updatedAt: new Date((status as any).updatedAt || Date.now()),
         });
       }
 
@@ -423,17 +489,56 @@ export class MessagesService {
       const messagesWithStatus = filteredMessages.map((msg: any) => {
         const msgId = msg._id.toString();
         const msgStatuses = statusByMessageId.get(msgId) || [];
+        const senderId = typeof msg.senderId === 'string' ? msg.senderId : String(msg.senderId?._id || '');
 
         const status = this.aggregateMessageStatus(
           msgId,
-          msg.senderId,
+          senderId,
           userId,
           msgStatuses,
         );
 
+        const readBy = msgStatuses
+          .filter((item) => item.status === 'read' && item.userId !== senderId)
+          .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+          .map((item) => {
+            const participant = participantByUserId.get(String(item.userId));
+            return {
+              userId: String(item.userId),
+              displayName: participant?.displayName || 'Nguoi dung',
+              avatarUrl: participant?.avatarUrl,
+              readAt: item.updatedAt,
+            };
+          });
+
+        const readByIds = new Set(readBy.map((item) => String(item.userId)));
+
+        const sentTo = memberIds
+          .filter((memberId) => memberId !== senderId && !readByIds.has(memberId))
+          .map((memberId) => {
+            const participant = participantByUserId.get(memberId);
+            return {
+              userId: memberId,
+              displayName: participant?.displayName || 'Nguoi dung',
+              avatarUrl: participant?.avatarUrl,
+            };
+          });
+
+        const readByPreview = Array.isArray(msg.readByPreview) && msg.readByPreview.length > 0
+          ? msg.readByPreview.map((item: any) => ({
+            userId: String(item.userId),
+            displayName: item.displayName || 'Nguoi dung',
+            avatarUrl: item.avatarUrl,
+            readAt: new Date(item.readAt),
+          }))
+          : readBy.slice(0, 3);
+
         return {
           ...msg,
           status,
+          readBy,
+          sentTo,
+          readByPreview,
         };
       });
 
@@ -544,6 +649,7 @@ export class MessagesService {
       if (conversationId) {
         try {
           await ConversationsService.clearUnreadCount(conversationId, userId);
+          await this.refreshReadByPreviewForReadEvents(conversationId, messageIds);
         } catch (err) {
           logger.warn('Failed to clear unread count', err);
         }
@@ -753,9 +859,7 @@ export class MessagesService {
     idempotencyKey: string,
     userId: string,
   ): Promise<IMessage> {
-    const message = await MessageModel.findOne({
-      idempotencyKey: idempotencyKey
-    });
+    const message = await MessageModel.findOne(this.getMessageLookupQuery(idempotencyKey));
 
     if (!message) {
       throw new BadRequestError('Message not found');
@@ -779,6 +883,23 @@ export class MessagesService {
     await message.save();
     logger.info(`[Delete] Message ${idempotencyKey} deleted for me by user ${userId}`);
     return message.toObject() as unknown as IMessage;
+  }
+
+  static async deleteMessageForMeWithConversationSync(
+    messageReference: string,
+    userId: string,
+  ): Promise<DeleteForMeSyncResult> {
+    const message = await this.deleteMessageForMe(messageReference, userId);
+
+    const { effectiveLastMessage, unreadCount, lastVisibleMessage } =
+      await ConversationsService.applyDeleteForMeMemberState(message.conversationId, userId);
+
+    return {
+      message,
+      effectiveLastMessage,
+      unreadCount,
+      lastVisibleMessage,
+    };
   }
 
   /**
@@ -827,6 +948,20 @@ export class MessagesService {
 
     logger.info(`[Recall] Message ${messageReference} recalled by user ${userId}`);
     return message.toObject() as unknown as IMessage;
+  }
+
+  static async recallMessageWithConversationSync(
+    messageReference: string,
+    userId: string,
+    force: boolean = false,
+  ): Promise<RecallSyncResult> {
+    const message = await this.recallMessageWithRetry(messageReference, userId, force);
+    const conversationLastMessage = await ConversationsService.recomputeConversationLastMessage(message.conversationId);
+
+    return {
+      message,
+      conversationLastMessage,
+    };
   }
 
   /**
@@ -971,6 +1106,99 @@ export class MessagesService {
     }
 
     return details;
+  }
+
+  static async refreshReadByPreviewForReadEvents(
+    conversationId: string,
+    messageRefs: string[],
+  ): Promise<void> {
+    if (!conversationId || !Array.isArray(messageRefs) || messageRefs.length === 0) {
+      return;
+    }
+
+    const latestMessage = await MessageModel.findOne({
+      conversationId,
+      isDeleted: { $ne: true },
+    })
+      .sort({ createdAt: -1, _id: -1 })
+      .select('_id idempotencyKey')
+      .lean();
+
+    if (!latestMessage) {
+      return;
+    }
+
+    const refSet = new Set(messageRefs.map((ref) => String(ref)));
+    const latestMessageId = String(latestMessage._id);
+    const latestIdempotencyKey = latestMessage.idempotencyKey ? String(latestMessage.idempotencyKey) : '';
+
+    if (!refSet.has(latestMessageId) && (!latestIdempotencyKey || !refSet.has(latestIdempotencyKey))) {
+      return;
+    }
+
+    await this.updateReadByPreview(latestMessageId);
+  }
+
+  private static async updateReadByPreview(messageReference: string): Promise<void> {
+    const message = await MessageModel.findOne(this.getMessageLookupQuery(messageReference))
+      .select('_id senderId isDeleted')
+      .lean();
+
+    if (!message || message.isDeleted) {
+      return;
+    }
+
+    const readStatuses = await MessageStatusModel.find({
+      messageId: String(message._id),
+      status: 'read',
+      userId: { $ne: String(message.senderId) },
+    })
+      .select('userId updatedAt')
+      .lean();
+
+    if (readStatuses.length === 0) {
+      await MessageModel.updateOne({ _id: message._id }, { $set: { readByPreview: [] } });
+      return;
+    }
+
+    const latestReadByUser = new Map<string, Date>();
+    readStatuses.forEach((status: any) => {
+      const targetUserId = String(status.userId);
+      const targetUpdatedAt = new Date(status.updatedAt || Date.now());
+      const existing = latestReadByUser.get(targetUserId);
+      if (!existing || existing.getTime() < targetUpdatedAt.getTime()) {
+        latestReadByUser.set(targetUserId, targetUpdatedAt);
+      }
+    });
+
+    const sortedReaders = Array.from(latestReadByUser.entries())
+      .sort((a, b) => b[1].getTime() - a[1].getTime())
+      .slice(0, 3);
+
+    const readerIds = sortedReaders.map(([readerId]) => readerId);
+    const users = readerIds.length > 0
+      ? await UserModel.find({ _id: { $in: readerIds } }).select('displayName avatarUrl').lean()
+      : [];
+
+    const userById = new Map<string, { displayName: string; avatarUrl?: string }>();
+    users.forEach((user: any) => {
+      userById.set(String(user._id), {
+        displayName: user.displayName || 'Nguoi dung',
+        avatarUrl: user.avatarUrl,
+      });
+    });
+
+    const readByPreview = sortedReaders.map(([readerId, readAt]) => {
+      const profile = userById.get(readerId);
+      return {
+        userId: readerId,
+        displayName: profile?.displayName || 'Nguoi dung',
+        avatarUrl: profile?.avatarUrl,
+        readAt,
+      };
+    });
+
+    await MessageModel.updateOne({ _id: message._id }, { $set: { readByPreview } });
   }
 
 }

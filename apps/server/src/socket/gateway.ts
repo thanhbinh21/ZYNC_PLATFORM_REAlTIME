@@ -2,6 +2,7 @@ import { type Server as HttpServer } from 'http';
 import { Server, type Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
+import { Types } from 'mongoose';
 import { createRedisDuplicate, getRedis, setTypingIndicator, removeTypingIndicator, setUserOnline, removeUserOnline, checkMessageRateLimit } from '../infrastructure/redis';
 import { logger } from '../shared/logger';
 import type { StoryReactionType } from '../modules/stories/story.model';
@@ -11,6 +12,7 @@ import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
 import { UserModel } from '../modules/users/user.model';
+import { stickerService } from '../modules/stickers/sticker.service';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
 import { produceNotificationEvent } from '../modules/notifications/notifications.service';
 import { MessageType } from '../modules/messages/message.model';
@@ -1019,6 +1021,7 @@ async function emitCallSummaryMessage(
   });
 
   io.to(`conv:${params.conversationId}`).emit('status_update', {
+    conversationId: params.conversationId,
     messageId: message._id,
     status: 'sent',
     userId: params.senderId,
@@ -1123,7 +1126,19 @@ async function handleSendMessage(
   }
 
   const msg = payload as Record<string, unknown>;
-  let { conversationId, content, type, mediaUrl, idempotencyKey } = msg;
+  let {
+    conversationId,
+    content,
+    type,
+    mediaUrl,
+    idempotencyKey,
+    replyToMessageRef,
+    replyToMessageId,
+    replyToPreview,
+    replyToSenderId,
+    replyToSenderDisplayName,
+    replyToType,
+  } = msg;
 
   if (!conversationId || !idempotencyKey) {
     socket.emit('error', { message: 'Missing required fields: conversationId, idempotencyKey' });
@@ -1149,6 +1164,94 @@ async function handleSendMessage(
   if (!isValidMessageType(normalizedType)) {
     socket.emit('error', { message: 'Invalid message type' });
     return;
+  }
+
+  const normalizedReplyMessageRef = typeof replyToMessageRef === 'string'
+    ? replyToMessageRef.trim()
+    : '';
+  const normalizedReplyMessageId = typeof replyToMessageId === 'string'
+    ? replyToMessageId.trim()
+    : '';
+
+  if (normalizedReplyMessageRef.length > 0 && normalizedReplyMessageRef.length > 100) {
+    socket.emit('error', { message: 'replyToMessageRef is too long' });
+    return;
+  }
+
+  if (normalizedReplyMessageId.length > 0 && normalizedReplyMessageId.length > 100) {
+    socket.emit('error', { message: 'replyToMessageId is too long' });
+    return;
+  }
+
+  const normalizedReplyToPreview = typeof replyToPreview === 'string'
+    ? replyToPreview.trim().slice(0, 160)
+    : undefined;
+
+  const normalizedReplyToSenderId = typeof replyToSenderId === 'string'
+    ? replyToSenderId.trim()
+    : undefined;
+
+  const normalizedReplyToSenderDisplayName = typeof replyToSenderDisplayName === 'string'
+    ? replyToSenderDisplayName.trim().slice(0, 120)
+    : undefined;
+
+  const normalizedReplyToType = typeof replyToType === 'string'
+    ? replyToType.trim().slice(0, 24)
+    : undefined;
+
+  let resolvedReplyTo: {
+    messageRef: string;
+    messageId?: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    contentPreview?: string;
+    type?: string;
+    isDeleted?: boolean;
+  } | undefined;
+
+  const requestedReplyRef = normalizedReplyMessageRef.length > 0
+    ? normalizedReplyMessageRef
+    : normalizedReplyMessageId;
+
+  if (requestedReplyRef.length > 0) {
+    const replyMessageFilters: Array<Record<string, unknown>> = [
+      { idempotencyKey: requestedReplyRef },
+    ];
+    if (Types.ObjectId.isValid(requestedReplyRef)) {
+      replyMessageFilters.push({ _id: requestedReplyRef });
+    }
+
+    const repliedMessage = await MessageModel.findOne({
+      $or: replyMessageFilters,
+      conversationId: conversationId as string,
+    }).select('_id idempotencyKey senderId content type').lean();
+
+    let resolvedReplySenderDisplayName: string | undefined = normalizedReplyToSenderDisplayName;
+    if (repliedMessage?.senderId) {
+      try {
+        const replySender = await UserModel.findOne({ _id: repliedMessage.senderId }).select('displayName').lean();
+        if (typeof replySender?.displayName === 'string' && replySender.displayName.trim().length > 0) {
+          resolvedReplySenderDisplayName = replySender.displayName.trim();
+        }
+      } catch (lookupErr) {
+        logger.warn('[Gateway] Failed to resolve reply sender displayName', {
+          senderId: repliedMessage.senderId,
+          error: lookupErr instanceof Error ? lookupErr.message : String(lookupErr),
+        });
+      }
+    }
+
+    resolvedReplyTo = {
+      messageRef: repliedMessage?.idempotencyKey || requestedReplyRef,
+      messageId: repliedMessage?._id ? String(repliedMessage._id) : (normalizedReplyMessageId || undefined),
+      senderId: repliedMessage?.senderId || normalizedReplyToSenderId,
+      senderDisplayName: resolvedReplySenderDisplayName,
+      contentPreview: repliedMessage?.content
+        ? String(repliedMessage.content).slice(0, 160)
+        : normalizedReplyToPreview,
+      type: repliedMessage?.type || normalizedReplyToType,
+      isDeleted: false,
+    };
   }
 
   const membership = await ConversationMemberModel.findOne({
@@ -1181,6 +1284,20 @@ async function handleSendMessage(
   await socket.join(`conv:${conversationId as string}`);
 
   let moderationWarning = false;
+
+  // ─── Sticker URL Validation ───
+  if (normalizedType === 'sticker') {
+    if (!mediaUrl || typeof mediaUrl !== 'string') {
+      socket.emit('error', { message: 'Sticker mediaUrl is required' });
+      return;
+    }
+    if (!stickerService.validateStickerUrl(mediaUrl)) {
+      socket.emit('error', { message: 'Invalid sticker URL' });
+      return;
+    }
+    // Clear content for sticker messages
+    content = '';
+  }
 
   // ─── Fast moderation gate (sync) ───
   // Blocks obvious text violations before publishing to Kafka/socket recipients.
@@ -1267,6 +1384,7 @@ async function handleSendMessage(
       (idempotencyKey as string),
       mediaUrl ? (mediaUrl as string) : undefined,
       moderationWarning,
+      resolvedReplyTo,
     );
 
     // Note: createMessage already publishes to Kafka (worker will insert)
@@ -1281,12 +1399,14 @@ async function handleSendMessage(
       type: normalizedType,
       mediaUrl,
       moderationWarning,
+      replyTo: message.replyTo,
       idempotencyKey,
       createdAt: message.createdAt,
     });
 
     // ─── Emit Status Update to ALL (including sender) ───
     io.to(`conv:${conversationId}`).emit('status_update', {
+      conversationId,
       messageId: message._id,
       status: 'sent',
       userId,
@@ -1442,18 +1562,32 @@ async function handleMessageRead(
 
   // ─── Batch Update Message Status ───
   try {
+    const refs = messageIds.map((value) => String(value));
+
     for (const messageId of messageIds) {
       await MessagesService.markAsRead(messageId as string, userId);
     }
+
+    await MessagesService.refreshReadByPreviewForReadEvents(conversationId as string, refs);
+
+    const readerProfile = await UserModel.findById(userId).select('displayName avatarUrl').lean();
+    const readAt = new Date();
 
     // ─── Simply emit read status back to sender ───
     // Note: We don't query MongoDB for aggregation here because it's async
     // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
-      messageIds,
+      conversationId,
+      messageIds: refs,
       status: 'read',
       userId,
-      updatedAt: new Date(),
+      updatedAt: readAt,
+      reader: {
+        userId,
+        displayName: readerProfile?.displayName || 'Nguoi dung',
+        avatarUrl: readerProfile?.avatarUrl,
+        readAt,
+      },
     });
 
     logger.debug(`Marked ${messageIds.length} messages as read by ${userId}`);
@@ -1511,6 +1645,7 @@ async function handleMessageDelivered(
     // Note: We don't query MongoDB for aggregation here because it's async
     // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
+      conversationId,
       messageIds,
       status: 'delivered',
       userId,
@@ -1548,13 +1683,16 @@ async function handleDeleteMessageForMe(
   }
 
   // ✅ USE .then() INSTEAD OF await
-  MessagesService.deleteMessageForMe(idempotencyKey, userId)
-    .then((message) => {
+  MessagesService.deleteMessageForMeWithConversationSync(idempotencyKey, userId)
+    .then(({ message, effectiveLastMessage, unreadCount, lastVisibleMessage }) => {
       // Notify only this user (only they see the change)
       socket.emit('message_deleted_for_me', {
         messageId: messageId,
         conversationId,
         deletedAt: new Date().toISOString(),
+        effectiveLastMessage: effectiveLastMessage || null,
+        unreadCount,
+        lastVisibleMessage: lastVisibleMessage || null,
       });
 
       logger.debug(`Message ${messageId} deleted for me by user ${userId}`);
@@ -1589,8 +1727,8 @@ async function handleRecallMessage(
   }
 
   // ✅ USE .then() INSTEAD OF await
-  MessagesService.recallMessage(idempotencyKey, userId)
-    .then((message) => {
+  MessagesService.recallMessageWithConversationSync(idempotencyKey, userId)
+    .then(({ message, conversationLastMessage }) => {
       // Broadcast to EVERYONE in conversation (sender + all recipients)
       io.to(`conv:${conversationId}`).emit('message_recalled', {
         messageId: messageId,
@@ -1598,6 +1736,7 @@ async function handleRecallMessage(
         conversationId,
         recalledBy: userId,
         recalledAt: new Date().toISOString(),
+        conversationLastMessage: conversationLastMessage || null,
       });
 
       logger.info(`Message ${messageId} recalled by user ${userId}`);

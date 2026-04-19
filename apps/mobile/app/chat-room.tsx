@@ -33,6 +33,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
 import { MessagePreviewOverlay } from '../src/components/MessagePreviewOverlay';
+import { StickerPicker } from '../src/components/StickerPicker';
+
+interface MessageReadParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+interface MessageReadParticipantWithTime extends MessageReadParticipant {
+  readAt: string;
+}
 
 interface Message {
   _id: string;
@@ -44,6 +55,15 @@ interface Message {
   status?: 'sent' | 'delivered' | 'read';
   createdAt: string;
   idempotencyKey?: string;
+  replyTo?: {
+    messageRef: string;
+    messageId?: string;
+    senderId?: string;
+    senderDisplayName?: string;
+    contentPreview?: string;
+    type?: string;
+    isDeleted?: boolean;
+  };
   reactionSummary?: {
     totalCount: number;
     emojiCounts: Record<string, number>;
@@ -53,11 +73,15 @@ interface Message {
     totalCount: number;
     emojiCounts: Record<string, number>;
   };
+  readBy?: MessageReadParticipantWithTime[];
+  readByPreview?: MessageReadParticipantWithTime[];
+  sentTo?: MessageReadParticipant[];
 }
 
 interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
+  replyTo?: Message['replyTo'];
 }
 
 interface PendingMediaDraft {
@@ -71,6 +95,13 @@ interface PendingMediaSend {
   idempotencyKey: string;
   content: string;
   messageType: 'image' | 'video';
+}
+
+interface PendingJumpTarget {
+  messageRef: string;
+  attempts: number;
+  stagnantRounds: number;
+  lastMessageCount: number;
 }
 
 interface ConversationMeta {
@@ -125,6 +156,9 @@ interface AppDialogState {
 }
 
 const REACTION_EMOJIS = ['👍', '❤️', '🤣', '😳', '😭', '😡'] as const;
+const QUICK_EMOJIS = ['😀', '😂', '😍', '🥰', '😭', '😎', '🤔', '👍', '❤️', '🔥', '🎉', '🙏'] as const;
+
+type ComposerPickerTab = 'emoji' | 'sticker';
 
 const FILE_PREFIX = 'file/';
 
@@ -211,6 +245,103 @@ function normalizeMessage(raw: unknown): Message | null {
       }
       : undefined;
 
+  const rawReplyTo = data.replyTo;
+  const normalizedReplyTo =
+    rawReplyTo && typeof rawReplyTo === 'object'
+      ? {
+        messageRef: String((rawReplyTo as Record<string, unknown>).messageRef || ''),
+        messageId:
+          typeof (rawReplyTo as Record<string, unknown>).messageId === 'string'
+            ? (rawReplyTo as Record<string, unknown>).messageId as string
+            : undefined,
+        senderId:
+          typeof (rawReplyTo as Record<string, unknown>).senderId === 'string'
+            ? (rawReplyTo as Record<string, unknown>).senderId as string
+            : undefined,
+        senderDisplayName:
+          typeof (rawReplyTo as Record<string, unknown>).senderDisplayName === 'string'
+            ? (rawReplyTo as Record<string, unknown>).senderDisplayName as string
+            : undefined,
+        contentPreview:
+          typeof (rawReplyTo as Record<string, unknown>).contentPreview === 'string'
+            ? (rawReplyTo as Record<string, unknown>).contentPreview as string
+            : undefined,
+        type:
+          typeof (rawReplyTo as Record<string, unknown>).type === 'string'
+            ? (rawReplyTo as Record<string, unknown>).type as string
+            : undefined,
+        isDeleted:
+          typeof (rawReplyTo as Record<string, unknown>).isDeleted === 'boolean'
+            ? (rawReplyTo as Record<string, unknown>).isDeleted as boolean
+            : undefined,
+      }
+      : undefined;
+
+  const normalizeReadParticipant = (value: unknown): MessageReadParticipant | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const item = value as Record<string, unknown>;
+    const rawUserId = item.userId ?? item._id;
+    if (!rawUserId) {
+      return null;
+    }
+
+    return {
+      userId: String(rawUserId),
+      displayName: typeof item.displayName === 'string' && item.displayName.trim().length > 0
+        ? item.displayName
+        : 'Nguoi dung',
+      avatarUrl: typeof item.avatarUrl === 'string' ? item.avatarUrl : undefined,
+    };
+  };
+
+  const normalizeReadParticipantWithTime = (value: unknown): MessageReadParticipantWithTime | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const base = normalizeReadParticipant(value);
+    if (!base) {
+      return null;
+    }
+
+    const item = value as Record<string, unknown>;
+    const readAt = typeof item.readAt === 'string'
+      ? item.readAt
+      : new Date().toISOString();
+
+    return {
+      ...base,
+      readAt,
+    };
+  };
+
+  const normalizeReadBy = (rawList: unknown): MessageReadParticipantWithTime[] | undefined => {
+    if (!Array.isArray(rawList)) {
+      return undefined;
+    }
+
+    return rawList
+      .map((item) => normalizeReadParticipantWithTime(item))
+      .filter((item): item is MessageReadParticipantWithTime => Boolean(item));
+  };
+
+  const normalizeSentTo = (rawList: unknown): MessageReadParticipant[] | undefined => {
+    if (!Array.isArray(rawList)) {
+      return undefined;
+    }
+
+    return rawList
+      .map((item) => normalizeReadParticipant(item))
+      .filter((item): item is MessageReadParticipant => Boolean(item));
+  };
+
+  const normalizedReadBy = normalizeReadBy(data.readBy);
+  const normalizedReadByPreview = normalizeReadBy(data.readByPreview);
+  const normalizedSentTo = normalizeSentTo(data.sentTo);
+
   return {
     _id: String(rawId),
     conversationId: typeof data.conversationId === 'string' ? data.conversationId : undefined,
@@ -221,8 +352,12 @@ function normalizeMessage(raw: unknown): Message | null {
     status,
     createdAt: typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString(),
     idempotencyKey: typeof data.idempotencyKey === 'string' ? data.idempotencyKey : undefined,
+    replyTo: normalizedReplyTo && normalizedReplyTo.messageRef ? normalizedReplyTo : undefined,
     reactionSummary: normalizedReactionSummary,
     reactionUserState: normalizedReactionUserState,
+    readBy: normalizedReadBy,
+    readByPreview: normalizedReadByPreview,
+    sentTo: normalizedSentTo,
   };
 }
 
@@ -283,24 +418,59 @@ function resolveMessageRef(message: Message): string {
   return message.idempotencyKey || message._id;
 }
 
-function MessageStatusTicks({ status }: { status?: string }) {
-  if (!status) return null;
-
-  let iconName: 'checkmark' | 'checkmark-done' = 'checkmark';
-  let color = '#64748b';
-
-  switch (status) {
-    case 'delivered':
-      iconName = 'checkmark-done';
-      break;
-    case 'read':
-      iconName = 'checkmark-done';
-      break;
-    default:
-      break;
+function MessageReceiptIndicator({
+  message,
+  onPressReadPreview,
+}: {
+  message: Message;
+  onPressReadPreview?: () => void;
+}) {
+  if (!message.status || message.type === 'system-recall') {
+    return null;
   }
 
-  return <Ionicons name={iconName} size={14} color={color} style={{ marginLeft: 4 }} />;
+  if (message.status === 'delivered') {
+    return <Ionicons name="checkmark" size={14} color="#64748b" style={{ marginLeft: 4 }} />;
+  }
+
+  if (message.status !== 'read') {
+    return null;
+  }
+
+  const preview = Array.isArray(message.readByPreview) ? message.readByPreview : [];
+  if (preview.length === 0) {
+    return null;
+  }
+
+  const visibleReadCount = Array.isArray(message.readBy) && message.readBy.length > 0
+    ? message.readBy.length
+    : preview.length;
+
+  return (
+    <Pressable style={bubbleStyles.readPreviewButton} onPress={onPressReadPreview}>
+      <View style={bubbleStyles.readPreviewStack}>
+        {preview.map((reader) => {
+          const hasAvatar = Boolean(reader.avatarUrl);
+          return hasAvatar ? (
+            <Image
+              key={`reader-${reader.userId}`}
+              source={{ uri: reader.avatarUrl }}
+              style={bubbleStyles.readPreviewAvatar}
+            />
+          ) : (
+            <View key={`reader-${reader.userId}`} style={[bubbleStyles.readPreviewAvatar, bubbleStyles.readPreviewFallback]}>
+              <Text style={bubbleStyles.readPreviewFallbackText}>
+                {(reader.displayName || 'U').slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+      {visibleReadCount > preview.length && (
+        <Text style={bubbleStyles.readPreviewMore}>+{visibleReadCount - preview.length}</Text>
+      )}
+    </Pressable>
+  );
 }
 
 function TypingIndicator({ typingUsers }: { typingUsers: string[] }) {
@@ -489,6 +659,11 @@ export default function ChatRoomScreen() {
   const [reactionSheetLoading, setReactionSheetLoading] = useState(false);
   const [reactionSheetData, setReactionSheetData] = useState<ReactionDetailsResponse | null>(null);
   const [reactionSheetTab, setReactionSheetTab] = useState('ALL');
+  const [statusDetailsVisible, setStatusDetailsVisible] = useState(false);
+  const [statusDetailsMessage, setStatusDetailsMessage] = useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
+  const [showComposerPicker, setShowComposerPicker] = useState(false);
+  const [composerPickerTab, setComposerPickerTab] = useState<ComposerPickerTab>('emoji');
   const [appDialog, setAppDialog] = useState<AppDialogState>({
     visible: false,
     mode: 'alert',
@@ -550,9 +725,31 @@ export default function ChatRoomScreen() {
   } = useMessagePreview(conversationId ?? null);
 
   const flatListRef = useRef<FlatList>(null);
+  const jumpTargetRef = useRef<PendingJumpTarget | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
+  const scrollOffsetRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const preserveViewportRef = useRef<{ offset: number; contentHeight: number } | null>(null);
+
+  const notifyInaccessibleReplyTarget = useCallback(() => {
+    Alert.alert('Thong bao', 'Tin nhan khong the truy cap.');
+  }, []);
+
+  const openStatusDetails = useCallback((message: Message) => {
+    if (message.status !== 'read' || (message.readByPreview?.length || 0) === 0) {
+      return;
+    }
+
+    setStatusDetailsMessage(message);
+    setStatusDetailsVisible(true);
+  }, []);
+
+  const closeStatusDetails = useCallback(() => {
+    setStatusDetailsVisible(false);
+    setStatusDetailsMessage(null);
+  }, []);
 
   const scrollToBottom = useCallback((animated = true) => {
     requestAnimationFrame(() => {
@@ -1183,6 +1380,8 @@ export default function ChatRoomScreen() {
       setNextCursor(null);
       setHasMore(true);
       setShowOptionsId(null);
+      setReplyingTo(null);
+      jumpTargetRef.current = null;
       void loadMessages();
       void loadConversationMeta();
 
@@ -1200,6 +1399,9 @@ export default function ChatRoomScreen() {
     setReactionSheetVisible(false);
     setReactionSheetData(null);
     setReactionSheetTab('ALL');
+    setStatusDetailsVisible(false);
+    setStatusDetailsMessage(null);
+    jumpTargetRef.current = null;
   }, [conversationId]);
 
   useEffect(() => {
@@ -1303,14 +1505,103 @@ export default function ChatRoomScreen() {
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || isMoreLoading || isLoading || !nextCursor) return;
+
+    preserveViewportRef.current = {
+      offset: scrollOffsetRef.current,
+      contentHeight: contentHeightRef.current,
+    };
+
     void loadMessages(nextCursor);
   }, [hasMore, isMoreLoading, isLoading, nextCursor, loadMessages]);
 
+  const findMessageIndexByRef = useCallback((messageRef: string) => {
+    if (!messageRef) {
+      return -1;
+    }
+
+    return messages.findIndex(
+      (msg) => msg._id === messageRef || msg.idempotencyKey === messageRef,
+    );
+  }, [messages]);
+
+  const jumpToMessage = useCallback((messageRef: string) => {
+    if (!messageRef) {
+      return;
+    }
+
+    const idx = findMessageIndexByRef(messageRef);
+
+    if (idx >= 0) {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      return;
+    }
+
+    if (!hasMore) {
+      notifyInaccessibleReplyTarget();
+      return;
+    }
+
+    jumpTargetRef.current = {
+      messageRef,
+      attempts: 0,
+      stagnantRounds: 0,
+      lastMessageCount: messages.length,
+    };
+
+    handleLoadMore();
+  }, [findMessageIndexByRef, handleLoadMore, hasMore, messages.length, notifyInaccessibleReplyTarget]);
+
   const handleScrollList = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+
     if (event.nativeEvent.contentOffset.y < 120) {
       handleLoadMore();
     }
   }, [handleLoadMore]);
+
+  useEffect(() => {
+    const pendingJump = jumpTargetRef.current;
+    if (!pendingJump) {
+      return;
+    }
+
+    if (isMoreLoading) {
+      return;
+    }
+
+    const idx = findMessageIndexByRef(pendingJump.messageRef);
+
+    if (idx >= 0) {
+      jumpTargetRef.current = null;
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      return;
+    }
+
+    if (!hasMore) {
+      jumpTargetRef.current = null;
+      notifyInaccessibleReplyTarget();
+      return;
+    }
+
+    const nextAttempts = pendingJump.attempts + 1;
+    const hasNewMessages = messages.length > pendingJump.lastMessageCount;
+    const nextStagnantRounds = hasNewMessages ? 0 : pendingJump.stagnantRounds + 1;
+
+    if (nextAttempts >= 8 || nextStagnantRounds >= 2) {
+      jumpTargetRef.current = null;
+      notifyInaccessibleReplyTarget();
+      return;
+    }
+
+    jumpTargetRef.current = {
+      messageRef: pendingJump.messageRef,
+      attempts: nextAttempts,
+      stagnantRounds: nextStagnantRounds,
+      lastMessageCount: messages.length,
+    };
+
+    handleLoadMore();
+  }, [findMessageIndexByRef, handleLoadMore, hasMore, isMoreLoading, messages.length, notifyInaccessibleReplyTarget]);
 
   useEffect(() => {
     const socket = socketService.getSocket();
@@ -1351,9 +1642,20 @@ export default function ChatRoomScreen() {
       messageId?: string;
       messageIds?: string[];
       idempotencyKeys?: string[];
+      conversationId?: string;
       status?: Message['status'];
+      reader?: {
+        userId: string;
+        displayName: string;
+        avatarUrl?: string;
+        readAt: string;
+      };
     }) => {
       if (!data.status) return;
+
+      if (data.conversationId && data.conversationId !== conversationId) {
+        return;
+      }
 
       const messageIds = Array.isArray(data.messageIds) ? data.messageIds.map(String) : [];
       if (data.messageId) {
@@ -1376,9 +1678,29 @@ export default function ChatRoomScreen() {
           return message;
         }
 
+        if (data.status !== 'read' || !data.reader) {
+          return {
+            ...message,
+            status: data.status,
+          };
+        }
+
+        const currentReadBy = Array.isArray(message.readBy) ? message.readBy : [];
+        const mergedReadBy = [
+          data.reader,
+          ...currentReadBy.filter((entry) => entry.userId !== data.reader!.userId),
+        ].sort((a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime());
+
+        const sentTo = Array.isArray(message.sentTo)
+          ? message.sentTo.filter((entry) => entry.userId !== data.reader!.userId)
+          : message.sentTo;
+
         return {
           ...message,
-          status: data.status,
+          status: 'read',
+          readBy: mergedReadBy,
+          readByPreview: mergedReadBy.slice(0, 3),
+          sentTo,
         };
       }));
     };
@@ -1604,6 +1926,7 @@ export default function ChatRoomScreen() {
       status: 'sent',
       createdAt: new Date().toISOString(),
       idempotencyKey,
+      replyTo: options?.replyTo,
     };
 
     setMessages((prev) => {
@@ -1639,7 +1962,17 @@ export default function ChatRoomScreen() {
         type,
         mediaUrl,
         idempotencyKey,
+        replyToMessageRef: options?.replyTo?.messageRef,
+        replyToMessageId: options?.replyTo?.messageId,
+        replyToSenderId: options?.replyTo?.senderId,
+        replyToSenderDisplayName: options?.replyTo?.senderDisplayName,
+        replyToPreview: options?.replyTo?.contentPreview,
+        replyToType: options?.replyTo?.type,
       });
+
+      if (options?.replyTo) {
+        setReplyingTo(null);
+      }
     }
 
     setTimeout(() => scrollToBottom(), 80);
@@ -1683,7 +2016,7 @@ export default function ChatRoomScreen() {
         messageContent,
         pendingMediaDraft.messageType,
         pendingMediaDraft.localUri,
-        { deferEmit: true },
+        { deferEmit: true, replyTo: replyingTo ?? undefined },
       );
 
       if (!pendingMessageId) {
@@ -1713,7 +2046,7 @@ export default function ChatRoomScreen() {
             messageContent,
             pendingMediaDraft.messageType,
             secureUrl,
-            { idempotencyKey: pendingMessageId },
+            { idempotencyKey: pendingMessageId, replyTo: replyingTo ?? undefined },
           );
 
           setPendingMediaSend(null);
@@ -1739,8 +2072,31 @@ export default function ChatRoomScreen() {
       return;
     }
 
-    handleSend();
-  }, [handleSend, inputText, isUploadingMedia, pendingMediaDraft, pendingMediaSend, uploadAssetToCloudinary]);
+    handleSend(undefined, 'text', undefined, { replyTo: replyingTo ?? undefined });
+  }, [handleSend, inputText, isUploadingMedia, pendingMediaDraft, pendingMediaSend, replyingTo, uploadAssetToCloudinary]);
+
+  const handleToggleComposerPicker = useCallback(() => {
+    setShowComposerPicker((prev) => !prev);
+    setComposerPickerTab('emoji');
+  }, []);
+
+  const handleSendComposerEmoji = useCallback((emoji: string) => {
+    if (Boolean(pendingMediaSend) || isUploadingMedia) {
+      return;
+    }
+
+    handleSend(emoji, 'text', undefined, { replyTo: replyingTo ?? undefined });
+    setShowComposerPicker(false);
+  }, [handleSend, isUploadingMedia, pendingMediaSend, replyingTo]);
+
+  const handleSendComposerSticker = useCallback((mediaUrl: string) => {
+    if (Boolean(pendingMediaSend) || isUploadingMedia) {
+      return;
+    }
+
+    handleSend('', 'sticker', mediaUrl, { replyTo: replyingTo ?? undefined });
+    setShowComposerPicker(false);
+  }, [handleSend, isUploadingMedia, pendingMediaSend, replyingTo]);
 
   const handleRecall = async (messageId: string, idempotencyKey?: string) => {
     try {
@@ -1838,6 +2194,23 @@ export default function ChatRoomScreen() {
             )}
 
             <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleOther]}>
+              {message.replyTo && message.replyTo.messageRef && (
+                <Pressable
+                  onPress={() => jumpToMessage(message.replyTo?.messageRef || '')}
+                  style={[bubbleStyles.replyCard, isMe ? bubbleStyles.replyCardMe : bubbleStyles.replyCardOther]}
+                >
+                  <Text style={[bubbleStyles.replyLabel, isMe && bubbleStyles.replyLabelMe]}>Tra loi</Text>
+                  {message.replyTo.senderDisplayName && (
+                    <Text style={[bubbleStyles.replySenderName, isMe && bubbleStyles.replySenderNameMe]} numberOfLines={1}>
+                      {message.replyTo.senderDisplayName}
+                    </Text>
+                  )}
+                  <Text style={[bubbleStyles.replyPreview, isMe && bubbleStyles.replyPreviewMe]} numberOfLines={1}>
+                    {message.replyTo.contentPreview || '[Tin nhan]'}
+                  </Text>
+                </Pressable>
+              )}
+
               {isRecalled ? (
                 <Text style={[bubbleStyles.msgText, bubbleStyles.recallText, isMe && bubbleStyles.recallTextMe]}>
                   {isMe ? 'Ban da thu hoi tin nhan' : 'Tin nhan da duoc thu hoi'}
@@ -1845,7 +2218,13 @@ export default function ChatRoomScreen() {
               ) : message.type === 'text' && message.content ? (
                 <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
               ) : message.type === 'sticker' ? (
-                <Text style={bubbleStyles.stickerText}>{message.content || ':)'}</Text>
+                message.mediaUrl ? (
+                  <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
+                    <Image source={{ uri: message.mediaUrl }} style={bubbleStyles.stickerImage} resizeMode="contain" />
+                  </Pressable>
+                ) : (
+                  <Text style={bubbleStyles.stickerText}>{message.content || ':)'}</Text>
+                )
               ) : message.type === 'image' ? (
                 message.mediaUrl ? (
                   <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
@@ -1892,7 +2271,12 @@ export default function ChatRoomScreen() {
                 <Text style={[bubbleStyles.time, isMe && bubbleStyles.timeMe]}>
                   {formatTime(message.createdAt)}
                 </Text>
-                {isMe && <MessageStatusTicks status={message.status} />}
+                {isMe && (
+                  <MessageReceiptIndicator
+                    message={message}
+                    onPressReadPreview={() => openStatusDetails(message)}
+                  />
+                )}
               </View>
             </View>
 
@@ -1932,11 +2316,13 @@ export default function ChatRoomScreen() {
       getReactionUserStateForMessage,
       handleDeleteForMe,
       handleOpenMedia,
+      openStatusDetails,
       handleQuickAddFromTrigger,
       handleRecall,
       isGroup,
       openReactionDetailsSheet,
       openReactionPicker,
+      jumpToMessage,
       showOptionsId,
       userId,
     ],
@@ -2052,8 +2438,31 @@ export default function ChatRoomScreen() {
               contentContainerStyle={styles.messageList}
               showsVerticalScrollIndicator={false}
               onScroll={handleScrollList}
+              onContentSizeChange={(_, height) => {
+                const pending = preserveViewportRef.current;
+                contentHeightRef.current = height;
+
+                if (!pending) {
+                  return;
+                }
+
+                preserveViewportRef.current = null;
+
+                const delta = height - pending.contentHeight;
+                if (delta <= 0) {
+                  return;
+                }
+
+                flatListRef.current?.scrollToOffset({
+                  offset: Math.max(0, pending.offset + delta),
+                  animated: false,
+                });
+              }}
               scrollEventThrottle={16}
               onLayout={() => scrollToBottom(false)}
+              onScrollToIndexFailed={() => {
+                // Fallback when item layout has not been measured yet.
+              }}
               ListHeaderComponent={isMoreLoading ? (
                 <View style={styles.loadMoreIndicator}>
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -2242,6 +2651,83 @@ export default function ChatRoomScreen() {
           </Modal>
 
           <Modal
+            visible={statusDetailsVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={closeStatusDetails}
+          >
+            <View style={styles.sheetOverlay}>
+              <View style={[styles.sheetCard, styles.statusDetailsCard]}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Thong ke da xem</Text>
+                  <TouchableOpacity style={styles.sheetCloseBtn} onPress={closeStatusDetails}>
+                    <Text style={styles.sheetCloseText}>Dong</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.statusSection}>
+                  <Text style={styles.statusSectionTitle}>
+                    Da xem ({statusDetailsMessage?.readBy?.length || 0})
+                  </Text>
+                  {(statusDetailsMessage?.readBy?.length || 0) === 0 ? (
+                    <Text style={styles.statusEmptyText}>Chua co ai da xem.</Text>
+                  ) : (
+                    <ScrollView style={styles.statusList}>
+                      {(statusDetailsMessage?.readBy || []).map((item) => (
+                        <View key={`read-${item.userId}`} style={styles.statusRow}>
+                          {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.statusAvatar} />
+                          ) : (
+                            <View style={[styles.statusAvatar, styles.statusAvatarFallback]}>
+                              <Text style={styles.statusAvatarText}>
+                                {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.statusInfo}>
+                            <Text style={styles.statusName}>{item.displayName}</Text>
+                            <Text style={styles.statusMeta}>
+                              {new Date(item.readAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+
+                <View style={styles.statusSection}>
+                  <Text style={styles.statusSectionTitle}>
+                    Chua doc ({statusDetailsMessage?.sentTo?.length || 0})
+                  </Text>
+                  {(statusDetailsMessage?.sentTo?.length || 0) === 0 ? (
+                    <Text style={styles.statusEmptyText}>Tat ca da doc.</Text>
+                  ) : (
+                    <ScrollView style={styles.statusList}>
+                      {(statusDetailsMessage?.sentTo || []).map((item) => (
+                        <View key={`sent-${item.userId}`} style={styles.statusRow}>
+                          {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.statusAvatar} />
+                          ) : (
+                            <View style={[styles.statusAvatar, styles.statusAvatarFallback]}>
+                              <Text style={styles.statusAvatarText}>
+                                {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.statusInfo}>
+                            <Text style={styles.statusName}>{item.displayName}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
             visible={isArchiveOpen}
             transparent
             animationType="slide"
@@ -2421,6 +2907,20 @@ export default function ChatRoomScreen() {
           <View style={[styles.composerContainer, { marginBottom: androidKeyboardOffset }]}>
             <TypingIndicator typingUsers={typingUsers} />
 
+            {replyingTo && (
+              <View style={styles.replyComposerBar}>
+                <View style={styles.replyComposerMeta}>
+                  <Text style={styles.replyComposerLabel}>Dang tra loi</Text>
+                  <Text style={styles.replyComposerPreview} numberOfLines={1}>
+                    {replyingTo.contentPreview || '[Tin nhan]'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.replyComposerCancelBtn} onPress={() => setReplyingTo(null)}>
+                  <Ionicons name="close" size={16} color="#cbd5e1" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {pendingMediaDraft && (
               <View style={styles.mediaDraftBar}>
                 {pendingMediaDraft.messageType === 'image' ? (
@@ -2458,7 +2958,66 @@ export default function ChatRoomScreen() {
               </View>
             )}
 
-            <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            {showComposerPicker && (
+              <View style={[styles.composerPickerWrap, { marginBottom: 16 }]}>
+                <View style={styles.composerPickerTabs}>
+                  <TouchableOpacity
+                    style={[
+                      styles.composerPickerTab,
+                      composerPickerTab === 'emoji' ? styles.composerPickerTabActive : null,
+                    ]}
+                    onPress={() => setComposerPickerTab('emoji')}
+                  >
+                    <Text
+                      style={[
+                        styles.composerPickerTabText,
+                        composerPickerTab === 'emoji' ? styles.composerPickerTabTextActive : null,
+                      ]}
+                    >
+                      Emoji
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.composerPickerTab,
+                      composerPickerTab === 'sticker' ? styles.composerPickerTabActive : null,
+                    ]}
+                    onPress={() => setComposerPickerTab('sticker')}
+                  >
+                    <Text
+                      style={[
+                        styles.composerPickerTabText,
+                        composerPickerTab === 'sticker' ? styles.composerPickerTabTextActive : null,
+                      ]}
+                    >
+                      Sticker
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {composerPickerTab === 'emoji' ? (
+                  <View style={styles.quickEmojiPanel}>
+                    {QUICK_EMOJIS.map((emoji) => (
+                      <TouchableOpacity
+                        key={emoji}
+                        style={styles.quickEmojiBtn}
+                        onPress={() => handleSendComposerEmoji(emoji)}
+                      >
+                        <Text style={styles.quickEmojiText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <StickerPicker
+                    isOpen={showComposerPicker && composerPickerTab === 'sticker'}
+                    onSelectSticker={handleSendComposerSticker}
+                  />
+                )}
+              </View>
+            )}
+
+            <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 14, 22) }]}>
               <TouchableOpacity
                 style={styles.inputAction}
                 onPress={() => {
@@ -2480,12 +3039,13 @@ export default function ChatRoomScreen() {
                   placeholderTextColor={colors.textMuted}
                   value={inputText}
                   onChangeText={handleTextChange}
+                  onFocus={() => setShowComposerPicker(false)}
                   multiline
                   maxLength={2000}
                 />
                 <TouchableOpacity
                   style={styles.emojiBtn}
-                  onPress={() => handleSend(':)', 'sticker')}
+                  onPress={handleToggleComposerPicker}
                   disabled={Boolean(pendingMediaSend) || isUploadingMedia}
                 >
                   <Ionicons name="happy-outline" size={22} color={colors.textMuted} />
@@ -2542,6 +3102,31 @@ export default function ChatRoomScreen() {
 
                 {targetMessage && (
                   <View style={styles.reactionActionRow}>
+                    <Pressable
+                      style={styles.reactionActionButton}
+                      onPress={() => {
+                        const senderNameFromMessage = getSenderName(targetMessage);
+                        const inferredReplySenderDisplayName = senderNameFromMessage
+                          || (getSenderId(targetMessage) === userId
+                            ? 'Ban'
+                            : (!isGroupChat ? conversationName : 'Thanh vien'));
+
+                        setReplyingTo({
+                          messageRef: targetMessage.idempotencyKey || targetMessage._id,
+                          messageId: targetMessage._id,
+                          senderId: getSenderId(targetMessage),
+                          senderDisplayName: inferredReplySenderDisplayName,
+                          contentPreview: String(targetMessage.content || '').slice(0, 160),
+                          type: targetMessage.type,
+                          isDeleted: false,
+                        });
+                        closeReactionPicker();
+                      }}
+                    >
+                      <Ionicons name="return-up-back-outline" size={16} color="#e2e8f0" />
+                      <Text style={styles.reactionActionText}>Tra loi</Text>
+                    </Pressable>
+
                     <Pressable
                       style={styles.reactionActionButton}
                       onPress={() => {
@@ -2712,6 +3297,47 @@ const bubbleStyles = StyleSheet.create({
     backgroundColor: '#1e293b',
     borderBottomLeftRadius: 6,
   },
+  replyCard: {
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 8,
+  },
+  replyCardMe: {
+    borderLeftColor: '#0f172a',
+    backgroundColor: 'rgba(2,6,23,0.18)',
+  },
+  replyCardOther: {
+    borderLeftColor: '#34d399',
+    backgroundColor: 'rgba(15,23,42,0.5)',
+  },
+  replyLabel: {
+    fontSize: 10,
+    color: '#86efac',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    marginBottom: 1,
+  },
+  replyLabelMe: {
+    color: '#0f172a',
+  },
+  replySenderName: {
+    fontSize: 11,
+    color: '#a7f3d0',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    marginBottom: 1,
+  },
+  replySenderNameMe: {
+    color: 'rgba(15,23,42,0.82)',
+  },
+  replyPreview: {
+    fontSize: 12,
+    color: '#d1fae5',
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  replyPreviewMe: {
+    color: '#0f172a',
+  },
   msgText: {
     color: '#e2e8f0',
     fontSize: 15,
@@ -2734,6 +3360,10 @@ const bubbleStyles = StyleSheet.create({
   stickerText: {
     fontSize: 28,
     lineHeight: 34,
+  },
+  stickerImage: {
+    width: 100,
+    height: 100,
   },
   mediaPlaceholder: {
     flexDirection: 'row',
@@ -2846,6 +3476,43 @@ const bubbleStyles = StyleSheet.create({
   },
   timeMe: {
     color: 'rgba(17,24,39,0.6)',
+  },
+  readPreviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.14)',
+  },
+  readPreviewStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  readPreviewAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -4,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: '#2f6657',
+  },
+  readPreviewFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readPreviewFallbackText: {
+    color: '#d1fae5',
+    fontSize: 9,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  readPreviewMore: {
+    marginLeft: 4,
+    color: '#334155',
+    fontSize: 10,
+    fontFamily: 'BeVietnamPro_600SemiBold',
   },
   reactionRow: {
     flexDirection: 'row',
@@ -3012,6 +3679,42 @@ const styles = StyleSheet.create({
     borderTopColor: colors.glassBorder,
     backgroundColor: colors.surfaceHover,
   },
+  replyComposerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginHorizontal: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(2, 45, 35, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.35)',
+    gap: 10,
+  },
+  replyComposerMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  replyComposerLabel: {
+    color: '#86efac',
+    fontSize: 11,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  replyComposerPreview: {
+    marginTop: 2,
+    color: '#d1fae5',
+    fontSize: 12,
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  replyComposerCancelBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(30,41,59,0.8)',
+  },
   mediaDraftBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3103,6 +3806,61 @@ const styles = StyleSheet.create({
   emojiBtn: {
     padding: 4,
     marginBottom: 2,
+  },
+  composerPickerWrap: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  composerPickerTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  composerPickerTab: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(100,116,139,0.45)',
+    backgroundColor: 'rgba(15,23,42,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  composerPickerTabActive: {
+    borderColor: 'rgba(16,185,129,0.75)',
+    backgroundColor: 'rgba(16,185,129,0.2)',
+  },
+  composerPickerTabText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_500Medium',
+  },
+  composerPickerTabTextActive: {
+    color: '#d1fae5',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  quickEmojiPanel: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(45,106,88,0.75)',
+    backgroundColor: 'rgba(2, 45, 35, 0.65)',
+    padding: 10,
+  },
+  quickEmojiBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15,23,42,0.5)',
+  },
+  quickEmojiText: {
+    fontSize: 22,
+    lineHeight: 26,
   },
   sendBtn: {
     width: 40,
@@ -3560,6 +4318,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  sheetCard: {
+    marginHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    maxHeight: '80%',
+  },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(2, 6, 23, 0.45)',
@@ -3706,5 +4475,67 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontFamily: 'BeVietnamPro_600SemiBold',
     fontSize: 14,
+  },
+  statusDetailsCard: {
+    minHeight: 260,
+  },
+  statusSection: {
+    marginTop: 8,
+  },
+  statusSectionTitle: {
+    color: '#0f172a',
+    fontFamily: 'BeVietnamPro_700Bold',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  statusEmptyText: {
+    color: '#64748b',
+    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 12,
+  },
+  statusList: {
+    maxHeight: 140,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  statusAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
+    backgroundColor: '#2f6657',
+  },
+  statusAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusAvatarText: {
+    color: '#d1fae5',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 12,
+  },
+  statusInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusName: {
+    color: '#0f172a',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 13,
+  },
+  statusMeta: {
+    color: '#64748b',
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 11,
+    marginTop: 2,
   },
 });

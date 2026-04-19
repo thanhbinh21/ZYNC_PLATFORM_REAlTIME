@@ -11,6 +11,7 @@ import { ConversationsService } from '../conversations/conversations.service';
 import { reportAndReviewMessage } from '../ai/moderation/moderation.service';
 import { ConversationMemberModel } from '../conversations/conversation-member.model';
 import { refreshPenaltyWindow } from '../ai/moderation/penalty-policy';
+import { UserModel } from '../users/user.model';
 
 // â”€â”€â”€ POST /api/messages/send â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -26,7 +27,19 @@ export const sendMessageHandler = (async (
       return next(new BadRequestError(`Validation error: ${validationResult.error.message}`));
     }
 
-    const { conversationId, content, type, mediaUrl, idempotencyKey } = validationResult.data;
+    const {
+      conversationId,
+      content,
+      type,
+      mediaUrl,
+      idempotencyKey,
+      replyToMessageRef,
+      replyToMessageId,
+      replyToPreview,
+      replyToSenderId,
+      replyToSenderDisplayName,
+      replyToType,
+    } = validationResult.data;
     const userId = req.userId;
 
     const membership = await ConversationMemberModel.findOne({
@@ -51,6 +64,19 @@ export const sendMessageHandler = (async (
     }
 
     // Create message
+    const replyRef = replyToMessageRef || replyToMessageId;
+    const replyTo = replyRef
+      ? {
+          messageRef: replyRef,
+          messageId: replyToMessageId,
+          senderId: replyToSenderId,
+          senderDisplayName: replyToSenderDisplayName,
+          contentPreview: replyToPreview,
+          type: replyToType,
+          isDeleted: false,
+        }
+      : undefined;
+
     const message = await MessagesService.createMessage(
       conversationId,
       userId,
@@ -58,6 +84,8 @@ export const sendMessageHandler = (async (
       type as MessageType,
       idempotencyKey,
       mediaUrl ?? undefined,
+      false,
+      replyTo,
     );
 
     res.status(201).json({
@@ -111,6 +139,8 @@ export const getMessageHistoryHandler = (async (
       const undeliveredIds = await MessagesService.findUndeliveredForUser(conversationId, userId);
 
       if (undeliveredIds.length > 0) {
+        const readerProfile = await UserModel.findById(userId).select('displayName avatarUrl').lean();
+
         // Use bulkWrite with upsert for safe update-or-insert
         const bulkOps = undeliveredIds.map((u) => ({
           updateOne: {
@@ -126,16 +156,28 @@ export const getMessageHistoryHandler = (async (
         }));
 
         MessageStatusModel.bulkWrite(bulkOps as any)
-          .then(() => {
+          .then(async () => {
+            await MessagesService.refreshReadByPreviewForReadEvents(
+              conversationId,
+              undeliveredIds.flatMap((item) => [item.id, item.idempotencyKey]),
+            );
+
             // Broadcast status update AFTER DB update completes (to ensure persistence)
             const io = getIO();
             if (io) {
               io.to(`conv:${conversationId}`).emit('status_update', {
+                conversationId,
                 messageIds: undeliveredIds.map((u) => u.id),
                 idempotencyKeys: undeliveredIds.map((u) => u.idempotencyKey),
                 status: 'read',
                 userId,
                 updatedAt: new Date(),
+                reader: {
+                  userId,
+                  displayName: readerProfile?.displayName || 'Nguoi dung',
+                  avatarUrl: readerProfile?.avatarUrl,
+                  readAt: new Date(),
+                },
               });
               logger.info(
                 `[Auto-mark] Marked ${undeliveredIds.length} messages as read for user ${userId} in conversation ${conversationId}`,

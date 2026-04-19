@@ -14,6 +14,7 @@ import { reportMessage, reactMessage } from '@/services/chat';
 interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
+  replyTo?: Message['replyTo'];
 }
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
@@ -402,7 +403,28 @@ function ChatPanel({
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messageRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const messagesRef = useRef<Message[]>(messages);
+  const onLoadMoreRef = useRef(onLoadMore);
+  const jumpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isJumpingRef = useRef(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
+  const [jumpStatus, setJumpStatus] = useState<string | null>(null);
+
+  messagesRef.current = messages;
+
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
+
+  useEffect(() => {
+    return () => {
+      if (jumpTimeoutRef.current) {
+        clearTimeout(jumpTimeoutRef.current);
+      }
+    };
+  }, []);
   const [activeSpeakerUserId, setActiveSpeakerUserId] = useState<string | null>(null);
 
   // Auto-scroll to bottom on new messages
@@ -556,6 +578,117 @@ function ChatPanel({
     }
   }, []);
 
+  const handleReplyMessage = useCallback((message: Message) => {
+    const senderDisplayName = (message as Message & { senderDisplayName?: string }).senderDisplayName
+      || (String(message.senderId) === String(currentUserId)
+        ? 'Ban'
+        : (!isGroupConversation ? participantName : undefined));
+
+    setReplyingTo({
+      messageRef: message.idempotencyKey || message._id,
+      messageId: message._id,
+      senderId: String(message.senderId),
+      senderDisplayName,
+      contentPreview: (message.content || '').slice(0, 160),
+      type: message.type,
+      isDeleted: false,
+    });
+  }, [currentUserId, isGroupConversation, participantName]);
+
+  const showJumpStatus = useCallback((message: string) => {
+    setJumpStatus(message);
+    if (jumpTimeoutRef.current) {
+      clearTimeout(jumpTimeoutRef.current);
+    }
+    jumpTimeoutRef.current = setTimeout(() => {
+      setJumpStatus(null);
+      jumpTimeoutRef.current = null;
+    }, 3500);
+  }, []);
+
+  const scrollToMessageElement = useCallback((targetMessageId: string) => {
+    const tryScroll = () => {
+      const element = messageRowRefs.current[targetMessageId];
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    requestAnimationFrame(tryScroll);
+    setTimeout(tryScroll, 120);
+  }, []);
+
+  const handleJumpToMessage = useCallback(async (messageRef: string) => {
+    if (!messageRef || isJumpingRef.current) {
+      return;
+    }
+
+    const findTarget = () => messagesRef.current.find(
+      (msg) => msg.idempotencyKey === messageRef || msg._id === messageRef,
+    );
+
+    const immediateTarget = findTarget();
+    if (immediateTarget) {
+      scrollToMessageElement(immediateTarget._id);
+      return;
+    }
+
+    isJumpingRef.current = true;
+
+    try {
+      let previousCount = messagesRef.current.length;
+      let stagnantTurns = 0;
+      const maxAttempts = 20;
+
+      const waitForMessagesGrowth = async (baselineCount: number): Promise<boolean> => {
+        const start = Date.now();
+        const timeoutMs = 1200;
+
+        while (Date.now() - start < timeoutMs) {
+          if (messagesRef.current.length > baselineCount) {
+            return true;
+          }
+          await new Promise<void>((resolve) => {
+            setTimeout(() => resolve(), 60);
+          });
+        }
+
+        return messagesRef.current.length > baselineCount;
+      };
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const beforeLoadCount = messagesRef.current.length;
+        await onLoadMoreRef.current();
+        const hasGrowth = await waitForMessagesGrowth(beforeLoadCount);
+
+        const found = findTarget();
+        if (found) {
+          scrollToMessageElement(found._id);
+          return;
+        }
+
+        const currentCount = messagesRef.current.length;
+        if (!hasGrowth || currentCount <= previousCount) {
+          stagnantTurns += 1;
+        } else {
+          stagnantTurns = 0;
+          previousCount = currentCount;
+        }
+
+        // No growth in consecutive attempts: likely no more accessible history for this user.
+        if (stagnantTurns >= 3) {
+          break;
+        }
+      }
+
+      showJumpStatus('Tin nhan khong the truy cap.');
+    } catch {
+      showJumpStatus('Khong the tai them tin nhan de di den tin goc.');
+    } finally {
+      isJumpingRef.current = false;
+    }
+  }, [scrollToMessageElement, showJumpStatus]);
+
   return (
     <article className="zync-glass-panel zync-glass-panel-strong relative grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
       {/* Header */}
@@ -628,6 +761,13 @@ function ChatPanel({
         <div className="bg-[#0d3a2e] border-b border-[#2a6057] px-5 py-2 text-sm text-[#aefcd6] flex items-center justify-between">
           <span>{reportStatus}</span>
           <button onClick={() => setReportStatus(null)} className="text-[#6bbda0] hover:text-white">✕</button>
+        </div>
+      )}
+
+      {jumpStatus && (
+        <div className="bg-[#4a2f11]/55 border-b border-[#8b5b23] px-5 py-2 text-sm text-[#ffd89f] flex items-center justify-between">
+          <span>{jumpStatus}</span>
+          <button onClick={() => setJumpStatus(null)} className="text-[#d8b277] hover:text-white">✕</button>
         </div>
       )}
 
@@ -856,23 +996,31 @@ function ChatPanel({
             )}
 
             {messages.map((message) => (
-              <MessageItem
+              <div
                 key={message._id}
-                message={message}
-                isSender={String(message.senderId) === String(currentUserId)}
-                canRecall={canRecallMessage(message.createdAt)}
-                senderAvatar={participantAvatar}
-                messageStatus={messageStatus}
-                onDeleteForMe={onDeleteMessageForMe}
-                onRecall={onRecallMessage}
-                onForward={onForwardMessage}
-                reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
-                onReactionUpsert={onReactionUpsert}
-                onReactionRemoveAllMine={onReactionRemoveAllMine}
-                onFetchReactionDetails={onFetchReactionDetails}
-                onReport={handleReportMessage}
-                onReact={handleReactMessage}
-              />
+                ref={(node) => {
+                  messageRowRefs.current[message._id] = node;
+                }}
+              >
+                <MessageItem
+                  message={message}
+                  isSender={String(message.senderId) === String(currentUserId)}
+                  canRecall={canRecallMessage(message.createdAt)}
+                  senderAvatar={participantAvatar}
+                  messageStatus={messageStatus}
+                  onDeleteForMe={onDeleteMessageForMe}
+                  onRecall={onRecallMessage}
+                  onForward={onForwardMessage}
+                  onReply={handleReplyMessage}
+                  onJumpToMessage={handleJumpToMessage}
+                  reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
+                  onReactionUpsert={onReactionUpsert}
+                  onReactionRemoveAllMine={onReactionRemoveAllMine}
+                  onFetchReactionDetails={onFetchReactionDetails}
+                  onReport={handleReportMessage}
+                  onReact={handleReactMessage}
+                />
+              </div>
             ))}
 
             {/* Typing Indicator */}
@@ -920,6 +1068,8 @@ function ChatPanel({
         onCancelPendingMessage={onCancelPendingMessage}
         onStartTyping={onStartTyping}
         onStopTyping={onStopTyping}
+        replyingTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
         isLoading={isLoading}
         disabled={!!userMutedUntil && new Date(userMutedUntil) > new Date()}
       />

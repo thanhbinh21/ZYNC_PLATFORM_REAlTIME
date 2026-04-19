@@ -12,6 +12,23 @@ export interface IStoryRef {
   thumbnail?: string;
 }
 
+export interface IReplyTo {
+  messageRef: string;
+  messageId?: string;
+  senderId?: string;
+  senderDisplayName?: string;
+  contentPreview?: string;
+  type?: string;
+  isDeleted?: boolean;
+}
+
+export interface IReadByPreviewItem {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  readAt: Date;
+}
+
 export interface IMessage extends Document {
   conversationId: string;
   senderId: string;
@@ -19,6 +36,7 @@ export interface IMessage extends Document {
   type: MessageType;
   mediaUrl?: string;
   storyRef?: IStoryRef;
+  replyTo?: IReplyTo;
   idempotencyKey: string;
   
     // Deletion fields
@@ -31,6 +49,7 @@ export interface IMessage extends Document {
   // Chat Reactions
   reactions?: Array<{ type: string; userId: string }>;
   moderationWarning?: boolean;
+  readByPreview?: IReadByPreviewItem[];
 
   createdAt: Date;
 }
@@ -53,6 +72,29 @@ const storyRefSchema = new Schema<IStoryRef>(
   { _id: false },
 );
 
+const replyToSchema = new Schema<IReplyTo>(
+  {
+    messageRef: { type: String, required: true },
+    messageId: { type: String },
+    senderId: { type: String },
+    senderDisplayName: { type: String },
+    contentPreview: { type: String },
+    type: { type: String },
+    isDeleted: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
+const readByPreviewSchema = new Schema<IReadByPreviewItem>(
+  {
+    userId: { type: String, required: true },
+    displayName: { type: String, required: true },
+    avatarUrl: { type: String },
+    readAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 const messageSchema = new Schema<IMessage>(
   {
     conversationId: { type: String, required: true },
@@ -68,11 +110,13 @@ const messageSchema = new Schema<IMessage>(
     },
     mediaUrl: { type: String },
     storyRef: { type: storyRefSchema },
+    replyTo: { type: replyToSchema },
     idempotencyKey: { type: String, required: true, unique: true },
     
     // Chat Reactions
     reactions: { type: [reactionSchema], default: [] },
     moderationWarning: { type: Boolean, default: false },
+    readByPreview: { type: [readByPreviewSchema], default: [] },
     
     // Deletion fields
     isDeleted: { type: Boolean, default: false },

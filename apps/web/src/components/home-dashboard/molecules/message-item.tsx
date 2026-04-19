@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
@@ -79,6 +80,8 @@ interface MessageItemProps {
   onDeleteForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecall?: (messageId: string, idempotencyKey: string) => void;
   onForward?: (message: Message) => void;
+  onReply?: (message: Message) => void;
+  onJumpToMessage?: (messageRef: string) => void;
   onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
   onReactionRemoveAllMine?: (message: Message) => void;
   onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
@@ -157,6 +160,110 @@ function ReactionDetailsModal({
   );
 }
 
+function StatusDetailsModal({
+  open,
+  message,
+  onClose,
+}: {
+  open: boolean;
+  message: Message;
+  onClose: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  const readBy = Array.isArray(message.readBy) ? message.readBy : [];
+  const sentTo = Array.isArray(message.sentTo) ? message.sentTo : [];
+
+  return (
+    <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] p-4 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h4 className="text-base font-semibold text-[#dffef2]">Thong ke da xem</h4>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf] hover:bg-[#145845]"
+          >
+            Dong
+          </button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
+            <p className="mb-2 text-xs uppercase tracking-wide text-[#8cc4b0]">Da xem ({readBy.length})</p>
+            {readBy.length === 0 ? (
+              <p className="text-sm text-[#8cc4b0]">Chua co ai da xem.</p>
+            ) : (
+              <div className="space-y-2">
+                {readBy.map((item) => (
+                  <div key={`read-${item.userId}`} className="rounded-md border border-[#1d5a49] bg-[#0b3a2f] px-2.5 py-2">
+                    <div className="flex items-center gap-2.5">
+                      {item.avatarUrl ? (
+                        <Image
+                          src={item.avatarUrl}
+                          alt={item.displayName || 'user'}
+                          width={28}
+                          height={28}
+                          className="h-7 w-7 rounded-full border border-[#1f5c4c] object-cover"
+                        />
+                      ) : (
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#1f5c4c] bg-[#1f5c4c] text-[11px] font-semibold text-[#dffef2]">
+                          {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#d6f8ec]">{item.displayName}</p>
+                        <p className="text-xs text-[#8cc4b0]">
+                          {new Date(item.readAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
+            <p className="mb-2 text-xs uppercase tracking-wide text-[#8cc4b0]">Chua doc ({sentTo.length})</p>
+            {sentTo.length === 0 ? (
+              <p className="text-sm text-[#8cc4b0]">Tat ca da doc.</p>
+            ) : (
+              <div className="space-y-2">
+                {sentTo.map((item) => (
+                  <div key={`sent-${item.userId}`} className="rounded-md border border-[#1d5a49] bg-[#0b3a2f] px-2.5 py-2">
+                    <div className="flex items-center gap-2.5">
+                      {item.avatarUrl ? (
+                        <Image
+                          src={item.avatarUrl}
+                          alt={item.displayName || 'user'}
+                          width={28}
+                          height={28}
+                          className="h-7 w-7 rounded-full border border-[#1f5c4c] object-cover"
+                        />
+                      ) : (
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#1f5c4c] bg-[#1f5c4c] text-[11px] font-semibold text-[#dffef2]">
+                          {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <p className="truncate text-sm font-medium text-[#d6f8ec]">{item.displayName}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function isGroupLifecycleNotice(message: Message): boolean {
   const normalized = message.content.trim().toLowerCase();
   if (!normalized) {
@@ -206,6 +313,8 @@ export function MessageItem({
   onDeleteForMe,
   onRecall,
   onForward,
+  onReply,
+  onJumpToMessage,
   onReactionUpsert,
   onReactionRemoveAllMine,
   onFetchReactionDetails,
@@ -215,6 +324,7 @@ export function MessageItem({
   const [showMenu, setShowMenu] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showReactionDetails, setShowReactionDetails] = useState(false);
+  const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [reactionDetailsLoading, setReactionDetailsLoading] = useState(false);
   const [reactionDetails, setReactionDetails] = useState<ReactionDetailsResponse | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -247,6 +357,10 @@ export function MessageItem({
     : DEFAULT_MENU_REACTIONS;
 
   const isRecalled = message.type === 'system-recall' && message.content === '[Tin nhan da duoc thu hoi]';
+  const canOpenReadStats = isSender
+    && status === 'read'
+    && !isRecalled
+    && (message.readByPreview?.length || 0) > 0;
 
   const handleClickOutside = useCallback((event: MouseEvent) => {
     if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -278,6 +392,11 @@ export function MessageItem({
     onForward?.(message);
     setShowMenu(false);
   }, [message, onForward]);
+
+  const handleReplyClick = useCallback(() => {
+    onReply?.(message);
+    setShowMenu(false);
+  }, [message, onReply]);
 
   const handleReactionClick = useCallback((emoji: string, source = 'menu') => {
     if (onReactionUpsert) {
@@ -344,6 +463,13 @@ export function MessageItem({
     setShowMenu(false);
   }, [message.idempotencyKey, message._id, onReport]);
 
+  const handleOpenReadStats = useCallback(() => {
+    if (!canOpenReadStats) {
+      return;
+    }
+    setShowStatusDetails(true);
+  }, [canOpenReadStats]);
+
   useEffect(() => {
     if (showMenu || showReactionPicker) {
       document.addEventListener('click', handleClickOutside);
@@ -390,13 +516,18 @@ export function MessageItem({
         loading={reactionDetailsLoading}
         onClose={() => setShowReactionDetails(false)}
       />
+      <StatusDetailsModal
+        open={showStatusDetails}
+        message={message}
+        onClose={() => setShowStatusDetails(false)}
+      />
 
       <div className="relative mb-2 max-w-full min-w-0 flex-1">
         <div className={`relative max-w-full ${isSender ? 'ml-auto w-fit' : 'w-fit'}`}>
           {!isRecalled && (
             <button
               onClick={() => setShowMenu((prev) => !prev)}
-              className={`absolute top-1 ${isSender ? '-left-7' : '-right-7'} inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1a4a3e]/90 hover:bg-[#1f5946] transition-colors z-30`}
+              className={`absolute top-1 ${isSender ? '-left-7' : '-right-7'} inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1a4a3e]/90 hover:bg-[#1f5946] transition-colors z-2`}
               title="Them tuy chon"
             >
               <EllipsisVerticalIcon className="h-3.5 w-3.5 text-[#88b8a7]" />
@@ -405,7 +536,7 @@ export function MessageItem({
 
           {!isRecalled && (
             <div
-              className={`absolute -top-2 z-30 flex items-center gap-1 ${isSender ? '-right-1' : 'left-10'}`}
+              className={`absolute -top-2 z-2 flex items-center gap-1 ${isSender ? '-right-1' : 'left-10'}`}
               onMouseEnter={showReactionPickerNow}
               onMouseLeave={hideReactionPickerDelayed}
             >
@@ -457,8 +588,13 @@ export function MessageItem({
             content={message.content}
             type={message.type}
             mediaUrl={message.mediaUrl}
+            replyTo={message.replyTo}
+            onJumpToMessage={onJumpToMessage}
             moderationWarning={Boolean((message as any).moderationWarning)}
             status={status}
+            readByPreview={message.readByPreview}
+            readByCount={message.readBy?.length}
+            onReadPreviewPress={canOpenReadStats ? handleOpenReadStats : undefined}
             timestamp={message.createdAt}
             senderAvatar={senderAvatar}
           />
@@ -494,6 +630,14 @@ export function MessageItem({
                 <ForwardIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Chuyen tiep</span>
               </button>
+
+              <button
+                onClick={handleReplyClick}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-t border-[#234a3f]"
+              >
+                <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Tra loi</span>
+              </button>
             </div>
           )}
 
@@ -522,6 +666,14 @@ export function MessageItem({
               >
                 <FlagIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Bao cao vi pham</span>
+              </button>
+
+              <button
+                onClick={handleReplyClick}
+                className="flex w-full items-center gap-3 border-t border-[#234a3f] px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+              >
+                <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+                <span>Tra loi</span>
               </button>
             </div>
           )}
