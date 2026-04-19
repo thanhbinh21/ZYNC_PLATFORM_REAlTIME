@@ -1438,9 +1438,10 @@ async function handleSendMessage(
 
         const sender = await UserModel.findById(userId).select('displayName').lean();
         const senderName = (sender?.displayName as string) ?? 'Someone';
-        const preview = typeof content === 'string'
-          ? content.slice(0, 100)
-          : (normalizedType === 'text' ? '' : `[${normalizedType}]`);
+        const rawText = typeof content === 'string' ? content.trim() : '';
+        const preview = rawText.length > 0
+          ? rawText.slice(0, 100)
+          : (normalizedType === 'text' ? 'Ban co tin nhan moi' : `[${normalizedType}]`);
 
         for (const member of members) {
           if (member.userId === userId) continue;

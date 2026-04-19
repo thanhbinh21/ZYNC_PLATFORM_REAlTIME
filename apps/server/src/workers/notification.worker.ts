@@ -65,6 +65,21 @@ export async function stopNotificationWorker(): Promise<void> {
 
 async function processNotification(payload: NotificationPayload): Promise<void> {
   const { userId, type, title, body, data, conversationId, fromUserId } = payload;
+  const safeTitle = typeof title === 'string' && title.trim().length > 0
+    ? title.trim()
+    : 'Thong bao moi';
+  const safeBody = typeof body === 'string' && body.trim().length > 0
+    ? body.trim()
+    : 'Ban co thong bao moi';
+
+  if (safeTitle !== title || safeBody !== body) {
+    logger.warn('Notification payload missing title/body; fallback text applied', {
+      userId,
+      type,
+      conversationId,
+    });
+  }
+
   const pref = await NotificationPreferenceModel.findOne({ userId }).lean();
 
   // E1.2 – Check mute
@@ -108,8 +123,8 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   const notificationDoc = await NotificationModel.create({
     userId,
     type,
-    title,
-    body,
+    title: safeTitle,
+    body: safeBody,
     data,
     conversationId,
     fromUserId,
@@ -162,7 +177,7 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   }
 
   const expiredTokenIds: string[] = [];
-  const pushPayload = { title, body };
+  const pushPayload = { title: safeTitle, body: safeBody };
   const pushData = data ?? {};
 
   // E1.9 – Route FCM: android tokens + web tokens without pushSubscription
@@ -192,7 +207,7 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
       for (const dt of webPushTokens) {
         const result = await sendWebPush(
           dt.pushSubscription!,
-          JSON.stringify({ title, body, data: pushData }),
+          JSON.stringify({ title: safeTitle, body: safeBody, data: pushData }),
         );
         if (result.expired) {
           expiredTokenIds.push(dt._id.toString());
