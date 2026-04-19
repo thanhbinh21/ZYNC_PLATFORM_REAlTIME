@@ -11,9 +11,10 @@ type PanelView = 'closed' | 'list' | 'settings';
 
 interface NotificationHubProps {
   onNavigate?: (notification: Notification) => void;
+  openSignal?: string | null;
 }
 
-export function NotificationHub({ onNavigate }: NotificationHubProps) {
+export function NotificationHub({ onNavigate, openSignal }: NotificationHubProps) {
   const {
     notifications,
     unreadCount,
@@ -33,6 +34,12 @@ export function NotificationHub({ onNavigate }: NotificationHubProps) {
   useEffect(() => {
     void loadNotifications();
   }, [loadNotifications]);
+
+  // Allow external trigger (from toast deep link) to open list
+  useEffect(() => {
+    if (!openSignal) return;
+    setView('list');
+  }, [openSignal]);
 
   const handleBellClick = useCallback(() => {
     setView((prev) => (prev === 'closed' ? 'list' : 'closed'));

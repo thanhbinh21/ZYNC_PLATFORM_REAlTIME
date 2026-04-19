@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { HomeDashboardScreen } from '@/components/home-dashboard/organisms/home-dashboard-screen';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
 import { HomeDashboardProfilePanel } from '@/components/home-dashboard/organisms/home-dashboard-profile-panel';
@@ -31,6 +31,7 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     data,
     loading,
@@ -131,6 +132,7 @@ export default function HomePage() {
   const [viewerGroupIdx, setViewerGroupIdx] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeNavId, setActiveNavId] = useState('chat');
+  const openNotificationsSignal = searchParams.get('openNotifications');
   const [profile, setProfile] = useState<MeUser | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -166,6 +168,34 @@ export default function HomePage() {
     document.documentElement.dataset['zyncTheme'] = appearanceSettings.theme;
     document.documentElement.dataset['zyncMessageSize'] = appearanceSettings.messageFontSize;
   }, [appearanceSettings.messageFontSize, appearanceSettings.theme]);
+
+  // Expose current nav for global toast logic
+  useEffect(() => {
+    (globalThis as Record<string, unknown>)['__zyncActiveNavId'] = activeNavId;
+  }, [activeNavId]);
+
+  // Deep link support from in-app toast: /home?nav=chat&conversationId=...
+  useEffect(() => {
+    const nav = searchParams.get('nav');
+    const conversationId = searchParams.get('conversationId');
+    if (nav !== 'chat' || !conversationId) return;
+
+    setActiveNavId('chat');
+    onSelectConversation(conversationId);
+
+    // Clean URL to avoid re-trigger on re-render/back-forward
+    router.replace('/home');
+  }, [onSelectConversation, router, searchParams]);
+
+  // Open notifications dropdown when requested (from summary toast)
+  useEffect(() => {
+    if (openNotificationsSignal !== '1') return;
+    // Let NotificationHub open itself via prop signal; then clean URL.
+    const t = setTimeout(() => {
+      router.replace('/home');
+    }, 0);
+    return () => clearTimeout(t);
+  }, [openNotificationsSignal, router]);
 
   const allFeed: StoryFeedGroup[] = useMemo(() => {
     const groups: StoryFeedGroup[] = [];
@@ -276,6 +306,7 @@ export default function HomePage() {
         onLogout={onLogout}
         notificationSlot={
           <NotificationHub
+            openSignal={openNotificationsSignal}
             onNavigate={(n) => {
               if (n.type === 'friend_request' || n.type === 'friend_accepted') {
                 router.push('/friends');
