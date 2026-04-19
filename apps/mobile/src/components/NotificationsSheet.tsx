@@ -4,7 +4,6 @@ import {
   Dimensions,
   FlatList,
   Modal,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,7 +12,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import type { AppNotification, NotificationAnchorRect } from '../services/notifications';
 import { colors } from '../theme/colors';
 
@@ -152,11 +150,8 @@ export function NotificationsSheet({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
-        </Pressable>
-
+      {/* `box-none` để không chặn tương tác với màn hình chính */}
+      <View style={styles.modalRoot} pointerEvents="box-none">
         <View
           style={[
             styles.dropdown,
@@ -167,7 +162,7 @@ export function NotificationsSheet({
               maxHeight: layout.listMaxHeight + 52 + 12,
             },
           ]}
-          pointerEvents="box-none"
+          pointerEvents="auto"
         >
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Thông báo</Text>
@@ -223,10 +218,6 @@ export function NotificationsSheet({
 const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   dropdown: {
     position: 'absolute',
