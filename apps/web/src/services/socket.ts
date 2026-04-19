@@ -224,9 +224,16 @@ export function listenToStatusUpdates(
     messageIds?: string[];
     messageId?: string;
     idempotencyKeys?: string[];
+    conversationId?: string;
     status: 'sent' | 'delivered' | 'read';
     userId: string;
     updatedAt: string;
+    reader?: {
+      userId: string;
+      displayName: string;
+      avatarUrl?: string;
+      readAt: string;
+    };
   }) => void,
 ): void {
   if (!socket) {

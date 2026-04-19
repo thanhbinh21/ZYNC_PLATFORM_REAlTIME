@@ -328,10 +328,21 @@ export function useChat({
       messageId?: string;
       messageIds?: string[];
       idempotencyKeys?: string[];
+      conversationId?: string;
       status: MessageStatus;
       userId: string;
       updatedAt: string;
+      reader?: {
+        userId: string;
+        displayName: string;
+        avatarUrl?: string;
+        readAt: string;
+      };
     }) => {
+      if (data.conversationId && data.conversationId !== conversationId) {
+        return;
+      }
+
       const ids = data.messageIds || [];
       const idems = data.idempotencyKeys || [];
 
@@ -361,6 +372,43 @@ export function useChat({
         // });
         return updated;
       });
+
+      if (data.status === 'read' && data.reader) {
+        const targetRefs = new Set<string>([
+          ...ids.map(String),
+          ...idems.map(String),
+          ...(data.messageId ? [String(data.messageId)] : []),
+        ]);
+
+        if (targetRefs.size === 0) {
+          return;
+        }
+
+        setMessages((prev) => prev.map((msg) => {
+          const messageRefs = [String(msg._id), String(msg.idempotencyKey || '')].filter(Boolean);
+          const isTarget = messageRefs.some((ref) => targetRefs.has(ref));
+
+          if (!isTarget) {
+            return msg;
+          }
+
+          const existingReadBy = Array.isArray(msg.readBy) ? msg.readBy : [];
+          const mergedReadBy = [data.reader!, ...existingReadBy.filter((item) => item.userId !== data.reader!.userId)]
+            .sort((a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime());
+
+          const sentTo = Array.isArray(msg.sentTo)
+            ? msg.sentTo.filter((item) => item.userId !== data.reader!.userId)
+            : msg.sentTo;
+
+          return {
+            ...msg,
+            status: 'read' as MessageStatus,
+            readBy: mergedReadBy,
+            readByPreview: mergedReadBy.slice(0, 3),
+            sentTo,
+          };
+        }));
+      }
     };
 
     try {

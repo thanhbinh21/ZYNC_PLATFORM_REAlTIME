@@ -22,6 +22,13 @@ export interface IReplyTo {
   isDeleted?: boolean;
 }
 
+export interface IReadByPreviewItem {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  readAt: Date;
+}
+
 export interface IMessage extends Document {
   conversationId: string;
   senderId: string;
@@ -42,6 +49,7 @@ export interface IMessage extends Document {
   // Chat Reactions
   reactions?: Array<{ type: string; userId: string }>;
   moderationWarning?: boolean;
+  readByPreview?: IReadByPreviewItem[];
 
   createdAt: Date;
 }
@@ -77,6 +85,16 @@ const replyToSchema = new Schema<IReplyTo>(
   { _id: false },
 );
 
+const readByPreviewSchema = new Schema<IReadByPreviewItem>(
+  {
+    userId: { type: String, required: true },
+    displayName: { type: String, required: true },
+    avatarUrl: { type: String },
+    readAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 const messageSchema = new Schema<IMessage>(
   {
     conversationId: { type: String, required: true },
@@ -98,6 +116,7 @@ const messageSchema = new Schema<IMessage>(
     // Chat Reactions
     reactions: { type: [reactionSchema], default: [] },
     moderationWarning: { type: Boolean, default: false },
+    readByPreview: { type: [readByPreviewSchema], default: [] },
     
     // Deletion fields
     isDeleted: { type: Boolean, default: false },

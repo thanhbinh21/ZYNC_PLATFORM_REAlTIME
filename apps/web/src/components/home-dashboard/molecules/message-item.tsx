@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
@@ -159,6 +160,110 @@ function ReactionDetailsModal({
   );
 }
 
+function StatusDetailsModal({
+  open,
+  message,
+  onClose,
+}: {
+  open: boolean;
+  message: Message;
+  onClose: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  const readBy = Array.isArray(message.readBy) ? message.readBy : [];
+  const sentTo = Array.isArray(message.sentTo) ? message.sentTo : [];
+
+  return (
+    <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] p-4 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h4 className="text-base font-semibold text-[#dffef2]">Thong ke da xem</h4>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf] hover:bg-[#145845]"
+          >
+            Dong
+          </button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
+            <p className="mb-2 text-xs uppercase tracking-wide text-[#8cc4b0]">Da xem ({readBy.length})</p>
+            {readBy.length === 0 ? (
+              <p className="text-sm text-[#8cc4b0]">Chua co ai da xem.</p>
+            ) : (
+              <div className="space-y-2">
+                {readBy.map((item) => (
+                  <div key={`read-${item.userId}`} className="rounded-md border border-[#1d5a49] bg-[#0b3a2f] px-2.5 py-2">
+                    <div className="flex items-center gap-2.5">
+                      {item.avatarUrl ? (
+                        <Image
+                          src={item.avatarUrl}
+                          alt={item.displayName || 'user'}
+                          width={28}
+                          height={28}
+                          className="h-7 w-7 rounded-full border border-[#1f5c4c] object-cover"
+                        />
+                      ) : (
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#1f5c4c] bg-[#1f5c4c] text-[11px] font-semibold text-[#dffef2]">
+                          {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#d6f8ec]">{item.displayName}</p>
+                        <p className="text-xs text-[#8cc4b0]">
+                          {new Date(item.readAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
+            <p className="mb-2 text-xs uppercase tracking-wide text-[#8cc4b0]">Chua doc ({sentTo.length})</p>
+            {sentTo.length === 0 ? (
+              <p className="text-sm text-[#8cc4b0]">Tat ca da doc.</p>
+            ) : (
+              <div className="space-y-2">
+                {sentTo.map((item) => (
+                  <div key={`sent-${item.userId}`} className="rounded-md border border-[#1d5a49] bg-[#0b3a2f] px-2.5 py-2">
+                    <div className="flex items-center gap-2.5">
+                      {item.avatarUrl ? (
+                        <Image
+                          src={item.avatarUrl}
+                          alt={item.displayName || 'user'}
+                          width={28}
+                          height={28}
+                          className="h-7 w-7 rounded-full border border-[#1f5c4c] object-cover"
+                        />
+                      ) : (
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#1f5c4c] bg-[#1f5c4c] text-[11px] font-semibold text-[#dffef2]">
+                          {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <p className="truncate text-sm font-medium text-[#d6f8ec]">{item.displayName}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function isGroupLifecycleNotice(message: Message): boolean {
   const normalized = message.content.trim().toLowerCase();
   if (!normalized) {
@@ -219,6 +324,7 @@ export function MessageItem({
   const [showMenu, setShowMenu] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [showReactionDetails, setShowReactionDetails] = useState(false);
+  const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [reactionDetailsLoading, setReactionDetailsLoading] = useState(false);
   const [reactionDetails, setReactionDetails] = useState<ReactionDetailsResponse | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -251,6 +357,10 @@ export function MessageItem({
     : DEFAULT_MENU_REACTIONS;
 
   const isRecalled = message.type === 'system-recall' && message.content === '[Tin nhan da duoc thu hoi]';
+  const canOpenReadStats = isSender
+    && status === 'read'
+    && !isRecalled
+    && (message.readByPreview?.length || 0) > 0;
 
   const handleClickOutside = useCallback((event: MouseEvent) => {
     if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -353,6 +463,13 @@ export function MessageItem({
     setShowMenu(false);
   }, [message.idempotencyKey, message._id, onReport]);
 
+  const handleOpenReadStats = useCallback(() => {
+    if (!canOpenReadStats) {
+      return;
+    }
+    setShowStatusDetails(true);
+  }, [canOpenReadStats]);
+
   useEffect(() => {
     if (showMenu || showReactionPicker) {
       document.addEventListener('click', handleClickOutside);
@@ -398,6 +515,11 @@ export function MessageItem({
         details={reactionDetails}
         loading={reactionDetailsLoading}
         onClose={() => setShowReactionDetails(false)}
+      />
+      <StatusDetailsModal
+        open={showStatusDetails}
+        message={message}
+        onClose={() => setShowStatusDetails(false)}
       />
 
       <div className="relative mb-2 max-w-full min-w-0 flex-1">
@@ -470,6 +592,9 @@ export function MessageItem({
             onJumpToMessage={onJumpToMessage}
             moderationWarning={Boolean((message as any).moderationWarning)}
             status={status}
+            readByPreview={message.readByPreview}
+            readByCount={message.readBy?.length}
+            onReadPreviewPress={canOpenReadStats ? handleOpenReadStats : undefined}
             timestamp={message.createdAt}
             senderAvatar={senderAvatar}
           />

@@ -66,6 +66,16 @@ export interface MessageReplyTo {
   isDeleted?: boolean;
 }
 
+export interface MessageReadParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+export interface MessageReadParticipantWithTime extends MessageReadParticipant {
+  readAt: string;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -80,6 +90,9 @@ export interface Message {
   createdAt: string;
   reactionSummary?: MessageReactionSummary;
   reactionUserState?: MessageReactionUserState;
+  readBy?: MessageReadParticipantWithTime[];
+  readByPreview?: MessageReadParticipantWithTime[];
+  sentTo?: MessageReadParticipant[];
 }
 
 // Kiểu dữ liệu Story
@@ -137,9 +150,14 @@ export interface ReceiveMessagePayload {
 }
 
 export interface StatusUpdatePayload {
-  messageId: string;
+  messageId?: string;
+  messageIds?: string[];
+  idempotencyKeys?: string[];
+  conversationId?: string;
   status: MessageStatus;
   userId: string;
+  updatedAt?: string;
+  reader?: MessageReadParticipantWithTime;
 }
 
 export interface TypingIndicatorPayload {

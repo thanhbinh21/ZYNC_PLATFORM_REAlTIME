@@ -869,6 +869,7 @@ async function emitCallSummaryMessage(
   });
 
   io.to(`conv:${params.conversationId}`).emit('status_update', {
+    conversationId: params.conversationId,
     messageId: message._id,
     status: 'sent',
     userId: params.senderId,
@@ -1239,6 +1240,7 @@ async function handleSendMessage(
 
     // ─── Emit Status Update to ALL (including sender) ───
     io.to(`conv:${conversationId}`).emit('status_update', {
+      conversationId,
       messageId: message._id,
       status: 'sent',
       userId,
@@ -1394,18 +1396,32 @@ async function handleMessageRead(
 
   // ─── Batch Update Message Status ───
   try {
+    const refs = messageIds.map((value) => String(value));
+
     for (const messageId of messageIds) {
       await MessagesService.markAsRead(messageId as string, userId);
     }
+
+    await MessagesService.refreshReadByPreviewForReadEvents(conversationId as string, refs);
+
+    const readerProfile = await UserModel.findById(userId).select('displayName avatarUrl').lean();
+    const readAt = new Date();
 
     // ─── Simply emit read status back to sender ───
     // Note: We don't query MongoDB for aggregation here because it's async
     // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
-      messageIds,
+      conversationId,
+      messageIds: refs,
       status: 'read',
       userId,
-      updatedAt: new Date(),
+      updatedAt: readAt,
+      reader: {
+        userId,
+        displayName: readerProfile?.displayName || 'Nguoi dung',
+        avatarUrl: readerProfile?.avatarUrl,
+        readAt,
+      },
     });
 
     logger.debug(`Marked ${messageIds.length} messages as read by ${userId}`);
@@ -1463,6 +1479,7 @@ async function handleMessageDelivered(
     // Note: We don't query MongoDB for aggregation here because it's async
     // and may not reflect the just-updated status. Frontend will fetch latest via API.
     io.to(`conv:${conversationId}`).emit('status_update', {
+      conversationId,
       messageIds,
       status: 'delivered',
       userId,

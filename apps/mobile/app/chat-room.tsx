@@ -35,6 +35,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
 import { MessagePreviewOverlay } from '../src/components/MessagePreviewOverlay';
 
+interface MessageReadParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+interface MessageReadParticipantWithTime extends MessageReadParticipant {
+  readAt: string;
+}
+
 interface Message {
   _id: string;
   conversationId?: string;
@@ -63,6 +73,9 @@ interface Message {
     totalCount: number;
     emojiCounts: Record<string, number>;
   };
+  readBy?: MessageReadParticipantWithTime[];
+  readByPreview?: MessageReadParticipantWithTime[];
+  sentTo?: MessageReadParticipant[];
 }
 
 interface SendMessageOptions {
@@ -249,6 +262,71 @@ function normalizeMessage(raw: unknown): Message | null {
       }
       : undefined;
 
+  const normalizeReadParticipant = (value: unknown): MessageReadParticipant | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const item = value as Record<string, unknown>;
+    const rawUserId = item.userId ?? item._id;
+    if (!rawUserId) {
+      return null;
+    }
+
+    return {
+      userId: String(rawUserId),
+      displayName: typeof item.displayName === 'string' && item.displayName.trim().length > 0
+        ? item.displayName
+        : 'Nguoi dung',
+      avatarUrl: typeof item.avatarUrl === 'string' ? item.avatarUrl : undefined,
+    };
+  };
+
+  const normalizeReadParticipantWithTime = (value: unknown): MessageReadParticipantWithTime | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const base = normalizeReadParticipant(value);
+    if (!base) {
+      return null;
+    }
+
+    const item = value as Record<string, unknown>;
+    const readAt = typeof item.readAt === 'string'
+      ? item.readAt
+      : new Date().toISOString();
+
+    return {
+      ...base,
+      readAt,
+    };
+  };
+
+  const normalizeReadBy = (rawList: unknown): MessageReadParticipantWithTime[] | undefined => {
+    if (!Array.isArray(rawList)) {
+      return undefined;
+    }
+
+    return rawList
+      .map((item) => normalizeReadParticipantWithTime(item))
+      .filter((item): item is MessageReadParticipantWithTime => Boolean(item));
+  };
+
+  const normalizeSentTo = (rawList: unknown): MessageReadParticipant[] | undefined => {
+    if (!Array.isArray(rawList)) {
+      return undefined;
+    }
+
+    return rawList
+      .map((item) => normalizeReadParticipant(item))
+      .filter((item): item is MessageReadParticipant => Boolean(item));
+  };
+
+  const normalizedReadBy = normalizeReadBy(data.readBy);
+  const normalizedReadByPreview = normalizeReadBy(data.readByPreview);
+  const normalizedSentTo = normalizeSentTo(data.sentTo);
+
   return {
     _id: String(rawId),
     conversationId: typeof data.conversationId === 'string' ? data.conversationId : undefined,
@@ -262,6 +340,9 @@ function normalizeMessage(raw: unknown): Message | null {
     replyTo: normalizedReplyTo && normalizedReplyTo.messageRef ? normalizedReplyTo : undefined,
     reactionSummary: normalizedReactionSummary,
     reactionUserState: normalizedReactionUserState,
+    readBy: normalizedReadBy,
+    readByPreview: normalizedReadByPreview,
+    sentTo: normalizedSentTo,
   };
 }
 
@@ -322,24 +403,59 @@ function resolveMessageRef(message: Message): string {
   return message.idempotencyKey || message._id;
 }
 
-function MessageStatusTicks({ status }: { status?: string }) {
-  if (!status) return null;
-
-  let iconName: 'checkmark' | 'checkmark-done' = 'checkmark';
-  let color = '#64748b';
-
-  switch (status) {
-    case 'delivered':
-      iconName = 'checkmark-done';
-      break;
-    case 'read':
-      iconName = 'checkmark-done';
-      break;
-    default:
-      break;
+function MessageReceiptIndicator({
+  message,
+  onPressReadPreview,
+}: {
+  message: Message;
+  onPressReadPreview?: () => void;
+}) {
+  if (!message.status || message.type === 'system-recall') {
+    return null;
   }
 
-  return <Ionicons name={iconName} size={14} color={color} style={{ marginLeft: 4 }} />;
+  if (message.status === 'delivered') {
+    return <Ionicons name="checkmark" size={14} color="#64748b" style={{ marginLeft: 4 }} />;
+  }
+
+  if (message.status !== 'read') {
+    return null;
+  }
+
+  const preview = Array.isArray(message.readByPreview) ? message.readByPreview : [];
+  if (preview.length === 0) {
+    return null;
+  }
+
+  const visibleReadCount = Array.isArray(message.readBy) && message.readBy.length > 0
+    ? message.readBy.length
+    : preview.length;
+
+  return (
+    <Pressable style={bubbleStyles.readPreviewButton} onPress={onPressReadPreview}>
+      <View style={bubbleStyles.readPreviewStack}>
+        {preview.map((reader) => {
+          const hasAvatar = Boolean(reader.avatarUrl);
+          return hasAvatar ? (
+            <Image
+              key={`reader-${reader.userId}`}
+              source={{ uri: reader.avatarUrl }}
+              style={bubbleStyles.readPreviewAvatar}
+            />
+          ) : (
+            <View key={`reader-${reader.userId}`} style={[bubbleStyles.readPreviewAvatar, bubbleStyles.readPreviewFallback]}>
+              <Text style={bubbleStyles.readPreviewFallbackText}>
+                {(reader.displayName || 'U').slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+      {visibleReadCount > preview.length && (
+        <Text style={bubbleStyles.readPreviewMore}>+{visibleReadCount - preview.length}</Text>
+      )}
+    </Pressable>
+  );
 }
 
 function TypingIndicator({ typingUsers }: { typingUsers: string[] }) {
@@ -527,6 +643,8 @@ export default function ChatRoomScreen() {
   const [reactionSheetLoading, setReactionSheetLoading] = useState(false);
   const [reactionSheetData, setReactionSheetData] = useState<ReactionDetailsResponse | null>(null);
   const [reactionSheetTab, setReactionSheetTab] = useState('ALL');
+  const [statusDetailsVisible, setStatusDetailsVisible] = useState(false);
+  const [statusDetailsMessage, setStatusDetailsMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
 
   const {
@@ -548,6 +666,20 @@ export default function ChatRoomScreen() {
 
   const notifyInaccessibleReplyTarget = useCallback(() => {
     Alert.alert('Thong bao', 'Tin nhan khong the truy cap.');
+  }, []);
+
+  const openStatusDetails = useCallback((message: Message) => {
+    if (message.status !== 'read' || (message.readByPreview?.length || 0) === 0) {
+      return;
+    }
+
+    setStatusDetailsMessage(message);
+    setStatusDetailsVisible(true);
+  }, []);
+
+  const closeStatusDetails = useCallback(() => {
+    setStatusDetailsVisible(false);
+    setStatusDetailsMessage(null);
   }, []);
 
   const scrollToBottom = useCallback((animated = true) => {
@@ -1208,6 +1340,8 @@ export default function ChatRoomScreen() {
     setReactionSheetVisible(false);
     setReactionSheetData(null);
     setReactionSheetTab('ALL');
+    setStatusDetailsVisible(false);
+    setStatusDetailsMessage(null);
     jumpTargetRef.current = null;
   }, [conversationId]);
 
@@ -1449,9 +1583,20 @@ export default function ChatRoomScreen() {
       messageId?: string;
       messageIds?: string[];
       idempotencyKeys?: string[];
+      conversationId?: string;
       status?: Message['status'];
+      reader?: {
+        userId: string;
+        displayName: string;
+        avatarUrl?: string;
+        readAt: string;
+      };
     }) => {
       if (!data.status) return;
+
+      if (data.conversationId && data.conversationId !== conversationId) {
+        return;
+      }
 
       const messageIds = Array.isArray(data.messageIds) ? data.messageIds.map(String) : [];
       if (data.messageId) {
@@ -1474,9 +1619,29 @@ export default function ChatRoomScreen() {
           return message;
         }
 
+        if (data.status !== 'read' || !data.reader) {
+          return {
+            ...message,
+            status: data.status,
+          };
+        }
+
+        const currentReadBy = Array.isArray(message.readBy) ? message.readBy : [];
+        const mergedReadBy = [
+          data.reader,
+          ...currentReadBy.filter((entry) => entry.userId !== data.reader!.userId),
+        ].sort((a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime());
+
+        const sentTo = Array.isArray(message.sentTo)
+          ? message.sentTo.filter((entry) => entry.userId !== data.reader!.userId)
+          : message.sentTo;
+
         return {
           ...message,
-          status: data.status,
+          status: 'read',
+          readBy: mergedReadBy,
+          readByPreview: mergedReadBy.slice(0, 3),
+          sentTo,
         };
       }));
     };
@@ -2016,7 +2181,12 @@ export default function ChatRoomScreen() {
                 <Text style={[bubbleStyles.time, isMe && bubbleStyles.timeMe]}>
                   {formatTime(message.createdAt)}
                 </Text>
-                {isMe && <MessageStatusTicks status={message.status} />}
+                {isMe && (
+                  <MessageReceiptIndicator
+                    message={message}
+                    onPressReadPreview={() => openStatusDetails(message)}
+                  />
+                )}
               </View>
             </View>
 
@@ -2056,6 +2226,7 @@ export default function ChatRoomScreen() {
       getReactionUserStateForMessage,
       handleDeleteForMe,
       handleOpenMedia,
+      openStatusDetails,
       handleQuickAddFromTrigger,
       handleRecall,
       isGroup,
@@ -2385,6 +2556,83 @@ export default function ChatRoomScreen() {
                     <Text style={styles.leaveGroupText}>Roi nhom</Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={statusDetailsVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={closeStatusDetails}
+          >
+            <View style={styles.sheetOverlay}>
+              <View style={[styles.sheetCard, styles.statusDetailsCard]}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Thong ke da xem</Text>
+                  <TouchableOpacity style={styles.sheetCloseBtn} onPress={closeStatusDetails}>
+                    <Text style={styles.sheetCloseText}>Dong</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.statusSection}>
+                  <Text style={styles.statusSectionTitle}>
+                    Da xem ({statusDetailsMessage?.readBy?.length || 0})
+                  </Text>
+                  {(statusDetailsMessage?.readBy?.length || 0) === 0 ? (
+                    <Text style={styles.statusEmptyText}>Chua co ai da xem.</Text>
+                  ) : (
+                    <ScrollView style={styles.statusList}>
+                      {(statusDetailsMessage?.readBy || []).map((item) => (
+                        <View key={`read-${item.userId}`} style={styles.statusRow}>
+                          {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.statusAvatar} />
+                          ) : (
+                            <View style={[styles.statusAvatar, styles.statusAvatarFallback]}>
+                              <Text style={styles.statusAvatarText}>
+                                {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.statusInfo}>
+                            <Text style={styles.statusName}>{item.displayName}</Text>
+                            <Text style={styles.statusMeta}>
+                              {new Date(item.readAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+
+                <View style={styles.statusSection}>
+                  <Text style={styles.statusSectionTitle}>
+                    Chua doc ({statusDetailsMessage?.sentTo?.length || 0})
+                  </Text>
+                  {(statusDetailsMessage?.sentTo?.length || 0) === 0 ? (
+                    <Text style={styles.statusEmptyText}>Tat ca da doc.</Text>
+                  ) : (
+                    <ScrollView style={styles.statusList}>
+                      {(statusDetailsMessage?.sentTo || []).map((item) => (
+                        <View key={`sent-${item.userId}`} style={styles.statusRow}>
+                          {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.statusAvatar} />
+                          ) : (
+                            <View style={[styles.statusAvatar, styles.statusAvatarFallback]}>
+                              <Text style={styles.statusAvatarText}>
+                                {(item.displayName || 'U').slice(0, 1).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.statusInfo}>
+                            <Text style={styles.statusName}>{item.displayName}</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
               </View>
             </View>
           </Modal>
@@ -2982,6 +3230,43 @@ const bubbleStyles = StyleSheet.create({
   },
   timeMe: {
     color: 'rgba(17,24,39,0.6)',
+  },
+  readPreviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.14)',
+  },
+  readPreviewStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  readPreviewAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -4,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: '#2f6657',
+  },
+  readPreviewFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readPreviewFallbackText: {
+    color: '#d1fae5',
+    fontSize: 9,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  readPreviewMore: {
+    marginLeft: 4,
+    color: '#334155',
+    fontSize: 10,
+    fontFamily: 'BeVietnamPro_600SemiBold',
   },
   reactionRow: {
     flexDirection: 'row',
@@ -3657,6 +3942,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  sheetCard: {
+    marginHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    maxHeight: '80%',
+  },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(2, 6, 23, 0.45)',
@@ -3803,5 +4099,67 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontFamily: 'BeVietnamPro_600SemiBold',
     fontSize: 14,
+  },
+  statusDetailsCard: {
+    minHeight: 260,
+  },
+  statusSection: {
+    marginTop: 8,
+  },
+  statusSectionTitle: {
+    color: '#0f172a',
+    fontFamily: 'BeVietnamPro_700Bold',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  statusEmptyText: {
+    color: '#64748b',
+    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 12,
+  },
+  statusList: {
+    maxHeight: 140,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  statusAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
+    backgroundColor: '#2f6657',
+  },
+  statusAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusAvatarText: {
+    color: '#d1fae5',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 12,
+  },
+  statusInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusName: {
+    color: '#0f172a',
+    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 13,
+  },
+  statusMeta: {
+    color: '#64748b',
+    fontFamily: 'BeVietnamPro_400Regular',
+    fontSize: 11,
+    marginTop: 2,
   },
 });

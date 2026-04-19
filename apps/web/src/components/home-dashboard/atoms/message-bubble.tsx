@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import type { MessageStatus, MessageReplyTo } from '@zync/shared-types';
+import type { MessageStatus, MessageReplyTo, MessageReadParticipantWithTime } from '@zync/shared-types';
 import { GetFileIcon } from './file-type-icons';
 
 function CheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
@@ -10,21 +10,6 @@ function CheckCircleIcon({ filled, className }: { filled: boolean; className: st
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
       <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-function DoubleCheckCircleIcon({ filled, className }: { filled: boolean; className: string }) {
-  return (
-    <div className="relative inline-flex">
-      <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className={`${className} absolute`} aria-hidden>
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} className={`${className} relative`} style={{ marginLeft: '-6px' }} aria-hidden>
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 12l2.5 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
   );
 }
 
@@ -55,6 +40,9 @@ interface MessageBubbleProps {
   onJumpToMessage?: (messageRef: string) => void;
   moderationWarning?: boolean;
   status?: MessageStatus;
+  readByPreview?: MessageReadParticipantWithTime[];
+  readByCount?: number;
+  onReadPreviewPress?: () => void;
   timestamp: string;
   senderAvatar?: string;
 }
@@ -68,6 +56,9 @@ export function MessageBubble({
   onJumpToMessage,
   moderationWarning = false,
   status,
+  readByPreview = [],
+  readByCount = 0,
+  onReadPreviewPress,
   timestamp,
   senderAvatar,
 }: MessageBubbleProps) {
@@ -83,11 +74,9 @@ export function MessageBubble({
     ? senderAvatar.slice(0, 2).toUpperCase()
     : 'U';
 
-  const statusIcon = {
-    sent: <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
-    delivered: <DoubleCheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />,
-    read: <DoubleCheckCircleIcon filled={true} className="w-4 h-4 text-[#88b8a7]" />,
-  }[status || 'sent'];
+  const previewReaders = Array.isArray(readByPreview) ? readByPreview : [];
+  const visibleReadCount = readByCount > 0 ? readByCount : previewReaders.length;
+  const hasReadPreview = isOwn && type !== 'system-recall' && status === 'read' && previewReaders.length > 0;
 
   return (
     <div className={`flex gap-2 mb-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -191,11 +180,47 @@ export function MessageBubble({
         <div className={`flex items-center gap-1 mt-1 text-xs text-[#88b8a7] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           <span>{timeStr}</span>
           {moderationWarning && type !== 'system-recall' && (
-            <span className="inline-flex items-center text-[11px] text-yellow-400" title="Tin nhắn cảnh báo nội dung">
+            <span className="inline-flex items-center text-[11px] text-yellow-400" title="Tin nhan canh bao noi dung">
               ⚠
             </span>
           )}
-          {type !== 'system-recall' && isOwn && statusIcon}
+          {type !== 'system-recall' && isOwn && status === 'delivered' && (
+            <CheckCircleIcon filled={false} className="w-4 h-4 text-[#88b8a7]" />
+          )}
+          {hasReadPreview && (
+            <button
+              type="button"
+              onClick={onReadPreviewPress}
+              className="inline-flex items-center gap-1 rounded-full border border-[#2f6657] bg-[#0f4335]/70 px-1.5 py-0.5 hover:bg-[#165647]"
+              title="Xem chi tiet da xem"
+            >
+              <span className="inline-flex -space-x-2">
+                {previewReaders.map((reader) => {
+                  const hasAvatar = Boolean(reader.avatarUrl && /^(https?:\/\/|\/)/.test(reader.avatarUrl));
+                  return hasAvatar ? (
+                    <Image
+                      key={`read-${reader.userId}`}
+                      src={reader.avatarUrl!}
+                      alt={reader.displayName || 'reader'}
+                      width={16}
+                      height={16}
+                      className="h-4 w-4 rounded-full border border-[#0d2f26] object-cover"
+                    />
+                  ) : (
+                    <span
+                      key={`read-${reader.userId}`}
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#0d2f26] bg-[#1f5c4c] text-[9px] font-semibold text-[#dffef2]"
+                    >
+                      {(reader.displayName || 'U').slice(0, 1).toUpperCase()}
+                    </span>
+                  );
+                })}
+              </span>
+              {visibleReadCount > previewReaders.length && (
+                <span className="text-[10px] text-[#bde8d9]">+{visibleReadCount - previewReaders.length}</span>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
