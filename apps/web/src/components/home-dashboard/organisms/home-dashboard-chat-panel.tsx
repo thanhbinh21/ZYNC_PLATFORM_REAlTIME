@@ -1573,6 +1573,9 @@ export function HomeDashboardChatPanel({
   const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
   const [groupManageError, setGroupManageError] = useState<string | null>(null);
   const [groupManageSuccess, setGroupManageSuccess] = useState<string | null>(null);
+  const [isRemoveMemberConfirmOpen, setIsRemoveMemberConfirmOpen] = useState(false);
+  const [removeMemberTargetId, setRemoveMemberTargetId] = useState<string | null>(null);
+  const [isDisbandConfirmOpen, setIsDisbandConfirmOpen] = useState(false);
   const [locallyRemovedConversationIds, setLocallyRemovedConversationIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupQuery, setGroupQuery] = useState('');
@@ -1590,20 +1593,6 @@ export function HomeDashboardChatPanel({
     setIsArchiveOpen(false);
     setIsMembersViewOpen(false);
   }, [selectedConversationId]);
-
-  useEffect(() => {
-    if (!groupManageSuccess) {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      setGroupManageSuccess(null);
-    }, 3000);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [groupManageSuccess]);
 
   const visibleConversations = conversationItems.filter(
     (item) => !locallyRemovedConversationIds.includes(item.id),
@@ -1814,14 +1803,20 @@ export function HomeDashboardChatPanel({
       return;
     }
 
-    const confirmed = globalThis.confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?');
-    if (!confirmed) {
+    setRemoveMemberTargetId(memberId);
+    setIsRemoveMemberConfirmOpen(true);
+  };
+
+  const handleConfirmRemoveMember = async () => {
+    if (!onRemoveGroupMember || !selectedConversationId || !removeMemberTargetId) {
       return;
     }
 
     try {
       setGroupManageError(null);
-      await onRemoveGroupMember(selectedConversationId, memberId);
+      await onRemoveGroupMember(selectedConversationId, removeMemberTargetId);
+      setIsRemoveMemberConfirmOpen(false);
+      setRemoveMemberTargetId(null);
     } catch {
       setGroupManageError('Không thể xóa thành viên. Vui lòng thử lại.');
     }
@@ -1832,8 +1827,11 @@ export function HomeDashboardChatPanel({
       return;
     }
 
-    const confirmed = globalThis.confirm('Giải tán nhóm sẽ xóa toàn bộ nhóm. Bạn có chắc muốn tiếp tục?');
-    if (!confirmed) {
+    setIsDisbandConfirmOpen(true);
+  };
+
+  const handleConfirmDisbandGroup = async () => {
+    if (!onDisbandGroup || !selectedConversationId) {
       return;
     }
 
@@ -1852,6 +1850,7 @@ export function HomeDashboardChatPanel({
 
       setIsManageGroupOpen(false);
       setIsInfoOpen(false);
+      setIsDisbandConfirmOpen(false);
       setGroupManageSuccess('Nhóm đã giải tán');
     } catch {
       setGroupManageError('Không thể giải tán nhóm. Vui lòng thử lại.');
@@ -2110,20 +2109,8 @@ export function HomeDashboardChatPanel({
                   )}
                 </div>
 
-                {(isConversationMuted || isConversationPinned) && (
-                  <p className="mb-5 rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-3 py-2 text-xs text-[#bfead9]">
-                    {isConversationPinned ? 'Đã ghim hội thoại. ' : ''}
-                    {isConversationMuted ? 'Đang tắt thông báo cho hội thoại này.' : ''}
-                  </p>
-                )}
-
                 {!isGroupConversation && (
                   <>
-                    <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
-                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Nhắc hẹn</p>
-                      <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
-                      <p className="text-sm text-[#d6f8ec]">22 nhóm chung</p>
-                    </div>
                     <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
                       <div className="grid grid-cols-4 gap-2">
@@ -2207,11 +2194,6 @@ export function HomeDashboardChatPanel({
                       >
                         Xem thành viên
                       </button>
-                    </div>
-                    <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
-                      <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
-                      <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
-                      <p className="text-sm text-[#d6f8ec]">Ghi chú, ghim, bình chọn</p>
                     </div>
                     <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                       <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
@@ -2469,20 +2451,8 @@ export function HomeDashboardChatPanel({
               )}
             </div>
 
-            {(isConversationMuted || isConversationPinned) && (
-              <p className="mb-5 rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-3 py-2 text-xs text-[#bfead9]">
-                {isConversationPinned ? 'Đã ghim hội thoại. ' : ''}
-                {isConversationMuted ? 'Đang tắt thông báo cho hội thoại này.' : ''}
-              </p>
-            )}
-
             {!isGroupConversation && (
               <>
-                <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Nhắc hẹn</p>
-                  <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
-                  <p className="text-sm text-[#d6f8ec]">22 nhóm chung</p>
-                </div>
                 <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
                   <div className="grid grid-cols-4 gap-2">
@@ -2566,11 +2536,6 @@ export function HomeDashboardChatPanel({
                   >
                     Xem thành viên
                   </button>
-                </div>
-                <div className="mb-4 space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Bảng tin nhóm</p>
-                  <p className="text-sm text-[#d6f8ec]">Danh sách nhắc hẹn</p>
-                  <p className="text-sm text-[#d6f8ec]">Ghi chú, ghim, bình chọn</p>
                 </div>
                 <div className="space-y-2 rounded-2xl border border-[#175443] bg-[#072d24] p-4">
                   <p className="text-sm font-semibold uppercase tracking-wide text-[#9ad6c1]">Ảnh/Video</p>
@@ -2785,15 +2750,88 @@ export function HomeDashboardChatPanel({
         </div>
       )}
 
+      {isRemoveMemberConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#6d2f2f] bg-[#2a1515] p-5">
+            <h4 className="text-lg font-semibold text-[#ffe4e4]">Xóa thành viên</h4>
+            <p className="mt-2 text-sm text-[#ffc7c7]">Bạn có chắc muốn xóa thành viên này khỏi nhóm?</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRemoveMemberConfirmOpen(false);
+                  setRemoveMemberTargetId(null);
+                }}
+                className="rounded-lg bg-[#3a2323] px-3 py-2 text-sm text-[#ffd7d7]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleConfirmRemoveMember(); }}
+                className="rounded-lg bg-[#8b3535] px-3 py-2 text-sm font-semibold text-[#ffe9e9]"
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDisbandConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#6d2f2f] bg-[#2a1515] p-5">
+            <h4 className="text-lg font-semibold text-[#ffe4e4]">Giải tán nhóm</h4>
+            <p className="mt-2 text-sm text-[#ffc7c7]">Giải tán nhóm sẽ xóa toàn bộ nhóm. Bạn có chắc muốn tiếp tục?</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDisbandConfirmOpen(false)}
+                className="rounded-lg bg-[#3a2323] px-3 py-2 text-sm text-[#ffd7d7]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => { void handleConfirmDisbandGroup(); }}
+                className="rounded-lg bg-[#8b3535] px-3 py-2 text-sm font-semibold text-[#ffe9e9]"
+              >
+                Giải tán
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {groupManageError && (
-        <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-lg -translate-x-1/2 rounded-xl border border-[#7a3131] bg-[#421f1f] px-4 py-3 text-sm text-[#ffd0d0]">
-          {groupManageError}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#7a3131] bg-[#421f1f] p-5">
+            <h4 className="text-lg font-semibold text-[#ffe4e4]">Thông báo</h4>
+            <p className="mt-2 text-sm text-[#ffd0d0]">{groupManageError}</p>
+            <button
+              type="button"
+              onClick={() => setGroupManageError(null)}
+              className="mt-4 w-full rounded-lg bg-[#5a2828] px-3 py-2 text-sm font-semibold text-[#ffe9e9]"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       )}
 
       {groupManageSuccess && (
-        <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-lg -translate-x-1/2 rounded-xl border border-[#1f5e4b] bg-[#0a3128] px-4 py-3 text-sm text-[#d4fbe9]">
-          {groupManageSuccess}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#1f5e4b] bg-[#0a3128] p-5">
+            <h4 className="text-lg font-semibold text-[#dfffee]">Thành công</h4>
+            <p className="mt-2 text-sm text-[#d4fbe9]">{groupManageSuccess}</p>
+            <button
+              type="button"
+              onClick={() => setGroupManageSuccess(null)}
+              className="mt-4 w-full rounded-lg bg-[#145845] px-3 py-2 text-sm font-semibold text-[#e6fff5]"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       )}
 

@@ -179,6 +179,12 @@ export async function muteConversation(
     update,
     { upsert: true, new: true },
   );
+
+  // Keep homepage badge consistent with mute state for this conversation.
+  await NotificationModel.updateMany(
+    { userId, conversationId, read: false },
+    { $set: { read: true } },
+  );
 }
 
 // ─── C1.9 – Unmute conversation ───

@@ -190,12 +190,13 @@ describe('Notification Worker', () => {
       conversationId: CONV_ID,
     });
 
-    // Notification is still saved
+    // Notification must NOT be saved for muted conversations
     const saved = await NotificationModel.findOne({ userId: USER_ID });
-    expect(saved).toBeTruthy();
+    expect(saved).toBeNull();
 
     // But FCM should NOT be called
     expect(mockSendFCM).not.toHaveBeenCalled();
+    expect(mockEmitNotification).not.toHaveBeenCalled();
   });
 
   it('should skip push when user is online (new_message only)', async () => {
@@ -399,5 +400,6 @@ describe('Notification Worker', () => {
     });
 
     expect(mockSendFCM).not.toHaveBeenCalled();
+    expect(mockEmitNotification).not.toHaveBeenCalled();
   });
 });

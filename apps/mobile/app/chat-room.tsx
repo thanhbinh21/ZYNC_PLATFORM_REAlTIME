@@ -17,7 +17,6 @@ import {
   Animated,
   Linking,
   Image,
-  Alert,
   Modal,
   ScrollView,
 } from 'react-native';
@@ -142,6 +141,18 @@ interface ReactionDetailsResponse {
     totalCount: number;
     emojiCounts: Record<string, number>;
   }>;
+}
+
+interface AppDialogState {
+  visible: boolean;
+  mode: 'alert' | 'confirm';
+  title: string;
+  message: string;
+  tone: 'info' | 'error';
+  onClose?: () => void;
+  onConfirm?: () => void;
+  confirmLabel?: string;
+  cancelLabel?: string;
 }
 
 const REACTION_EMOJIS = ['👍', '❤️', '🤣', '😳', '😭', '😡'] as const;
@@ -629,6 +640,7 @@ export default function ChatRoomScreen() {
   const [isConversationPinned, setIsConversationPinned] = useState(false);
   const [conversationMutedUntil, setConversationMutedUntil] = useState<Date | null>(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [isMuteDurationModalOpen, setIsMuteDurationModalOpen] = useState(false);
   const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
   const [groupNameDraft, setGroupNameDraft] = useState('');
   const [groupAvatarDraft, setGroupAvatarDraft] = useState<string | undefined>(undefined);
@@ -652,6 +664,57 @@ export default function ChatRoomScreen() {
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
   const [showComposerPicker, setShowComposerPicker] = useState(false);
   const [composerPickerTab, setComposerPickerTab] = useState<ComposerPickerTab>('emoji');
+  const [appDialog, setAppDialog] = useState<AppDialogState>({
+    visible: false,
+    mode: 'alert',
+    title: '',
+    message: '',
+    tone: 'info',
+  });
+
+  const openInfoDialog = (title: string, message: string, tone: 'info' | 'error' = 'info', onClose?: () => void) => {
+    setAppDialog({
+      visible: true,
+      mode: 'alert',
+      title,
+      message,
+      tone,
+      onClose,
+      onConfirm: undefined,
+      confirmLabel: undefined,
+      cancelLabel: undefined,
+    });
+  };
+
+  const openConfirmDialog = (title: string, message: string, onConfirm: () => void, confirmLabel: string) => {
+    setAppDialog({
+      visible: true,
+      mode: 'confirm',
+      title,
+      message,
+      tone: 'info',
+      onClose: undefined,
+      onConfirm,
+      confirmLabel,
+      cancelLabel: 'Huy',
+    });
+  };
+
+  const closeInfoDialog = () => {
+    const onClose = appDialog.onClose;
+    setAppDialog({ visible: false, mode: 'alert', title: '', message: '', tone: 'info' });
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleDialogConfirm = () => {
+    const onConfirm = appDialog.onConfirm;
+    setAppDialog({ visible: false, mode: 'alert', title: '', message: '', tone: 'info' });
+    if (onConfirm) {
+      onConfirm();
+    }
+  };
 
   const {
     previews,
@@ -845,7 +908,7 @@ export default function ChatRoomScreen() {
       }
     } catch (err) {
       console.error('Upload group avatar failed:', err);
-      Alert.alert('Thong bao', 'Khong the tai len anh nhom. Vui long thu lai.');
+      openInfoDialog('Thong bao', 'Khong the tai len anh nhom. Vui long thu lai.', 'error');
     } finally {
       setIsUploadingGroupAvatar(false);
     }
@@ -883,7 +946,7 @@ export default function ChatRoomScreen() {
       router.setParams({ avatarUrl: updatedAvatar });
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      Alert.alert('Khong the cap nhat anh nhom', typeof message === 'string' ? message : 'Vui long thu lai.');
+      openInfoDialog('Khong the cap nhat anh nhom', typeof message === 'string' ? message : 'Vui long thu lai.', 'error');
     } finally {
       setIsUploadingGroupAvatar(false);
     }
@@ -927,7 +990,7 @@ export default function ChatRoomScreen() {
       router.setParams({ name: nextName, avatarUrl: nextAvatar || '' });
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      Alert.alert('Khong the cap nhat nhom', typeof message === 'string' ? message : 'Vui long thu lai.');
+      openInfoDialog('Khong the cap nhat nhom', typeof message === 'string' ? message : 'Vui long thu lai.', 'error');
     } finally {
       setIsSavingGroupInfo(false);
     }
@@ -958,7 +1021,7 @@ export default function ChatRoomScreen() {
     } catch (err: any) {
       setIsConversationPinned(!nextPinned);
       const message = err?.response?.data?.message;
-      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat ghim hoi thoai.');
+      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat ghim hoi thoai.', 'error');
     }
   }, [conversationId, isConversationPinned]);
 
@@ -979,21 +1042,15 @@ export default function ChatRoomScreen() {
     try {
       await api.post(`/notifications/mute/${conversationId}`, { until: untilDate.toISOString() });
       setConversationMutedUntil(untilDate);
-      Alert.alert('Thong bao', 'Da tat thong bao hoi thoai.');
+      openInfoDialog('Thong bao', 'Da tat thong bao hoi thoai.');
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the tat thong bao hoi thoai.');
+      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the tat thong bao hoi thoai.', 'error');
     }
   }, [conversationId]);
 
   const handleMuteConversation = useCallback(() => {
-    Alert.alert('Tat thong bao', 'Chon thoi gian tat thong bao:', [
-      { text: 'Trong 1h', onPress: () => { void muteConversationWithDuration('1h'); } },
-      { text: 'Trong 4h', onPress: () => { void muteConversationWithDuration('4h'); } },
-      { text: 'Trong 8h', onPress: () => { void muteConversationWithDuration('8h'); } },
-      { text: 'Cho den khi toi bat lai', onPress: () => { void muteConversationWithDuration('until_enabled'); } },
-      { text: 'Huy', style: 'cancel' },
-    ]);
+    setIsMuteDurationModalOpen(true);
   }, [muteConversationWithDuration]);
 
   const handleUnmuteConversation = useCallback(async () => {
@@ -1004,10 +1061,10 @@ export default function ChatRoomScreen() {
     try {
       await api.delete(`/notifications/mute/${conversationId}`);
       setConversationMutedUntil(null);
-      Alert.alert('Thong bao', 'Da bat lai thong bao.');
+      openInfoDialog('Thong bao', 'Da bat lai thong bao.');
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the bat thong bao.');
+      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the bat thong bao.', 'error');
     }
   }, [conversationId]);
 
@@ -1016,25 +1073,23 @@ export default function ChatRoomScreen() {
       return;
     }
 
-    Alert.alert('Roi nhom', 'Ban co chac muon roi nhom nay?', [
-      { text: 'Huy', style: 'cancel' },
-      {
-        text: 'Roi nhom',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await api.delete(`/groups/${conversationId}/members/me`);
-              setIsGroupInfoOpen(false);
-              router.back();
-            } catch (err: any) {
-              const message = err?.response?.data?.message;
-              Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the roi nhom luc nay.');
-            }
-          })();
-        },
+    openConfirmDialog(
+      'Roi nhom',
+      'Ban co chac muon roi nhom nay?',
+      () => {
+        void (async () => {
+          try {
+            await api.delete(`/groups/${conversationId}/members/me`);
+            setIsGroupInfoOpen(false);
+            router.back();
+          } catch (err: any) {
+            const message = err?.response?.data?.message;
+            openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the roi nhom luc nay.', 'error');
+          }
+        })();
       },
-    ]);
+      'Roi nhom',
+    );
   }, [conversationId, isGroupChat, router]);
 
   const handleAssignMemberRole = useCallback(async (memberId: string, role: 'admin' | 'member') => {
@@ -1046,10 +1101,10 @@ export default function ChatRoomScreen() {
       setIsUpdatingMemberRole(true);
       const response = await api.patch(`/groups/${conversationId}/members/${memberId}/role`, { role });
       applyGroupMeta(response.data?.data);
-      Alert.alert('Thong bao', role === 'admin' ? 'Da gan quyen quan tri vien.' : 'Da go quyen quan tri vien.');
+      openInfoDialog('Thong bao', role === 'admin' ? 'Da gan quyen quan tri vien.' : 'Da go quyen quan tri vien.');
     } catch (err: any) {
       const message = err?.response?.data?.message;
-      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat quyen thanh vien.');
+      openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the cap nhat quyen thanh vien.', 'error');
     } finally {
       setIsUpdatingMemberRole(false);
     }
@@ -1060,28 +1115,26 @@ export default function ChatRoomScreen() {
       return;
     }
 
-    Alert.alert('Xoa thanh vien', `Ban co chac muon xoa ${memberDisplayName} khoi nhom?`, [
-      { text: 'Huy', style: 'cancel' },
-      {
-        text: 'Xoa',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              setIsUpdatingMemberRole(true);
-              const response = await api.delete(`/groups/${conversationId}/members/${memberId}`);
-              applyGroupMeta(response.data?.data);
-              Alert.alert('Thong bao', 'Da xoa thanh vien khoi nhom.');
-            } catch (err: any) {
-              const message = err?.response?.data?.message;
-              Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the xoa thanh vien luc nay.');
-            } finally {
-              setIsUpdatingMemberRole(false);
-            }
-          })();
-        },
+    openConfirmDialog(
+      'Xoa thanh vien',
+      `Ban co chac muon xoa ${memberDisplayName} khoi nhom?`,
+      () => {
+        void (async () => {
+          try {
+            setIsUpdatingMemberRole(true);
+            const response = await api.delete(`/groups/${conversationId}/members/${memberId}`);
+            applyGroupMeta(response.data?.data);
+            openInfoDialog('Thong bao', 'Da xoa thanh vien khoi nhom.');
+          } catch (err: any) {
+            const message = err?.response?.data?.message;
+            openInfoDialog('Thong bao', typeof message === 'string' ? message : 'Khong the xoa thanh vien luc nay.', 'error');
+          } finally {
+            setIsUpdatingMemberRole(false);
+          }
+        })();
       },
-    ]);
+      'Xoa',
+    );
   }, [applyGroupMeta, conversationId, isGroupChat]);
   const getReactionUserStateForMessage = useCallback((message: Message) => {
     const byId = reactionUserStateByMessage[message._id];
@@ -1713,14 +1766,16 @@ export default function ChatRoomScreen() {
       }
 
       if (payload.type === 'disbanded') {
-        Alert.alert('Thong bao', 'Nhom da giai tan.');
-        router.back();
+        openInfoDialog('Thong bao', 'Nhom da giai tan.', 'info', () => {
+          router.back();
+        });
         return;
       }
 
       if (payload.type === 'member_removed' && payload.data?.userId === userId) {
-        Alert.alert('Thong bao', 'Ban da roi khoi nhom nay.');
-        router.back();
+        openInfoDialog('Thong bao', 'Ban da roi khoi nhom nay.', 'info', () => {
+          router.back();
+        });
         return;
       }
 
@@ -2004,7 +2059,7 @@ export default function ChatRoomScreen() {
             ),
           );
           setPendingMediaSend(null);
-          Alert.alert('Thong bao', 'Tai media that bai. Vui long thu lai.');
+          openInfoDialog('Thong bao', 'Tai media that bai. Vui long thu lai.', 'error');
         } finally {
           setIsUploadingMedia(false);
         }
@@ -2318,7 +2373,7 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={24} color="#fff" />
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerInfo}>
               <TouchableOpacity
@@ -2354,10 +2409,10 @@ export default function ChatRoomScreen() {
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.actionIcon}>
-                <Ionicons name="call-outline" size={22} color="#10b981" />
+                <Ionicons name="call-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionIcon}>
-                <Ionicons name="videocam-outline" size={22} color="#10b981" />
+                <Ionicons name="videocam-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionIcon}
@@ -2371,7 +2426,7 @@ export default function ChatRoomScreen() {
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#10b981" />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Dang tai tin nhan...</Text>
             </View>
           ) : (
@@ -2410,7 +2465,7 @@ export default function ChatRoomScreen() {
               }}
               ListHeaderComponent={isMoreLoading ? (
                 <View style={styles.loadMoreIndicator}>
-                  <ActivityIndicator size="small" color="#10b981" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 </View>
               ) : null}
               ListEmptyComponent={
@@ -2738,6 +2793,98 @@ export default function ChatRoomScreen() {
             </View>
           </Modal>
 
+          <Modal
+            visible={isMuteDurationModalOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setIsMuteDurationModalOpen(false)}
+          >
+            <View style={styles.groupModalOverlay}>
+              <View style={styles.dialogCard}>
+                <Text style={styles.dialogTitle}>Tat thong bao</Text>
+                <Text style={styles.dialogMessage}>Chon thoi gian tat thong bao hoi thoai:</Text>
+
+                <View style={styles.dialogActionsColumn}>
+                  <TouchableOpacity
+                    style={styles.dialogOptionButton}
+                    onPress={() => {
+                      void muteConversationWithDuration('1h');
+                      setIsMuteDurationModalOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dialogOptionText}>Trong 1h</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.dialogOptionButton}
+                    onPress={() => {
+                      void muteConversationWithDuration('4h');
+                      setIsMuteDurationModalOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dialogOptionText}>Trong 4h</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.dialogOptionButton}
+                    onPress={() => {
+                      void muteConversationWithDuration('8h');
+                      setIsMuteDurationModalOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dialogOptionText}>Trong 8h</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.dialogOptionButton}
+                    onPress={() => {
+                      void muteConversationWithDuration('until_enabled');
+                      setIsMuteDurationModalOpen(false);
+                    }}
+                  >
+                    <Text style={styles.dialogOptionText}>Cho den khi toi bat lai</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.dialogButton, styles.dialogCancelButton]}
+                  onPress={() => setIsMuteDurationModalOpen(false)}
+                >
+                  <Text style={styles.dialogCancelText}>Dong</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal
+            visible={appDialog.visible}
+            transparent
+            animationType="fade"
+            onRequestClose={closeInfoDialog}
+          >
+            <View style={styles.groupModalOverlay}>
+              <View style={styles.dialogCard}>
+                <Text style={[styles.dialogTitle, appDialog.tone === 'error' && styles.dialogTitleError]}>{appDialog.title}</Text>
+                <Text style={[styles.dialogMessage, appDialog.tone === 'error' && styles.dialogMessageError]}>{appDialog.message}</Text>
+
+                <View style={styles.dialogFooterRow}>
+                  {appDialog.mode === 'confirm' && (
+                    <TouchableOpacity
+                      style={[styles.dialogButton, styles.dialogCancelButton]}
+                      onPress={closeInfoDialog}
+                    >
+                      <Text style={styles.dialogCancelText}>{appDialog.cancelLabel || 'Huy'}</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.dialogButton, appDialog.tone === 'error' ? styles.dialogDangerButton : styles.dialogPrimaryButton]}
+                    onPress={appDialog.mode === 'confirm' ? handleDialogConfirm : closeInfoDialog}
+                  >
+                    <Text style={styles.dialogPrimaryText}>{appDialog.confirmLabel || 'Dong'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
           <MessagePreviewOverlay
             previews={previews}
             onDismiss={dismissPreview}
@@ -2879,9 +3026,9 @@ export default function ChatRoomScreen() {
                 disabled={isUploadingMedia || Boolean(pendingMediaSend)}
               >
                 {isUploadingMedia ? (
-                  <ActivityIndicator size="small" color="#10b981" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Ionicons name="add-circle-outline" size={26} color="#64748b" />
+                  <Ionicons name="add-circle-outline" size={26} color={colors.textMuted} />
                 )}
               </TouchableOpacity>
 
@@ -2889,7 +3036,7 @@ export default function ChatRoomScreen() {
                 <TextInput
                   style={styles.textInput}
                   placeholder="Nhap tin nhan..."
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={colors.textMuted}
                   value={inputText}
                   onChangeText={handleTextChange}
                   onFocus={() => setShowComposerPicker(false)}
@@ -2901,7 +3048,7 @@ export default function ChatRoomScreen() {
                   onPress={handleToggleComposerPicker}
                   disabled={Boolean(pendingMediaSend) || isUploadingMedia}
                 >
-                  <Ionicons name="happy-outline" size={22} color="#64748b" />
+                  <Ionicons name="happy-outline" size={22} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
 
@@ -2911,11 +3058,11 @@ export default function ChatRoomScreen() {
                   onPress={handleComposerSend}
                   disabled={Boolean(pendingMediaSend)}
                 >
-                  <Ionicons name="send" size={20} color="#111827" />
+                  <Ionicons name="send" size={20} color={colors.background} />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.micBtn} disabled>
-                  <Ionicons name="mic-outline" size={24} color="#64748b" />
+                  <Ionicons name="mic-outline" size={24} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -3745,14 +3892,14 @@ const styles = StyleSheet.create({
   groupModalCard: {
     width: '100%',
     borderRadius: 18,
-    backgroundColor: '#0b1726',
+    backgroundColor: colors.glassPanelStrong,
     borderWidth: 1,
-    borderColor: '#1f3347',
+    borderColor: colors.glassBorder,
     padding: 18,
     alignItems: 'center',
   },
   groupModalTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 18,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 16,
@@ -3791,14 +3938,14 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#334155',
-    color: '#e2e8f0',
+    borderColor: colors.glassBorderSoft,
+    color: colors.text,
     fontSize: 15,
     fontFamily: 'BeVietnamPro_500Medium',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
-    backgroundColor: '#111c2b',
+    backgroundColor: colors.glassStrong,
   },
   memberRoleSection: {
     width: '100%',
@@ -3919,7 +4066,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   groupActionText: {
-    color: '#d1fae5',
+    color: colors.text,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
     textAlign: 'center',
@@ -3935,8 +4082,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   leaveGroupText: {
-    color: '#fecaca',
+    color: '#ffe0e0',
     fontSize: 14,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  dialogCard: {
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: colors.glassPanelStrong,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: 16,
+  },
+  dialogTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontFamily: 'BeVietnamPro_700Bold',
+  },
+  dialogTitleError: {
+    color: '#ffd8d8',
+  },
+  dialogMessage: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 14,
+    fontFamily: 'BeVietnamPro_400Regular',
+  },
+  dialogMessageError: {
+    color: '#ffc7c7',
+  },
+  dialogActionsColumn: {
+    marginTop: 14,
+    gap: 8,
+  },
+  dialogOptionButton: {
+    borderRadius: 10,
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  dialogOptionText: {
+    color: colors.text,
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_500Medium',
+  },
+  dialogFooterRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  dialogButton: {
+    minWidth: 96,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialogCancelButton: {
+    backgroundColor: colors.surfaceHover,
+  },
+  dialogCancelText: {
+    color: colors.text,
+    fontSize: 13,
+    fontFamily: 'BeVietnamPro_600SemiBold',
+  },
+  dialogPrimaryButton: {
+    backgroundColor: colors.primary,
+  },
+  dialogDangerButton: {
+    backgroundColor: '#8f2b2b',
+  },
+  dialogPrimaryText: {
+    color: colors.background,
+    fontSize: 13,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   archiveModalCard: {
