@@ -14,6 +14,7 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
   navItems: [
     { id: 'home', label: 'Trang chủ', icon: 'home', active: true },
     { id: 'chat', label: 'Chat', icon: 'chat' },
+    { id: 'friends', label: 'Bạn bè', icon: 'friends' },
     { id: 'profile', label: 'Cá nhân', icon: 'profile' },
   ],
   sideFooterItems: [

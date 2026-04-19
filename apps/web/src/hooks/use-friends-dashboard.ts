@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getSocket } from '@/services/socket';
 import {
   acceptFriendRequest,
   blockUser,
@@ -162,6 +163,25 @@ export function useFriendsDashboard() {
   }, [loadData]);
 
   const pendingTotal = useMemo(() => incomingRequests.length + outgoingRequests.length, [incomingRequests, outgoingRequests]);
+
+  useEffect(() => {
+    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
+    if (!token) return;
+
+    const socket = getSocket(token);
+
+    const handleNewNotification = (notification: { type: string }) => {
+      if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
+        void loadData();
+      }
+    };
+
+    socket.on('new_notification', handleNewNotification);
+
+    return () => {
+      socket.off('new_notification', handleNewNotification);
+    };
+  }, [loadData]);
 
   return {
     friends,

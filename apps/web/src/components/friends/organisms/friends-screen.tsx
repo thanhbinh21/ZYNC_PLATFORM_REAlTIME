@@ -26,17 +26,13 @@ export function FriendsScreen({
   onUnblock,
 }: FriendsScreenProps) {
   return (
-    <main className="zync-auth-shell min-h-screen text-white">
-      <section className="zync-page-container py-10">
+    <div className="flex h-full w-full flex-col overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 text-white">
+      <section className="w-full">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="font-ui-brand text-4xl text-[#44ddb0]">ZYNC</p>
-            <h1 className="font-ui-title mt-3 text-[clamp(2rem,4.5vw,3.5rem)] text-[#daf5ec]">Trung tâm bạn bè</h1>
+            <h1 className="font-ui-title text-[clamp(1.8rem,4vw,2.8rem)] text-[#daf5ec]">Trung tâm bạn bè</h1>
             <p className="font-ui-content mt-1 text-base text-[#9fcabd]">Quản lý kết nối, lời mời và danh sách bạn bè ở một nơi duy nhất.</p>
           </div>
-          <Link href="/home" className="font-ui-title rounded-full border border-[#2f8f73] px-5 py-2 text-sm text-[#c4ebde] transition hover:bg-[#0f4d3e]">
-            Về trang chủ
-          </Link>
         </header>
 
         <section className="mt-7 grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -156,6 +152,6 @@ export function FriendsScreen({
         {infoMessage ? <p className="font-ui-content mt-4 rounded-lg border border-[#3a876d] bg-[#154335]/60 px-3 py-2 text-sm text-[#c8f3e2]">{infoMessage}</p> : null}
         {errorMessage ? <p className="font-ui-content mt-3 rounded-lg border border-[#b75662] bg-[#601e29]/55 px-3 py-2 text-sm text-[#ffcccf]">{errorMessage}</p> : null}
       </section>
-    </main>
+    </div>
   );
 }

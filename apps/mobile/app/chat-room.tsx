@@ -363,14 +363,70 @@ function normalizeMessage(raw: unknown): Message | null {
 }
 
 function dedupeMessages(messages: Message[]): Message[] {
-  const unique = new Map<string, Message>();
+  const merged: Message[] = [];
+
+  const areSameMessage = (a: Message, b: Message) => {
+    const aId = String(a._id || '');
+    const bId = String(b._id || '');
+    const aKey = String(a.idempotencyKey || '');
+    const bKey = String(b.idempotencyKey || '');
+
+    return (
+      (aId && bId && aId === bId)
+      || (aKey && bKey && aKey === bKey)
+      || (aId && bKey && aId === bKey)
+      || (aKey && bId && aKey === bId)
+    );
+  };
+
+  const mergeTwoMessages = (current: Message, incoming: Message): Message => {
+    const currentIsRecalled = current.type === 'system-recall';
+    const incomingIsRecalled = incoming.type === 'system-recall';
+
+    if (currentIsRecalled && !incomingIsRecalled) {
+      return {
+        ...incoming,
+        ...current,
+        _id: current._id && current._id !== current.idempotencyKey
+          ? current._id
+          : (incoming._id || current._id),
+        idempotencyKey: current.idempotencyKey || incoming.idempotencyKey,
+        type: 'system-recall',
+        content: current.content || '[Tin nhan da duoc thu hoi]',
+        mediaUrl: undefined,
+      };
+    }
+
+    if (!currentIsRecalled && incomingIsRecalled) {
+      return {
+        ...current,
+        ...incoming,
+        idempotencyKey: current.idempotencyKey || incoming.idempotencyKey,
+        type: 'system-recall',
+        content: incoming.content || '[Tin nhan da duoc thu hoi]',
+        mediaUrl: undefined,
+      };
+    }
+
+    return {
+      ...current,
+      ...incoming,
+      idempotencyKey: current.idempotencyKey || incoming.idempotencyKey,
+    };
+  };
 
   for (const message of messages) {
-    const key = message.idempotencyKey || message._id;
-    unique.set(key, message);
+    const index = merged.findIndex((item) => areSameMessage(item, message));
+
+    if (index === -1) {
+      merged.push(message);
+      continue;
+    }
+
+    merged[index] = mergeTwoMessages(merged[index], message);
   }
 
-  return Array.from(unique.values()).sort(
+  return merged.sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
 }

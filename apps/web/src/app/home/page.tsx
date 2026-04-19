@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { HomeDashboardScreen } from '@/components/home-dashboard/organisms/home-dashboard-screen';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
 import { HomeDashboardProfilePanel } from '@/components/home-dashboard/organisms/home-dashboard-profile-panel';
@@ -21,6 +22,7 @@ import { useStories } from '@/hooks/use-stories';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { fetchMyProfile, type MeUser } from '@/services/users';
 import type { StoryReactionType, StoryFeedGroup } from '@/components/stories/stories.types';
+import FriendsPage from '../friends/page';
 
 const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
   theme: 'verdant',
@@ -28,6 +30,7 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const {
     data,
     loading,
@@ -262,6 +265,8 @@ export default function HomePage() {
     <>
       <HomeDashboardScreen
         data={data}
+        activeNavId={activeNavId}
+        onNavSelect={handleNavSelect}
         onActivityClick={(item) => {
           if (item.conversationId) {
             onSelectConversation(item.conversationId);
@@ -272,6 +277,10 @@ export default function HomePage() {
         notificationSlot={
           <NotificationHub
             onNavigate={(n) => {
+              if (n.type === 'friend_request' || n.type === 'friend_accepted') {
+                router.push('/friends');
+                return;
+              }
               if (n.conversationId) {
                 onSelectConversation(n.conversationId);
                 setActiveNavId('chat');
@@ -370,8 +379,6 @@ export default function HomePage() {
           />
         }
         storySlot={storySlot}
-        activeNavId={activeNavId}
-        onNavSelect={handleNavSelect}
         onViewUserProfile={(uid) => setProfileViewUserId(uid)}
         profileSlot={
           <HomeDashboardProfilePanel
@@ -396,6 +403,7 @@ export default function HomePage() {
             }}
           />
         }
+        friendsSlot={<FriendsPage />}
       />
 
       <UserProfileModal

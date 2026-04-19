@@ -44,7 +44,7 @@ coverage/
 
 # Internal project docs (private)
 .github/
-plan/
+zync_plan/
 agents/
 codex/
 claude/

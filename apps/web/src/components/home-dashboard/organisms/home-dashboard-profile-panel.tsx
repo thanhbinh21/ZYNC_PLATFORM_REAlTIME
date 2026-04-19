@@ -59,7 +59,7 @@ export function HomeDashboardProfilePanel({
     bio: '',
   });
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'friends' | 'stories'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'stories'>('info');
 
   useEffect(() => {
     if (!profile) return;
@@ -194,9 +194,8 @@ export function HomeDashboardProfilePanel({
     setAvatarFile(file);
   };
 
-  const tabs: Array<{ id: 'info' | 'friends' | 'stories'; label: string; count?: number }> = [
+  const tabs: Array<{ id: 'info' | 'stories'; label: string; count?: number }> = [
     { id: 'info', label: 'Thông tin' },
-    { id: 'friends', label: 'Bạn bè', count: friendsCount ?? friends.length },
     { id: 'stories', label: 'Stories', count: feed.length },
   ];
 
@@ -588,43 +587,6 @@ export function HomeDashboardProfilePanel({
         </div>
       )}
 
-      {/* ── Tab: Bạn bè ────────────────────────────────────────────────────────── */}
-      {activeTab === 'friends' && (
-        <section className="zync-glass-panel rounded-3xl p-4">
-          <h3 className="font-ui-title mb-4 text-lg text-[#dffcf0]">
-            Danh sách bạn bè ({friendsCount ?? friends.length})
-          </h3>
-          {friends.length === 0 ? (
-            <p className="font-ui-content text-sm text-[#7cb3a1]">Bạn chưa có bạn bè nào.</p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {friends.map((friend) => (
-                <button
-                  key={friend.id}
-                  type="button"
-                  onClick={() => onViewUserProfile?.(friend.id)}
-                  className="flex items-center gap-3 rounded-2xl bg-[#0b2f25] p-3 text-left transition hover:bg-[#10382d]"
-                >
-                  <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-[#b0e4d2]">
-                    {friend.avatarUrl ? (
-                      <img src={friend.avatarUrl} alt={friend.displayName} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="font-ui-title flex h-full w-full items-center justify-center text-sm text-[#0a2a22]">
-                        {getInitials(friend.displayName)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-ui-title truncate text-sm text-[#e4fff5]">{friend.displayName}</p>
-                    {friend.bio && <p className="font-ui-content truncate text-xs text-[#7cb3a1]">{friend.bio}</p>}
-                  </div>
-                  <span className="font-ui-content text-xs text-[#4cf0bf]">Xem →</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
 
       {/* ── Tab: Stories Feed ───────────────────────────────────────────────────── */}
       {activeTab === 'stories' && (
