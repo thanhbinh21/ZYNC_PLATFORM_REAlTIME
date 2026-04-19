@@ -29,6 +29,30 @@ function VideoIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x={1} y={5} width={15} height={14} rx={2} ry={2} /></svg>;
 }
 
+function MicIcon({ className }: { className: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={2} width={6} height={11} rx={3} /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v5" /><path d="M8 22h8" /></svg>;
+}
+
+function CameraControlIcon({ className }: { className: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect x={2} y={6} width={14} height={12} rx={2} ry={2} /></svg>;
+}
+
+function ScreenShareIcon({ className }: { className: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={2} y={3} width={20} height={14} rx={2} /><path d="M8 21h8" /><path d="M12 17v4" /><path d="m9 10 3-3 3 3" /><path d="M12 7v7" /></svg>;
+}
+
+function EndCallIcon({ className }: { className: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 15.5c4.8-4.5 10.2-4.5 15 0" /><path d="M8.5 12.5c.4 1.6.8 2.6 1.4 3.1" /><path d="M15.5 12.5c-.4 1.6-.8 2.6-1.4 3.1" /></svg>;
+}
+
+function CheckIcon({ className }: { className: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>;
+}
+
+function CloseIcon({ className }: { className: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>;
+}
+
 function InfoIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={10} /><line x1={12} y1={16} x2={12} y2={12} /><line x1={12} y1={8} x2={12.01} y2={8} /></svg>;
 }
@@ -97,6 +121,8 @@ interface ChatPanelProps {
   }>;
   callStatus?: CallUiStatus;
   callPeerName?: string;
+  callParticipantNames?: string[];
+  isGroupCallActive?: boolean;
   callError?: string | null;
   isCallingAvailable?: boolean;
   isMicMuted?: boolean;
@@ -104,10 +130,16 @@ interface ChatPanelProps {
   isScreenSharing?: boolean;
   localVideoRef?: RefObject<HTMLVideoElement>;
   remoteVideoRef?: RefObject<HTMLVideoElement>;
+  remoteParticipantVideos?: Array<{
+    userId: string;
+    displayName: string;
+    stream: MediaStream;
+  }>;
   onStartVideoCall?: () => void;
   onAcceptIncomingCall?: () => void;
   onRejectIncomingCall?: () => void;
   onEndCall?: () => void;
+  onDismissCallBanner?: () => void;
   onToggleMic?: () => void;
   onToggleCamera?: () => void;
   onToggleScreenShare?: () => void;
@@ -348,6 +380,8 @@ function ChatPanel({
   reactionUserStateByMessage = {},
   callStatus = 'idle',
   callPeerName,
+  callParticipantNames = [],
+  isGroupCallActive = false,
   callError = null,
   isCallingAvailable = false,
   isMicMuted = false,
@@ -355,10 +389,12 @@ function ChatPanel({
   isScreenSharing = false,
   localVideoRef,
   remoteVideoRef,
+  remoteParticipantVideos = [],
   onStartVideoCall = () => {},
   onAcceptIncomingCall = () => {},
   onRejectIncomingCall = () => {},
   onEndCall = () => {},
+  onDismissCallBanner = () => {},
   onToggleMic = () => {},
   onToggleCamera = () => {},
   onToggleScreenShare = () => {},
@@ -389,6 +425,7 @@ function ChatPanel({
       }
     };
   }, []);
+  const [activeSpeakerUserId, setActiveSpeakerUserId] = useState<string | null>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -417,15 +454,108 @@ function ChatPanel({
   const isRemovedFromGroup = inputDisabled && inputDisabledReason?.toLowerCase().includes('bị xóa khỏi nhóm');
   const hasRemovedNoticeInMessages = messages.some((message) => message.content.toLowerCase().includes('bị xóa khỏi nhóm'));
   const isCallVisible = callStatus !== 'idle';
+  const isTerminalCallState = callStatus === 'ended' || callStatus === 'missed' || callStatus === 'rejected';
+  const shouldRenderCallMedia = callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected' || callStatus === 'incoming';
   const callStatusLabel: Record<Exclude<CallUiStatus, 'idle'>, string> = {
-    outgoing: 'Dang do chuong...',
-    incoming: 'Cuoc goi den',
-    connecting: 'Dang ket noi...',
-    connected: 'Dang trong cuoc goi',
-    ended: 'Da ket thuc',
-    missed: 'Nho cuoc goi',
-    rejected: 'Da tu choi',
+    outgoing: 'Đang đổ chuông...',
+    incoming: 'Cuộc gọi đến',
+    connecting: 'Đang kết nối...',
+    connected: 'Đang trong cuộc gọi',
+    ended: 'Đã kết thúc',
+    missed: 'Nhỡ cuộc gọi',
+    rejected: 'Đã từ chối',
   };
+
+  useEffect(() => {
+    if (!isGroupCallActive || callStatus !== 'connected' || remoteParticipantVideos.length === 0) {
+      setActiveSpeakerUserId(null);
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const AudioContextClass = window.AudioContext
+      ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) {
+      return;
+    }
+
+    const audioContext = new AudioContextClass();
+    type AudioMeter = {
+      userId: string;
+      analyser: AnalyserNode;
+      data: Uint8Array<ArrayBuffer>;
+      source: MediaStreamAudioSourceNode;
+    };
+
+    const meters: AudioMeter[] = [];
+    remoteParticipantVideos.forEach((participant) => {
+      const audioTracks = participant.stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        return;
+      }
+
+      const audioOnlyStream = new MediaStream(audioTracks);
+      const source = audioContext.createMediaStreamSource(audioOnlyStream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      meters.push({
+        userId: participant.userId,
+        analyser,
+        data: new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>,
+        source,
+      });
+    });
+
+    if (meters.length === 0) {
+      setActiveSpeakerUserId(null);
+      void audioContext.close();
+      return;
+    }
+
+    const interval = setInterval(() => {
+      let maxVolume = 0;
+      let loudestUserId: string | null = null;
+
+      meters.forEach((meter) => {
+        meter.analyser.getByteTimeDomainData(meter.data);
+        let sum = 0;
+        for (const value of meter.data) {
+          const normalized = (value - 128) / 128;
+          sum += normalized * normalized;
+        }
+        const rms = Math.sqrt(sum / meter.data.length);
+        if (rms > maxVolume) {
+          maxVolume = rms;
+          loudestUserId = meter.userId;
+        }
+      });
+
+      if (maxVolume < 0.02) {
+        setActiveSpeakerUserId(null);
+        return;
+      }
+
+      setActiveSpeakerUserId(loudestUserId);
+    }, 220);
+
+    return () => {
+      clearInterval(interval);
+      meters.forEach((meter) => {
+        meter.source.disconnect();
+        meter.analyser.disconnect();
+      });
+      void audioContext.close();
+    };
+  }, [callStatus, isGroupCallActive, remoteParticipantVideos]);
+
+  const activeSpeakerName = activeSpeakerUserId
+    ? remoteParticipantVideos.find((participant) => participant.userId === activeSpeakerUserId)?.displayName
+    : null;
   // Report message
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const handleReportMessage = useCallback(async (messageId: string) => {
@@ -560,7 +690,7 @@ function ChatPanel({
   }, [scrollToMessageElement, showJumpStatus]);
 
   return (
-    <article className="zync-glass-panel zync-glass-panel-strong grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
+    <article className="zync-glass-panel zync-glass-panel-strong relative grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
       {/* Header */}
       <header className="zync-glass-subtle flex items-center justify-between border-b zync-glass-divider px-5 py-3 bg-[#06271f]/42">
         <div className="flex items-center gap-3">
@@ -600,8 +730,8 @@ function ChatPanel({
           <button
             type="button"
             className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72 disabled:cursor-not-allowed disabled:opacity-45"
-            title="Call"
-            disabled={!isCallingAvailable || isGroupConversation}
+            title="Gọi thoại"
+            disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
             <PhoneIcon className="w-5 h-5" />
@@ -609,8 +739,8 @@ function ChatPanel({
           <button
             type="button"
             className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72 disabled:cursor-not-allowed disabled:opacity-45"
-            title="Video call"
-            disabled={!isCallingAvailable || isGroupConversation}
+            title="Gọi video"
+            disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
             <VideoIcon className="w-5 h-5" />
@@ -655,8 +785,18 @@ function ChatPanel({
       )}
 
       {isCallVisible && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#010d0ad4] px-4 py-6 backdrop-blur-sm">
-          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[#2f6b58] bg-[linear-gradient(180deg,#04241c_0%,#031912_100%)] text-[#d9fff1] shadow-[0_28px_80px_rgba(0,0,0,0.55)]">
+        <div
+          className={`absolute inset-0 z-[40] flex px-3 py-3 sm:px-5 sm:py-4 ${
+            isTerminalCallState
+              ? 'items-start justify-center bg-transparent pointer-events-none'
+              : 'items-center justify-center bg-[#010d0ab8] backdrop-blur-[2px]'
+          }`}
+        >
+          <div
+            className={`pointer-events-auto w-full overflow-hidden rounded-2xl border border-[#2f6b58] bg-[linear-gradient(180deg,#04241c_0%,#031912_100%)] text-[#d9fff1] shadow-[0_20px_46px_rgba(0,0,0,0.48)] ${
+              isTerminalCallState ? 'max-w-xl' : 'max-w-3xl'
+            }`}
+          >
             <div className="border-b border-[#245b4b] px-5 py-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -664,27 +804,52 @@ function ChatPanel({
                     {callStatusLabel[callStatus]}
                   </p>
                   <p className="text-xs text-[#8cc4b0]">
-                    {callPeerName ? `Nguoi tham gia: ${callPeerName}` : 'Dang dong bo thong tin cuoc goi'}
+                    {callPeerName
+                      ? (isGroupCallActive ? `Nhóm gọi: ${callPeerName}` : `Người tham gia: ${callPeerName}`)
+                      : 'Đang đồng bộ thông tin cuộc gọi'}
                   </p>
+                  {isGroupCallActive && callParticipantNames.length > 0 && (
+                    <p className="mt-1 text-xs text-[#9ad3bf]">
+                      Thành viên: {callParticipantNames.join(', ')}
+                    </p>
+                  )}
+                  {isGroupCallActive && activeSpeakerName && callStatus === 'connected' && (
+                    <p className="mt-1 text-xs font-semibold text-[#7cf1c5]">
+                      Đang nói: {activeSpeakerName}
+                    </p>
+                  )}
                   {callError && <p className="mt-1 text-xs text-[#ff9f9f]">{callError}</p>}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {isTerminalCallState && (
+                    <button
+                      type="button"
+                      onClick={onDismissCallBanner}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                    >
+                      <CloseIcon className="h-3.5 w-3.5" />
+                      Đóng
+                    </button>
+                  )}
+
                   {callStatus === 'incoming' && (
                     <>
                       <button
                         type="button"
                         onClick={onAcceptIncomingCall}
-                        className="rounded-lg bg-[#1d7f62] px-3 py-1.5 text-xs font-semibold text-[#e8fff7] hover:bg-[#249875]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#1d7f62] px-3 py-1.5 text-xs font-semibold text-[#e8fff7] hover:bg-[#249875]"
                       >
-                        Nhan
+                        <CheckIcon className="h-3.5 w-3.5" />
+                        Nhận
                       </button>
                       <button
                         type="button"
                         onClick={onRejectIncomingCall}
-                        className="rounded-lg bg-[#7f2f2f] px-3 py-1.5 text-xs font-semibold text-[#ffe6e6] hover:bg-[#9a3a3a]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#7f2f2f] px-3 py-1.5 text-xs font-semibold text-[#ffe6e6] hover:bg-[#9a3a3a]"
                       >
-                        Tu choi
+                        <CloseIcon className="h-3.5 w-3.5" />
+                        Từ chối
                       </button>
                     </>
                   )}
@@ -694,25 +859,28 @@ function ChatPanel({
                       <button
                         type="button"
                         onClick={onToggleMic}
-                        className="rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
                       >
-                        {isMicMuted ? 'Bat mic' : 'Tat mic'}
+                        <MicIcon className="h-3.5 w-3.5" />
+                        {isMicMuted ? 'Bật mic' : 'Tắt mic'}
                       </button>
                       <button
                         type="button"
                         onClick={onToggleCamera}
-                        className="rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
                       >
-                        {isCameraEnabled ? 'Tat camera' : 'Bat camera'}
+                        <CameraControlIcon className="h-3.5 w-3.5" />
+                        {isCameraEnabled ? 'Tắt camera' : 'Bật camera'}
                       </button>
                       <button
                         type="button"
                         onClick={() => {
                           void onToggleScreenShare();
                         }}
-                        className="rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#114539] px-3 py-1.5 text-xs font-semibold text-[#d9fff1] hover:bg-[#165848]"
                       >
-                        {isScreenSharing ? 'Dung chia se' : 'Chia se man hinh'}
+                        <ScreenShareIcon className="h-3.5 w-3.5" />
+                        {isScreenSharing ? 'Dừng chia sẻ' : 'Chia sẻ màn hình'}
                       </button>
                     </>
                   )}
@@ -721,16 +889,17 @@ function ChatPanel({
                     <button
                       type="button"
                       onClick={onEndCall}
-                      className="rounded-lg bg-[#8a2f2f] px-3 py-1.5 text-xs font-semibold text-[#ffe4e4] hover:bg-[#a53d3d]"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#8a2f2f] px-3 py-1.5 text-xs font-semibold text-[#ffe4e4] hover:bg-[#a53d3d]"
                     >
-                      Ket thuc
+                      <EndCallIcon className="h-3.5 w-3.5" />
+                      Kết thúc
                     </button>
                   )}
                 </div>
               </div>
             </div>
 
-            {(callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected' || callStatus === 'incoming') && (
+            {shouldRenderCallMedia && (
               <div className="grid gap-3 p-4 sm:grid-cols-[240px_minmax(0,1fr)]">
                 <div className="overflow-hidden rounded-xl border border-[#235747] bg-[#031b15]">
                   <video
@@ -740,17 +909,55 @@ function ChatPanel({
                     playsInline
                     className="h-44 w-full object-cover"
                   />
-                  <p className="border-t border-[#1a4a3b] px-2 py-1 text-[11px] text-[#8cc4b0]">Preview camera</p>
+                  <p className="border-t border-[#1a4a3b] px-2 py-1 text-[11px] text-[#8cc4b0]">Camera của bạn</p>
                 </div>
 
-                <div className="relative overflow-hidden rounded-xl border border-[#235747] bg-[#041f18]">
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="h-44 w-full object-cover sm:h-full"
-                  />
-                </div>
+                {isGroupCallActive ? (
+                  <div className="grid max-h-[52vh] grid-cols-1 gap-2 overflow-auto rounded-xl border border-[#235747] bg-[#041f18] p-2 sm:grid-cols-2">
+                    {remoteParticipantVideos.length === 0 && (
+                      <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-[#2d6f5b] text-xs text-[#89c5b0] sm:col-span-2">
+                        Đang chờ thành viên khác tham gia...
+                      </div>
+                    )}
+                    {remoteParticipantVideos.map((participant) => (
+                      <div
+                        key={participant.userId}
+                        className={`overflow-hidden rounded-lg border bg-[#032019] ${
+                          activeSpeakerUserId === participant.userId
+                            ? 'border-[#4dffd2] shadow-[0_0_0_1px_rgba(77,255,210,0.6)]'
+                            : 'border-[#2c6755]'
+                        }`}
+                      >
+                        <video
+                          autoPlay
+                          playsInline
+                          className="h-40 w-full object-cover"
+                          ref={(node) => {
+                            if (!node) {
+                              return;
+                            }
+                            if (node.srcObject !== participant.stream) {
+                              node.srcObject = participant.stream;
+                            }
+                          }}
+                        />
+                        <p className="border-t border-[#1a4a3b] px-2 py-1 text-[11px] text-[#8cc4b0]">
+                          {participant.displayName}
+                          {activeSpeakerUserId === participant.userId ? ' - đang nói' : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="relative overflow-hidden rounded-xl border border-[#235747] bg-[#041f18]">
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="h-44 w-full object-cover sm:h-full"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
