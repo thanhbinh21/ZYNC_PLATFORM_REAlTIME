@@ -14,6 +14,7 @@ import {
   Platform,
   StatusBar,
   ActivityIndicator,
+  Alert,
   Animated,
   Linking,
   Image,

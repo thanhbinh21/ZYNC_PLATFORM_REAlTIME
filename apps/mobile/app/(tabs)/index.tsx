@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,15 +7,17 @@ import {
   TouchableOpacity, 
   StatusBar,
   RefreshControl,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api from '../../src/services/api';
+import { useNotificationsContext } from '../../src/context/notifications-context';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -31,6 +33,30 @@ export default function HomeScreen() {
   const userInfo = useAuthStore((s) => s.userInfo);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isHydrated = useAuthStore((s) => s.isHydrated);
+  const { unreadCount: notificationUnread, openNotificationSheet, refreshUnreadCount } =
+    useNotificationsContext();
+  const notificationBtnRef = useRef<View>(null);
+
+  const onPressNotificationBell = useCallback(() => {
+    const v = notificationBtnRef.current;
+    if (!v) {
+      openNotificationSheet(null);
+      return;
+    }
+    v.measureInWindow((pageX, pageY, width, height) => {
+      if (width <= 0 || height <= 0) {
+        openNotificationSheet(null);
+        return;
+      }
+      openNotificationSheet({ pageX, pageY, width, height });
+    });
+  }, [openNotificationSheet]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUnreadCount();
+    }, [refreshUnreadCount]),
+  );
 
   const [friendCount, setFriendCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
@@ -118,10 +144,23 @@ export default function HomeScreen() {
             <Text style={styles.welcomeText}>{getGreeting()},</Text>
             <Text style={styles.userName}>{displayName} 👋</Text>
           </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Ionicons name="notifications-outline" size={24} color="#fff" />
-            {unreadTotal > 0 && <View style={styles.badge} />}
-          </TouchableOpacity>
+          <View ref={notificationBtnRef} collapsable={false} style={styles.notificationBtn}>
+            <TouchableOpacity
+              onPress={onPressNotificationBell}
+              accessibilityLabel="Thông báo"
+              activeOpacity={0.75}
+              style={styles.notificationBtnHit}
+            >
+              <Ionicons name="notifications-outline" size={24} color="#fff" />
+              {notificationUnread > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {notificationUnread > 99 ? '99+' : String(notificationUnread)}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Story Bar Placeholder */}
@@ -231,8 +270,6 @@ const styles = StyleSheet.create({
     height: 45,
     borderRadius: 12,
     backgroundColor: colors.glassPanel,
-    justifyContent: 'center',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.glassBorder,
     shadowColor: colors.glassShadow,
@@ -242,17 +279,32 @@ const styles = StyleSheet.create({
       width: 0,
       height: 5,
     },
+    overflow: 'visible',
+  },
+  notificationBtnHit: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   badge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    top: 4,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
     backgroundColor: '#ef4444',
     borderWidth: 2,
     borderColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontFamily: 'BeVietnamPro_700Bold',
   },
   section: {
     marginBottom: 25,

@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { DashboardHomeMockData } from '../home-dashboard.types';
@@ -10,7 +9,6 @@ import { DashboardNavItemRow } from '../molecules/dashboard-nav-item';
 import { DashboardStoryItemRow } from '../molecules/dashboard-story-item';
 import { DashboardStatCard } from '../molecules/dashboard-stat-card';
 import { DashboardActivityItemRow } from '../molecules/dashboard-activity-item';
-import { searchFriendCandidates, sendFriendRequest, type FriendUser } from '@/services/friends';
 
 import type { DashboardActivityItem } from '../home-dashboard.types';
 
@@ -54,57 +52,6 @@ export function HomeDashboardScreen({
     onNavSelect?.(id);
     setIsMobileSidebarOpen(false);
   };
-
-  // ─── Search state ─────────────────────────────────────────────────────
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<FriendUser[]>([]);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
-  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    if (value.trim().length < 2) {
-      setSearchResults([]);
-      setSearchOpen(false);
-      return;
-    }
-    searchTimerRef.current = setTimeout(async () => {
-      setSearchLoading(true);
-      try {
-        const results = await searchFriendCandidates(value.trim());
-        setSearchResults(results);
-        setSearchOpen(true);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 400);
-  }, []);
-
-  const handleSendFriendRequest = useCallback(async (userId: string) => {
-    try {
-      await sendFriendRequest(userId);
-      setSentRequests((prev) => new Set(prev).add(userId));
-    } catch {
-      /* silent */
-    }
-  }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        setSearchOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   return (
     <main className="zync-dashboard-main h-screen overflow-hidden text-[#d9f8ec]">
@@ -253,7 +200,7 @@ export function HomeDashboardScreen({
 
         <section className={`${sectionClassName} zync-glass-panel rounded-3xl border-none shadow-xl`}>
           {selectedNavId === 'home' && (
-            <header className="zync-glass-panel zync-glass-floating shrink-0 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3">
+            <header className="zync-glass-panel zync-glass-floating relative z-20 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3 !overflow-visible">
               <h1 className="font-ui-title text-[clamp(1.3rem,2.3vw,2rem)] text-[#e4fff5]">{data.greeting}</h1>
               <div className="flex items-center gap-3">
                 {/* Search bar removed from Trang chủ as requested */}
