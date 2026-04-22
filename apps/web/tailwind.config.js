@@ -8,6 +8,30 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        bg: {
+          primary: 'var(--bg-primary)',
+          secondary: 'var(--bg-secondary)',
+          sidebar: 'var(--bg-sidebar)',
+          hover: 'var(--bg-hover)',
+          active: 'var(--bg-active)',
+          code: 'var(--bg-code)',
+          card: 'var(--bg-card)',
+        },
+        text: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
+          link: 'var(--text-link)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          light: 'var(--accent-light)',
+        },
+        border: {
+          DEFAULT: 'var(--border)',
+          light: 'var(--border-light)',
+        },
         story: {
           bg: '#041f18',
           surface: '#062920',
@@ -20,6 +44,20 @@ module.exports = {
           text: '#e2fff5',
           'text-dim': '#8cc4b3',
         },
+      },
+      fontFamily: {
+        body: ['var(--font-body)', 'sans-serif'],
+        code: ['var(--font-code)', 'monospace'],
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+      },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
       },
       animation: {
         'story-ring': 'story-ring-spin 3s linear infinite',

@@ -14,11 +14,11 @@ export function DashboardNavItemRow({ item, isActive = false, onClick }: Dashboa
       onClick={() => onClick?.(item)}
       className={`group flex h-10 w-full items-center gap-3 rounded-r-xl border-l-2 px-4 text-left transition ${
         isActive
-          ? 'border-l-[#2be4b0] bg-[#0d3e31] text-[#b9ffe8]'
-          : 'border-l-transparent text-[#86a99e] hover:bg-[#0f3a30] hover:text-[#d0ffef]'
+          ? 'border-l-accent bg-bg-active text-text-primary'
+          : 'border-l-transparent text-text-secondary hover:bg-bg-hover hover:text-text-primary'
       }`}
     >
-      <span className={`${isActive ? 'text-[#4ff0c3]' : 'text-[#84a79c] group-hover:text-[#bff9e7]'}`}>
+      <span className={`${isActive ? 'text-accent' : 'text-text-tertiary group-hover:text-accent-hover'}`}>
         <DashboardIcon name={item.icon} className="h-[15px] w-[15px]" />
       </span>
       <span className="font-ui-content text-[0.98rem]">{item.label}</span>
