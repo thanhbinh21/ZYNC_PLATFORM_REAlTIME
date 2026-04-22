@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Be_Vietnam_Pro } from 'next/font/google';
 import './globals.css';
+import { Providers } from './providers';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'latin-ext'],
@@ -16,7 +17,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className={beVietnamPro.variable}>{children}</body>
+      <body className={beVietnamPro.variable}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
