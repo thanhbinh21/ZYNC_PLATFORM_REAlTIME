@@ -13,18 +13,18 @@ export function AvatarCluster({ members, extraMembersLabel, caption }: AvatarClu
         {members.map((member, index) => (
           <span
             key={member.id}
-            className={`font-ui-title inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#06271f] text-[11px] font-bold text-[#082b22] ${member.tone}`}
+            className={`font-ui-title inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-[11px] font-bold text-text-primary shadow-sm ${member.tone}`}
             style={{ marginLeft: index === 0 ? 0 : -8 }}
             title={member.name}
           >
             {member.initials}
           </span>
         ))}
-        <span className="font-ui-title -ml-2 inline-flex h-10 items-center rounded-full border-2 border-[#06271f] bg-[#0f7c58] px-3 text-xs font-semibold text-[#cef2e7]">
+        <span className="font-ui-title -ml-2 inline-flex h-10 items-center rounded-full border border-border bg-accent-light px-3 text-xs font-semibold text-accent-strong shadow-sm">
           {extraMembersLabel}
         </span>
       </div>
-      <p className="font-ui-meta text-sm text-[#92b8ac]">{caption}</p>
+      <p className="font-ui-meta text-sm text-text-secondary">{caption}</p>
     </div>
   );
 }

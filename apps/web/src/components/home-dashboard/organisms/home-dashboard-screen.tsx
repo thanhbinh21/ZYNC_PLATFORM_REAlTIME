@@ -231,15 +231,23 @@ export function HomeDashboardScreen({
             </header>
           )}
 
-          <div className={`flex-1 ${selectedNavId === 'chat' || selectedNavId === 'friends' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6'}`}>
+          <div className={`flex-1 ${selectedNavId === 'chat' || selectedNavId === 'friends' ? 'overflow-hidden px-2 py-2 sm:px-4 sm:py-4' : 'overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6'}`}>
             {selectedNavId === 'chat' ? (
-              <div className="flex h-full w-full">{chatSlot}</div>
+              <div className="flex h-full w-full justify-center">
+                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+                  {chatSlot}
+                </div>
+              </div>
             ) : selectedNavId === 'settings' ? (
               <div>{settingsSlot}</div>
             ) : selectedNavId === 'profile' ? (
               <div>{profileSlot}</div>
             ) : selectedNavId === 'friends' ? (
-              <div className="flex h-full w-full">{friendsSlot}</div>
+              <div className="flex h-full w-full justify-center">
+                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+                  {friendsSlot}
+                </div>
+              </div>
             ) : (
               <div className="mx-auto max-w-6xl">
                 <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">

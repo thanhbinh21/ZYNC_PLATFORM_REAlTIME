@@ -742,9 +742,9 @@ function ChatPanel({
   }, [scrollToMessageElement, showJumpStatus]);
 
   return (
-    <article className="relative grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-bg-card rounded-2xl border border-border shadow-sm">
+    <article className="relative mx-auto grid h-full w-full max-w-[1440px] min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden rounded-[2rem] border border-border bg-bg-card shadow-sm">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-5 py-3 bg-bg-card">
+      <header className="flex items-center justify-between border-b border-border bg-bg-card px-5 py-3">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -1020,7 +1020,7 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-5 py-4 space-y-2"
+        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto space-y-2 px-5 py-4"
       >
         {/* Load More Button */}
         {messages.length > 0 && (
