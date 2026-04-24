@@ -35,6 +35,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
 import { MessagePreviewOverlay } from '../src/components/MessagePreviewOverlay';
 import { StickerPicker } from '../src/components/StickerPicker';
+import { ForwardModal } from '../src/components/ForwardModal';
 
 interface MessageReadParticipant {
   userId: string;
@@ -721,6 +722,12 @@ export default function ChatRoomScreen() {
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
   const [showComposerPicker, setShowComposerPicker] = useState(false);
   const [composerPickerTab, setComposerPickerTab] = useState<ComposerPickerTab>('emoji');
+  // Trang thai Forward Modal
+  const [forwardModalVisible, setForwardModalVisible] = useState(false);
+  const [forwardMessageId, setForwardMessageId] = useState<string | null>(null);
+  // Trang thai Action Menu (hien thi khi long-press tin nhan)
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
+  const [actionMenuMessage, setActionMenuMessage] = useState<Message | null>(null);
   const [appDialog, setAppDialog] = useState<AppDialogState>({
     visible: false,
     mode: 'alert',
@@ -2160,6 +2167,8 @@ export default function ChatRoomScreen() {
       const socket = socketService.getSocket();
       socket?.emit('recall_message', { conversationId, messageId, idempotencyKey });
       setShowOptionsId(null);
+      setActionMenuVisible(false);
+      setActionMenuMessage(null);
     } catch (err) {
       console.error('Recall failed:', err);
     }
@@ -2170,10 +2179,60 @@ export default function ChatRoomScreen() {
       const socket = socketService.getSocket();
       socket?.emit('delete_message_for_me', { conversationId, messageId, idempotencyKey });
       setShowOptionsId(null);
+      setActionMenuVisible(false);
+      setActionMenuMessage(null);
     } catch (err) {
       console.error('Delete failed:', err);
     }
   };
+
+  // Mo forward modal cho tin nhan
+  const handleOpenForward = useCallback((message: Message) => {
+    setForwardMessageId(message._id);
+    setForwardModalVisible(true);
+    setActionMenuVisible(false);
+    setActionMenuMessage(null);
+  }, []);
+
+  // Xu ly chuyen tiep tin nhan qua socket
+  const handleForwardToConversation = useCallback((toConversationId: string) => {
+    if (!forwardMessageId) return;
+    const socket = socketService.getSocket();
+    if (!socket) return;
+    socket.emit('forward_message', {
+      originalMessageId: forwardMessageId,
+      toConversationId,
+      idempotencyKey: generateUUID(),
+    });
+    setForwardMessageId(null);
+  }, [forwardMessageId]);
+
+  // Mo action menu khi long-press tin nhan
+  const openActionMenu = useCallback((message: Message) => {
+    if (message.type === 'system-recall') return;
+    setActionMenuMessage(message);
+    setActionMenuVisible(true);
+  }, []);
+
+  // Dong action menu
+  const closeActionMenu = useCallback(() => {
+    setActionMenuVisible(false);
+    setActionMenuMessage(null);
+  }, []);
+
+  // Reply tu action menu
+  const handleReplyFromMenu = useCallback(() => {
+    if (!actionMenuMessage) return;
+    setReplyingTo({
+      messageRef: resolveMessageRef(actionMenuMessage),
+      messageId: actionMenuMessage._id,
+      senderId: getSenderId(actionMenuMessage),
+      senderDisplayName: getSenderName(actionMenuMessage) || undefined,
+      contentPreview: actionMenuMessage.content?.slice(0, 80) || '[Media]',
+      type: actionMenuMessage.type,
+    });
+    closeActionMenu();
+  }, [actionMenuMessage, closeActionMenu]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);
@@ -2238,7 +2297,7 @@ export default function ChatRoomScreen() {
           <TouchableOpacity
             onLongPress={() => {
               if (!isRecalled) {
-                openReactionPicker(message);
+                openActionMenu(message);
               }
             }}
             delayLongPress={220}
@@ -3322,6 +3381,115 @@ export default function ChatRoomScreen() {
               </View>
             </View>
           </Modal>
+
+          {/* Action Menu Modal – hien khi long-press tin nhan */}
+          <Modal
+            visible={actionMenuVisible}
+            animationType="slide"
+            transparent
+            onRequestClose={closeActionMenu}
+          >
+            <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={closeActionMenu}>
+              <View style={{ flex: 1 }} />
+              <Pressable
+                onPress={(e) => e.stopPropagation()}
+                style={{
+                  backgroundColor: '#fff',
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                  paddingHorizontal: 16,
+                  paddingTop: 16,
+                  paddingBottom: Math.max(insets.bottom, 24),
+                }}
+              >
+                <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#d1d5db', alignSelf: 'center', marginBottom: 16 }} />
+                <Text style={{ fontSize: 15, fontWeight: '600', color: '#1e293b', marginBottom: 14, fontFamily: 'BeVietnamPro_600SemiBold' }}>
+                  Tùy chọn tin nhắn
+                </Text>
+
+                {/* Phan hoi */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 14 }}
+                  onPress={handleReplyFromMenu}
+                >
+                  <Ionicons name="return-up-back-outline" size={20} color="#3b82f6" />
+                  <Text style={{ fontSize: 15, color: '#1e293b', fontFamily: 'BeVietnamPro_500Medium' }}>Trả lời</Text>
+                </TouchableOpacity>
+
+                {/* Cam xuc */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 14 }}
+                  onPress={() => {
+                    if (actionMenuMessage) {
+                      openReactionPicker(actionMenuMessage);
+                    }
+                    closeActionMenu();
+                  }}
+                >
+                  <Ionicons name="happy-outline" size={20} color="#f59e0b" />
+                  <Text style={{ fontSize: 15, color: '#1e293b', fontFamily: 'BeVietnamPro_500Medium' }}>Thả cảm xúc</Text>
+                </TouchableOpacity>
+
+                {/* Chuyen tiep */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 14 }}
+                  onPress={() => {
+                    if (actionMenuMessage) handleOpenForward(actionMenuMessage);
+                  }}
+                >
+                  <Ionicons name="arrow-redo-outline" size={20} color="#8b5cf6" />
+                  <Text style={{ fontSize: 15, color: '#1e293b', fontFamily: 'BeVietnamPro_500Medium' }}>Chuyển tiếp</Text>
+                </TouchableOpacity>
+
+                {/* Xoa cho toi */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 14 }}
+                  onPress={() => {
+                    if (actionMenuMessage) {
+                      void handleDeleteForMe(actionMenuMessage._id, actionMenuMessage.idempotencyKey);
+                    }
+                  }}
+                >
+                  <Ionicons name="eye-off-outline" size={20} color="#64748b" />
+                  <Text style={{ fontSize: 15, color: '#1e293b', fontFamily: 'BeVietnamPro_500Medium' }}>Xóa cho tôi</Text>
+                </TouchableOpacity>
+
+                {/* Thu hoi – chi hien cho tin nhan cua chinh minh */}
+                {actionMenuMessage && getSenderId(actionMenuMessage) === userId && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, gap: 14 }}
+                    onPress={() => {
+                      void handleRecall(actionMenuMessage._id, actionMenuMessage.idempotencyKey);
+                    }}
+                  >
+                    <Ionicons name="close-circle-outline" size={20} color="#ef4444" />
+                    <Text style={{ fontSize: 15, color: '#ef4444', fontFamily: 'BeVietnamPro_500Medium' }}>Thu hồi</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Huy */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, marginTop: 4, backgroundColor: '#f1f5f9', borderRadius: 12 }}
+                  onPress={closeActionMenu}
+                >
+                  <Text style={{ fontSize: 15, color: '#64748b', fontFamily: 'BeVietnamPro_500Medium' }}>Hủy</Text>
+                </TouchableOpacity>
+              </Pressable>
+            </Pressable>
+          </Modal>
+
+          {/* Forward Modal */}
+          <ForwardModal
+            visible={forwardModalVisible}
+            messageId={forwardMessageId}
+            currentConversationId={conversationId || ''}
+            onClose={() => {
+              setForwardModalVisible(false);
+              setForwardMessageId(null);
+            }}
+            onForward={handleForwardToConversation}
+          />
+
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>

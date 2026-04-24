@@ -28,18 +28,18 @@ export function NotificationBell({ unreadCount, onClick, isOpen }: NotificationB
     <button
       type="button"
       onClick={onClick}
-      className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+      className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
         isOpen
-          ? 'bg-[#14463a] ring-1 ring-[#30d7ab]/40 text-[#30d7ab]'
-          : 'bg-[#0d3128] text-[#cdece0] hover:bg-[#14463a]'
+          ? 'border-transparent bg-text-primary text-white shadow-sm'
+          : 'border-border bg-white/70 text-text-secondary hover:text-text-primary'
       }`}
-      aria-label={`Thông báo${unreadCount > 0 ? ` (${unreadCount} chưa đọc)` : ''}`}
+      aria-label={`Thong bao${unreadCount > 0 ? ` (${unreadCount} chua doc)` : ''}`}
     >
       <DashboardIcon name="bell" className={`h-4 w-4 ${pulse ? 'animate-[bellSwing_0.6s_ease-in-out]' : ''}`} />
 
       {unreadCount > 0 && (
         <span
-          className={`absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#f04848] px-1 font-ui-title text-[10px] font-bold leading-none text-white shadow-[0_0_8px_rgba(240,72,72,0.5)] ${
+          className={`absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border border-white bg-[var(--danger-text)] px-1 font-ui-title text-[10px] font-bold leading-none text-white shadow-sm ${
             pulse ? 'animate-[badgePop_0.4s_ease-out]' : ''
           }`}
         >

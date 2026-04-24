@@ -505,6 +505,19 @@ npm run dev:web
 - [x] OX9.4: Nâng cấp premium glassmorphism cho Web + Mobile (ultra transparency, blur mạnh, panel frosted nhiều lớp) và chuẩn hóa bộ quy tắc parity UI liên nền tảng <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.5: Đồng bộ màu giữa các tab Dashboard Web (Chat/Profile/Settings) bằng shared glass tokens để thống nhất palette liên tab <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.6: Giảm độ sáng trắng và tăng sắc xanh lá trong bộ token UI (Web + Mobile) để đồng bộ tone glass dịu mắt hơn <!-- done: 17/04/2026 by binhdev -->
+- [x] OX9.7: Đồng bộ lại web auth shell và khung chat dashboard theo shared tokens, tăng contrast light mode và cố định layout chat ở trung tâm <!-- done: 24/04/2026 -->
+
+### Master Plan: Community Pivot (Phase R1 - R7, N1 - N3)
+- [x] Phase R1: UX Redesign (Web & Mobile) - Light Theme, Shared Sidebar, Toast Notification, Font Inter/JetBrains Mono
+- [x] Phase R2: Mobile App Parity - Đồng bộ 100% tính năng Web lên Mobile (Forward, Action Menu, Story, Group, Settings, Profile, Notifications)
+- [ ] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC)
+- [ ] Phase R4: Đổi tên thương hiệu (Zalo Clone -> Zync Community)
+- [ ] Phase N1: Community Posts (Chức năng đăng bài cộng đồng)
+- [ ] Phase N3: Khám phá & Gợi ý (Explore & Discovery)
+- [ ] Phase R5: Hoàn thiện tính năng AI Assistant Chatbot hiện có
+- [ ] Phase N2: "Killer Feature" - Developer DNA (Thẻ định danh phong cách code tạo từ AI)
+- [ ] Phase R6: Tối ưu hoá Hệ thống
+- [ ] Phase R7: Triển khai Production
 
 ---
 

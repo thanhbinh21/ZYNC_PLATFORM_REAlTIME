@@ -3,7 +3,12 @@ import { z } from 'zod';
 export const CreateGroupSchema = z.object({
   name: z.string().trim().min(1, 'Group name is required').max(100, 'Group name too long'),
   avatarUrl: z.string().url('avatarUrl must be a valid URL').optional(),
-  memberIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid user id')).min(2, 'Select at least 2 members').max(100, 'Maximum 100 members'),
+  memberIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid user id')).max(100, 'Maximum 100 members').optional().default([]),
+  category: z.enum(['frontend','backend','devops','ai-ml','mobile','career','general','other']).optional(),
+  tags: z.array(z.string()).optional(),
+  description: z.string().max(1000).optional(),
+  rules: z.string().max(2000).optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export const UpdateGroupSchema = z.object({

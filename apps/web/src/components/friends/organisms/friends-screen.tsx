@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { FriendsScreenProps } from '../friends.types';
 import { FriendItem } from '../molecules/friend-item';
 import { RequestItem } from '../molecules/request-item';
@@ -26,24 +25,28 @@ export function FriendsScreen({
   onUnblock,
 }: FriendsScreenProps) {
   return (
-    <div className="flex h-full w-full flex-col overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 text-white">
+    <div className="flex h-full w-full flex-col overflow-y-auto px-4 py-5 text-text-primary sm:px-6 lg:px-8">
       <section className="w-full">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-ui-title text-[clamp(1.8rem,4vw,2.8rem)] text-[#daf5ec]">Trung tâm bạn bè</h1>
-            <p className="font-ui-content mt-1 text-base text-[#9fcabd]">Quản lý kết nối, lời mời và danh sách bạn bè ở một nơi duy nhất.</p>
+            <span className="zync-soft-kicker">Network Hub</span>
+            <h1 className="font-ui-title mt-4 text-[clamp(2rem,4vw,3.1rem)] text-text-primary">Trung tam ban be</h1>
+            <p className="font-ui-content mt-2 max-w-2xl text-base text-text-secondary">
+              Quan ly ket noi, loi moi va danh sach ban be trong mot khong gian sang, ro va de theo doi hon.
+            </p>
           </div>
         </header>
 
         <section className="mt-7 grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-2xl border border-[#16513f] bg-[#0a4335]/70 p-5">
+          <div className="zync-soft-card zync-soft-card-elevated rounded-[1.8rem] p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-ui-title text-xl text-[#d8f4eb]">Lời mời kết bạn ({pendingTotal})</h2>
+              <h2 className="font-ui-title text-xl text-text-primary">Loi moi ket ban ({pendingTotal})</h2>
+              <span className="zync-soft-badge text-xs">Incoming</span>
             </div>
 
             <div className="mt-4 space-y-3">
               {incomingRequests.length === 0 ? (
-                <p className="font-ui-meta text-sm text-[#8db5a8]">Chưa có lời mời đến.</p>
+                <p className="font-ui-meta text-sm text-text-tertiary">Chua co loi moi den.</p>
               ) : (
                 incomingRequests.map((item) => (
                   <RequestItem
@@ -59,10 +62,10 @@ export function FriendsScreen({
               )}
             </div>
 
-            <h3 className="font-ui-title mt-6 text-base text-[#d8f4eb]">Lời mời đã gửi</h3>
+            <h3 className="font-ui-title mt-7 text-base text-text-primary">Loi moi da gui</h3>
             <div className="mt-3 space-y-3">
               {outgoingRequests.length === 0 ? (
-                <p className="font-ui-meta text-sm text-[#8db5a8]">Bạn chưa gửi lời mời nào.</p>
+                <p className="font-ui-meta text-sm text-text-tertiary">Ban chua gui loi moi nao.</p>
               ) : (
                 outgoingRequests.map((item) => (
                   <RequestItem
@@ -79,14 +82,18 @@ export function FriendsScreen({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#16513f] bg-[#0a4335]/70 p-5">
-            <h2 className="font-ui-title text-xl text-[#d8f4eb]">Tìm người để kết bạn</h2>
-            <div className="mt-3 flex gap-2">
+          <div className="zync-soft-card zync-soft-card-elevated rounded-[1.8rem] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-ui-title text-xl text-text-primary">Tim nguoi de ket ban</h2>
+              <span className="zync-soft-badge text-xs">Discover</span>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <input
                 value={searchKeyword}
                 onChange={(event) => onSearchKeywordChange(event.target.value)}
-                placeholder="Nhập @username hoặc email"
-                className="font-ui-content h-11 w-full rounded-xl border border-[#1f6651] bg-[#0d4a3b]/75 px-4 text-sm text-[#d8f4eb] outline-none placeholder:text-[#7da79a]"
+                placeholder="Nhap @username hoac email"
+                className="zync-soft-input"
               />
               <button
                 type="button"
@@ -94,15 +101,15 @@ export function FriendsScreen({
                   void onSearch();
                 }}
                 disabled={isLoading}
-                className="font-ui-title h-11 rounded-xl bg-[#36d4a8] px-4 text-sm text-[#063328] transition hover:brightness-110 disabled:opacity-60"
+                className="zync-soft-button h-12 px-5 text-sm"
               >
-                Tìm
+                Tim
               </button>
             </div>
 
             <div className="mt-4 space-y-3">
               {searchResults.length === 0 ? (
-                <p className="font-ui-meta text-sm text-[#8db5a8]">Chưa có kết quả tìm kiếm.</p>
+                <p className="font-ui-meta text-sm text-text-tertiary">Chua co ket qua tim kiem.</p>
               ) : (
                 searchResults.map((user) => (
                   <SearchResultItem
@@ -117,11 +124,15 @@ export function FriendsScreen({
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-[#16513f] bg-[#0a4335]/70 p-5">
-          <h2 className="font-ui-title text-xl text-[#d8f4eb]">Danh sách bạn bè ({friends.length})</h2>
+        <section className="zync-soft-card mt-6 rounded-[1.8rem] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-ui-title text-xl text-text-primary">Danh sach ban be ({friends.length})</h2>
+            <span className="zync-soft-badge text-xs">Trusted Circle</span>
+          </div>
+
           <div className="mt-4 space-y-3">
             {friends.length === 0 ? (
-              <p className="font-ui-meta text-sm text-[#8db5a8]">Bạn chưa có bạn bè nào.</p>
+              <p className="font-ui-meta text-sm text-text-tertiary">Ban chua co ban be nao.</p>
             ) : (
               friends.map((friend) => (
                 <FriendItem
@@ -142,15 +153,19 @@ export function FriendsScreen({
                 void onLoadMoreFriends();
               }}
               disabled={isLoading}
-              className="font-ui-title mt-5 h-10 rounded-xl border border-[#2f8f73] px-4 text-sm text-[#c8ece1] transition hover:bg-[#0f4d3e] disabled:opacity-60"
+              className="zync-soft-button-secondary mt-5 h-10 px-4 text-sm"
             >
-              Tải thêm bạn bè
+              Tai them ban be
             </button>
           ) : null}
         </section>
 
-        {infoMessage ? <p className="font-ui-content mt-4 rounded-lg border border-[#3a876d] bg-[#154335]/60 px-3 py-2 text-sm text-[#c8f3e2]">{infoMessage}</p> : null}
-        {errorMessage ? <p className="font-ui-content mt-3 rounded-lg border border-[#b75662] bg-[#601e29]/55 px-3 py-2 text-sm text-[#ffcccf]">{errorMessage}</p> : null}
+        {infoMessage ? (
+          <p className="zync-soft-notice mt-4 rounded-2xl px-4 py-3 text-sm font-medium">{infoMessage}</p>
+        ) : null}
+        {errorMessage ? (
+          <p className="zync-soft-notice-danger mt-3 rounded-2xl px-4 py-3 text-sm font-medium">{errorMessage}</p>
+        ) : null}
       </section>
     </div>
   );

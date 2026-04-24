@@ -7,15 +7,15 @@ interface DashboardStatCardProps {
 
 export function DashboardStatCard({ item }: DashboardStatCardProps) {
   return (
-    <article className="zync-glass-panel zync-glass-floating rounded-3xl p-5">
+    <article className="zync-soft-card rounded-[1.6rem] p-5 transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
-        <span className="zync-glass-subtle inline-flex h-10 w-10 items-center justify-center rounded-xl border-[#8dffd9]/25 bg-[#133f33]/58 text-[#8dffd9]">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent-light text-accent-strong">
           <DashboardIcon name={item.icon} className="h-4 w-4" />
         </span>
-        {item.badge ? <span className="font-ui-title text-xl text-[#9fffe0]">{item.badge}</span> : null}
+        {item.badge ? <span className="font-ui-title text-xl text-accent-strong">{item.badge}</span> : null}
       </div>
-      <p className="font-ui-title mt-7 text-[2.25rem] leading-none text-[#d9f6ed]">{item.value}</p>
-      <p className="font-ui-content mt-2 text-[1rem] text-[#d1ece2]">{item.label}</p>
+      <p className="font-ui-title mt-7 text-[2.25rem] leading-none text-text-primary">{item.value}</p>
+      <p className="font-ui-content mt-2 text-[1rem] text-text-secondary">{item.label}</p>
     </article>
   );
 }

@@ -107,7 +107,7 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.editProfileBtn}>
               <Text style={styles.editProfileText}>Chỉnh sửa hồ sơ</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsBtn}>
+            <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
               <Ionicons name="settings-outline" size={20} color="#fff" />
             </TouchableOpacity>
           </View>

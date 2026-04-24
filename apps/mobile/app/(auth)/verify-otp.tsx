@@ -56,7 +56,11 @@ export default function VerifyOtpScreen() {
         
         if (res.data.success) {
           await login(res.data.accessToken, res.data.user);
-          router.replace('/(tabs)');
+          if (!res.data.user.onboardingCompleted) {
+            router.replace('/(auth)/onboarding');
+          } else {
+            router.replace('/(tabs)');
+          }
         }
       } else if (flow === 'register') {
         const res = await api.post('/auth/verify-otp', {
@@ -71,7 +75,11 @@ export default function VerifyOtpScreen() {
         
         if (res.data.success) {
           await login(res.data.accessToken, res.data.user);
-          router.replace('/(tabs)');
+          if (!res.data.user.onboardingCompleted) {
+            router.replace('/(auth)/onboarding');
+          } else {
+            router.replace('/(tabs)');
+          }
         }
       } else if (flow === 'forgot') {
         // Implementation for forgot password

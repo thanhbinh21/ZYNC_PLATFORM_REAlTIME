@@ -137,3 +137,45 @@ export async function deleteGroupHandler(
     next(err);
   }
 }
+
+export async function getPublicChannelsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const channels = await GroupsService.getPublicChannels();
+    res.json({ success: true, data: channels });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function discoverChannelsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const channels = await GroupsService.discoverChannels(userId);
+    res.json({ success: true, data: channels });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function joinPublicChannelHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const group = await GroupsService.joinPublicChannel(userId, req.params['groupId'] as string);
+    res.json({ success: true, data: group });
+  } catch (err) {
+    next(err);
+  }
+}
+

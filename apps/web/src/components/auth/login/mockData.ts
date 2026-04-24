@@ -5,9 +5,9 @@ export const LOGIN_SCREEN_MOCK_DATA: LoginScreenMockData = {
   headline: ['Kết nối cùng', 'thế giới.'],
   subtitle: 'Bước vào không gian NO VIBE NO LIFE. Trải nghiệm nhắn tin tối giản, bảo mật và giữ mạch giao tiếp liên tục.',
   members: [
-    { id: '1', name: 'An', initials: 'AN', tone: 'bg-[#d7b498]' },
-    { id: '2', name: 'Binh', initials: 'BI', tone: 'bg-[#9eb8d4]' },
-    { id: '3', name: 'Chi', initials: 'CH', tone: 'bg-[#8ca67f]' },
+    { id: '1', name: 'An', initials: 'AN', tone: 'bg-accent-light text-accent-strong' },
+    { id: '2', name: 'Binh', initials: 'BI', tone: 'bg-bg-hover text-text-primary' },
+    { id: '3', name: 'Chi', initials: 'CH', tone: 'bg-accent-light text-accent-strong' },
   ],
   extraMembersLabel: '+2k',
   bottomCaption: 'Tham gia cùng hàng nghìn người dùng đang hoạt động mỗi ngày.',

@@ -4,7 +4,10 @@ import { logger } from '../shared/logger';
 let redisClient: Redis | null = null;
 
 export async function connectRedis(): Promise<void> {
-  const url = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+  const url = process.env['REDIS_URL'];
+  if (!url) {
+    throw new Error('REDIS_URL is required. Please set REDIS_URL in your .env');
+  }
 
   redisClient = new Redis(url, {
     lazyConnect: true,

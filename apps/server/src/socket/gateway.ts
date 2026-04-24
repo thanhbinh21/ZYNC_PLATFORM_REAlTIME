@@ -124,9 +124,17 @@ export function emitNotification(
 }
 
 export function initSocketGateway(httpServer: HttpServer): Server {
+  const configuredCorsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const isLanMode = process.env['NODE_ENV'] !== 'production'
+    && process.env['HOST'] === '0.0.0.0';
+  const socketCorsOrigin = isLanMode ? true : configuredCorsOrigins;
+
   const io = new Server(httpServer, {
     cors: {
-      origin: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001').split(','),
+      origin: socketCorsOrigin,
       credentials: true,
     },
     transports: ['websocket', 'polling'],
@@ -1430,9 +1438,10 @@ async function handleSendMessage(
 
         const sender = await UserModel.findById(userId).select('displayName').lean();
         const senderName = (sender?.displayName as string) ?? 'Someone';
-        const preview = typeof content === 'string'
-          ? content.slice(0, 100)
-          : (normalizedType === 'text' ? '' : `[${normalizedType}]`);
+        const rawText = typeof content === 'string' ? content.trim() : '';
+        const preview = rawText.length > 0
+          ? rawText.slice(0, 100)
+          : (normalizedType === 'text' ? 'Ban co tin nhan moi' : `[${normalizedType}]`);
 
         for (const member of members) {
           if (member.userId === userId) continue;

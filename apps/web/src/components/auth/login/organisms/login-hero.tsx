@@ -13,7 +13,7 @@ export function LoginHero({ data }: LoginHeroProps) {
         <BrandLogo brand={data.brand} />
       </div>
 
-      <h1 className="font-ui-title mx-auto mt-10 max-w-[14ch] text-balance text-[clamp(3rem,7vw,6rem)] font-semibold leading-[1.04] tracking-[-0.015em] text-[#d8eee6] lg:mx-0 lg:mt-12">
+      <h1 className="font-ui-title mx-auto mt-10 max-w-[14ch] text-balance text-[clamp(3rem,7vw,6rem)] font-semibold leading-[1.04] tracking-[-0.015em] text-text-primary lg:mx-0 lg:mt-12">
         {data.headline.map((line) => (
           <span key={line} className="block">
             {line}
@@ -21,7 +21,7 @@ export function LoginHero({ data }: LoginHeroProps) {
         ))}
       </h1>
 
-      <p className="font-ui-content mx-auto mt-8 max-w-[28ch] text-balance text-[clamp(1.7rem,3.6vw,2.9rem)] leading-[1.12] text-[#89b1a4] lg:mx-0 lg:mt-10">
+      <p className="font-ui-content mx-auto mt-8 max-w-[28ch] text-balance text-[clamp(1.7rem,3.6vw,2.9rem)] leading-[1.2] text-text-secondary lg:mx-0 lg:mt-10">
         {data.subtitle}
       </p>
 

@@ -1,7 +1,40 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
+function resolveApiBaseUrl(): string {
+  const explicitUrl = process.env['NEXT_PUBLIC_API_URL'];
+  if (explicitUrl && typeof window === 'undefined') {
+    return explicitUrl;
+  }
+
+  if (typeof window !== 'undefined') {
+    if (explicitUrl) {
+      try {
+        const explicit = new URL(explicitUrl);
+        const currentHost = window.location.hostname;
+        const isExplicitLocal = explicit.hostname === 'localhost' || explicit.hostname === '127.0.0.1';
+        const isCurrentLocal = currentHost === 'localhost' || currentHost === '127.0.0.1';
+
+        if (!isExplicitLocal || isCurrentLocal) {
+          return explicitUrl;
+        }
+
+        const port = explicit.port || '3000';
+        return `${window.location.protocol}//${currentHost}:${port}`;
+      } catch {
+        return explicitUrl;
+      }
+    }
+
+    return `${window.location.protocol}//${window.location.hostname}:3000`;
+  }
+
+  return 'http://localhost:3000';
+}
+
+const apiBaseUrl = resolveApiBaseUrl();
+
 export const apiClient = axios.create({
-  baseURL: process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3000',
+  baseURL: apiBaseUrl,
   withCredentials: true, // send http-only cookie for refresh token
   headers: { 'Content-Type': 'application/json' },
 });
@@ -23,7 +56,7 @@ apiClient.interceptors.response.use(
       if (err.config) err.config._retry = true;
       try {
         const { data } = await axios.post<{ accessToken: string }>(
-          `${process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3000'}/api/auth/refresh`,
+          `${apiBaseUrl}/api/auth/refresh`,
           {},
           { withCredentials: true },
         );

@@ -17,6 +17,7 @@ import { runPgvectorMigration, isNeonAvailable } from './infrastructure/neon';
 import { logger } from './shared/logger';
 
 const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
+const HOST = process.env['HOST'];
 
 async function bootstrap(): Promise<void> {
   // Kết nối infrastructure
@@ -60,9 +61,15 @@ async function bootstrap(): Promise<void> {
   initSocketGateway(httpServer);
 
   // Bắt đầu lắng nghe request
-  httpServer.listen(PORT, () => {
-    logger.info(`Zync server khởi động trên cổng ${PORT} [${process.env['NODE_ENV']}]`);
-  });
+  const onListen = (): void => {
+    const address = HOST ? `${HOST}:${PORT}` : `${PORT}`;
+    logger.info(`Zync server started at ${address} [${process.env['NODE_ENV']}]`);
+  };
+  if (HOST) {
+    httpServer.listen(PORT, HOST, onListen);
+  } else {
+    httpServer.listen(PORT, onListen);
+  }
 
   // Tắt server an toàn khi nhận signal
   const shutdown = async (signal: string): Promise<void> => {
@@ -89,3 +96,4 @@ bootstrap().catch((err: unknown) => {
   logger.error('Failed to start server', err);
   process.exit(1);
 });
+

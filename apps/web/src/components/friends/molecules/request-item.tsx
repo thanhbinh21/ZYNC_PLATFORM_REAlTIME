@@ -22,20 +22,20 @@ export function RequestItem({
   const dateLabel = new Date(item.createdAt).toLocaleString('vi-VN');
 
   return (
-    <article className="rounded-xl border border-[#1a654f] bg-[#0b4738]/65 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-[1.4rem] border border-border bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <FriendsAvatar name={item.displayName} />
           <div>
-            <p className="font-ui-title text-base text-[#d7f2e8]">{item.displayName}</p>
-            <p className="font-ui-meta text-xs text-[#90b8ab]">{dateLabel}</p>
+            <p className="font-ui-title text-base text-text-primary">{item.displayName}</p>
+            <p className="font-ui-meta text-xs text-text-tertiary">{dateLabel}</p>
           </div>
         </div>
 
         {type === 'incoming' ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <FriendsActionButton
-              label="Chấp nhận"
+              label="Chap nhan"
               variant="primary"
               disabled={isLoading}
               onClick={() => {
@@ -43,7 +43,7 @@ export function RequestItem({
               }}
             />
             <FriendsActionButton
-              label="Từ chối"
+              label="Tu choi"
               variant="danger"
               disabled={isLoading}
               onClick={() => {
@@ -53,7 +53,7 @@ export function RequestItem({
           </div>
         ) : (
           <FriendsActionButton
-            label="Bỏ chặn"
+            label="Bo chan"
             variant="neutral"
             disabled={isLoading}
             onClick={() => {

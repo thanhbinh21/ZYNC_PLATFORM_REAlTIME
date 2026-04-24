@@ -14,6 +14,7 @@ interface VerifyOtpResponse {
     displayName: string;
     email?: string;
     avatarUrl?: string;
+    onboardingCompleted?: boolean;
   };
 }
 

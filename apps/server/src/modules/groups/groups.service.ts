@@ -23,6 +23,12 @@ interface GroupSummary {
   createdBy: string;
   adminIds: string[];
   memberApprovalEnabled: boolean;
+  category?: string;
+  tags?: string[];
+  description?: string;
+  rules?: string;
+  isPublic?: boolean;
+  memberCount?: number;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   updatedAt: Date;
 }
@@ -128,6 +134,12 @@ async function buildGroupSummary(groupId: string): Promise<GroupSummary> {
     createdBy: getGroupCreatorId(group),
     adminIds: group.adminIds,
     memberApprovalEnabled: Boolean(group.memberApprovalEnabled),
+    category: group.category,
+    tags: group.tags,
+    description: group.description,
+    rules: group.rules,
+    isPublic: group.isPublic,
+    memberCount: group.memberCount,
     users: normalizedUsers,
     updatedAt: group.updatedAt,
   };
@@ -196,11 +208,11 @@ async function createAndEmitGroupSystemMessage(
 export class GroupsService {
   static async createGroup(
     creatorId: string,
-    input: { name: string; avatarUrl?: string; memberIds: string[] },
+    input: { name: string; avatarUrl?: string; memberIds?: string[]; category?: string; tags?: string[]; description?: string; rules?: string; isPublic?: boolean },
   ): Promise<GroupSummary> {
-    const uniqueMembers = Array.from(new Set(input.memberIds.filter((id) => id !== creatorId)));
+    const uniqueMembers = Array.from(new Set((input.memberIds || []).filter((id) => id !== creatorId)));
 
-    if (uniqueMembers.length < 2) {
+    if (!input.isPublic && uniqueMembers.length < 2) {
       throw new BadRequestError('Group requires at least 2 selected members');
     }
 
@@ -219,6 +231,12 @@ export class GroupsService {
       adminIds: [creatorId],
       memberApprovalEnabled: false,
       unreadCounts: new Map<string, number>(),
+      category: input.category || 'general',
+      tags: input.tags || [],
+      description: input.description || '',
+      rules: input.rules || '',
+      isPublic: input.isPublic || false,
+      memberCount: 1 + uniqueMembers.length,
     });
 
     await ConversationMemberModel.insertMany([
@@ -634,5 +652,68 @@ export class GroupsService {
         by: currentUserId,
       },
     });
+  }
+
+  static async getPublicChannels(): Promise<GroupSummary[]> {
+    const channels = await ConversationModel.find({ type: 'group', isPublic: true }).sort({ memberCount: -1 }).limit(50).lean();
+    return Promise.all(channels.map(c => buildGroupSummary(c._id.toString())));
+  }
+
+  static async discoverChannels(userId: string): Promise<GroupSummary[]> {
+    const userGroups = await ConversationMemberModel.find({ userId }).select('conversationId').lean();
+    const userGroupIds = userGroups.map(m => m.conversationId);
+    
+    const channels = await ConversationModel.find({ 
+      type: 'group', 
+      isPublic: true,
+      _id: { $nin: userGroupIds }
+    }).sort({ memberCount: -1 }).limit(20).lean();
+
+    return Promise.all(channels.map(c => buildGroupSummary(c._id.toString())));
+  }
+
+  static async joinPublicChannel(userId: string, groupId: string): Promise<GroupSummary> {
+    const group = await getGroupOrThrow(groupId);
+    if (!group.isPublic) {
+      throw new ForbiddenError('This channel is not public');
+    }
+    
+    const isMember = await isGroupMember(groupId, userId);
+    if (isMember) {
+      throw new BadRequestError('Already a member');
+    }
+
+    await ConversationMemberModel.create({
+      conversationId: groupId,
+      userId,
+      role: 'member',
+    });
+
+    group.memberCount = (group.memberCount || 0) + 1;
+    await group.save();
+
+    const summary = await buildGroupSummary(groupId);
+    
+    const memberIds = await getGroupMemberIds(groupId);
+    
+    const currentUser = await UserModel.findById(userId).select('displayName').lean();
+    const displayName = currentUser?.displayName || 'Thành viên';
+    await createAndEmitGroupSystemMessage(
+      groupId,
+      userId,
+      `${displayName} đã tham gia channel`,
+      memberIds,
+    );
+
+    emitGroupUpdated(memberIds, {
+      groupId,
+      type: 'member_added',
+      data: {
+        memberIds: [userId],
+        addedBy: userId,
+      },
+    });
+
+    return summary;
   }
 }

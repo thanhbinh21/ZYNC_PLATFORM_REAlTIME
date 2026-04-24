@@ -11,7 +11,7 @@ export function FriendsAvatar({ name }: FriendsAvatarProps) {
     .join('');
 
   return (
-    <span className="font-ui-title inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0f5a46] text-sm text-[#d8f5eb]">
+    <span className="font-ui-title inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-accent-light text-sm text-accent-strong shadow-sm">
       {initials || 'U'}
     </span>
   );
