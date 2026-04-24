@@ -77,7 +77,14 @@ export const UpdateProfileSchema = z.object({
   username: usernameSchema.optional(),
   displayName: z.string().trim().min(1).max(50).optional(),
   avatarUrl: z.string().url().optional(),
-  bio: z.string().trim().max(200).optional(),
+  bio: z.string().trim().max(500).optional(),
+  skills: z.array(z.string()).optional(),
+  interests: z.array(z.string()).optional(),
+  githubUrl: z.string().url().optional().or(z.literal('')),
+  portfolioUrl: z.string().url().optional().or(z.literal('')),
+  linkedinUrl: z.string().url().optional().or(z.literal('')),
+  devRole: z.enum(['developer','mentor','student','recruiter','other']).optional(),
+  onboardingCompleted: z.boolean().optional(),
 }).strict();
 export type UpdateProfileDto = z.infer<typeof UpdateProfileSchema>;
 

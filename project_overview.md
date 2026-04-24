@@ -508,7 +508,7 @@ npm run dev:web
 
 ### Master Plan: Community Pivot (Phase R1 - R7, N1 - N3)
 - [x] Phase R1: UX Redesign (Web & Mobile) - Light Theme, Shared Sidebar, Toast Notification, Font Inter/JetBrains Mono
-- [ ] Phase R2: Mobile App Parity - Đồng bộ 100% tính năng Web lên Mobile (Reply, Forward, Reaction, Forwarded UI)
+- [x] Phase R2: Mobile App Parity - Đồng bộ 100% tính năng Web lên Mobile (Forward, Action Menu, Story, Group, Settings, Profile, Notifications)
 - [ ] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC)
 - [ ] Phase R4: Đổi tên thương hiệu (Zalo Clone -> Zync Community)
 - [ ] Phase N1: Community Posts (Chức năng đăng bài cộng đồng)

@@ -25,7 +25,7 @@ import type { StoryReactionType, StoryFeedGroup } from '@/components/stories/sto
 import FriendsPage from '../friends/page';
 
 const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
-  theme: 'verdant',
+  theme: 'light',
   messageFontSize: 'medium',
 };
 
@@ -152,9 +152,11 @@ export default function HomePage() {
     const savedFontSize = globalThis.localStorage?.getItem('zync.dashboard.messageFontSize');
 
     const theme =
-      savedTheme === 'verdant' || savedTheme === 'dark' || savedTheme === 'light'
-        ? savedTheme
-        : DEFAULT_APPEARANCE_SETTINGS.theme;
+      savedTheme === 'dark'
+        ? 'dark'
+        : savedTheme === 'light' || savedTheme === 'verdant'
+          ? 'light'
+          : DEFAULT_APPEARANCE_SETTINGS.theme;
 
     const messageFontSize =
       savedFontSize === 'small' || savedFontSize === 'medium' || savedFontSize === 'large'
@@ -224,8 +226,8 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#021612]">
-        <div className="text-[#30d7ab] animate-pulse">Đang tải trung tâm điều khiển...</div>
+      <div className="flex min-h-screen items-center justify-center bg-bg-primary">
+        <div className="text-accent animate-pulse">Đang tải trung tâm điều khiển...</div>
       </div>
     );
   }
@@ -254,6 +256,11 @@ export default function HomePage() {
     globalThis.localStorage?.setItem('zync.dashboard.messageFontSize', settings.messageFontSize);
   };
 
+  const handleToggleTheme = () => {
+    const newTheme = appearanceSettings.theme === 'dark' ? 'light' : 'dark';
+    handleApplyAppearance({ ...appearanceSettings, theme: newTheme });
+  };
+
   const handleResetAppearance = () => {
     setAppearanceSettings(DEFAULT_APPEARANCE_SETTINGS);
     globalThis.localStorage?.setItem('zync.dashboard.theme', DEFAULT_APPEARANCE_SETTINGS.theme);
@@ -275,9 +282,9 @@ export default function HomePage() {
 
   const storySlot = isFeedLoading ? (
     <div className="flex gap-4 overflow-x-auto pb-2">
-      <div className="h-16 w-16 animate-pulse rounded-full bg-[#0d3228]" />
-      <div className="h-16 w-16 animate-pulse rounded-full bg-[#0d3228]" />
-      <div className="h-16 w-16 animate-pulse rounded-full bg-[#0d3228]" />
+      <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
+      <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
+      <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
     </div>
   ) : (
     <StoryBar
@@ -297,6 +304,8 @@ export default function HomePage() {
         data={data}
         activeNavId={activeNavId}
         onNavSelect={handleNavSelect}
+        theme={appearanceSettings.theme}
+        onToggleTheme={handleToggleTheme}
         onActivityClick={(item) => {
           if (item.conversationId) {
             onSelectConversation(item.conversationId);

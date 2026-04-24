@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-export type DashboardThemeMode = 'verdant' | 'dark' | 'light';
+export type DashboardThemeMode = 'dark' | 'light';
 export type DashboardMessageFontSize = 'small' | 'medium' | 'large';
 
 export interface DashboardAppearanceSettings {
@@ -19,19 +19,19 @@ interface SettingSwitchProps {
 
 function SettingSwitch({ label, description, checked, onChange }: SettingSwitchProps) {
   return (
-    <div className="zync-glass-subtle flex items-start justify-between gap-4 rounded-2xl border-[#98ffe0]/18 bg-[#07241d]/58 p-4">
+    <div className="zync-soft-card-muted flex items-start justify-between gap-4 rounded-[1.2rem] p-4">
       <div>
-        <p className="font-ui-title text-[0.98rem] text-[#e2fff4]">{label}</p>
-        <p className="font-ui-content mt-1 text-sm text-[#9dc8ba]">{description}</p>
+        <p className="font-ui-title text-sm text-text-primary">{label}</p>
+        <p className="font-ui-content mt-1 text-xs leading-6 text-text-secondary">{description}</p>
       </div>
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-7 w-12 rounded-full transition ${checked ? 'bg-[#34dfb5]' : 'bg-[#295246]'}`}
+        className={`relative inline-flex h-6 w-11 rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-border'}`}
         aria-pressed={checked}
       >
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${checked ? 'left-6' : 'left-1'}`}
+          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${checked ? 'left-6' : 'left-1'}`}
         />
       </button>
     </div>
@@ -72,7 +72,7 @@ export function HomeDashboardSettingsPanel({
       soundEnabled,
       readReceipts,
     ].filter(Boolean).length;
-    return `${enabled}/6 tuỳ chọn đang bật`;
+    return `${enabled}/6 tuy chon dang bat`;
   }, [
     allowFriendRequests,
     desktopNotifications,
@@ -84,88 +84,87 @@ export function HomeDashboardSettingsPanel({
 
   return (
     <section className="mt-5 space-y-5">
-      <header className="zync-glass-panel zync-glass-panel-strong rounded-3xl px-5 py-5">
-        <p className="font-ui-meta text-xs uppercase tracking-[0.16em] text-[#6db8a2]">Trung tâm thiết lập</p>
-        <h2 className="font-ui-title mt-2 text-[clamp(1.35rem,2.5vw,2.1rem)] text-[#e5fff5]">Cài đặt tài khoản</h2>
-        <p className="font-ui-content mt-2 text-sm text-[#aad5c6]">
-          Tuỳ chỉnh quyền riêng tư, thông báo và giao diện để tối ưu trải nghiệm ZYNC theo phong cách của bạn.
+      <header className="zync-soft-card rounded-[1.8rem] px-5 py-5">
+        <p className="font-ui-meta text-xs uppercase tracking-wider text-accent-strong">Control center</p>
+        <h2 className="font-ui-title mt-2 text-2xl text-text-primary">Cai dat tai khoan</h2>
+        <p className="font-ui-content mt-2 max-w-2xl text-sm leading-7 text-text-secondary">
+          Dong bo theme, readability va cac toggle quan trong theo mot bo token chung cho light va dark mode.
         </p>
-        <p className="font-ui-content mt-3 text-sm text-[#4de5b8]">{summary}</p>
+        <p className="font-ui-title mt-4 text-sm text-text-primary">{summary}</p>
       </header>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="zync-glass-panel space-y-3 rounded-3xl p-4 sm:p-5">
-          <h3 className="font-ui-title text-lg text-[#defcef]">Quyền riêng tư</h3>
+        <section className="zync-soft-card rounded-[1.8rem] p-4 sm:p-5">
+          <h3 className="font-ui-title text-lg text-text-primary">Quyen rieng tu</h3>
 
-          <SettingSwitch
-            label="Hiển thị trạng thái hoạt động"
-            description="Cho phép bạn bè nhìn thấy khi bạn đang online."
-            checked={showOnlineStatus}
-            onChange={setShowOnlineStatus}
-          />
+          <div className="mt-4 space-y-3">
+            <SettingSwitch
+              label="Hien thi trang thai hoat dong"
+              description="Cho phep ban be nhin thay khi ban dang online."
+              checked={showOnlineStatus}
+              onChange={setShowOnlineStatus}
+            />
 
-          <SettingSwitch
-            label="Cho phép nhận lời mời kết bạn"
-            description="Người dùng khác có thể gửi lời mời kết bạn đến bạn."
-            checked={allowFriendRequests}
-            onChange={setAllowFriendRequests}
-          />
+            <SettingSwitch
+              label="Cho phep nhan loi moi ket ban"
+              description="Nguoi dung khac co the gui loi moi ket ban den ban."
+              checked={allowFriendRequests}
+              onChange={setAllowFriendRequests}
+            />
 
-          <SettingSwitch
-            label="Hiển thị đã xem"
-            description="Cho phép người khác thấy bạn đã đọc tin nhắn của họ."
-            checked={readReceipts}
-            onChange={setReadReceipts}
-          />
+            <SettingSwitch
+              label="Hien thi da xem"
+              description="Cho phep nguoi khac thay ban da doc tin nhan cua ho."
+              checked={readReceipts}
+              onChange={setReadReceipts}
+            />
+          </div>
         </section>
 
-        <section className="zync-glass-panel space-y-3 rounded-3xl p-4 sm:p-5">
-          <h3 className="font-ui-title text-lg text-[#defcef]">Thông báo</h3>
+        <section className="zync-soft-card rounded-[1.8rem] p-4 sm:p-5">
+          <h3 className="font-ui-title text-lg text-text-primary">Thong bao</h3>
 
-          <SettingSwitch
-            label="Thông báo trên desktop"
-            description="Hiển thị popup thông báo cho tin nhắn mới trên trình duyệt."
-            checked={desktopNotifications}
-            onChange={setDesktopNotifications}
-          />
+          <div className="mt-4 space-y-3">
+            <SettingSwitch
+              label="Thong bao tren desktop"
+              description="Hien thi popup thong bao cho tin nhan moi tren trinh duyet."
+              checked={desktopNotifications}
+              onChange={setDesktopNotifications}
+            />
 
-          <SettingSwitch
-            label="Thông báo qua email"
-            description="Nhận email tổng hợp hoạt động quan trọng mỗi ngày."
-            checked={emailNotifications}
-            onChange={setEmailNotifications}
-          />
+            <SettingSwitch
+              label="Thong bao qua email"
+              description="Nhan email tong hop hoat dong quan trong moi ngay."
+              checked={emailNotifications}
+              onChange={setEmailNotifications}
+            />
 
-          <SettingSwitch
-            label="Âm thanh tin nhắn"
-            description="Phát âm thanh khi có tin nhắn mới hoặc nhắc nhở."
-            checked={soundEnabled}
-            onChange={setSoundEnabled}
-          />
+            <SettingSwitch
+              label="Am thanh tin nhan"
+              description="Phat am thanh khi co tin nhan moi hoac nhac nho."
+              checked={soundEnabled}
+              onChange={setSoundEnabled}
+            />
+          </div>
         </section>
       </div>
 
-      <section className="zync-glass-panel rounded-3xl p-4 sm:p-5">
-        <h3 className="font-ui-title text-lg text-[#defcef]">Giao diện hiển thị</h3>
+      <section className="zync-soft-card rounded-[1.8rem] p-4 sm:p-5">
+        <h3 className="font-ui-title text-lg text-text-primary">Giao dien hien thi</h3>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-5 grid gap-6 lg:grid-cols-2">
           <div>
-            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-[#79b6a2]">Bảng màu</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-text-secondary">Theme mode</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {[
-                { id: 'verdant', label: 'Verdant Nexus' },
-                { id: 'dark', label: 'Dark Graphite' },
-                { id: 'light', label: 'Light Mint' },
+                { id: 'light', label: 'Light mode' },
+                { id: 'dark', label: 'Dark mode' },
               ].map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setTheme(item.id as DashboardThemeMode)}
-                  className={`font-ui-title rounded-xl px-4 py-2 text-sm transition ${
-                    theme === item.id
-                      ? 'bg-[#34dfb5] text-[#04362c]'
-                      : 'border border-[#1d4e41] bg-[#0a2f26] text-[#b5e2d3] hover:bg-[#0f3a2f]'
-                  }`}
+                  className={`zync-soft-step ${theme === item.id ? 'zync-soft-step-active' : ''}`}
                 >
                   {item.label}
                 </button>
@@ -174,22 +173,18 @@ export function HomeDashboardSettingsPanel({
           </div>
 
           <div>
-            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-[#79b6a2]">Cỡ chữ tin nhắn</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-text-secondary">Co chu tin nhan</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {[
-                { id: 'small', label: 'Nhỏ' },
-                { id: 'medium', label: 'Vừa' },
-                { id: 'large', label: 'Lớn' },
+                { id: 'small', label: 'Nho' },
+                { id: 'medium', label: 'Vua' },
+                { id: 'large', label: 'Lon' },
               ].map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setMessageFontSize(item.id as DashboardMessageFontSize)}
-                  className={`font-ui-title rounded-xl px-4 py-2 text-sm transition ${
-                    messageFontSize === item.id
-                      ? 'bg-[#34dfb5] text-[#04362c]'
-                      : 'border border-[#1d4e41] bg-[#0a2f26] text-[#b5e2d3] hover:bg-[#0f3a2f]'
-                  }`}
+                  className={`zync-soft-step ${messageFontSize === item.id ? 'zync-soft-step-active' : ''}`}
                 >
                   {item.label}
                 </button>
@@ -198,24 +193,24 @@ export function HomeDashboardSettingsPanel({
           </div>
         </div>
 
-        <div className="mt-5 flex justify-end gap-3">
+        <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={() => {
               onResetAppearance();
             }}
-            className="font-ui-title rounded-xl border border-[#1d4e41] px-4 py-2 text-sm text-[#b5e2d3] hover:bg-[#0f3a2f]"
+            className="zync-soft-button-ghost px-4 py-2.5 text-sm"
           >
-            Khôi phục mặc định
+            Khoi phuc mac dinh
           </button>
           <button
             type="button"
             onClick={() => {
               onApplyAppearance({ theme, messageFontSize });
             }}
-            className="font-ui-title rounded-xl bg-[#34dfb5] px-4 py-2 text-sm text-[#04362c] transition hover:brightness-110"
+            className="zync-soft-button px-4 py-2.5 text-sm"
           >
-            Lưu thay đổi
+            Luu thay doi
           </button>
         </div>
       </section>

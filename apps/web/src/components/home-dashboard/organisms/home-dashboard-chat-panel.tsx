@@ -257,18 +257,18 @@ function ConversationList({
     : [];
 
   return (
-    <aside className="zync-glass-panel zync-glass-panel-strong h-full min-h-0 overflow-y-auto border-r zync-glass-divider p-4">
-      <h2 className="text-2xl font-bold text-[#e6fff5] mb-4">Tin nhắn</h2>
+    <aside className="h-full min-h-0 overflow-y-auto border-r border-border bg-bg-card p-4">
+      <h2 className="text-2xl font-bold text-text-primary mb-4">Tin nhắn</h2>
 
       {/* Search */}
-      <label className="zync-glass-subtle mb-4 flex h-11 items-center gap-2 rounded-xl bg-[#12392f]/48 px-3 text-[#b5ddd0]">
+      <label className="mb-4 flex h-11 items-center gap-2 rounded-xl bg-bg-hover px-3 text-text-secondary border border-border-light">
         <SearchIcon />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Tìm kiếm cuộc hội thoại"
-          className="w-full bg-transparent text-sm text-[#d8f7ec] outline-none placeholder:text-[#90b8a9]"
+          className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
         />
       </label>
 
@@ -319,12 +319,12 @@ function ConversationList({
               onClick={() => onSelectConversation(item.id)}
               className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
                 selectedId === item.id
-                  ? 'zync-glass-subtle border-[#9bffe0]/44 bg-[#113f32]/66'
-                  : 'border-transparent hover:border-[#8bf8d0]/22 hover:bg-[#0b3027]/62'
+                  ? 'border-accent bg-bg-active text-text-primary'
+                  : 'border-transparent hover:border-border hover:bg-bg-hover'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="relative h-11 w-11 rounded-full bg-[#2f6657] text-[#dffef1] flex-shrink-0">
+                <div className="relative h-11 w-11 rounded-full bg-accent text-white flex-shrink-0">
                   <span className="flex h-full w-full items-center justify-center text-sm font-semibold">
                     {item.avatar}
                   </span>
@@ -334,20 +334,20 @@ function ConversationList({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="truncate text-base font-semibold text-[#e6fff6]">{item.name}</p>
+                    <p className="truncate text-base font-semibold text-text-primary">{item.name}</p>
                     <div className="flex items-center gap-2">
                       {isMuted && (
-                        <span className="inline-flex items-center text-[#ffd8a8]" aria-label="Đã tắt thông báo" title="Đã tắt thông báo">
+                        <span className="inline-flex items-center text-accent" aria-label="Đã tắt thông báo" title="Đã tắt thông báo">
                           <BellOffMiniIcon />
                         </span>
                       )}
-                      <p className="text-xs uppercase tracking-wide text-[#9ac7b7] whitespace-nowrap">{item.time}</p>
+                      <p className="text-xs uppercase tracking-wide text-text-tertiary whitespace-nowrap">{item.time}</p>
                     </div>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="truncate text-sm text-[#9fc6b8]">{item.preview}</p>
+                    <p className="truncate text-sm text-text-secondary">{item.preview}</p>
                     {item.isPinned && (
-                      <span className="inline-flex items-center text-[#b5f8e2]" aria-label="Đã ghim" title="Đã ghim">
+                        <span className="inline-flex items-center text-accent" aria-label="Đã ghim" title="Đã ghim">
                         <PinMiniIcon />
                       </span>
                     )}
@@ -742,20 +742,20 @@ function ChatPanel({
   }, [scrollToMessageElement, showJumpStatus]);
 
   return (
-    <article className="zync-glass-panel zync-glass-panel-strong relative grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-[radial-gradient(circle_at_12%_18%,rgba(170,255,228,0.12),transparent_38%),linear-gradient(180deg,#031d17_0%,#02140f_100%)]">
+    <article className="relative grid h-full w-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] overflow-hidden bg-bg-card rounded-2xl border border-border shadow-sm">
       {/* Header */}
-      <header className="zync-glass-subtle flex items-center justify-between border-b zync-glass-divider px-5 py-3 bg-[#06271f]/42">
+      <header className="flex items-center justify-between border-b border-border px-5 py-3 bg-bg-card">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className={`relative h-11 w-11 overflow-hidden rounded-full bg-[#376f5f] ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
+            className={`relative h-11 w-11 overflow-hidden rounded-full bg-accent-light ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
             onClick={isGroupConversation ? onAvatarClick : undefined}
             title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
           >
             {participantAvatarUrl ? (
               <img src={participantAvatarUrl} alt={participantName} className="h-full w-full object-cover" />
             ) : (
-              <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-[#e6fff5]">
+              <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-accent">
                 {participantAvatar ? participantAvatar[0] : participantName[0]}
               </span>
             )}
@@ -766,22 +766,22 @@ function ChatPanel({
           <div>
             <button
               type="button"
-              className={`text-left text-base font-semibold text-[#e4fff4] ${isGroupConversation ? 'cursor-pointer hover:text-[#bff8e6]' : 'cursor-default'}`}
+              className={`text-left text-base font-semibold text-text-primary ${isGroupConversation ? 'cursor-pointer hover:text-accent' : 'cursor-default'}`}
               onClick={isGroupConversation ? onNameClick : undefined}
               title={isGroupConversation ? 'Đổi tên nhóm' : undefined}
             >
               {participantName}
             </button>
-            <p className="text-xs text-[#53e1b5]">
+            <p className="text-xs text-text-tertiary">
               {isOnline ? 'đang hoạt động' : 'ngoại tuyến'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-[#a8d8c7]">
+        <div className="flex items-center gap-2 text-text-secondary">
           <button
             type="button"
-            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bg-hover transition-colors hover:bg-border-light disabled:cursor-not-allowed disabled:opacity-45"
             title="Gọi thoại"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
@@ -790,7 +790,7 @@ function ChatPanel({
           </button>
           <button
             type="button"
-            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bg-hover transition-colors hover:bg-border-light disabled:cursor-not-allowed disabled:opacity-45"
             title="Gọi video"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
@@ -799,7 +799,7 @@ function ChatPanel({
           </button>
           <button
             type="button"
-            className="zync-glass-subtle inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0d342a]/62 transition-colors hover:bg-[#16473a]/72"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bg-hover transition-colors hover:bg-border-light"
             title="Info"
             onClick={onInfoClick}
           >

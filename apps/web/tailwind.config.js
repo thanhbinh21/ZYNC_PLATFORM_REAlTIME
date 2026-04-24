@@ -27,10 +27,17 @@ module.exports = {
           DEFAULT: 'var(--accent)',
           hover: 'var(--accent-hover)',
           light: 'var(--accent-light)',
+          strong: 'var(--accent-strong)',
         },
         border: {
           DEFAULT: 'var(--border)',
           light: 'var(--border-light)',
+        },
+        surface: {
+          DEFAULT: 'var(--surface-card)',
+          strong: 'var(--surface-card-strong)',
+          muted: 'var(--surface-muted)',
+          glass: 'var(--surface-glass)',
         },
         story: {
           bg: '#041f18',
@@ -47,6 +54,7 @@ module.exports = {
       },
       fontFamily: {
         body: ['var(--font-body)', 'sans-serif'],
+        display: ['var(--font-display)', 'sans-serif'],
         code: ['var(--font-code)', 'monospace'],
       },
       boxShadow: {

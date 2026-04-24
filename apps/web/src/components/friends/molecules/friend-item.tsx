@@ -11,19 +11,19 @@ interface FriendItemProps {
 
 export function FriendItem({ friend, onUnfriend, onBlock, isLoading }: FriendItemProps) {
   return (
-    <article className="rounded-xl border border-[#1a654f] bg-[#0b4738]/65 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-[1.4rem] border border-border bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <FriendsAvatar name={friend.displayName} />
           <div>
-            <p className="font-ui-title text-base text-[#d7f2e8]">{friend.displayName}</p>
-            {friend.bio ? <p className="font-ui-meta text-sm text-[#90b8ab]">{friend.bio}</p> : null}
+            <p className="font-ui-title text-base text-text-primary">{friend.displayName}</p>
+            {friend.bio ? <p className="font-ui-content text-sm text-text-secondary">{friend.bio}</p> : null}
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <FriendsActionButton
-            label="Hủy kết bạn"
+            label="Huy ket ban"
             variant="neutral"
             disabled={isLoading}
             onClick={() => {
@@ -31,7 +31,7 @@ export function FriendItem({ friend, onUnfriend, onBlock, isLoading }: FriendIte
             }}
           />
           <FriendsActionButton
-            label="Chặn"
+            label="Chan"
             variant="danger"
             disabled={isLoading}
             onClick={() => {

@@ -1,10 +1,13 @@
 'use client';
 
+import type { JSX } from 'react';
 import { Toaster as HotToaster, toast as hotToast } from 'react-hot-toast';
+
+const SafeHotToaster = HotToaster as unknown as (props: Record<string, unknown>) => JSX.Element;
 
 export const Toaster = () => {
   return (
-    <HotToaster
+    <SafeHotToaster
       position="top-right"
       toastOptions={{
         duration: 3000,

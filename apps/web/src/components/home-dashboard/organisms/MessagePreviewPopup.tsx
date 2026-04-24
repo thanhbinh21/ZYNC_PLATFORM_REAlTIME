@@ -102,12 +102,12 @@ function PreviewCard({
   }, [replyText, onQuickReply, onDismiss]);
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+    (event: React.KeyboardEvent) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
         handleSendReply();
       }
-      if (e.key === 'Escape') {
+      if (event.key === 'Escape') {
         handleCloseReply();
       }
     },
@@ -126,7 +126,7 @@ function PreviewCard({
 
   return (
     <div
-      className={`group relative w-[380px] overflow-hidden rounded-2xl border border-[#1a5c4a]/70 shadow-[0_8px_40px_rgba(0,0,0,0.45),0_0_0_1px_rgba(48,215,171,0.08)] backdrop-blur-xl transition-all ${
+      className={`group relative w-[380px] overflow-hidden rounded-[1.6rem] zync-soft-glass transition-all ${
         isDismissing ? 'animate-preview-slide-out' : 'animate-preview-slide-in'
       }`}
       style={{ animationDelay: `${index * 60}ms` }}
@@ -135,38 +135,30 @@ function PreviewCard({
         if (!isReplying) onResume();
       }}
     >
-      {/* Glassmorphic background */}
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,#0a3b2f_0%,#072d23_50%,#041e17_100%)] opacity-95" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(48,215,171,0.08)_0%,transparent_60%)]" />
+      {!isReplying && !sentFeedback && (
+        <div className="absolute left-0 right-0 top-0 h-[3px] overflow-hidden">
+          <div className="h-full animate-preview-progress bg-gradient-to-r from-accent via-accent-strong to-[#7de0cf]" />
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleDismiss}
+        className="absolute right-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-white/80 text-text-tertiary opacity-0 transition-opacity hover:text-text-primary group-hover:opacity-100"
+        aria-label="Dong"
+      >
+        <CloseIcon className="h-3 w-3" />
+      </button>
 
       <div className="relative">
-        {/* Progress bar (auto-dismiss timer) */}
-        {!isReplying && !sentFeedback && (
-          <div className="absolute left-0 right-0 top-0 h-[2px] overflow-hidden">
-            <div className="h-full animate-preview-progress bg-gradient-to-r from-[#30d7ab] via-[#43e6b8] to-[#30d7ab]/30" />
-          </div>
-        )}
-
-        {/* Close button */}
-        <button
-          type="button"
-          onClick={handleDismiss}
-          className="absolute right-2.5 top-2.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-[#0d3a2f]/80 text-[#7cb3a1] opacity-0 transition-opacity hover:bg-[#145845] hover:text-[#d7f3e9] group-hover:opacity-100"
-          aria-label="Đóng"
-        >
-          <CloseIcon className="h-3 w-3" />
-        </button>
-
-        {/* Main content */}
         <div
           className="flex cursor-pointer gap-3 px-4 pb-3 pt-4"
           onClick={() => {
             if (!isReplying) onNavigate();
           }}
         >
-          {/* Avatar */}
           <div className="relative flex-shrink-0">
-            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#1e6f59] to-[#0d4233] ring-2 ring-[#30d7ab]/25">
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-border bg-accent-light text-accent-strong">
               {preview.avatarUrl ? (
                 <Image
                   src={preview.avatarUrl}
@@ -176,74 +168,71 @@ function PreviewCard({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <span className="text-sm font-bold text-[#b0e4d2]">
+                <span className="text-sm font-bold">
                   {preview.avatarInitials}
                 </span>
               )}
             </div>
             {preview.isGroup && (
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#072d23] bg-[#1a5c4a]">
-                <GroupIcon className="h-2.5 w-2.5 text-[#30d7ab]" />
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-text-primary">
+                <GroupIcon className="h-2.5 w-2.5 text-white" />
               </span>
             )}
           </div>
 
-          {/* Text content */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-[0.92rem] font-semibold text-[#e4fff5]">
+              <span className="truncate text-[0.92rem] font-semibold text-text-primary">
                 {preview.senderName}
               </span>
-              <span className="flex-shrink-0 text-[0.7rem] tracking-wide text-[#6db39e]">
+              <span className="flex-shrink-0 text-[0.7rem] tracking-wide text-text-tertiary">
                 {timeLabel}
               </span>
             </div>
-            <p className="mt-0.5 line-clamp-2 text-[0.82rem] leading-[1.45] text-[#a8d8c7]">
+            <p className="mt-0.5 line-clamp-2 text-[0.82rem] leading-[1.5] text-text-secondary">
               {preview.body}
             </p>
           </div>
         </div>
 
-        {/* Sent feedback */}
         {sentFeedback && (
-          <div className="flex items-center justify-center gap-2 border-t border-[#1a5c4a]/50 px-4 py-2.5">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#30d7ab]/20">
-              <svg viewBox="0 0 24 24" className="h-3 w-3 text-[#30d7ab]" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex items-center justify-center gap-2 border-t border-border-light px-4 py-2.5">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent-light">
+              <svg viewBox="0 0 24 24" className="h-3 w-3 text-accent-strong" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </span>
-            <span className="text-[0.8rem] font-medium text-[#30d7ab]">Đã gửi</span>
+            <span className="text-[0.8rem] font-medium text-accent-strong">Da gui</span>
           </div>
         )}
 
-        {/* Quick reply section */}
         {!sentFeedback && (
-          <div className="border-t border-[#1a5c4a]/50 px-3 pb-3 pt-2">
+          <div className="border-t border-border-light px-3 pb-3 pt-2">
             {isReplying ? (
               <div className="flex items-center gap-2">
                 <input
                   ref={inputRef}
                   type="text"
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
+                  onChange={(event) => setReplyText(event.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Nhập tin nhắn..."
-                  className="h-9 min-w-0 flex-1 rounded-xl border border-[#1d5b4a] bg-[#0b3b2f]/80 px-3 text-[0.82rem] text-[#d7f6eb] outline-none placeholder:text-[#5e9a87] focus:border-[#30d7ab]/60"
+                  placeholder="Nhap tin nhan..."
+                  className="zync-soft-input h-9 min-w-0 flex-1 text-[0.82rem]"
                 />
                 <button
                   type="button"
                   onClick={handleSendReply}
                   disabled={!replyText.trim()}
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#30d7ab] text-[#04342a] transition hover:brightness-110 disabled:opacity-40"
-                  aria-label="Gửi"
+                  className="zync-soft-button flex h-9 w-9 flex-shrink-0 p-0"
+                  aria-label="Gui"
                 >
                   <SendIcon className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
                   onClick={handleCloseReply}
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#0d3a2f] text-[#7cb3a1] transition hover:bg-[#145845]"
-                  aria-label="Hủy"
+                  className="zync-soft-button-secondary flex h-9 w-9 flex-shrink-0 p-0"
+                  aria-label="Huy"
                 >
                   <CloseIcon className="h-3.5 w-3.5" />
                 </button>
@@ -253,22 +242,22 @@ function PreviewCard({
                 <button
                   type="button"
                   onClick={handleOpenReply}
-                  className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0d3a2f]/70 text-[0.78rem] font-medium text-[#88bca9] transition hover:bg-[#145845] hover:text-[#d7f3e9]"
+                  className="zync-soft-button-secondary flex h-8 flex-1 items-center justify-center gap-1.5 px-3 text-[0.78rem]"
                 >
                   <ReplyIcon className="h-3.5 w-3.5" />
-                  Trả lời nhanh
+                  Tra loi nhanh
                 </button>
                 <button
                   type="button"
                   onClick={onNavigate}
-                  className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0d3a2f]/70 text-[0.78rem] font-medium text-[#88bca9] transition hover:bg-[#145845] hover:text-[#d7f3e9]"
+                  className="zync-soft-button-secondary flex h-8 flex-1 items-center justify-center gap-1.5 px-3 text-[0.78rem]"
                 >
                   <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                     <polyline points="15 3 21 3 21 9" />
                     <line x1="10" y1="14" x2="21" y2="3" />
                   </svg>
-                  Mở hội thoại
+                  Mo hoi thoai
                 </button>
               </div>
             )}

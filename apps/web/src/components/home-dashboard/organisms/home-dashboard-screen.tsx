@@ -5,11 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { DashboardHomeMockData } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
-import { DashboardNavItemRow } from '../molecules/dashboard-nav-item';
 import { DashboardStoryItemRow } from '../molecules/dashboard-story-item';
 import { DashboardStatCard } from '../molecules/dashboard-stat-card';
 import { DashboardActivityItemRow } from '../molecules/dashboard-activity-item';
-import { Sidebar } from '../../shared/Sidebar';
 
 import type { DashboardActivityItem } from '../home-dashboard.types';
 
@@ -26,6 +24,8 @@ interface HomeDashboardScreenProps {
   onViewUserProfile?: (userId: string) => void;
   onActivityClick?: (item: DashboardActivityItem) => void;
   onLogout?: () => void;
+  theme?: string;
+  onToggleTheme?: () => void;
 }
 
 export function HomeDashboardScreen({
@@ -41,115 +41,247 @@ export function HomeDashboardScreen({
   onViewUserProfile,
   onActivityClick,
   onLogout,
+  theme,
+  onToggleTheme,
 }: HomeDashboardScreenProps) {
   const selectedNavId = activeNavId ?? data.navItems.find((item) => item.active)?.id ?? data.navItems[0]?.id;
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const sectionClassName = 'flex min-h-0 flex-1 flex-col overflow-hidden';
+
   const handleSelectNav = (id: string) => {
     if (id === 'logout') {
       onLogout?.();
       return;
     }
     onNavSelect?.(id);
-    setIsMobileSidebarOpen(false);
+    setIsMobileMenuOpen(false);
   };
 
   return (
-    <main className="zync-dashboard-main h-screen overflow-hidden text-text-primary">
-      <button
-        type="button"
-        onClick={() => setIsMobileSidebarOpen(true)}
-        className="fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full bg-bg-card shadow-lg text-text-primary lg:hidden"
-        aria-label="Mở thanh điều hướng"
-      >
-        <span className="text-lg leading-none">☰</span>
-      </button>
+    <main className="zync-page-shell zync-dashboard-main flex min-h-screen flex-col overflow-hidden text-text-primary">
+      <header className="sticky top-0 z-30 px-2 pt-2 sm:px-4 sm:pt-4">
+        <div className="zync-soft-topbar flex h-16 items-center justify-between rounded-[1.75rem] px-4 lg:px-6">
+          <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-3">
+              <span className="relative block h-10 w-10 overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-sm">
+                <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
+              </span>
+              <div className="hidden sm:block">
+                <p className="font-ui-brand text-xl leading-none text-text-primary">{data.brand}</p>
+                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">Workspace</p>
+              </div>
+            </div>
 
-      <Sidebar 
-        data={data}
-        activeNavId={selectedNavId}
-        onNavSelect={handleSelectNav}
-        isMobileSidebarOpen={isMobileSidebarOpen}
-        onMobileSidebarClose={() => setIsMobileSidebarOpen(false)}
-      />
-
-      <div className="flex h-screen overflow-hidden gap-3 p-3 lg:gap-5 lg:p-5">
-        {/* Desktop Sidebar spacing handled by Sidebar component rendering fixed/relative or we need a spacer? The Sidebar component has 'hidden ... lg:flex' but it's absolute? Wait, the desktop sidebar in the new Sidebar component is NOT fixed, it relies on flex layout. We need to wrap it correctly or pass it inside the flex layout. */}
-        {/* Since Sidebar component returns Fragments containing the mobile overlay and desktop aside, we just place it here inside the flex container. Wait! The mobile overlay is fixed, so it can be anywhere. The desktop aside is part of the flex layout. */}
-
-        <section className={`${sectionClassName} bg-bg-primary rounded-3xl border border-border shadow-md`}>
-          {selectedNavId === 'home' && (
-            <header className="bg-bg-card relative z-20 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3 border-b border-border-light shadow-sm !overflow-visible">
-              <h1 className="font-ui-title text-[clamp(1.3rem,2.3vw,2rem)] text-text-primary">{data.greeting}</h1>
-              <div className="flex items-center gap-3">
-                {/* Search bar removed from Trang chủ as requested */}
-
-                {notificationSlot ?? (
-                  <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-bg-hover text-text-secondary transition hover:bg-border-light hover:text-text-primary">
-                    <DashboardIcon name="bell" className="h-4 w-4" />
-                  </button>
-                )}
-                <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-bg-hover text-text-secondary transition hover:bg-border-light hover:text-text-primary">
-                  <DashboardIcon name="gear" className="h-4 w-4" />
+            <nav className="hidden items-center gap-2 md:flex">
+              {data.navItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectNav(item.id)}
+                  className={`rounded-full px-4 py-2 text-sm transition ${
+                    selectedNavId === item.id
+                      ? 'bg-text-primary text-white shadow-sm'
+                      : 'border border-border bg-white/65 text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <DashboardIcon name={item.icon} className="h-4 w-4" />
+                    {item.label}
+                  </span>
                 </button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="zync-soft-badge hidden text-xs sm:inline-flex"
+              title="Chuyen doi giao dien"
+            >
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+
+            {notificationSlot ?? (
+              <button type="button" className="zync-soft-badge h-10 w-10 p-0">
+                <DashboardIcon name="bell" className="h-4 w-4" />
+              </button>
+            )}
+
+            <div className="hidden items-center gap-2 border-l border-border pl-3 sm:flex">
+              {data.sideFooterItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectNav(item.id)}
+                  className={`rounded-full px-3 py-2 text-sm transition ${
+                    selectedNavId === item.id
+                      ? 'bg-text-primary text-white shadow-sm'
+                      : 'border border-border bg-white/65 text-text-secondary hover:text-text-primary'
+                  }`}
+                  title={item.label}
+                >
+                  <span className="flex items-center gap-2">
+                    <DashboardIcon name={item.icon} className="h-4 w-4" />
+                    <span className="hidden lg:inline">{item.label}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSelectNav('profile')}
+              className="flex items-center gap-2 rounded-full border border-border bg-white/70 p-1 pl-2 transition hover:bg-white/90"
+            >
+              <span className="font-ui-title hidden text-sm text-text-primary lg:block">{data.user.displayName}</span>
+              <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent-light text-xs font-semibold text-accent-strong">
+                {data.user.avatarUrl ? (
+                  <Image src={data.user.avatarUrl} alt={data.user.displayName} width={32} height={32} className="h-full w-full object-cover" />
+                ) : (
+                  data.user.initials
+                )}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white/65 text-text-secondary md:hidden"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
+          <aside className="absolute right-3 top-3 bottom-3 w-[min(82vw,320px)] rounded-[1.8rem] zync-soft-card zync-soft-card-elevated p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <span className="zync-soft-kicker">Navigation</span>
+                <p className="font-ui-title mt-3 text-lg text-text-primary">Workspace menu</p>
+              </div>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="zync-soft-button-ghost h-10 w-10 p-0 text-base">
+                x
+              </button>
+            </div>
+
+            <nav className="flex flex-col gap-2">
+              {data.navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleSelectNav(item.id)}
+                  className={`flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left transition ${
+                    selectedNavId === item.id
+                      ? 'bg-text-primary text-white shadow-sm'
+                      : 'border border-border bg-white/70 text-text-secondary'
+                  }`}
+                >
+                  <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" />
+                  {item.label}
+                </button>
+              ))}
+
+              <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
+                {data.sideFooterItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSelectNav(item.id)}
+                    className={`flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left transition ${
+                      selectedNavId === item.id
+                        ? 'bg-text-primary text-white shadow-sm'
+                        : 'border border-border bg-white/70 text-text-secondary'
+                    }`}
+                  >
+                    <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+
+            <button
+              onClick={() => handleSelectNav('logout')}
+              className="zync-soft-button-danger mt-6 h-11 w-full text-sm"
+            >
+              Dang xuat
+            </button>
+          </aside>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4">
+        <section className={`${sectionClassName} zync-soft-card zync-soft-card-elevated h-full rounded-[2rem]`}>
+          {selectedNavId === 'home' && (
+            <header className="border-b border-border-light px-4 py-4 sm:px-6 sm:py-5">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Daily overview</p>
+                  <h1 className="font-ui-title mt-2 text-2xl text-text-primary">{data.greeting}</h1>
+                </div>
+                <span className="zync-soft-badge">Light-first workspace</span>
               </div>
             </header>
           )}
 
-          {/* Scrollable Content Wrapper */}
-          <div className={`flex-1 ${selectedNavId === 'chat' || selectedNavId === 'friends' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-3 pb-20 sm:px-6'}`}>
+          <div className={`flex-1 ${selectedNavId === 'chat' || selectedNavId === 'friends' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6'}`}>
             {selectedNavId === 'chat' ? (
               <div className="flex h-full w-full">{chatSlot}</div>
             ) : selectedNavId === 'settings' ? (
               <div>{settingsSlot}</div>
             ) : selectedNavId === 'profile' ? (
-              <div className="mt-5">{profileSlot}</div>
+              <div>{profileSlot}</div>
             ) : selectedNavId === 'friends' ? (
               <div className="flex h-full w-full">{friendsSlot}</div>
             ) : (
-            <>
-              <div className="mt-5 shrink-0">
-                {storySlot ?? (
-                  <div className="flex gap-3 overflow-x-auto pb-1">
-                    {data.stories.map((item) => (
-                      <DashboardStoryItemRow key={item.id} item={item} />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 grid gap-4 shrink-0 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {data.stats.map((item) => (
-                  <DashboardStatCard key={item.id} item={item} />
-                ))}
-              </div>
-
-              <section className="bg-bg-card border border-border-light mt-8 shrink-0 rounded-3xl p-4 sm:p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="font-ui-title text-[clamp(1.35rem,2.3vw,2rem)] text-text-primary">{data.activityTitle}</h2>
-                  <Link href="/friends" className="font-ui-title text-sm text-accent transition hover:text-accent-hover">
-                    {data.activityCtaLabel}
-                  </Link>
+              <div className="mx-auto max-w-6xl">
+                <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">
+                  {storySlot ?? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                      {data.stories.map((item) => (
+                        <DashboardStoryItemRow key={item.id} item={item} />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  {data.activities.map((item) => (
-                    <DashboardActivityItemRow
-                      key={item.id}
-                      item={item}
-                      onClick={onActivityClick}
-                    />
+                <div className="mt-6 grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {data.stats.map((item) => (
+                    <DashboardStatCard key={item.id} item={item} />
                   ))}
                 </div>
-              </section>
+
+                <section className="mt-8 shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
+                  <div className="mb-4 flex items-center justify-between gap-3 border-b border-border-light pb-3">
+                    <h2 className="font-ui-title text-xl text-text-primary">{data.activityTitle}</h2>
+                    <Link href="/friends" className="zync-soft-badge text-sm hover:text-text-primary">
+                      {data.activityCtaLabel}
+                    </Link>
+                  </div>
+
+                  <div className="space-y-1">
+                    {data.activities.map((item) => (
+                      <DashboardActivityItemRow
+                        key={item.id}
+                        item={item}
+                        onClick={onActivityClick}
+                      />
+                    ))}
+                  </div>
+                </section>
                 <div className="h-10 shrink-0" tabIndex={-1} />
-              </>
+              </div>
             )}
           </div>
-
         </section>
       </div>
     </main>
   );
 }
-
