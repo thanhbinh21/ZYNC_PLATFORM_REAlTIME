@@ -62,6 +62,7 @@ module.exports = {
       },
       aspectRatio: {
         'story': '9 / 16',
+      },
       fontFamily: {
         body: ['var(--font-body)', 'sans-serif'],
         display: ['var(--font-display)', 'sans-serif'],

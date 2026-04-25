@@ -897,17 +897,11 @@ export function useMessageHistory({
         setMessages((prev) => (currentCursor ? [...reversedMessages, ...prev] : reversedMessages));
         setCursor(nextCursor);
         setHasMore(Boolean(nextCursor));
-        const response = await getMessages(conversationId, cursor, 20);
-        const { messages, nextCursor } = response;
-
-        if (messages && Array.isArray(messages)) {
-          const reversedMessages = messages.reverse();
-          setMessages((prev) =>
-            currentCursor ? [...reversedMessages, ...prev] : reversedMessages,
-          );
-          setCursor(nextCursor);
-          setHasMore(nextCursor ? messages.length === 20 : false);
-        }
+      } else {
+        setMessages([]);
+        setCursor(undefined);
+        setHasMore(false);
+      }
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to fetch messages";

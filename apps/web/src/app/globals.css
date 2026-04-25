@@ -983,6 +983,7 @@ html {
 [data-zync-theme='dark'] .load-more-button {
 	background: #103a30;
 	color: #cdebe1;
+}
 /* ─── Story Viewer – Full-screen & Gesture Helpers ─── */
 
 .story-viewer-container {
