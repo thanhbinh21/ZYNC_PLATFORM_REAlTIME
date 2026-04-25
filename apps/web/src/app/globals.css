@@ -15,29 +15,29 @@
 
 :root {
 	/* Light mode: Clean Minimal SaaS + soft glass */
-	--bg-primary: #f4fbff;
-	--bg-secondary: #eef5fb;
-	--bg-sidebar: rgba(255, 255, 255, 0.76);
-	--bg-hover: #eaf2f7;
-	--bg-active: #d8ece8;
-	--bg-code: #eef4f8;
-	--bg-card: #ffffff;
+	--bg-primary: #eaf1f8; /* Toned down from white-ish to slightly grayish/blue */
+	--bg-secondary: #e8f0f6;
+	--bg-sidebar: rgba(255, 255, 255, 0.65);
+	--bg-hover: #e0eaf3;
+	--bg-active: #d0e2ec;
+	--bg-code: #e1e7f0;
+	--bg-card: #f6f9fc;
 
-	--surface-card: rgba(255, 255, 255, 0.84);
-	--surface-card-strong: rgba(255, 255, 255, 0.96);
-	--surface-muted: rgba(247, 250, 252, 0.72);
-	--surface-glass: rgba(255, 255, 255, 0.62);
-	--surface-glass-strong: rgba(255, 255, 255, 0.76);
+	--surface-card: rgba(250, 252, 255, 0.84);
+	--surface-card-strong: rgba(255, 255, 255, 0.98);
+	--surface-muted: rgba(240, 244, 248, 0.82);
+	--surface-glass: rgba(250, 252, 255, 0.52);
+	--surface-glass-strong: rgba(255, 255, 255, 0.85);
 
-	--text-primary: #102038;
-	--text-secondary: #52637c;
-	--text-tertiary: #72839a;
-	--text-link: #0f8d82;
+	--text-primary: #0b1120; /* Darker for better emphasis */
+	--text-secondary: #1e293b; /* Darker secondary */
+	--text-tertiary: #5c6c85;
+	--text-link: #0a7569;
 
-	--accent: #14b8a6;
-	--accent-hover: #0f9a8b;
-	--accent-light: #d7f8f3;
-	--accent-strong: #0f766e;
+	--accent: #0f9d8e; /* Stronger accent color */
+	--accent-hover: #0b8073;
+	--accent-light: #ccebe6;
+	--accent-strong: #07544b;
 
 	--border: #d7e4ee;
 	--border-light: #e6eff5;

@@ -208,3 +208,48 @@ export async function removeDeviceToken(
 ): Promise<void> {
   await DeviceTokenModel.findOneAndDelete({ userId, deviceToken });
 }
+
+/** Khám phá developers nổi bật theo skills/tags */
+export async function discoverUsers(
+  requesterId: string,
+): Promise<Array<{
+  id: string;
+  username?: string;
+  displayName: string;
+  avatarUrl?: string;
+  bio?: string;
+  skills?: string[];
+  interests?: string[];
+  devRole?: string;
+  githubUrl?: string;
+  friendCount: number;
+}>> {
+  const users = await UserModel.find({
+    _id: { $ne: new Types.ObjectId(requesterId) },
+    onboardingCompleted: true,
+  })
+    .select('username displayName avatarUrl bio skills interests devRole githubUrl')
+    .sort({ trustScore: -1 })
+    .limit(30)
+    .lean();
+
+  const results = await Promise.all(
+    users.map(async (user) => {
+      const friendCount = await getFriendsCount(user._id.toString());
+      return {
+        id: user._id.toString(),
+        username: user.username as string | undefined,
+        displayName: user.displayName as string,
+        avatarUrl: user.avatarUrl as string | undefined,
+        bio: user.bio as string | undefined,
+        skills: user.skills as string[] | undefined,
+        interests: user.interests as string[] | undefined,
+        devRole: user.devRole as string | undefined,
+        githubUrl: user.githubUrl as string | undefined,
+        friendCount,
+      };
+    }),
+  );
+
+  return results;
+}

@@ -8,6 +8,7 @@ import {
   searchUsersHandler,
   updateProfileHandler,
   upsertDeviceTokenHandler,
+  discoverUsersHandler,
 } from './users.controller';
 
 export const usersRouter = Router();
@@ -20,6 +21,9 @@ usersRouter.get('/me', getMeHandler);
 
 // GET /api/users/search?query=...&limit=10 – search users for friend request
 usersRouter.get('/search', searchUsersHandler);
+
+// GET /api/users/discover – nổi bật theo skills/tags
+usersRouter.get('/discover', discoverUsersHandler);
 
 // GET /api/users/:userId – get user profile (public)
 usersRouter.get('/:userId', getUserByIdHandler);

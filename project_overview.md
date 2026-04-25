@@ -507,13 +507,34 @@ npm run dev:web
 - [x] OX9.6: Giảm độ sáng trắng và tăng sắc xanh lá trong bộ token UI (Web + Mobile) để đồng bộ tone glass dịu mắt hơn <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.7: Đồng bộ lại web auth shell và khung chat dashboard theo shared tokens, tăng contrast light mode và cố định layout chat ở trung tâm <!-- done: 24/04/2026 -->
 
+### Phase R4 – Pivot Branding (Developer Community)
+- [x] Bổ sung `discoverUsers()` service backend tìm developers nổi bật
+- [x] Sửa toàn bộ trang Onboarding (`/onboarding`) sang tiếng Việt có dấu, cải thiện form nhập liệu
+- [x] Cập nhật Onboarding redirect tại `/home` nếu user chưa hoàn thành `onboardingCompleted`
+- [x] Sửa hardcoded English text trên landing page (`/`) sang tiếng Việt
+- [x] Thay thế các emoji text bằng icon từ `lucide-react` toàn hệ thống (sidebar, community, explore, onboarding)
+- [x] Bổ sung Navigation cho "Cộng đồng" và "Khám phá" vào Dashboard sidebar
+
+### Phase N1 – Community Posts
+- [x] Xây dựng `PostModel` và `CommentModel` hỗ trợ reply threads, tags, likes, bookmarks
+- [x] Phát triển `PostsService` hỗ trợ CRUD, feed pagination và trending posts
+- [x] Dựng UI `CommunityContent` component với các tabs phân loại feed (Mới nhất, Trending, Câu hỏi, TIL)
+- [x] Chức năng tạo bài viết mới (CreatePostForm) hỗ trợ phân loại (thảo luận, hỏi đáp, tutorial...)
+- [x] Chức năng Like, Bookmark và hiển thị Comment counts
+
+### Phase N3 – Explore & Discovery
+- [x] Sử dụng `getPublicChannels` và `discoverChannels` từ GroupsService cho API
+- [x] Dựng `ExploreContent` component với thanh tìm kiếm đa luồng (Channels, Users, Posts)
+- [x] User discovery cards với hiển thị kỹ năng (skills), bio, links (Github)
+- [x] Cơ chế Join channel public trực tiếp từ màn hình Khám phá
+
 ### Master Plan: Community Pivot (Phase R1 - R7, N1 - N3)
 - [x] Phase R1: UX Redesign (Web & Mobile) - Light Theme, Shared Sidebar, Toast Notification, Font Inter/JetBrains Mono
 - [x] Phase R2: Mobile App Parity - Đồng bộ 100% tính năng Web lên Mobile (Forward, Action Menu, Story, Group, Settings, Profile, Notifications)
 - [ ] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC)
-- [ ] Phase R4: Đổi tên thương hiệu (Zalo Clone -> Zync Community)
-- [ ] Phase N1: Community Posts (Chức năng đăng bài cộng đồng)
-- [ ] Phase N3: Khám phá & Gợi ý (Explore & Discovery)
+- [x] Phase R4: Đổi tên thương hiệu (Zalo Clone -> Zync Community)
+- [x] Phase N1: Community Posts (Chức năng đăng bài cộng đồng)
+- [x] Phase N3: Khám phá & Gợi ý (Explore & Discovery)
 - [ ] Phase R5: Hoàn thiện tính năng AI Assistant Chatbot hiện có
 - [ ] Phase N2: "Killer Feature" - Developer DNA (Thẻ định danh phong cách code tạo từ AI)
 - [ ] Phase R6: Tối ưu hoá Hệ thống

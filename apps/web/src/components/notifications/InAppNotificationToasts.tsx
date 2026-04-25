@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { getSocket } from '@/services/socket';
 import type { Notification } from '@/services/notifications';
 import { markAsRead } from '@/services/notifications';
+import { MessageCircle, UserPlus, UserCheck, Users, Heart, MessageSquare, Bell } from 'lucide-react';
 
 type ToastItem = {
   id: string;
@@ -16,22 +17,16 @@ const MAX_TOASTS = 2;
 const AUTO_DISMISS_MS = 5500;
 const SUMMARY_ID = 'toast-summary';
 
-function iconForType(type: Notification['type']): string {
+function IconForType({ type, isSummary }: { type?: Notification['type'], isSummary?: boolean }) {
+  if (isSummary) return <Bell className="h-5 w-5 text-accent" />;
   switch (type) {
-    case 'new_message':
-      return '💬';
-    case 'friend_request':
-      return '🤝';
-    case 'friend_accepted':
-      return '🎉';
-    case 'group_invite':
-      return '👥';
-    case 'story_reaction':
-      return '❤️';
-    case 'story_reply':
-      return '💭';
-    default:
-      return '🔔';
+    case 'new_message': return <MessageCircle className="h-5 w-5 text-blue-400" />;
+    case 'friend_request': return <UserPlus className="h-5 w-5 text-amber-400" />;
+    case 'friend_accepted': return <UserCheck className="h-5 w-5 text-emerald-400" />;
+    case 'group_invite': return <Users className="h-5 w-5 text-indigo-400" />;
+    case 'story_reaction': return <Heart className="h-5 w-5 text-rose-400" />;
+    case 'story_reply': return <MessageSquare className="h-5 w-5 text-purple-400" />;
+    default: return <Bell className="h-5 w-5 text-text-secondary" />;
   }
 }
 
@@ -158,7 +153,6 @@ export function InAppNotificationToasts() {
   const rendered = useMemo(() => {
     return items.map((t) => {
       const isSummary = t.id === SUMMARY_ID;
-      const icon = isSummary ? '🔔' : iconForType(t.notification.type);
       const label = timeLabel(t.createdAt);
       return (
         <div
@@ -181,7 +175,7 @@ export function InAppNotificationToasts() {
             className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-[#0d3228]/55"
           >
             <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#1a5c4a]/60 bg-[#0a3b2f]/70 text-base">
-              {icon}
+              <IconForType type={t.notification.type} isSummary={isSummary} />
             </div>
 
             <div className="min-w-0 flex-1 pr-6">

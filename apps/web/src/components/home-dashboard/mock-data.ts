@@ -2,20 +2,21 @@ import type { DashboardHomeMockData } from './home-dashboard.types';
 
 export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
   brand: 'ZYNC',
-  greeting: 'Xin chào, bạn',
+  greeting: 'Xin chào, bạn! 👋',
   searchPlaceholder: 'Tìm kiếm cuộc hội thoại',
   user: {
-    displayName: 'Trung tâm điều khiển',
-    roleLabel: 'Trực tuyến',
-    initials: 'NM',
+    displayName: 'Người dùng',
+    roleLabel: 'Đang hoạt động',
+    initials: 'ZY',
     avatarUrl: undefined,
   },
   primaryAction: 'Tin nhắn mới',
   navItems: [
-    { id: 'home', label: 'Trang chủ', icon: 'home', active: true },
+    { id: 'home', label: 'Tổng quan', icon: 'home', active: true },
     { id: 'chat', label: 'Chat', icon: 'chat' },
     { id: 'friends', label: 'Bạn bè', icon: 'friends' },
-    { id: 'profile', label: 'Cá nhân', icon: 'profile' },
+    { id: 'community', label: 'Cộng đồng', icon: 'group' },
+    { id: 'explore', label: 'Khám phá', icon: 'search' },
   ],
   sideFooterItems: [
     { id: 'settings', label: 'Cài đặt', icon: 'settings' },
@@ -29,9 +30,9 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
     { id: 's4', name: 'Linh Chi', initials: 'LC', toneClass: 'bg-[#7f7a68]' },
   ],
   stats: [
-    { id: 'stat-1', value: '42', label: 'Số tin nhắn mới', badge: '+12', icon: 'message' },
-    { id: 'stat-2', value: '08', label: 'Lời mời kết bạn', badge: '5', icon: 'friends' },
-    { id: 'stat-3', value: '15', label: 'Nhóm đang hoạt động', badge: '', icon: 'group' },
+    { id: 'stat-1', value: '50K+', label: 'Developers', badge: 'Active', icon: 'friends' },
+    { id: 'stat-2', value: '1.2K+', label: 'Cộng đồng', badge: 'Channels', icon: 'group' },
+    { id: 'stat-3', value: '5M+', label: 'Code Snippets', badge: 'Shared', icon: 'message' },
   ],
   activityTitle: 'Hoạt động gần đây',
   activityCtaLabel: 'Xem tất cả',
@@ -39,7 +40,7 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
     {
       id: 'a1',
       title: 'Nguyễn Tuấn',
-      message: 'Vừa gửi một hình ảnh trong nhóm "Dự án Zync"',
+      message: 'Vừa đăng bài viết trong cộng đồng React Vietnam',
       timeLabel: '2 phút trước',
       initials: 'NT',
       toneClass: 'bg-[#97a7b8]',
@@ -48,7 +49,7 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
     {
       id: 'a2',
       title: 'Trần Thảo',
-      message: '"Tối nay đi cafe không mọi người?"',
+      message: '"Tối nay đi cafe không mọi người? ☕"',
       timeLabel: '15 phút trước',
       initials: 'TT',
       toneClass: 'bg-[#88b3c8]',
@@ -56,8 +57,8 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
     },
     {
       id: 'a3',
-      title: 'Cộng đồng Design',
-      message: 'Admin vừa cập nhật quy định của nhóm',
+      title: 'Cộng đồng DevOps',
+      message: 'Admin vừa chia sẻ bài viết mới về Kubernetes',
       timeLabel: '1 giờ trước',
       initials: 'CD',
       toneClass: 'bg-[#1a6f58]',

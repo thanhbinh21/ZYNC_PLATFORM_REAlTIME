@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { HomeDashboardScreen } from '@/components/home-dashboard/organisms/home-dashboard-screen';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
@@ -24,6 +24,8 @@ import { useLoginForm } from '@/hooks/use-login-form';
 import { fetchMyProfile, type MeUser } from '@/services/users';
 import type { StoryReactionType, StoryFeedGroup, StoryHighlight } from '@/components/stories/stories.types';
 import FriendsPage from '../friends/page';
+import CommunityContent from '../community/community-content';
+import ExploreContent from '../explore/explore-content';
 
 const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
   theme: 'light',
@@ -31,6 +33,14 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 };
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -133,7 +143,7 @@ export default function HomePage() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerGroupIdx, setViewerGroupIdx] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
-  const [activeNavId, setActiveNavId] = useState('chat');
+  const [activeNavId, setActiveNavId] = useState('home');
   const openNotificationsSignal = searchParams.get('openNotifications');
   const [profile, setProfile] = useState<MeUser | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -191,6 +201,19 @@ export default function HomePage() {
     router.replace('/home');
   }, [onSelectConversation, router, searchParams]);
 
+  // Kiểm tra onboarding và redirect nếu chưa hoàn thành
+  useEffect(() => {
+    if (!userId) return;
+    fetchMyProfile()
+      .then((p) => {
+        if (!p.onboardingCompleted) {
+          router.push('/onboarding');
+        }
+      })
+      .catch(() => {/* ignore */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
   // Open notifications dropdown when requested (from summary toast)
   useEffect(() => {
     if (openNotificationsSignal !== '1') return;
@@ -246,7 +269,7 @@ export default function HomePage() {
       const profileData = await fetchMyProfile();
       setProfile(profileData);
     } catch {
-      setProfileError('Khong the lay thong tin tu server. Vui long thu lai.');
+      setProfileError('Không thể lấy thông tin từ server. Vui lòng thử lại.');
     } finally {
       setProfileLoading(false);
     }
@@ -458,6 +481,8 @@ export default function HomePage() {
           />
         }
         friendsSlot={<FriendsPage />}
+        communitySlot={<CommunityContent />}
+        exploreSlot={<ExploreContent />}
       />
 
       <UserProfileModal

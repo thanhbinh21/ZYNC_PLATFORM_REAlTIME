@@ -16,6 +16,7 @@ import { aiRouter } from './modules/ai/ai.routes';
 import { moderationAdminRouter } from './modules/ai/moderation/moderation.controller';
 import { callsRouter } from './modules/calls/calls.routes';
 import { stickersRouter } from './modules/stickers/sticker.routes';
+import { postsRouter } from './modules/posts/posts.routes';
 import { AppError } from './shared/errors/app-error';
 import { logger } from './shared/logger';
 import { renderMetrics } from './shared/metrics';
@@ -71,6 +72,7 @@ export function createApp(): Application {
   app.use('/api/ai', aiRouter);
   app.use('/api/calls', callsRouter);
   app.use('/api/stickers', stickersRouter);
+  app.use('/api/posts', postsRouter);
   app.use('/api/admin/moderation', moderationAdminRouter);
 
   // Xử lý route không tồn tại

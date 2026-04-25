@@ -190,7 +190,7 @@ export function MessageBubble({
                 : 'rounded-bl-none border shadow-sm message-bubble-other'
             }`}
           >
-            <p className="text-sm">{content}</p>
+            <p className="text-[15px] font-medium leading-relaxed">{content}</p>
           </div>
         )}
 
