@@ -889,15 +889,7 @@ export function useMessageHistory({
         setLoading(true);
         setError(null);
 
-      const response = await getMessages(conversationId, currentCursor, 20);
-      const { messages, nextCursor } = response;
-
-      if (messages && Array.isArray(messages)) {
-        const reversedMessages = messages.reverse();
-        setMessages((prev) => (currentCursor ? [...reversedMessages, ...prev] : reversedMessages));
-        setCursor(nextCursor);
-        setHasMore(Boolean(nextCursor));
-        const response = await getMessages(conversationId, cursor, 20);
+        const response = await getMessages(conversationId, currentCursor, 20);
         const { messages, nextCursor } = response;
 
         if (messages && Array.isArray(messages)) {
