@@ -1,8 +1,15 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { Message, MessageStatus } from '@zync/shared-types';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { v4 as uuidv4 } from "uuid";
+import type { Message, MessageStatus } from "@zync/shared-types";
 import {
   getSocket,
   isConnected,
@@ -36,9 +43,9 @@ import {
   unlistenToMessageReacted,
   listenToUserPenaltyUpdated,
   unlistenToUserPenaltyUpdated,
-} from '@/services/socket';
-import { getMessages } from '@/services/chat';
-import { MessageType } from '@zync/shared-types';
+} from "@/services/socket";
+import { getMessages } from "@/services/chat";
+import { MessageType } from "@zync/shared-types";
 
 // ─── useChat Hook ───
 
@@ -61,19 +68,27 @@ interface UseChatOptions {
 export interface SendMessageOptions {
   idempotencyKey?: string;
   deferEmit?: boolean;
-  replyTo?: Message['replyTo'];
+  replyTo?: Message["replyTo"];
 }
 
 interface UseChatReturn {
   messages: Message[];
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
-  sendMessage: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null>;
+  sendMessage: (
+    content: string,
+    type: MessageType,
+    mediaUrl?: string,
+    options?: SendMessageOptions,
+  ) => Promise<string | null>;
   cancelPendingMessage: (idempotencyKey: string) => void;
   markAsRead: (messageIds: string[]) => void;
   startTyping: () => void;
   stopTyping: () => void;
-  deleteMessageForMe: (messageId: string, idempotencyKey: string) => Promise<void>;
+  deleteMessageForMe: (
+    messageId: string,
+    idempotencyKey: string,
+  ) => Promise<void>;
   recallMessage: (messageId: string, idempotencyKey: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
@@ -97,21 +112,21 @@ export function useChat({
 
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const previousConversationId = useRef<string>('');
+  const previousConversationId = useRef<string>("");
 
   // Initialize socket on mount or when token changes
   useEffect(() => {
     // Only initialize socket if token is available
     if (!token) {
-      setError('No authentication token available');
+      setError("No authentication token available");
       return;
     }
 
     try {
       getSocket(token);
     } catch (err) {
-      console.error('Failed to initialize socket:', err);
-      setError('Failed to connect to messaging service');
+      console.error("Failed to initialize socket:", err);
+      setError("Failed to connect to messaging service");
     }
   }, [token]);
 
@@ -123,7 +138,10 @@ export function useChat({
 
     const doJoin = () => {
       // Leave previous conversation if it exists and is different
-      if (previousConversationId.current && previousConversationId.current !== conversationId) {
+      if (
+        previousConversationId.current &&
+        previousConversationId.current !== conversationId
+      ) {
         leaveConversation(previousConversationId.current);
       }
       joinConversation(conversationId);
@@ -135,10 +153,10 @@ export function useChat({
     }
 
     // Re-join on (re)connect so room membership survives reconnects
-    sock.on('connect', doJoin);
+    sock.on("connect", doJoin);
 
     return () => {
-      sock.off('connect', doJoin);
+      sock.off("connect", doJoin);
     };
   }, [conversationId, token]);
 
@@ -152,7 +170,7 @@ export function useChat({
       type: string;
       mediaUrl?: string;
       moderationWarning?: boolean;
-      replyTo?: Message['replyTo'];
+      replyTo?: Message["replyTo"];
       idempotencyKey: string;
       createdAt: string;
     }) => {
@@ -165,18 +183,20 @@ export function useChat({
         conversationId: data.conversationId,
         senderId: data.senderId,
         content: data.content,
-        type: data.type as Message['type'],
+        type: data.type as Message["type"],
         mediaUrl: data.mediaUrl,
         moderationWarning: data.moderationWarning,
         replyTo: data.replyTo,
         idempotencyKey: data.idempotencyKey, // Will be set on send
-        status: 'delivered',
+        status: "delivered",
         createdAt: data.createdAt,
       };
 
       setMessages((prev) => {
         const index = prev.findIndex(
-          (msg) => msg._id === data.messageId || msg.idempotencyKey === data.idempotencyKey,
+          (msg) =>
+            msg._id === data.messageId ||
+            msg.idempotencyKey === data.idempotencyKey,
         );
 
         if (index === -1) {
@@ -195,8 +215,8 @@ export function useChat({
 
       setMessageStatus((prev) => ({
         ...prev,
-        [data.idempotencyKey]: 'delivered',
-        [data.messageId]: 'delivered',
+        [data.idempotencyKey]: "delivered",
+        [data.messageId]: "delivered",
       }));
 
       if (data.senderId !== userId) {
@@ -218,15 +238,20 @@ export function useChat({
       // Replace optimistic message (idempotency key) with real server message id.
       setMessages((prev) =>
         prev.map((msg) =>
-          msg._id === data.idempotencyKey || msg.idempotencyKey === data.idempotencyKey
-            ? { ...msg, _id: data.messageId, createdAt: data.createdAt || msg.createdAt }
+          msg._id === data.idempotencyKey ||
+          msg.idempotencyKey === data.idempotencyKey
+            ? {
+                ...msg,
+                _id: data.messageId,
+                createdAt: data.createdAt || msg.createdAt,
+              }
             : msg,
         ),
       );
 
       setMessageStatus((prev) => {
         const next = { ...prev };
-        const previousStatus = next[data.idempotencyKey] ?? 'sent';
+        const previousStatus = next[data.idempotencyKey] ?? "sent";
         next[data.messageId] = previousStatus;
         delete next[data.idempotencyKey];
         return next;
@@ -246,9 +271,9 @@ export function useChat({
           msg._id === data.messageId || msg.idempotencyKey === data.messageId
             ? {
                 ...msg,
-                content: '[Bị chặn bởi AI Moderator]',
+                content: "[Bị chặn bởi AI Moderator]",
                 mediaUrl: undefined,
-                type: 'system-recall' as Message['type'],
+                type: "system-recall" as Message["type"],
               }
             : msg,
         ),
@@ -256,10 +281,12 @@ export function useChat({
 
       setMessageStatus((prev) => ({
         ...prev,
-        [data.messageId]: 'read',
+        [data.messageId]: "read",
       }));
 
-      setError(`Tin nhắn không thể gửi - Vi phạm cộng đồng (Confidence: ${Math.round(data.confidence * 100)}%)`);
+      setError(
+        `Tin nhắn không thể gửi - Vi phạm cộng đồng (Confidence: ${Math.round(data.confidence * 100)}%)`,
+      );
     };
 
     const handleContentWarning = (data: {
@@ -279,13 +306,20 @@ export function useChat({
         );
       }
 
-      setError(data.message ?? 'Tin nhắn có dấu hiệu vi phạm. Hệ thống đã ghi nhận cảnh báo.');
+      setError(
+        data.message ??
+          "Tin nhắn có dấu hiệu vi phạm. Hệ thống đã ghi nhận cảnh báo.",
+      );
     };
 
     const handleMessageReacted = (data: any) => {
       if (data.conversationId !== conversationId) return;
-      setMessages((prev) => 
-        prev.map((msg) => msg._id === data.messageId ? { ...msg, reactions: data.reactions } : msg)
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === data.messageId
+            ? { ...msg, reactions: data.reactions }
+            : msg,
+        ),
       );
     };
 
@@ -302,9 +336,9 @@ export function useChat({
       listenToMessageReacted(handleMessageReacted);
       listenToUserPenaltyUpdated(handleUserPenaltyUpdated);
       const socket = getSocket(token);
-      socket.on('message_sent', handleMessageSent);
+      socket.on("message_sent", handleMessageSent);
     } catch (err) {
-      console.error('Failed to setup message listener:', err);
+      console.error("Failed to setup message listener:", err);
     }
 
     return () => {
@@ -315,9 +349,9 @@ export function useChat({
         unlistenToMessageReacted();
         unlistenToUserPenaltyUpdated();
         const socket = getSocket(token);
-        socket.off('message_sent', handleMessageSent);
+        socket.off("message_sent", handleMessageSent);
       } catch (err) {
-        console.error('Failed to cleanup message listener:', err);
+        console.error("Failed to cleanup message listener:", err);
       }
     };
   }, [conversationId, token, userId]);
@@ -373,7 +407,7 @@ export function useChat({
         return updated;
       });
 
-      if (data.status === 'read' && data.reader) {
+      if (data.status === "read" && data.reader) {
         const targetRefs = new Set<string>([
           ...ids.map(String),
           ...idems.map(String),
@@ -384,44 +418,56 @@ export function useChat({
           return;
         }
 
-        setMessages((prev) => prev.map((msg) => {
-          const messageRefs = [String(msg._id), String(msg.idempotencyKey || '')].filter(Boolean);
-          const isTarget = messageRefs.some((ref) => targetRefs.has(ref));
+        setMessages((prev) =>
+          prev.map((msg) => {
+            const messageRefs = [
+              String(msg._id),
+              String(msg.idempotencyKey || ""),
+            ].filter(Boolean);
+            const isTarget = messageRefs.some((ref) => targetRefs.has(ref));
 
-          if (!isTarget) {
-            return msg;
-          }
+            if (!isTarget) {
+              return msg;
+            }
 
-          const existingReadBy = Array.isArray(msg.readBy) ? msg.readBy : [];
-          const mergedReadBy = [data.reader!, ...existingReadBy.filter((item) => item.userId !== data.reader!.userId)]
-            .sort((a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime());
+            const existingReadBy = Array.isArray(msg.readBy) ? msg.readBy : [];
+            const mergedReadBy = [
+              data.reader!,
+              ...existingReadBy.filter(
+                (item) => item.userId !== data.reader!.userId,
+              ),
+            ].sort(
+              (a, b) =>
+                new Date(b.readAt).getTime() - new Date(a.readAt).getTime(),
+            );
 
-          const sentTo = Array.isArray(msg.sentTo)
-            ? msg.sentTo.filter((item) => item.userId !== data.reader!.userId)
-            : msg.sentTo;
+            const sentTo = Array.isArray(msg.sentTo)
+              ? msg.sentTo.filter((item) => item.userId !== data.reader!.userId)
+              : msg.sentTo;
 
-          return {
-            ...msg,
-            status: 'read' as MessageStatus,
-            readBy: mergedReadBy,
-            readByPreview: mergedReadBy.slice(0, 3),
-            sentTo,
-          };
-        }));
+            return {
+              ...msg,
+              status: "read" as MessageStatus,
+              readBy: mergedReadBy,
+              readByPreview: mergedReadBy.slice(0, 3),
+              sentTo,
+            };
+          }),
+        );
       }
     };
 
     try {
       listenToStatusUpdates(handleStatusUpdate);
     } catch (err) {
-      console.error('Failed to setup status listener:', err);
+      console.error("Failed to setup status listener:", err);
     }
 
     return () => {
       try {
         unlistenToStatusUpdates();
       } catch (err) {
-        console.error('Failed to cleanup status listener:', err);
+        console.error("Failed to cleanup status listener:", err);
       }
     };
   }, [conversationId, token]);
@@ -448,7 +494,9 @@ export function useChat({
 
           // Set auto-remove after 4s
           const timeout = setTimeout(() => {
-            setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
+            setTypingUsers((prev) =>
+              prev.filter((u) => u.userId !== data.userId),
+            );
             typingTimeouts.current.delete(data.userId);
           }, 4000);
 
@@ -457,7 +505,9 @@ export function useChat({
           // Remove user immediately
           const existingTimeout = typingTimeouts.current.get(data.userId);
           if (existingTimeout) clearTimeout(existingTimeout);
-          setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
+          setTypingUsers((prev) =>
+            prev.filter((u) => u.userId !== data.userId),
+          );
           typingTimeouts.current.delete(data.userId);
         }
       }
@@ -466,7 +516,7 @@ export function useChat({
     try {
       listenToTypingIndicators(handleTypingIndicator);
     } catch (err) {
-      console.error('Failed to setup typing listener:', err);
+      console.error("Failed to setup typing listener:", err);
     }
 
     return () => {
@@ -477,16 +527,21 @@ export function useChat({
       try {
         unlistenToTypingIndicators();
       } catch (err) {
-        console.error('Failed to cleanup typing listener:', err);
+        console.error("Failed to cleanup typing listener:", err);
       }
     };
   }, [conversationId, userId]);
 
   // Send message
   const handleSendMessage = useCallback(
-    async (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => {
+    async (
+      content: string,
+      type: MessageType,
+      mediaUrl?: string,
+      options?: SendMessageOptions,
+    ) => {
       if (!isConnected()) {
-        setError('Not connected to messaging service');
+        setError("Not connected to messaging service");
         return null;
       }
 
@@ -510,13 +565,15 @@ export function useChat({
           mediaUrl,
           replyTo: options?.replyTo,
           idempotencyKey,
-          status: 'sent',
+          status: "sent",
           createdAt: timestamp,
         };
 
         setMessages((prev) => {
           const index = prev.findIndex(
-            (msg) => msg.idempotencyKey === idempotencyKey || msg._id === idempotencyKey,
+            (msg) =>
+              msg.idempotencyKey === idempotencyKey ||
+              msg._id === idempotencyKey,
           );
 
           if (index === -1) {
@@ -535,12 +592,19 @@ export function useChat({
 
         setMessageStatus((prev) => ({
           ...prev,
-          [idempotencyKey]: 'sent',
+          [idempotencyKey]: "sent",
         }));
 
         if (shouldEmitNow) {
           // Send via socket only when media is ready or message is plain text
-          emitSendMessage(conversationId, content, type, idempotencyKey, mediaUrl, options?.replyTo);
+          emitSendMessage(
+            conversationId,
+            content,
+            type,
+            idempotencyKey,
+            mediaUrl,
+            options?.replyTo,
+          );
 
           // Clear pending typing indicator immediately (don't wait 3s)
           emitClearPendingTyping(conversationId);
@@ -548,9 +612,10 @@ export function useChat({
 
         return idempotencyKey;
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
+        const errorMsg =
+          err instanceof Error ? err.message : "Failed to send message";
         setError(errorMsg);
-        console.error('Send message error:', err);
+        console.error("Send message error:", err);
         return null;
       } finally {
         if (shouldEmitNow) {
@@ -563,7 +628,10 @@ export function useChat({
 
   const handleCancelPendingMessage = useCallback((idempotencyKey: string) => {
     setMessages((prev) =>
-      prev.filter((msg) => msg.idempotencyKey !== idempotencyKey && msg._id !== idempotencyKey),
+      prev.filter(
+        (msg) =>
+          msg.idempotencyKey !== idempotencyKey && msg._id !== idempotencyKey,
+      ),
     );
 
     setMessageStatus((prev) => {
@@ -585,11 +653,11 @@ export function useChat({
         messageIds.forEach((id) => {
           setMessageStatus((prev) => ({
             ...prev,
-            [id]: 'read',
+            [id]: "read",
           }));
         });
       } catch (err) {
-        console.error('Mark as read error:', err);
+        console.error("Mark as read error:", err);
       }
     },
     [conversationId],
@@ -600,7 +668,7 @@ export function useChat({
     try {
       emitStartTyping(conversationId);
     } catch (err) {
-      console.error('Start typing error:', err);
+      console.error("Start typing error:", err);
     }
   }, [conversationId]);
 
@@ -609,7 +677,7 @@ export function useChat({
     try {
       emitStopTyping(conversationId);
     } catch (err) {
-      console.error('Stop typing error:', err);
+      console.error("Stop typing error:", err);
     }
   }, [conversationId]);
 
@@ -629,9 +697,12 @@ export function useChat({
       // Remove from realtime message state so merge layer cannot resurrect it.
       setMessages((prev) =>
         prev.filter((msg) => {
-          const matchesById = msg._id === data.messageId || msg.idempotencyKey === data.messageId;
-          const matchesByKey = Boolean(data.idempotencyKey)
-            && (msg._id === data.idempotencyKey || msg.idempotencyKey === data.idempotencyKey);
+          const matchesById =
+            msg._id === data.messageId || msg.idempotencyKey === data.messageId;
+          const matchesByKey =
+            Boolean(data.idempotencyKey) &&
+            (msg._id === data.idempotencyKey ||
+              msg.idempotencyKey === data.idempotencyKey);
 
           return !(matchesById || matchesByKey);
         }),
@@ -662,10 +733,10 @@ export function useChat({
       setMessages((prev) =>
         prev.map((msg) => {
           const matches =
-            msg._id === data.messageId
-            || msg.idempotencyKey === data.idempotencyKey
-            || msg._id === data.idempotencyKey
-            || msg.idempotencyKey === data.messageId;
+            msg._id === data.messageId ||
+            msg.idempotencyKey === data.idempotencyKey ||
+            msg._id === data.idempotencyKey ||
+            msg.idempotencyKey === data.messageId;
 
           if (!matches) {
             return msg;
@@ -673,9 +744,12 @@ export function useChat({
 
           return {
             ...msg,
-            content: data.recalledBy === 'system' ? '[Bị chặn bởi AI Moderator]' : '[Tin nhắn đã được thu hồi]',
+            content:
+              data.recalledBy === "system"
+                ? "[Bị chặn bởi AI Moderator]"
+                : "[Tin nhắn đã được thu hồi]",
             mediaUrl: undefined,
-            type: 'system-recall' as Message['type'],
+            type: "system-recall" as Message["type"],
           };
         }),
       );
@@ -683,7 +757,7 @@ export function useChat({
       // Update status
       setMessageStatus((prev) => ({
         ...prev,
-        [data.messageId]: 'read',
+        [data.messageId]: "read",
       }));
     };
 
@@ -692,7 +766,7 @@ export function useChat({
       listenToMessageDeletion(handleMessageDeletedForMe);
       listenToMessageRecall(handleMessageRecalled);
     } catch (err) {
-      console.error('Failed to setup deletion listeners:', err);
+      console.error("Failed to setup deletion listeners:", err);
     }
 
     return () => {
@@ -700,7 +774,7 @@ export function useChat({
         unlistenToMessageDeletion(handleMessageDeletedForMe);
         unlistenToMessageRecall(handleMessageRecalled);
       } catch (err) {
-        console.error('Failed to cleanup deletion listeners:', err);
+        console.error("Failed to cleanup deletion listeners:", err);
       }
     };
   }, [conversationId, token]);
@@ -709,19 +783,20 @@ export function useChat({
   const handleDeleteForMe = useCallback(
     async (messageId: string, idempotencyKey: string) => {
       if (!isConnected()) {
-        setError('Not connected to messaging service');
+        setError("Not connected to messaging service");
         return;
       }
 
       try {
         // Optimistic remove to avoid temporary resurrection while waiting server ack.
         setMessages((prev) =>
-          prev.filter((msg) => (
-            msg._id !== messageId
-            && msg.idempotencyKey !== messageId
-            && msg._id !== idempotencyKey
-            && msg.idempotencyKey !== idempotencyKey
-          )),
+          prev.filter(
+            (msg) =>
+              msg._id !== messageId &&
+              msg.idempotencyKey !== messageId &&
+              msg._id !== idempotencyKey &&
+              msg.idempotencyKey !== idempotencyKey,
+          ),
         );
 
         setMessageStatus((prev) => {
@@ -733,29 +808,29 @@ export function useChat({
 
         deleteMessageForMe(conversationId, messageId, idempotencyKey);
       } catch (err) {
-        console.error('Failed to delete message:', err);
-        setError('Failed to delete message');
+        console.error("Failed to delete message:", err);
+        setError("Failed to delete message");
       }
     },
-    [conversationId]
+    [conversationId],
   );
 
   // Recall message
   const handleRecall = useCallback(
     async (messageId: string, idempotencyKey: string) => {
       if (!isConnected()) {
-        setError('Not connected to messaging service');
+        setError("Not connected to messaging service");
         return;
       }
 
       try {
         recallMessage(conversationId, messageId, idempotencyKey);
       } catch (err) {
-        console.error('Failed to recall message:', err);
-        setError('Failed to recall message');
+        console.error("Failed to recall message:", err);
+        setError("Failed to recall message");
       }
     },
-    [conversationId]
+    [conversationId],
   );
 
   return {
@@ -803,33 +878,39 @@ export function useMessageHistory({
   const [checkChange, setCheckChange] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMessages = useCallback(async (overrideCursor?: string) => {
-    if (!conversationId || loading) return;
+  const fetchMessages = useCallback(
+    async (overrideCursor?: string) => {
+      if (!conversationId || loading) return;
 
-    const currentCursor = overrideCursor ?? cursor;
-    if (currentCursor && !hasMore) return;
+      const currentCursor = overrideCursor ?? cursor;
+      if (currentCursor && !hasMore) return;
 
-    try {
-      setLoading(true);
-      setError(null);
+      try {
+        setLoading(true);
+        setError(null);
 
-      const response = await getMessages(conversationId, cursor, 20);
-      const { messages, nextCursor } = response;
+        const response = await getMessages(conversationId, cursor, 20);
+        const { messages, nextCursor } = response;
 
-      if (messages && Array.isArray(messages)) {
-        const reversedMessages = messages.reverse();
-        setMessages((prev) => (currentCursor ? [...reversedMessages, ...prev] : reversedMessages));
-        setCursor(nextCursor);
-        setHasMore(nextCursor ? messages.length === 20 : false);
+        if (messages && Array.isArray(messages)) {
+          const reversedMessages = messages.reverse();
+          setMessages((prev) =>
+            currentCursor ? [...reversedMessages, ...prev] : reversedMessages,
+          );
+          setCursor(nextCursor);
+          setHasMore(nextCursor ? messages.length === 20 : false);
+        }
+      } catch (err) {
+        const errorMsg =
+          err instanceof Error ? err.message : "Failed to fetch messages";
+        setError(errorMsg);
+        console.error("Fetch messages error:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch messages';
-      setError(errorMsg);
-      console.error('Fetch messages error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, cursor, hasMore, loading]);
+    },
+    [conversationId, cursor, hasMore, loading],
+  );
 
   useEffect(() => {
     if (!conversationId) {
@@ -844,13 +925,13 @@ export function useMessageHistory({
     setCursor(undefined);
     setHasMore(true);
     setError(null);
-    setCheckChange(prev => !prev);
+    setCheckChange((prev) => !prev);
   }, [conversationId]);
 
   // Auto-fetch initial messages when conversationId changes
   useEffect(() => {
     if (conversationId && !loading) {
-      fetchMessages('');
+      fetchMessages("");
     }
   }, [checkChange]);
 
@@ -876,9 +957,12 @@ export function useMessageHistory({
       // Remove from messages state
       setMessages((prev) =>
         prev.filter((msg) => {
-          const matchesById = msg._id === data.messageId || msg.idempotencyKey === data.messageId;
-          const matchesByKey = Boolean(data.idempotencyKey)
-            && (msg._id === data.idempotencyKey || msg.idempotencyKey === data.idempotencyKey);
+          const matchesById =
+            msg._id === data.messageId || msg.idempotencyKey === data.messageId;
+          const matchesByKey =
+            Boolean(data.idempotencyKey) &&
+            (msg._id === data.idempotencyKey ||
+              msg.idempotencyKey === data.idempotencyKey);
 
           return !(matchesById || matchesByKey);
         }),
@@ -898,15 +982,18 @@ export function useMessageHistory({
       // Update message to placeholder
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.idempotencyKey === data.idempotencyKey
-            || msg._id === data.messageId
-            || msg._id === data.idempotencyKey
-            || msg.idempotencyKey === data.messageId
+          msg.idempotencyKey === data.idempotencyKey ||
+          msg._id === data.messageId ||
+          msg._id === data.idempotencyKey ||
+          msg.idempotencyKey === data.messageId
             ? {
                 ...msg,
-                content: data.recalledBy === 'system' ? '[Bị chặn bởi AI Moderator]' : '[Tin nhắn đã được thu hồi]',
+                content:
+                  data.recalledBy === "system"
+                    ? "[Bị chặn bởi AI Moderator]"
+                    : "[Tin nhắn đã được thu hồi]",
                 mediaUrl: undefined,
-                type: 'system-recall' as Message['type'],
+                type: "system-recall" as Message["type"],
               }
             : msg,
         ),
@@ -919,7 +1006,9 @@ export function useMessageHistory({
       toConversationId: string;
     }) => {
       // Just log forward confirmation - message appears in target conversation via receive_message
-      console.debug(`Message forwarded: ${data.idempotencyKey} to ${data.toConversationId}`);
+      console.debug(
+        `Message forwarded: ${data.idempotencyKey} to ${data.toConversationId}`,
+      );
     };
 
     try {
@@ -927,7 +1016,7 @@ export function useMessageHistory({
       listenToMessageRecall(handleMessageRecalled);
       listenToMessageForwarded(handleMessageForwarded);
     } catch (err) {
-      console.error('Failed to setup deletion listeners:', err);
+      console.error("Failed to setup deletion listeners:", err);
     }
 
     return () => {
@@ -936,7 +1025,7 @@ export function useMessageHistory({
         unlistenToMessageRecall(handleMessageRecalled);
         unlistenToMessageForwarded();
       } catch (err) {
-        console.error('Failed to cleanup deletion listeners:', err);
+        console.error("Failed to cleanup deletion listeners:", err);
       }
     };
   }, [conversationId]);
@@ -986,12 +1075,16 @@ export function useTypingIndicator({
         // Add user
         setTypingUsers((prev) => {
           const exists = prev.find((u) => u.userId === data.userId);
-          return exists ? prev : [...prev, { userId: data.userId, displayName: data.userId }];
+          return exists
+            ? prev
+            : [...prev, { userId: data.userId, displayName: data.userId }];
         });
 
         // Auto-remove after 4s
         const timeout = setTimeout(() => {
-          setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
+          setTypingUsers((prev) =>
+            prev.filter((u) => u.userId !== data.userId),
+          );
           typingTimeouts.current.delete(data.userId);
         }, 4000);
 
@@ -1008,7 +1101,7 @@ export function useTypingIndicator({
     try {
       listenToTypingIndicators(handleTypingIndicator);
     } catch (err) {
-      console.error('Failed to setup typing listener:', err);
+      console.error("Failed to setup typing listener:", err);
     }
 
     return () => {
@@ -1018,7 +1111,7 @@ export function useTypingIndicator({
       try {
         unlistenToTypingIndicators();
       } catch (err) {
-        console.error('Failed to cleanup typing listener:', err);
+        console.error("Failed to cleanup typing listener:", err);
       }
     };
   }, [conversationId]);

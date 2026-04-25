@@ -1,13 +1,16 @@
-import type { Consumer } from 'kafkajs';
-import { createConsumer, KAFKA_TOPICS } from '../infrastructure/kafka';
-import { getRedis, getUserOnlineStatus } from '../infrastructure/redis';
-import { sendFCMNotification, isFCMConfigured } from '../infrastructure/fcm';
-import { sendWebPush, isWebPushConfigured } from '../infrastructure/web-push';
-import { NotificationModel, type NotificationType } from '../modules/notifications/notification.model';
-import { NotificationPreferenceModel } from '../modules/notifications/notification-preference.model';
-import { DeviceTokenModel } from '../modules/users/device-token.model';
-import { emitNotification } from '../socket/gateway';
-import { logger } from '../shared/logger';
+import type { Consumer } from "kafkajs";
+import { createConsumer, KAFKA_TOPICS } from "../infrastructure/kafka";
+import { getRedis, getUserOnlineStatus } from "../infrastructure/redis";
+import { sendFCMNotification, isFCMConfigured } from "../infrastructure/fcm";
+import { sendWebPush, isWebPushConfigured } from "../infrastructure/web-push";
+import {
+  NotificationModel,
+  type NotificationType,
+} from "../modules/notifications/notification.model";
+import { NotificationPreferenceModel } from "../modules/notifications/notification-preference.model";
+import { DeviceTokenModel } from "../modules/users/device-token.model";
+import { emitNotification } from "../socket/gateway";
+import { logger } from "../shared/logger";
 
 interface NotificationPayload {
   userId: string;
@@ -24,10 +27,15 @@ const DEBOUNCE_WINDOW_SECONDS = 5;
 let consumer: Consumer | null = null;
 
 export async function startNotificationWorker(): Promise<void> {
-  consumer = createConsumer(`${process.env['KAFKA_GROUP_ID'] ?? 'zync-server'}-notifications`);
+  consumer = createConsumer(
+    `${process.env["KAFKA_GROUP_ID"] ?? "zync-server"}-notifications`,
+  );
 
   await consumer.connect();
-  await consumer.subscribe({ topic: KAFKA_TOPICS.NOTIFICATIONS, fromBeginning: false });
+  await consumer.subscribe({
+    topic: KAFKA_TOPICS.NOTIFICATIONS,
+    fromBeginning: false,
+  });
 
   await consumer.run({
     eachMessage: async ({ message }) => {
@@ -35,18 +43,22 @@ export async function startNotificationWorker(): Promise<void> {
 
       try {
         // E1.1 – Parse payload
-        const payload = JSON.parse(message.value.toString()) as NotificationPayload;
-        logger.debug(`Processing notification for user ${payload.userId}: ${payload.type}`);
+        const payload = JSON.parse(
+          message.value.toString(),
+        ) as NotificationPayload;
+        logger.debug(
+          `Processing notification for user ${payload.userId}: ${payload.type}`,
+        );
 
         await processNotification(payload);
       } catch (err) {
         // E1.13 – Error handling: log but never throw (worker continues consuming)
-        logger.error('Failed to process notification event', err);
+        logger.error("Failed to process notification event", err);
       }
     },
   });
 
-  logger.info('Notification worker started – consuming notifications');
+  logger.info("Notification worker started – consuming notifications");
 }
 
 // E2.2 – Graceful shutdown
@@ -54,12 +66,12 @@ export async function stopNotificationWorker(): Promise<void> {
   if (!consumer) return;
 
   try {
-    logger.info('Stopping notification worker...');
+    logger.info("Stopping notification worker...");
     await consumer.disconnect();
     consumer = null;
-    logger.info('Notification worker stopped');
+    logger.info("Notification worker stopped");
   } catch (err) {
-    logger.error('Error stopping notification worker', err);
+    logger.error("Error stopping notification worker", err);
   }
 }
 
@@ -86,7 +98,9 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   let isMuted = false;
   if (conversationId) {
     if (pref?.mutedConversations?.includes(conversationId)) {
-      const mutedUntilMap = pref.mutedUntil as unknown as Record<string, Date> | undefined;
+      const mutedUntilMap = pref.mutedUntil as unknown as
+        | Record<string, Date>
+        | undefined;
       if (mutedUntilMap) {
         const expiry = mutedUntilMap[conversationId];
         if (expiry && new Date(expiry) < new Date()) {
@@ -94,7 +108,7 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
             { userId },
             {
               $pull: { mutedConversations: conversationId },
-              $unset: { [`mutedUntil.${conversationId}`]: '' },
+              $unset: { [`mutedUntil.${conversationId}`]: "" },
             },
           );
         } else {
@@ -115,7 +129,9 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   }
 
   if (isMuted) {
-    logger.debug(`Notification skipped (muted) for user ${userId}, conversation ${conversationId}`);
+    logger.debug(
+      `Notification skipped (muted) for user ${userId}, conversation ${conversationId}`,
+    );
     return;
   }
 
@@ -134,7 +150,10 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   // E1.7 – Emit Socket.IO only when notifications are effectively enabled.
   // This keeps in-app behavior consistent with mute/disable-push settings.
   if (!isMuted && pushEnabled) {
-    emitNotification(userId, notificationDoc.toObject() as unknown as Record<string, unknown>);
+    emitNotification(
+      userId,
+      notificationDoc.toObject() as unknown as Record<string, unknown>,
+    );
   }
 
   // Skip push if push disabled
@@ -144,7 +163,7 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   }
 
   // E1.4 – Check online status: skip push for new_message if user is online
-  if (type === 'new_message') {
+  if (type === "new_message") {
     const onlineStatus = await getUserOnlineStatus(userId);
     if (onlineStatus) {
       logger.debug(`User ${userId} is online – skipping push for new_message`);
@@ -153,7 +172,7 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   }
 
   // E1.5 – Debounce logic for conversation-scoped notifications
-  if (conversationId && type === 'new_message') {
+  if (conversationId && type === "new_message") {
     const redis = getRedis();
     const debounceKey = `notif_debounce:${userId}:${conversationId}`;
     const existing = await redis.get(debounceKey);
@@ -161,11 +180,13 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
     if (existing) {
       const count = parseInt(existing, 10) + 1;
       await redis.setex(debounceKey, DEBOUNCE_WINDOW_SECONDS, count.toString());
-      logger.debug(`Debounced notification for user ${userId} (${count} msgs in window)`);
+      logger.debug(
+        `Debounced notification for user ${userId} (${count} msgs in window)`,
+      );
       return;
     }
 
-    await redis.setex(debounceKey, DEBOUNCE_WINDOW_SECONDS, '1');
+    await redis.setex(debounceKey, DEBOUNCE_WINDOW_SECONDS, "1");
   }
 
   // E1.8 – Query device tokens
@@ -182,24 +203,34 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
 
   // E1.9 – Route FCM: android tokens + web tokens without pushSubscription
   const fcmTokens = deviceTokens
-    .filter((dt) => dt.platform === 'android' || (dt.platform === 'web' && !dt.pushSubscription))
+    .filter(
+      (dt) =>
+        dt.platform === "android" ||
+        (dt.platform === "web" && !dt.pushSubscription),
+    )
     .map((dt) => dt.deviceToken);
 
   if (fcmTokens.length > 0) {
     if (isFCMConfigured()) {
-      const result = await sendFCMNotification(fcmTokens, pushPayload, pushData);
+      const result = await sendFCMNotification(
+        fcmTokens,
+        pushPayload,
+        pushData,
+      );
       for (const expiredToken of result.expiredTokens) {
         const dt = deviceTokens.find((d) => d.deviceToken === expiredToken);
         if (dt) expiredTokenIds.push(dt._id.toString());
       }
     } else {
-      logger.debug(`[FCM dev-mode] Would push to ${fcmTokens.length} FCM token(s)`);
+      logger.debug(
+        `[FCM dev-mode] Would push to ${fcmTokens.length} FCM token(s)`,
+      );
     }
   }
 
   // E1.10 – Route Web Push: web tokens with pushSubscription
   const webPushTokens = deviceTokens.filter(
-    (dt) => dt.platform === 'web' && dt.pushSubscription,
+    (dt) => dt.platform === "web" && dt.pushSubscription,
   );
 
   if (webPushTokens.length > 0) {
@@ -214,19 +245,25 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
         }
       }
     } else {
-      logger.debug(`[WebPush dev-mode] Would push to ${webPushTokens.length} subscription(s)`);
+      logger.debug(
+        `[WebPush dev-mode] Would push to ${webPushTokens.length} subscription(s)`,
+      );
     }
   }
 
   // E1.11 – Route APNs: iOS placeholder
-  const iosTokens = deviceTokens.filter((dt) => dt.platform === 'ios');
+  const iosTokens = deviceTokens.filter((dt) => dt.platform === "ios");
   if (iosTokens.length > 0) {
-    logger.debug(`[APNs placeholder] Would push to ${iosTokens.length} iOS device(s)`);
+    logger.debug(
+      `[APNs placeholder] Would push to ${iosTokens.length} iOS device(s)`,
+    );
   }
 
   // E1.12 – Clean expired tokens
   if (expiredTokenIds.length > 0) {
     await DeviceTokenModel.deleteMany({ _id: { $in: expiredTokenIds } });
-    logger.info(`Cleaned ${expiredTokenIds.length} expired device token(s) for user ${userId}`);
+    logger.info(
+      `Cleaned ${expiredTokenIds.length} expired device token(s) for user ${userId}`,
+    );
   }
 }
