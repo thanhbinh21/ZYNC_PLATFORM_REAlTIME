@@ -8,7 +8,7 @@ import type { HomeScreenProps } from '../home.types';
 
 export function HomeScreen({ data }: HomeScreenProps) {
   const assistantBadges = ['Gemini', 'Claude', 'OpenAI'];
-  const workflowSteps = ['Discover', 'Review', 'Ship'];
+  const workflowSteps = ['Khám phá', 'Review', 'Kết nối'];
 
   return (
     <main className="zync-page-shell min-h-screen text-text-primary">
@@ -59,7 +59,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
             <div className="mt-6 flex flex-wrap gap-3">
               {assistantBadges.map((badge) => (
                 <span key={badge} className="zync-soft-badge text-sm">
-                  Ho tro {badge}
+                  Hỗ trợ {badge}
                 </span>
               ))}
             </div>
@@ -97,7 +97,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
             <div className="mt-6 rounded-[1.6rem] p-5 sm:p-6 zync-soft-card-muted">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Live Workspace</p>
+                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Nền tảng trực tiếp</p>
                   <h2 className="font-ui-title mt-2 text-[clamp(1.45rem,3vw,2.2rem)] leading-tight text-text-primary">
                     {data.globalTitle}
                   </h2>
@@ -105,12 +105,12 @@ export function HomeScreen({ data }: HomeScreenProps) {
                     {data.globalSubtitle}
                   </p>
                 </div>
-                <span className="zync-soft-badge zync-soft-badge-active">AI Ready</span>
+                <span className="zync-soft-badge zync-soft-badge-active">AI Sẵn sàng</span>
               </div>
 
               <div className="mt-6">
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-ui-content text-text-secondary">Community momentum</span>
+                  <span className="font-ui-content text-text-secondary">Đà tăng cộng đồng</span>
                   <span className="font-ui-title text-accent-strong">78%</span>
                 </div>
                 <div className="zync-soft-progress">
@@ -125,7 +125,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
                       <p className="font-ui-title text-sm text-text-primary">{feature.title}</p>
                       <p className="font-ui-content text-sm text-text-secondary">{feature.description}</p>
                     </div>
-                    <span className="zync-soft-badge text-xs">Ready</span>
+                    <span className="zync-soft-badge text-xs">Sẵn sàng</span>
                   </div>
                 ))}
               </div>
@@ -157,7 +157,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
         <section id="platforms" className="zync-reveal-up zync-reveal-delay-2 zync-soft-card zync-soft-card-elevated mt-10 rounded-[2rem] p-7 sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <span className="zync-soft-kicker">Build With Confidence</span>
+              <span className="zync-soft-kicker">Xây dựng với sự tự tin</span>
               <h2 className="font-ui-title mt-5 max-w-[22ch] text-balance text-[clamp(1.8rem,3vw,2.5rem)] leading-tight text-text-primary">
                 {data.ctaBlockTitle}
               </h2>

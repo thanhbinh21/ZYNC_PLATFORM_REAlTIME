@@ -6,6 +6,7 @@ import {
   searchUsers,
   updateProfile,
   upsertDeviceToken,
+  discoverUsers,
 } from './users.service';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
 
@@ -86,6 +87,22 @@ export async function upsertDeviceTokenHandler(
     const { userId } = req as AuthRequest;
     await upsertDeviceToken(userId, req.body as UpsertDeviceTokenDto);
     res.json({ success: true, message: 'Device token registered' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /api/users/discover ──────────────────────────────────────────────────────────────────────────────────
+
+export async function discoverUsersHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const users = await discoverUsers(userId);
+    res.json({ success: true, data: users });
   } catch (err) {
     next(err);
   }

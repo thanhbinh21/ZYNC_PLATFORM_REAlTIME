@@ -18,6 +18,8 @@ interface HomeDashboardScreenProps {
   profileSlot?: React.ReactNode;
   settingsSlot?: React.ReactNode;
   friendsSlot?: React.ReactNode;
+  communitySlot?: React.ReactNode;
+  exploreSlot?: React.ReactNode;
   notificationSlot?: React.ReactNode;
   activeNavId?: string;
   onNavSelect?: (id: string) => void;
@@ -35,6 +37,8 @@ export function HomeDashboardScreen({
   profileSlot,
   settingsSlot,
   friendsSlot,
+  communitySlot,
+  exploreSlot,
   notificationSlot,
   activeNavId,
   onNavSelect,
@@ -46,6 +50,11 @@ export function HomeDashboardScreen({
 }: HomeDashboardScreenProps) {
   const selectedNavId = activeNavId ?? data.navItems.find((item) => item.active)?.id ?? data.navItems[0]?.id;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Panel types that need full height with overflow hidden
+  const fullHeightNavIds = new Set(['chat', 'friends', 'community', 'explore']);
+  const isFullHeight = fullHeightNavIds.has(selectedNavId ?? '');
+
   const sectionClassName = 'flex min-h-0 flex-1 flex-col overflow-hidden';
 
   const handleSelectNav = (id: string) => {
@@ -58,8 +67,8 @@ export function HomeDashboardScreen({
   };
 
   return (
-    <main className="zync-page-shell zync-dashboard-main flex min-h-screen flex-col overflow-hidden text-text-primary">
-      <header className="sticky top-0 z-30 px-2 pt-2 sm:px-4 sm:pt-4">
+    <main className="zync-page-shell zync-dashboard-main flex h-[100dvh] flex-col overflow-hidden text-text-primary">
+      <header className="sticky top-0 z-30 px-2 pt-2 pb-2 sm:px-4 sm:pt-4 sm:pb-4">
         <div className="zync-soft-topbar flex h-16 items-center justify-between rounded-[1.75rem] px-4 lg:px-6">
           <div className="flex items-center gap-4 lg:gap-6">
             <div className="flex items-center gap-3">
@@ -68,11 +77,11 @@ export function HomeDashboardScreen({
               </span>
               <div className="hidden sm:block">
                 <p className="font-ui-brand text-xl leading-none text-text-primary">{data.brand}</p>
-                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">Workspace</p>
+                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">Developer Community</p>
               </div>
             </div>
 
-            <nav className="hidden items-center gap-2 md:flex">
+            <nav className="hidden items-center gap-1 md:flex">
               {data.navItems.map((item) => (
                 <button
                   key={item.id}
@@ -98,9 +107,9 @@ export function HomeDashboardScreen({
               type="button"
               onClick={onToggleTheme}
               className="zync-soft-badge hidden text-xs sm:inline-flex"
-              title="Chuyen doi giao dien"
+              title="Chuyển đổi giao diện"
             >
-              {theme === 'dark' ? 'Light' : 'Dark'}
+              {theme === 'dark' ? '☀️ Sáng' : '🌙 Tối'}
             </button>
 
             {notificationSlot ?? (
@@ -165,11 +174,11 @@ export function HomeDashboardScreen({
           <aside className="absolute right-3 top-3 bottom-3 w-[min(82vw,320px)] rounded-[1.8rem] zync-soft-card zync-soft-card-elevated p-5" onClick={(event) => event.stopPropagation()}>
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <span className="zync-soft-kicker">Navigation</span>
-                <p className="font-ui-title mt-3 text-lg text-text-primary">Workspace menu</p>
+                <span className="zync-soft-kicker">Điều hướng</span>
+                <p className="font-ui-title mt-3 text-lg text-text-primary">Menu workspace</p>
               </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="zync-soft-button-ghost h-10 w-10 p-0 text-base">
-                x
+                ✕
               </button>
             </div>
 
@@ -211,7 +220,7 @@ export function HomeDashboardScreen({
               onClick={() => handleSelectNav('logout')}
               className="zync-soft-button-danger mt-6 h-11 w-full text-sm"
             >
-              Dang xuat
+              Đăng xuất
             </button>
           </aside>
         </div>
@@ -223,15 +232,15 @@ export function HomeDashboardScreen({
             <header className="border-b border-border-light px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Daily overview</p>
+                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Tổng quan hàng ngày</p>
                   <h1 className="font-ui-title mt-2 text-2xl text-text-primary">{data.greeting}</h1>
                 </div>
-                <span className="zync-soft-badge">Light-first workspace</span>
+                <span className="zync-soft-badge">ZYNC Workspace</span>
               </div>
             </header>
           )}
 
-          <div className={`flex-1 ${selectedNavId === 'chat' || selectedNavId === 'friends' ? 'overflow-hidden px-2 py-2 sm:px-4 sm:py-4' : 'overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6'}`}>
+          <div className={`flex-1 ${isFullHeight ? 'overflow-hidden px-2 py-2 sm:px-4 sm:py-4' : 'overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6'}`}>
             {selectedNavId === 'chat' ? (
               <div className="flex h-full w-full justify-center">
                 <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
@@ -246,6 +255,18 @@ export function HomeDashboardScreen({
               <div className="flex h-full w-full justify-center">
                 <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
                   {friendsSlot}
+                </div>
+              </div>
+            ) : selectedNavId === 'community' ? (
+              <div className="flex h-full w-full justify-center">
+                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+                  {communitySlot}
+                </div>
+              </div>
+            ) : selectedNavId === 'explore' ? (
+              <div className="flex h-full w-full justify-center">
+                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+                  {exploreSlot}
                 </div>
               </div>
             ) : (

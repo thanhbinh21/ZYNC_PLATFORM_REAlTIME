@@ -528,7 +528,7 @@ export function MessageInput({
           placeholder="Nhập tin nhắn..."
           disabled={disabled || isLoading}
           rows={1}
-          className="flex-1 rounded-xl bg-bg-hover px-4 py-3 text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent-light disabled:opacity-50 border border-border-light"
+          className="flex-1 rounded-xl bg-bg-hover px-4 py-3 text-[15px] font-medium text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent-light disabled:opacity-50 border border-border-light"
           style={{
             minHeight: '46px',
             maxHeight: '120px',
@@ -562,7 +562,7 @@ export function MessageInput({
               className={`max-w-xs rounded-lg ${uploading ? 'opacity-50' : ''}`}
             />
           ) : (
-            <div className={`inline-flex max-w-xs items-center rounded-lg border border-[#2f6657] bg-[#10342b] px-3 py-2 text-sm text-[#d8f8ec] ${uploading ? 'opacity-50' : ''}`}>
+            <div className={`inline-flex max-w-xs items-center rounded-lg border border-border bg-bg-hover px-3 py-2 text-sm text-text-primary ${uploading ? 'opacity-50' : ''}`}>
               {uploadedMedia.fileName || 'Tệp đính kèm'}
             </div>
           )}
@@ -570,7 +570,7 @@ export function MessageInput({
           {/* Spinner only after user pressed Send */}
           {uploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
-              <div className="w-10 h-10 border-4 border-[#33deb3] border-t-transparent rounded-full animate-spin" />
+              <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
             </div>
           )}
 
@@ -595,7 +595,7 @@ export function MessageInput({
       )}
 
       {uploadedMedia && queuedMediaSend && uploading && (
-        <p className="mt-2 text-xs text-[#8dbcae]">Dang tai media sau khi gui...</p>
+        <p className="mt-2 text-xs text-text-tertiary">Dang tai media sau khi gui...</p>
       )}
     </div>
   );
