@@ -8,6 +8,7 @@ interface AuthState {
   userInfo: any | null; // Can type this properly later using shared-types
   hydrate: () => Promise<void>;
   login: (token: string, user: any) => Promise<void>;
+  updateUser: (user: any) => void;
   logout: () => Promise<void>;
 }
 
@@ -42,6 +43,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (token: string, user: any) => {
     await saveToken(token);
     set({ isAuthenticated: true, accessToken: token, userInfo: user });
+  },
+
+  updateUser: (user: any) => {
+    set((state) => ({
+      userInfo: state.userInfo ? { ...state.userInfo, ...user } : user,
+    }));
   },
 
   logout: async () => {
