@@ -22,6 +22,10 @@ export interface StoryItem {
   reactions: StoryReactionEntry[];
   expiresAt: string;
   createdAt: string;
+  /** Optional CTA link shown at the bottom of the story */
+  ctaUrl?: string;
+  /** Optional CTA button label (e.g. "View Product") */
+  ctaLabel?: string;
 }
 
 export interface StoryReactionEntry {
@@ -39,12 +43,29 @@ export interface StoryFeedGroup {
   stories: StoryItem[];
 }
 
+/** Persistent highlight collection */
+export interface StoryHighlight {
+  _id: string;
+  userId: string;
+  title: string;
+  coverUrl?: string;
+  storyIds: string[];
+}
+
+/* ─── Atom Props ─── */
+
 export interface StoryAvatarProps {
   initials: string;
   avatarUrl?: string;
   seen: boolean;
   isOwner?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  showLiveBadge?: boolean;
+  storyCount?: number;
+  /** Dim the avatar for seen stories */
+  dimmed?: boolean;
+  /** Preview thumbnail URL for desktop hover tooltip */
+  previewThumbnail?: string;
   onClick?: () => void;
 }
 
@@ -61,6 +82,25 @@ export interface ReactionButtonProps {
   active?: boolean;
   onClick: (emoji: StoryReactionType) => void;
 }
+
+export interface StorySkeletonProps {
+  count?: number;
+  variant?: 'bar' | 'card' | 'viewer' | 'highlight';
+}
+
+export interface VolumeSliderProps {
+  volume: number;
+  muted: boolean;
+  onChange: (volume: number) => void;
+  onMuteToggle: () => void;
+}
+
+export interface StoryCtaButtonProps {
+  label: string;
+  url: string;
+}
+
+/* ─── Molecule Props ─── */
 
 export interface StoryCardProps {
   user: StoryUser;
@@ -97,11 +137,29 @@ export interface StoryReactionsModalProps {
   onClose: () => void;
 }
 
+export interface StoryActionBarProps {
+  liked: boolean;
+  onLike: () => void;
+  onComment: () => void;
+  onShare: () => void;
+  onReply: (content: string) => void;
+  showReplyInput?: boolean;
+  disabled?: boolean;
+}
+
+export interface StoryHighlightCardProps {
+  highlight: StoryHighlight;
+  onClick: () => void;
+}
+
+/* ─── Organism Props ─── */
+
 export interface StoryBarProps {
   feed: StoryFeedGroup[];
   myStories: StoryItem[];
   currentUserId: string;
   currentUserName: string;
+  loading?: boolean;
   onViewStory: (groupIndex: number) => void;
   onViewMyStory: () => void;
   onCreateStory: () => void;
@@ -116,4 +174,12 @@ export interface StoryViewerProps {
   onReply: (storyId: string, content: string) => void;
   onView: (storyId: string) => void;
   onDelete: (storyId: string) => void;
+  onShare?: (storyId: string) => void;
+}
+
+export interface StoryHighlightsProps {
+  highlights: StoryHighlight[];
+  loading?: boolean;
+  onViewHighlight: (highlightId: string) => void;
+  onCreateHighlight?: () => void;
 }

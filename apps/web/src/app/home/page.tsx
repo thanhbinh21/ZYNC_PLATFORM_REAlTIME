@@ -16,12 +16,13 @@ import { MessagePreviewPopup } from '@/components/home-dashboard/organisms/Messa
 import { useMessagePreview } from '@/hooks/use-message-preview';
 import { StoryBar } from '@/components/stories/organisms/StoryBar';
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
+import { StoryHighlights } from '@/components/stories/organisms/StoryHighlights';
 import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useStories } from '@/hooks/use-stories';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { fetchMyProfile, type MeUser } from '@/services/users';
-import type { StoryReactionType, StoryFeedGroup } from '@/components/stories/stories.types';
+import type { StoryReactionType, StoryFeedGroup, StoryHighlight } from '@/components/stories/stories.types';
 import FriendsPage from '../friends/page';
 
 const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
@@ -281,22 +282,33 @@ export default function HomePage() {
     setViewerOpen(true);
   };
 
-  const storySlot = isFeedLoading ? (
-    <div className="flex gap-4 overflow-x-auto pb-2">
-      <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
-      <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
-      <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
+  // Mock highlights (replace with real API data when available)
+  const highlights: StoryHighlight[] = [];
+
+  const storySlot = (
+    <div className="space-y-2">
+      {isFeedLoading && (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
+          <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
+          <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
+        </div>
+      )}
+
+      <StoryBar
+        feed={feed}
+        myStories={myStories}
+        currentUserId={userId}
+        currentUserName={data.user.displayName}
+        loading={isFeedLoading}
+        onViewStory={handleOpenViewer}
+        onViewMyStory={handleViewMyStory}
+        onCreateStory={() => setCreateOpen(true)}
+      />
+      {highlights.length > 0 && (
+        <StoryHighlights highlights={highlights} onViewHighlight={() => {}} />
+      )}
     </div>
-  ) : (
-    <StoryBar
-      feed={feed}
-      myStories={myStories}
-      currentUserId={userId}
-      currentUserName={data.user.displayName}
-      onViewStory={handleOpenViewer}
-      onViewMyStory={handleViewMyStory}
-      onCreateStory={() => setCreateOpen(true)}
-    />
   );
 
   return (
@@ -482,6 +494,7 @@ export default function HomePage() {
             onDelete(storyId);
             loadMyStories();
           }}
+          onShare={() => { /* TODO: implement share */ }}
         />
       )}
 
