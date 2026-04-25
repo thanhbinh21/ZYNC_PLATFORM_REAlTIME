@@ -92,6 +92,7 @@ export function MessageInput({
   const [queuedMediaSend, setQueuedMediaSend] = useState<QueuedMediaSend | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const stickerButtonRef = useRef<HTMLButtonElement>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -475,6 +476,7 @@ export function MessageInput({
         </button>
 
         <button
+          ref={stickerButtonRef}
           onClick={() => setShowStickerPicker(true)}
           disabled={disabled || isLoading || isSending}
           className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
@@ -493,13 +495,13 @@ export function MessageInput({
       </div>
 
       {isEmojiPickerOpen && (
-        <div className="mb-3 flex flex-wrap gap-2 rounded-lg border border-border bg-bg-card p-2 shadow-sm">
+        <div className="emoji-picker-container mb-3 flex flex-wrap gap-2 rounded-lg border p-2 shadow-sm">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => handleSendEmoji(emoji)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-bg-hover text-lg hover:bg-border-light"
+              className="emoji-button inline-flex h-9 w-9 items-center justify-center rounded-md text-lg hover:scale-110 transition-transform"
             >
               {emoji}
             </button>
@@ -512,6 +514,7 @@ export function MessageInput({
           isOpen={showStickerPicker}
           onClose={() => setShowStickerPicker(false)}
           onSelectSticker={handleSendSticker}
+          triggerRef={stickerButtonRef}
         />
       )}
 

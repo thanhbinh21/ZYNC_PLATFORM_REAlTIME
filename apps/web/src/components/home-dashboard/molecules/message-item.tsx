@@ -109,43 +109,43 @@ function ReactionDetailsModal({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-xl rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] p-4 shadow-2xl"
+        className="reaction-details-modal w-full max-w-xl rounded-2xl border p-4 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h4 className="text-base font-semibold text-[#dffef2]">Chi tiet cam xuc</h4>
+          <h4 className="reaction-modal-header text-base font-semibold">Chi tiet cam xuc</h4>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf] hover:bg-[#145845]"
+            className="reaction-modal-button rounded-lg px-3 py-1 text-sm hover:opacity-80 transition-opacity"
           >
             Dong
           </button>
         </div>
 
         {loading ? (
-          <p className="py-6 text-center text-sm text-[#8cc4b0]">Dang tai...</p>
+          <p className="reaction-row-meta py-6 text-center text-sm">Dang tai...</p>
         ) : !details || visibleRows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-[#8cc4b0]">Chua co cam xuc cho tin nhan nay.</p>
+          <p className="reaction-row-meta py-6 text-center text-sm">Chua co cam xuc cho tin nhan nay.</p>
         ) : (
           <>
             <div className="mb-3 flex flex-wrap gap-2">
               {details.tabs.map((tab) => (
-                <span key={tab.emoji} className="rounded-full bg-[#0f4335] px-3 py-1 text-sm text-[#d8f7ec]">
+                <span key={tab.emoji} className="reaction-emoji-tab rounded-full px-3 py-1 text-sm">
                   {tab.emoji} {tab.count}
                 </span>
               ))}
             </div>
             <div className="max-h-72 space-y-2 overflow-y-auto">
               {visibleRows.map((row) => (
-                <div key={row.userId} className="rounded-lg border border-[#175443] bg-[#072d24] px-3 py-2">
+                <div key={row.userId} className="reaction-row rounded-lg border px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-sm font-medium text-[#d6f8ec]">{row.displayName}</p>
-                    <p className="text-xs text-[#8cc4b0]">{row.totalCount} lan</p>
+                    <p className="reaction-row-text truncate text-sm font-medium">{row.displayName}</p>
+                    <p className="reaction-row-meta text-xs">{row.totalCount} lan</p>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {Object.entries(row.emojiCounts).map(([emoji, count]) => (
-                      <span key={`${row.userId}-${emoji}`} className="rounded-md bg-[#0f4335] px-2 py-0.5 text-xs text-[#a6e3cf]">
+                      <span key={`${row.userId}-${emoji}`} className="reaction-emoji-count rounded-md px-2 py-0.5 text-xs">
                         {emoji} {count}
                       </span>
                     ))}
@@ -179,29 +179,29 @@ function StatusDetailsModal({
   return (
     <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-[#1a5c4a] bg-[linear-gradient(180deg,#083328_0%,#05231c_100%)] p-4 shadow-2xl"
+        className="reaction-details-modal w-full max-w-lg rounded-2xl border p-4 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h4 className="text-base font-semibold text-[#dffef2]">Thong ke da xem</h4>
+          <h4 className="reaction-modal-header text-base font-semibold">Thong ke da xem</h4>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-[#0f4335] px-3 py-1 text-sm text-[#a6e3cf] hover:bg-[#145845]"
+            className="reaction-modal-button rounded-lg px-3 py-1 text-sm hover:opacity-80 transition-opacity"
           >
             Dong
           </button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
-            <p className="mb-2 text-xs uppercase tracking-wide text-[#8cc4b0]">Da xem ({readBy.length})</p>
+          <div className="status-modal-box rounded-xl border p-3">
+            <p className="status-modal-label mb-2 text-xs uppercase tracking-wide">Da xem ({readBy.length})</p>
             {readBy.length === 0 ? (
-              <p className="text-sm text-[#8cc4b0]">Chua co ai da xem.</p>
+              <p className="status-modal-label text-sm">Chua co ai da xem.</p>
             ) : (
               <div className="space-y-2">
                 {readBy.map((item) => (
-                  <div key={`read-${item.userId}`} className="rounded-md border border-[#1d5a49] bg-[#0b3a2f] px-2.5 py-2">
+                  <div key={`read-${item.userId}`} className="status-user-item rounded-md border px-2.5 py-2">
                     <div className="flex items-center gap-2.5">
                       {item.avatarUrl ? (
                         <Image
@@ -209,16 +209,16 @@ function StatusDetailsModal({
                           alt={item.displayName || 'user'}
                           width={28}
                           height={28}
-                          className="h-7 w-7 rounded-full border border-[#1f5c4c] object-cover"
+                          className="status-user-avatar h-7 w-7 rounded-full object-cover"
                         />
                       ) : (
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#1f5c4c] bg-[#1f5c4c] text-[11px] font-semibold text-[#dffef2]">
+                        <span className="status-user-avatar inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold">
                           {(item.displayName || 'U').slice(0, 1).toUpperCase()}
                         </span>
                       )}
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[#d6f8ec]">{item.displayName}</p>
-                        <p className="text-xs text-[#8cc4b0]">
+                        <p className="status-user-name truncate text-sm font-medium">{item.displayName}</p>
+                        <p className="status-modal-label text-xs">
                           {new Date(item.readAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
@@ -229,14 +229,14 @@ function StatusDetailsModal({
             )}
           </div>
 
-          <div className="rounded-xl border border-[#1a5c4a] bg-[#072d24] p-3">
-            <p className="mb-2 text-xs uppercase tracking-wide text-[#8cc4b0]">Chua doc ({sentTo.length})</p>
+          <div className="status-modal-box rounded-xl border p-3">
+            <p className="status-modal-label mb-2 text-xs uppercase tracking-wide">Chua doc ({sentTo.length})</p>
             {sentTo.length === 0 ? (
-              <p className="text-sm text-[#8cc4b0]">Tat ca da doc.</p>
+              <p className="status-modal-label text-sm">Tat ca da doc.</p>
             ) : (
               <div className="space-y-2">
                 {sentTo.map((item) => (
-                  <div key={`sent-${item.userId}`} className="rounded-md border border-[#1d5a49] bg-[#0b3a2f] px-2.5 py-2">
+                  <div key={`sent-${item.userId}`} className="status-user-item rounded-md border px-2.5 py-2">
                     <div className="flex items-center gap-2.5">
                       {item.avatarUrl ? (
                         <Image
@@ -244,14 +244,14 @@ function StatusDetailsModal({
                           alt={item.displayName || 'user'}
                           width={28}
                           height={28}
-                          className="h-7 w-7 rounded-full border border-[#1f5c4c] object-cover"
+                          className="status-user-avatar h-7 w-7 rounded-full object-cover"
                         />
                       ) : (
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#1f5c4c] bg-[#1f5c4c] text-[11px] font-semibold text-[#dffef2]">
+                        <span className="status-user-avatar inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold">
                           {(item.displayName || 'U').slice(0, 1).toUpperCase()}
                         </span>
                       )}
-                      <p className="truncate text-sm font-medium text-[#d6f8ec]">{item.displayName}</p>
+                      <p className="status-user-name truncate text-sm font-medium">{item.displayName}</p>
                     </div>
                   </div>
                 ))}
@@ -557,14 +557,14 @@ export function MessageItem({
                 <div
                   onMouseEnter={showReactionPickerNow}
                   onMouseLeave={hideReactionPickerDelayed}
-                  className={`absolute ${isSender ? 'right-0' : 'left-0'} -top-10 z-50 flex items-center gap-1 rounded-full border border-[#2f6657] bg-[#12392f] px-2 py-1 shadow-lg`}
+                  className={`reaction-pill absolute ${isSender ? 'right-0' : 'left-0'} -top-10 z-50 flex items-center gap-1 rounded-full border px-2 py-1 shadow-lg`}
                 >
                   {QUICK_REACTIONS.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
                       onClick={() => handleReactionClick(emoji, 'picker-select')}
-                      className="rounded-full px-1.5 py-0.5 text-base hover:bg-[#1a4a3e]"
+                      className="rounded-full px-1.5 py-0.5 text-base hover:opacity-80 transition-opacity"
                     >
                       {emoji}
                     </button>
@@ -573,7 +573,7 @@ export function MessageItem({
                     <button
                       type="button"
                       onClick={handleRemoveMineReactions}
-                      className="rounded-full px-2 py-0.5 text-xs text-[#ffd2d2] hover:bg-[#5a2b2b]"
+                      className="rounded-full px-2 py-0.5 text-xs text-red-500 hover:opacity-80 transition-opacity"
                     >
                       Xoa
                     </button>
@@ -602,12 +602,12 @@ export function MessageItem({
           {isSender && !isRecalled && showMenu && (
             <div
               ref={menuRef}
-              className="absolute right-0 top-full mt-1 z-50 rounded-xl border border-[#2f6657] bg-[#0e3329] shadow-xl"
+              className="message-context-menu absolute right-0 top-full mt-1 z-50 rounded-xl shadow-xl"
               style={{ minWidth: '160px' }}
             >
               <button
                 onClick={handleDeleteForMeClick}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
+                className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:opacity-80 transition-colors border-b"
               >
                 <TrashIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Xoa cho toi</span>
@@ -616,7 +616,7 @@ export function MessageItem({
               {canRecall && (
                 <button
                   onClick={handleRecallClick}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-b border-[#234a3f]"
+                  className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:opacity-80 transition-colors border-b"
                 >
                   <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
                   <span>Thu hoi</span>
@@ -625,7 +625,7 @@ export function MessageItem({
 
               <button
                 onClick={handleForwardClick}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+                className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:opacity-80 transition-colors"
               >
                 <ForwardIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Chuyen tiep</span>
@@ -633,7 +633,7 @@ export function MessageItem({
 
               <button
                 onClick={handleReplyClick}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors border-t border-[#234a3f]"
+                className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:opacity-80 transition-colors border-t"
               >
                 <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Tra loi</span>
@@ -644,15 +644,15 @@ export function MessageItem({
           {!isSender && !isRecalled && showMenu && (
             <div
               ref={menuRef}
-              className="absolute left-0 top-full mt-1 z-50 rounded-xl border border-[#2f6657] bg-[#0e3329] shadow-xl"
+              className="message-context-menu absolute left-0 top-full mt-1 z-50 rounded-xl border shadow-xl"
               style={{ minWidth: '220px' }}
             >
-              <div className="flex items-center gap-1 px-3 py-2 border-b border-[#234a3f]">
+              <div className="flex items-center gap-1 px-3 py-2 border-b border-current opacity-30">
                 {menuReactions.map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => handleReactionClick(emoji, 'receiver-menu')}
-                    className="text-xl hover:scale-125 transition-transform p-0.5"
+                    className="reaction-menu-item hover:scale-125 transition-transform p-0.5"
                     title={`React ${emoji}`}
                   >
                     {emoji}
@@ -662,7 +662,7 @@ export function MessageItem({
 
               <button
                 onClick={handleReportClick}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-orange-300 hover:bg-[#1a4a3e] transition-colors"
+                className="message-menu-button-report flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:opacity-80 transition-colors"
               >
                 <FlagIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Bao cao vi pham</span>
@@ -670,7 +670,7 @@ export function MessageItem({
 
               <button
                 onClick={handleReplyClick}
-                className="flex w-full items-center gap-3 border-t border-[#234a3f] px-3 py-2 text-left text-sm text-[#d8f7ec] hover:bg-[#1a4a3e] transition-colors"
+                className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm hover:opacity-80 transition-colors"
               >
                 <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
                 <span>Tra loi</span>
@@ -680,7 +680,7 @@ export function MessageItem({
         </div>
 
         {isRecalled && (
-          <p className="mt-1 text-xs italic text-[#99c2b3]">
+          <p className="mt-1 text-xs italic text-text-tertiary">
             {isSender ? 'Ban da thu hoi tin nhan nay' : 'Tin nhan da duoc thu hoi'}
           </p>
         )}
@@ -689,7 +689,7 @@ export function MessageItem({
           <button
             type="button"
             onClick={handleOpenReactionDetails}
-            className={`mt-1 inline-flex items-center gap-1 rounded-full border border-[#255447] bg-[#0d342a] px-2.5 py-1 text-xs text-[#a8d8c7] hover:bg-[#16473a] ${isSender ? 'float-right' : ''}`}
+            className={`reaction-summary-button mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs hover:opacity-80 transition-opacity ${isSender ? 'float-right' : ''}`}
             title="Xem chi tiet cam xuc"
             disabled={!onFetchReactionDetails}
           >
@@ -708,7 +708,7 @@ export function MessageItem({
               <button
                 key={`${message._id}-${emoji}`}
                 onClick={() => handleReactionClick(emoji, 'legacy-pill')}
-                className="inline-flex items-center gap-1 rounded-full border border-[#2a6057] bg-[#0d3228] px-2 py-0.5 text-xs text-[#9dd8c5] hover:bg-[#123e32] transition-colors"
+                className="reaction-pill inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs hover:opacity-80 transition-opacity"
               >
                 <span>{emoji}</span>
                 {count > 1 && <span>{count}</span>}

@@ -187,7 +187,7 @@ export function MessageBubble({
             className={`px-4 py-2 rounded-2xl break-words ${
               isOwn
                 ? 'bg-accent text-white shadow-sm rounded-br-none'
-                : 'bg-white/80 text-text-primary rounded-bl-none border border-border-light shadow-sm'
+                : 'rounded-bl-none border shadow-sm message-bubble-other'
             }`}
           >
             <p className="text-sm">{content}</p>

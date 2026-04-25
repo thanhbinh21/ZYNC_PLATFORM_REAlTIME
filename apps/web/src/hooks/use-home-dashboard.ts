@@ -2922,6 +2922,7 @@ export function useHomeDashboard() {
     messages: messageHistory.messages,
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
+    messagesHasMore: messageHistory.hasMore,
     conversationInfo: getSelectedConversationInfo(),
     typingUsers,
     friendsForGroup,

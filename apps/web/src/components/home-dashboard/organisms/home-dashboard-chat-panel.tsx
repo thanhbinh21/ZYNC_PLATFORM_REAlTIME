@@ -144,6 +144,7 @@ interface ChatPanelProps {
   onToggleCamera?: () => void;
   onToggleScreenShare?: () => void;
   isLoading?: boolean;
+  hasMoreMessages?: boolean;
   error?: string | null;
   userPenaltyScore?: number;
   userMutedUntil?: Date | null;
@@ -418,6 +419,7 @@ function ChatPanel({
   onToggleScreenShare = () => {},
   userPenaltyScore = 0,
   userMutedUntil = null,
+  hasMoreMessages = true,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1023,12 +1025,12 @@ function ChatPanel({
         className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto space-y-2 px-5 py-4"
       >
         {/* Load More Button */}
-        {messages.length > 0 && (
+        {messages.length > 0 && hasMoreMessages && (
           <div className="flex justify-center mb-4">
             <button
               onClick={onLoadMore}
               disabled={isLoading}
-              className="zync-glass-subtle rounded-lg bg-[#103a30]/62 px-4 py-2 text-sm text-[#cdebe1] transition-colors hover:bg-[#0b3027]/72 disabled:opacity-50"
+              className="load-more-button zync-glass-subtle rounded-lg px-4 py-2 text-sm"
             >
               {isLoading ? 'Loading...' : 'Load more messages'}
             </button>

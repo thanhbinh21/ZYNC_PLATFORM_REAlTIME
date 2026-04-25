@@ -8,14 +8,16 @@ interface StickerPickerProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectSticker: (mediaUrl: string) => void;
+  triggerRef?: React.RefObject<HTMLButtonElement>;
 }
 
-export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPickerProps) {
+export function StickerPicker({ isOpen, onClose, onSelectSticker, triggerRef }: StickerPickerProps) {
   const [stickerPacks, setStickerPacks] = useState<(IStickerPack & { stickers: ISticker[] })[]>([]);
   const [selectedPackId, setSelectedPackId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [position, setPosition] = useState({ bottom: 0, left: 0 });
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Fetch sticker packs when picker opens
@@ -24,6 +26,17 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
       fetchStickerPacks();
     }
   }, [isOpen, stickerPacks.length]);
+
+  // Calculate position based on trigger button
+  useEffect(() => {
+    if (isOpen && triggerRef?.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPosition({
+        bottom: 180, // Position just above the button (picker height ~400px + 10px gap)
+        left: rect.left - 200, // Center horizontally
+      });
+    }
+  }, [isOpen, triggerRef]);
 
   const fetchStickerPacks = async () => {
     setLoading(true);
@@ -72,10 +85,17 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
   if (!isOpen) return null;
 
   return (
-    <div ref={pickerRef} className="fixed bottom-24 left-4 z-[9999] bg-gradient-to-b from-[#0f4738] to-[#052f24] rounded-2xl shadow-2xl border border-[#2d7a66] w-80 max-h-96 flex flex-col overflow-hidden">
+    <div 
+      ref={pickerRef} 
+      className="sticker-picker-container fixed z-[9999] rounded-2xl shadow-2xl border w-80 max-h-96 flex flex-col overflow-hidden"
+      style={{
+        bottom: `${position.bottom}px`,
+        left: `${position.left}px`,
+      }}
+    >
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center h-40 text-[#9bc4b6] text-sm">
+        <div className="flex items-center justify-center h-40 sticker-picker-text text-sm">
           Đang tải...
         </div>
       )}
@@ -91,7 +111,7 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
       {!loading && !error && (
         <>
           {/* Pack Tabs */}
-          <div className="flex gap-2 px-3 py-2 overflow-x-auto border-b border-[#2d7a66] bg-[#0a2f27]/30 scrollbar-hide">
+          <div className="flex gap-2 px-3 py-2 overflow-x-auto border-b border-current scrollbar-hide">
             {stickerPacks.map(pack => (
               <button
                 key={pack.packId}
@@ -101,8 +121,8 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
                 }}
                 className={`flex-shrink-0 p-1.5 rounded-lg transition-all ${
                   selectedPackId === pack.packId
-                    ? 'bg-[#10b981]'
-                    : 'bg-[#0f4738] hover:bg-[#155d4a]'
+                    ? 'sticker-picker-tab-active'
+                    : 'sticker-picker-tab hover:opacity-80'
                 }`}
                 title={pack.packName}
               >
@@ -116,7 +136,7 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
                     />
                   </div>
                 ) : (
-                  <div className="w-6 h-6 flex items-center justify-center text-xs font-semibold text-[#d1fae5]">
+                  <div className="w-6 h-6 flex items-center justify-center text-xs font-semibold sticker-picker-text">
                     {pack.packName[0]}
                   </div>
                 )}
@@ -125,13 +145,13 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
           </div>
 
           {/* Search Bar */}
-          <div className="px-3 py-2 border-b border-[#2d7a66] bg-[#0d3a2f]/30">
+          <div className="px-3 py-2 border-b border-current">
             <input
               type="text"
               placeholder="Tìm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 bg-[#0f4738] border border-[#2d7a66] rounded-lg text-xs text-[#d1fae5] placeholder:text-[#9bc4b6] focus:outline-none focus:ring-2 focus:ring-[#10b981]"
+              className="sticker-picker-search w-full px-3 py-1.5 border rounded-lg text-xs focus:outline-none focus:ring-2"
             />
           </div>
 
@@ -149,7 +169,7 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
                     className="relative hover:scale-110 transition-transform duration-200 h-[60px] w-[60px]"
                     title={sticker.alt || sticker.stickerId}
                   >
-                    <div className="relative w-full h-full bg-[#0f4738] rounded-lg overflow-hidden border border-[#2d7a66] hover:border-[#10b981]">
+                    <div className="sticker-picker-tab relative w-full h-full rounded-lg overflow-hidden border hover:opacity-80 transition-opacity">
                       <Image
                         src={sticker.mediaUrl}
                         alt={sticker.alt || sticker.stickerId}
@@ -164,7 +184,7 @@ export function StickerPicker({ isOpen, onClose, onSelectSticker }: StickerPicke
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-16 text-[#9bc4b6] text-xs">
+              <div className="flex items-center justify-center h-16 sticker-picker-text text-xs">
                 {searchQuery ? 'Không tìm thấy' : 'Chọn pack'}
               </div>
             )}
