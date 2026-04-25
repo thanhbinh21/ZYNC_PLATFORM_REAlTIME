@@ -21,12 +21,12 @@ export default function AuthPage() {
 
   if (isPageLoading) {
     return (
-      <main className="zync-auth-shell flex min-h-screen items-center justify-center text-[#dffcf2]">
-        <div className="zync-glass-panel zync-glass-panel-strong flex w-[92%] max-w-md flex-col gap-4 rounded-3xl p-6">
-          <div className="h-3 w-28 animate-pulse rounded-full bg-[#2ed9ae]/50" />
-          <div className="h-10 w-full animate-pulse rounded-xl bg-[#124738]" />
-          <div className="h-10 w-full animate-pulse rounded-xl bg-[#124738]" />
-          <div className="h-10 w-full animate-pulse rounded-xl bg-[#2ac79c]/40" />
+      <main className="zync-auth-shell flex min-h-screen items-center justify-center px-4 text-text-primary">
+        <div className="zync-soft-card zync-soft-card-elevated flex w-full max-w-md flex-col gap-4 rounded-[1.8rem] p-6">
+          <div className="h-3 w-28 animate-pulse rounded-full bg-bg-hover" />
+          <div className="h-10 w-full animate-pulse rounded-xl bg-bg-hover" />
+          <div className="h-10 w-full animate-pulse rounded-xl bg-bg-hover" />
+          <div className="h-10 w-full animate-pulse rounded-xl bg-accent-light/50" />
         </div>
       </main>
     );

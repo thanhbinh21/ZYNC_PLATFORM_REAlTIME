@@ -21,11 +21,11 @@ export default function HomePage() {
 
   if (isPageLoading) {
     return (
-      <main className="zync-auth-shell flex min-h-screen items-center justify-center text-[#dffcf2]">
-        <div className="zync-glass-panel zync-glass-panel-strong flex flex-col items-center gap-4 rounded-2xl px-8 py-7">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#2ed9ae]/30 border-t-[#43f0c2]" />
-          <p className="font-ui-title text-lg">Zync đang khởi tạo...</p>
-          <p className="font-ui-content text-sm text-[#d1ede3]">Chuẩn bị không gian trò chuyện cho bạn</p>
+      <main className="zync-page-shell flex min-h-screen items-center justify-center px-4">
+        <div className="zync-soft-card zync-soft-card-elevated flex max-w-md flex-col items-center gap-4 rounded-[1.8rem] px-8 py-7 text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-border border-t-accent" />
+          <p className="font-ui-title text-lg text-text-primary">Zync dang khoi tao...</p>
+          <p className="font-ui-content text-sm text-text-secondary">Chuan bi khong gian tro chuyen cho ban</p>
         </div>
       </main>
     );

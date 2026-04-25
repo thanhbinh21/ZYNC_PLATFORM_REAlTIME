@@ -7,6 +7,13 @@ export interface MeUser {
   email?: string;
   avatarUrl?: string;
   bio?: string;
+  devRole?: string;
+  skills?: string[];
+  interests?: string[];
+  githubUrl?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  onboardingCompleted?: boolean;
   createdAt?: string;
   globalViolationCount?: number;
   trustScore?: number;
@@ -18,6 +25,12 @@ export interface PublicUserProfile {
   displayName: string;
   avatarUrl?: string;
   bio?: string;
+  devRole?: string;
+  skills?: string[];
+  interests?: string[];
+  githubUrl?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
   emailMasked?: string;
   friendCount: number;
   mutualFriends: number;
@@ -29,6 +42,13 @@ export interface UpdateMyProfilePayload {
   displayName?: string;
   avatarUrl?: string;
   bio?: string;
+  devRole?: string;
+  skills?: string[];
+  interests?: string[];
+  githubUrl?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  onboardingCompleted?: boolean;
 }
 
 export async function fetchMyProfile(): Promise<MeUser> {

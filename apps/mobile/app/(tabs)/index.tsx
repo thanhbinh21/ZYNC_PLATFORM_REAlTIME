@@ -113,10 +113,10 @@ export default function HomeScreen() {
   ];
 
   const quickActions = [
-    { label: 'Tin nhắn', icon: 'chatbubble-ellipses', color: '#10b981', tab: 'chat' },
-    { label: 'Danh bạ', icon: 'people', color: '#3b82f6', tab: 'friends' },
-    { label: 'Tìm kiếm', icon: 'search', color: '#8b5cf6', tab: 'friends' },
-    { label: 'Tạo nhóm', icon: 'add-circle', color: '#ec4899', tab: 'chat' },
+    { label: 'Tin nhắn', icon: 'chatbubble-ellipses', color: '#10b981', action: () => router.push('/(tabs)/chat') },
+    { label: 'Danh bạ', icon: 'people', color: '#3b82f6', action: () => router.push('/(tabs)/friends') },
+    { label: 'Tạo nhóm', icon: 'add-circle', color: '#ec4899', action: () => router.push('/create-group') },
+    { label: 'Khoảnh khắc', icon: 'flash', color: '#8b5cf6', action: () => router.push('/create-story') },
   ];
 
   return (
@@ -167,7 +167,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Khoảnh khắc</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyContainer}>
-            <TouchableOpacity style={styles.addStory}>
+            <TouchableOpacity style={styles.addStory} onPress={() => router.push('/create-story')}>
               <View style={styles.addStoryCircle}>
                 <Ionicons name="add" size={24} color="#10b981" />
               </View>
@@ -205,10 +205,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={idx}
                 style={styles.quickAction}
-                onPress={() => {
-                  if (item.tab === 'chat') router.push('/(tabs)/chat');
-                  else router.push('/(tabs)/friends');
-                }}
+                onPress={item.action}
               >
                 <View style={[styles.quickIcon, { backgroundColor: `${item.color}15` }]}>
                   <Ionicons name={item.icon as any} size={24} color={item.color} />

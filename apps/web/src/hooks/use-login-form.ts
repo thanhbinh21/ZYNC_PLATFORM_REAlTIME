@@ -291,7 +291,12 @@ export function useLoginForm() {
       setPendingIdentifier(null);
       setInfoMessage('Xác thực thành công. Bạn đã đăng nhập vào hệ thống.');
       setErrorMessage(null);
-      router.push('/home');
+      
+      if (!response.user.onboardingCompleted) {
+        router.push('/onboarding');
+      } else {
+        router.push('/home');
+      }
     } catch (error: unknown) {
       const fallbackMessage = 'Xác thực OTP thất bại. Vui lòng thử lại.';
       const message =
@@ -361,7 +366,12 @@ export function useLoginForm() {
       (globalThis as Record<string, unknown>)['__accessToken'] = response.accessToken;
       setCurrentUserName(response.user.displayName);
       setInfoMessage('Đăng nhập Google thành công.');
-      router.push('/home');
+      
+      if (!response.user.onboardingCompleted) {
+        router.push('/onboarding');
+      } else {
+        router.push('/home');
+      }
     } catch (error: unknown) {
       const fallbackMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
       const message =

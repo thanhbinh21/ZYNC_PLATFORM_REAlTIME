@@ -9,6 +9,12 @@ export interface IConversation extends Document {
   createdBy?: string;
   adminIds: string[];
   memberApprovalEnabled?: boolean;
+  category?: 'frontend'|'backend'|'devops'|'ai-ml'|'mobile'|'career'|'general'|'other';
+  tags?: string[];
+  description?: string;
+  rules?: string;
+  isPublic?: boolean;
+  memberCount?: number;
   lastMessage?: {
     content: string;
     senderId: string;
@@ -26,6 +32,16 @@ const conversationSchema = new Schema<IConversation>(
     createdBy: { type: String },
     adminIds: [{ type: String }],
     memberApprovalEnabled: { type: Boolean, default: false },
+    category: {
+      type: String,
+      enum: ['frontend','backend','devops','ai-ml','mobile','career','general','other'],
+      default: 'general'
+    },
+    tags: [{ type: String }],
+    description: { type: String, maxlength: 1000 },
+    rules: { type: String, maxlength: 2000 },
+    isPublic: { type: Boolean, default: false },
+    memberCount: { type: Number, default: 0 },
     lastMessage: {
       content: { type: String },
       senderId: { type: String },

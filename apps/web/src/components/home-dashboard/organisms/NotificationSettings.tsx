@@ -11,15 +11,15 @@ interface NotificationSettingsProps {
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-3 transition hover:bg-[#0d3228]/50">
-      <span className="font-ui-content text-sm text-[#cdece0]">{label}</span>
+    <label className="zync-soft-card-muted flex cursor-pointer items-center justify-between gap-3 rounded-[1.1rem] px-3 py-3">
+      <span className="font-ui-content text-sm text-text-primary">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-6 w-10 flex-shrink-0 rounded-full transition-colors duration-200 ${
-          checked ? 'bg-[#30d7ab]' : 'bg-[#1a3d34]'
+          checked ? 'bg-accent' : 'bg-border'
         }`}
       >
         <span
@@ -49,10 +49,10 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
     return (
       <div
         ref={panelRef}
-        className="absolute right-0 top-[calc(100%+8px)] z-50 w-[320px] rounded-2xl border border-[#104638] bg-[#051f19] p-4 shadow-[0_16px_48px_rgba(0,0,0,0.55)]"
+        className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] rounded-[1.6rem] p-4 zync-soft-glass"
       >
         <div className="flex justify-center py-6">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#30d7ab] border-t-transparent" />
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-accent" />
         </div>
       </div>
     );
@@ -61,49 +61,46 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-[calc(100%+8px)] z-50 w-[320px] rounded-2xl border border-[#104638] bg-[#051f19] shadow-[0_16px_48px_rgba(0,0,0,0.55)]"
+      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] rounded-[1.6rem] zync-soft-glass"
       style={{ animation: 'settingsSlide 0.2s ease-out' }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#0d3228] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border-light px-4 py-3">
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#7cb3a1] transition hover:bg-[#0d3228]"
-          aria-label="Quay lại"
+          className="zync-soft-button-ghost h-8 w-8 p-0"
+          aria-label="Quay lai"
         >
           <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
             <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <h3 className="font-ui-title text-sm text-[#e4fff5]">Cài đặt thông báo</h3>
-        <div className="w-7" />
+        <h3 className="font-ui-title text-sm text-text-primary">Cai dat thong bao</h3>
+        <div className="w-8" />
       </div>
 
-      {/* Toggles */}
-      <div className="px-2 py-2">
+      <div className="space-y-3 px-3 py-3">
         <Toggle
           checked={preferences.enablePush}
-          onChange={(v) => onUpdate({ enablePush: v })}
+          onChange={(value) => onUpdate({ enablePush: value })}
           label="Push notification"
         />
         <Toggle
           checked={preferences.enableSound}
-          onChange={(v) => onUpdate({ enableSound: v })}
-          label="Âm thanh thông báo"
+          onChange={(value) => onUpdate({ enableSound: value })}
+          label="Am thanh thong bao"
         />
         <Toggle
           checked={preferences.enableBadge}
-          onChange={(v) => onUpdate({ enableBadge: v })}
-          label="Hiển thị badge đếm"
+          onChange={(value) => onUpdate({ enableBadge: value })}
+          label="Hien thi badge dem"
         />
       </div>
 
-      {/* Muted conversations info */}
       {preferences.mutedConversations.length > 0 && (
-        <div className="border-t border-[#0d3228] px-4 py-3">
-          <p className="font-ui-content text-xs text-[#4e8873]">
-            {preferences.mutedConversations.length} cuộc trò chuyện đang tắt tiếng
+        <div className="border-t border-border-light px-4 py-3">
+          <p className="font-ui-content text-xs text-text-secondary">
+            {preferences.mutedConversations.length} cuoc tro chuyen dang tat tieng
           </p>
         </div>
       )}

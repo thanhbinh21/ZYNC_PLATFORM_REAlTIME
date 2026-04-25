@@ -428,17 +428,17 @@ export function MessageInput({
   };
 
   return (
-    <div className="relative zync-glass-subtle border-t zync-glass-divider bg-[#0d2c24]/44 p-4">
+    <div className="relative border-t border-border bg-bg-card p-4">
       {replyingTo && (
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-[#2d6a58] bg-[#0f3a2f]/75 px-3 py-2">
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-bg-hover px-3 py-2">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-[#89d8bf]">Dang tra loi</p>
-            <p className="truncate text-sm text-[#dffcf2]">{replyingTo.contentPreview || '[Tin nhan]'}</p>
+            <p className="text-xs font-semibold text-accent">Dang tra loi</p>
+            <p className="truncate text-sm text-text-primary">{replyingTo.contentPreview || '[Tin nhan]'}</p>
           </div>
           <button
             type="button"
             onClick={onCancelReply}
-            className="ml-3 rounded-md bg-[#174b3d] px-2 py-1 text-xs text-[#c7f5e6] hover:bg-[#1d5c4a]"
+            className="ml-3 rounded-md bg-bg-primary px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-border-light"
           >
             Huy
           </button>
@@ -450,37 +450,37 @@ export function MessageInput({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isLoading}
-          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
           title="Attachment"
         >
-          <PaperclipIcon className="w-5 h-5 text-[#96c5b5]" />
+          <PaperclipIcon className="w-5 h-5" />
         </button>
 
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isLoading}
-          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
           title="Images/Videos"
         >
-          <ImageIcon className="w-5 h-5 text-[#96c5b5]" />
+          <ImageIcon className="w-5 h-5" />
         </button>
 
         <button
           onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
           disabled={disabled || isLoading}
-          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
           title="Emoji"
         >
-          <EmojiIcon className="w-5 h-5 text-[#96c5b5]" />
+          <EmojiIcon className="w-5 h-5" />
         </button>
 
         <button
           onClick={() => setShowStickerPicker(true)}
           disabled={disabled || isLoading || isSending}
-          className="rounded-lg p-2 transition-colors hover:bg-[#164336]/66 disabled:opacity-50"
+          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
           title="Sticker"
         >
-          <StickerIcon className="w-5 h-5 text-[#96c5b5]" />
+          <StickerIcon className="w-5 h-5" />
         </button>
 
         <input
@@ -493,13 +493,13 @@ export function MessageInput({
       </div>
 
       {isEmojiPickerOpen && (
-        <div className="zync-glass-subtle mb-3 flex flex-wrap gap-2 rounded-lg border-[#88f7d0]/20 bg-[#12392f]/56 p-2">
+        <div className="mb-3 flex flex-wrap gap-2 rounded-lg border border-border bg-bg-card p-2 shadow-sm">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => handleSendEmoji(emoji)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#0d2c24]/62 text-lg hover:bg-[#164336]/72"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-bg-hover text-lg hover:bg-border-light"
             >
               {emoji}
             </button>
@@ -525,9 +525,9 @@ export function MessageInput({
           placeholder="Nhập tin nhắn..."
           disabled={disabled || isLoading}
           rows={1}
-          className="zync-glass-subtle flex-1 rounded-lg bg-[#0d2c24]/62 px-4 py-2 text-[#dffcf2] placeholder:text-[#9bc4b6] resize-none focus:outline-none focus:ring-2 focus:ring-[#78ffd6] disabled:opacity-50"
+          className="flex-1 rounded-xl bg-bg-hover px-4 py-3 text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent-light disabled:opacity-50 border border-border-light"
           style={{
-            minHeight: '40px',
+            minHeight: '46px',
             maxHeight: '120px',
           }}
         />
@@ -537,9 +537,9 @@ export function MessageInput({
             void handleSend();
           }}
           disabled={isButtonDisabled}
-          className="p-2 bg-[#33deb3] hover:brightness-110 rounded-full transition-all disabled:bg-[#0d342a] disabled:cursor-not-allowed"
+          className="p-3 bg-accent hover:bg-accent-hover text-white rounded-full transition-all disabled:bg-bg-hover disabled:text-text-tertiary disabled:cursor-not-allowed mb-0.5"
         >
-          <SendIcon className={`w-5 h-5 transition-colors ${isButtonDisabled ? 'text-[#80ac9d]' : 'text-[#043329]'}`} />
+          <SendIcon className="w-5 h-5" />
         </button>
       </div>
 

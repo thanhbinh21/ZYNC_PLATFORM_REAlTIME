@@ -13,17 +13,17 @@ export function FriendsActionButton({
 }: FriendsActionButtonProps) {
   const classes =
     variant === 'primary'
-      ? 'bg-[#35d4a7] text-[#063428] hover:brightness-110'
+      ? 'zync-soft-button'
       : variant === 'danger'
-        ? 'bg-[#4e2130] text-[#ffd4dc] hover:bg-[#633042]'
-        : 'bg-[#0f4d3d] text-[#c8ece1] hover:bg-[#145d4a]';
+        ? 'zync-soft-button-danger'
+        : 'zync-soft-button-secondary';
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`font-ui-title h-9 rounded-lg px-3 text-xs font-semibold transition ${classes} disabled:cursor-not-allowed disabled:opacity-60`}
+      className={`h-9 px-3 text-xs ${classes}`}
     >
       {label}
     </button>

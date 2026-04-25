@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
+    "dev:lan": "node scripts/dev-lan.js",
     "build": "next build",
     "start": "next start -p 3001",
+    "start:lan": "next start --hostname 0.0.0.0 --port 3001",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests"
@@ -17,6 +19,7 @@
     "next": "14.2.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "react-hot-toast": "^2.6.0",
     "socket.io-client": "^4.7.5",
     "tailwind-merge": "^2.3.0",
     "zustand": "^4.5.2"

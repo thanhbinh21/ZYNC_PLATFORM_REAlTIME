@@ -118,8 +118,8 @@ services:
     ports:
       - "3478:3478/tcp"
       - "3478:3478/udp"
-      - "49160-49200:49160-49200/tcp"
-      - "49160-49200:49160-49200/udp"
+      - "20000-20040:20000-20040/tcp"
+      - "20000-20040:20000-20040/udp"
     command:
       - -n
       - --no-cli
@@ -127,8 +127,8 @@ services:
       - --fingerprint
       - --realm=${TURN_REALM:-zync.local}
       - --listening-port=3478
-      - --min-port=49160
-      - --max-port=49200
+      - --min-port=20000
+      - --max-port=20040
       - --user=${TURN_USERNAME:-zync}:${TURN_PASSWORD:-zync123}
       - --no-tls
       - --no-dtls

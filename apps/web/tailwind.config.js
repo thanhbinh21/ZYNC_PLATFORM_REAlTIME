@@ -8,6 +8,37 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        bg: {
+          primary: 'var(--bg-primary)',
+          secondary: 'var(--bg-secondary)',
+          sidebar: 'var(--bg-sidebar)',
+          hover: 'var(--bg-hover)',
+          active: 'var(--bg-active)',
+          code: 'var(--bg-code)',
+          card: 'var(--bg-card)',
+        },
+        text: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
+          link: 'var(--text-link)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          light: 'var(--accent-light)',
+          strong: 'var(--accent-strong)',
+        },
+        border: {
+          DEFAULT: 'var(--border)',
+          light: 'var(--border-light)',
+        },
+        surface: {
+          DEFAULT: 'var(--surface-card)',
+          strong: 'var(--surface-card-strong)',
+          muted: 'var(--surface-muted)',
+          glass: 'var(--surface-glass)',
+        },
         story: {
           bg: '#041f18',
           surface: '#062920',
@@ -31,6 +62,20 @@ module.exports = {
       },
       aspectRatio: {
         'story': '9 / 16',
+      fontFamily: {
+        body: ['var(--font-body)', 'sans-serif'],
+        display: ['var(--font-display)', 'sans-serif'],
+        code: ['var(--font-code)', 'monospace'],
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+      },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
       },
       animation: {
         // Ring & glow

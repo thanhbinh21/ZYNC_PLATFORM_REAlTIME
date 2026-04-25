@@ -35,6 +35,10 @@ export interface PublicUserProfile {
   displayName: string;
   avatarUrl?: string;
   bio?: string;
+  skills?: string[];
+  interests?: string[];
+  githubUrl?: string;
+  devRole?: string;
   emailMasked?: string;
   friendCount: number;
   mutualFriends: number;
@@ -47,7 +51,7 @@ export async function getUserById(
   requesterId?: string,
 ): Promise<PublicUserProfile> {
   const user = await UserModel.findById(userId).select(
-    'displayName username avatarUrl bio email createdAt',
+    'displayName username avatarUrl bio skills interests githubUrl devRole email createdAt',
   );
   if (!user) throw new NotFoundError('User not found');
 
@@ -64,6 +68,10 @@ export async function getUserById(
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     bio: user.bio,
+    skills: user.skills,
+    interests: user.interests,
+    githubUrl: user.githubUrl,
+    devRole: user.devRole,
     emailMasked: maskEmail(user.email),
     friendCount,
     mutualFriends,
@@ -76,7 +84,7 @@ export async function searchUsers(
   requesterId: string,
   keyword: string,
   limit: number,
-): Promise<Array<{ id: string; username?: string; displayName: string; email?: string; avatarUrl?: string; bio?: string }>> {
+): Promise<Array<{ id: string; username?: string; displayName: string; email?: string; avatarUrl?: string; bio?: string; skills?: string[]; devRole?: string }>> {
   const queryText = keyword.trim();
   if (queryText.length < 2) {
     throw new BadRequestError('Query must be at least 2 characters');
@@ -95,7 +103,7 @@ export async function searchUsers(
       { displayName: regex },
     ],
   })
-    .select('username displayName email avatarUrl bio')
+    .select('username displayName email avatarUrl bio skills devRole')
     .limit(safeLimit)
     .lean();
 
@@ -106,6 +114,8 @@ export async function searchUsers(
     email: user.email as string | undefined,
     avatarUrl: user.avatarUrl as string | undefined,
     bio: user.bio as string | undefined,
+    skills: user.skills as string[] | undefined,
+    devRole: user.devRole as string | undefined,
   }));
 }
 
@@ -119,6 +129,13 @@ export async function updateProfile(
     displayName?: string;
     avatarUrl?: string;
     bio?: string;
+    skills?: string[];
+    interests?: string[];
+    githubUrl?: string;
+    portfolioUrl?: string;
+    linkedinUrl?: string;
+    devRole?: string;
+    onboardingCompleted?: boolean;
   } = {};
 
   if (dto.username !== undefined) {
@@ -150,6 +167,14 @@ export async function updateProfile(
   if (dto.bio !== undefined) {
     updates.bio = dto.bio.trim();
   }
+
+  if (dto.skills !== undefined) updates.skills = dto.skills;
+  if (dto.interests !== undefined) updates.interests = dto.interests;
+  if (dto.githubUrl !== undefined) updates.githubUrl = dto.githubUrl;
+  if (dto.portfolioUrl !== undefined) updates.portfolioUrl = dto.portfolioUrl;
+  if (dto.linkedinUrl !== undefined) updates.linkedinUrl = dto.linkedinUrl;
+  if (dto.devRole !== undefined) updates.devRole = dto.devRole;
+  if (dto.onboardingCompleted !== undefined) updates.onboardingCompleted = dto.onboardingCompleted;
 
   if (Object.keys(updates).length === 0) {
     throw new BadRequestError('No valid profile fields to update');

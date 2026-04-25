@@ -10,19 +10,19 @@ interface SearchResultItemProps {
 
 export function SearchResultItem({ user, isLoading, onSendRequest }: SearchResultItemProps) {
   return (
-    <article className="rounded-xl border border-[#1a654f] bg-[#0b4738]/65 p-4">
-      <div className="flex items-center justify-between gap-3">
+    <article className="rounded-[1.4rem] border border-border bg-white/70 p-4 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <FriendsAvatar name={user.displayName} />
           <div>
-            <p className="font-ui-title text-base text-[#d7f2e8]">{user.displayName}</p>
-            {user.username ? <p className="font-ui-meta text-xs text-[#90b8ab]">@{user.username}</p> : null}
-            {user.email ? <p className="font-ui-meta text-xs text-[#78a798]">{user.email}</p> : null}
-            {user.bio ? <p className="font-ui-meta text-xs text-[#90b8ab]">{user.bio}</p> : null}
+            <p className="font-ui-title text-base text-text-primary">{user.displayName}</p>
+            {user.username ? <p className="font-ui-meta text-xs text-text-tertiary">@{user.username}</p> : null}
+            {user.email ? <p className="font-ui-meta text-xs text-text-tertiary">{user.email}</p> : null}
+            {user.bio ? <p className="font-ui-content text-xs text-text-secondary">{user.bio}</p> : null}
           </div>
         </div>
         <FriendsActionButton
-          label="Kết bạn"
+          label="Ket ban"
           variant="primary"
           disabled={isLoading}
           onClick={() => {

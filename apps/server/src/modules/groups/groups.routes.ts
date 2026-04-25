@@ -10,6 +10,9 @@ import {
   updateGroupHandler,
   updateGroupMemberApprovalHandler,
   updateGroupMemberRoleHandler,
+  getPublicChannelsHandler,
+  discoverChannelsHandler,
+  joinPublicChannelHandler,
 } from './groups.controller';
 import {
   AddGroupMembersSchema,
@@ -23,6 +26,12 @@ export const groupsRouter = Router();
 
 groupsRouter.use(authenticate);
 
+// GET /api/groups/public – public channels list
+groupsRouter.get('/public', getPublicChannelsHandler);
+
+// GET /api/groups/discover – channels by interests
+groupsRouter.get('/discover', discoverChannelsHandler);
+
 // POST /api/groups – create group
 groupsRouter.post('/', validateBody(CreateGroupSchema), createGroupHandler);
 
@@ -31,6 +40,9 @@ groupsRouter.patch('/:groupId', validateBody(UpdateGroupSchema), updateGroupHand
 
 // POST /api/groups/:groupId/members – add members
 groupsRouter.post('/:groupId/members', validateBody(AddGroupMembersSchema), addGroupMembersHandler);
+
+// POST /api/groups/:groupId/join – join public channel
+groupsRouter.post('/:groupId/join', joinPublicChannelHandler);
 
 // DELETE /api/groups/:groupId/members/me – leave group
 groupsRouter.delete('/:groupId/members/me', leaveGroupHandler);
