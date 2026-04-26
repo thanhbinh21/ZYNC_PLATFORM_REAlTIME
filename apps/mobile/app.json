@@ -4,7 +4,23 @@
     "slug": "zync-mobile",
     "plugins": [
       "expo-head",
-      "expo-video"
-    ]
+      "expo-video",
+      "expo-dev-client",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "ZYNC cần camera để gọi video",
+          "microphonePermission": "ZYNC cần microphone để gọi điện"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "869d86da-0b0f-49cc-9572-b5289e326115"
+      }
+    },
+    "android": {
+      "package": "com.binhdev_zync.zyncmobile"
+    }
   }
 }

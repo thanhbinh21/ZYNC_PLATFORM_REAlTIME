@@ -708,6 +708,7 @@ export default function ChatRoomScreen() {
   const [groupMembers, setGroupMembers] = useState<Array<{ _id: string; displayName: string; avatarUrl?: string }>>([]);
   const [groupAdminIds, setGroupAdminIds] = useState<string[]>([]);
   const [groupCreatorId, setGroupCreatorId] = useState<string | undefined>(undefined);
+  const [targetUserId, setTargetUserId] = useState<string | undefined>(undefined);
 
   const isGroupChat = isGroup === 'true';
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
@@ -870,6 +871,12 @@ export default function ChatRoomScreen() {
         setGroupMembers(Array.isArray(currentConversation.users) ? currentConversation.users : []);
         setGroupAdminIds(Array.isArray(currentConversation.adminIds) ? currentConversation.adminIds : []);
         setGroupCreatorId(currentConversation.createdBy || currentConversation.adminIds?.[0]);
+      } else {
+        const users = Array.isArray(currentConversation.users) ? currentConversation.users : [];
+        const otherUser = users.find(u => u._id !== userId);
+        if (otherUser) {
+          setTargetUserId(otherUser._id);
+        }
       }
 
       const prefs = (prefResponse.data?.data || {}) as {
@@ -2528,10 +2535,16 @@ export default function ChatRoomScreen() {
               </View>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.actionIcon}>
+              <TouchableOpacity style={styles.actionIcon} onPress={() => {
+                if (!conversationId) return;
+                router.push(`/call-screen?conversationId=${conversationId}&type=audio&isGroup=${isGroupChat}${!isGroupChat && targetUserId ? '&targetUserId=' + targetUserId : ''}`);
+              }}>
                 <Ionicons name="call-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionIcon}>
+              <TouchableOpacity style={styles.actionIcon} onPress={() => {
+                if (!conversationId) return;
+                router.push(`/call-screen?conversationId=${conversationId}&type=video&isGroup=${isGroupChat}${!isGroupChat && targetUserId ? '&targetUserId=' + targetUserId : ''}`);
+              }}>
                 <Ionicons name="videocam-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
