@@ -13,6 +13,8 @@ import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
 import { NotificationsProvider } from '../src/context/notifications-context';
 
+import { IncomingCallOverlay } from '../src/components/IncomingCallOverlay';
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -53,7 +55,9 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="chat-room" options={{ headerShown: false }} />
+          <Stack.Screen name="call-screen" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         </Stack>
+        <IncomingCallOverlay />
       </NotificationsProvider>
     </GestureHandlerRootView>
   );

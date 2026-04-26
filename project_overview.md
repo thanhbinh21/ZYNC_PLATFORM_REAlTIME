@@ -305,7 +305,7 @@ npm run dev:web
   - [x] Nâng cấp UI call: Việt hóa có dấu + thêm icon điều khiển (nhận/từ chối, mic, camera, chia sẻ, kết thúc) + hỗ trợ group modal với lưới video participant <!-- done: 18/04/2026 by binhdev -->
   - [x] Group call UX hardening: active-speaker highlight theo audio RMS tren grid participant + hien thi "Dang noi" realtime <!-- done: 18/04/2026 by binhdev -->
   - [x] Hotfix Web call modal: tu dong dong banner trang thai ket thuc de tra ve doan chat (khong can F5) + thu gon modal vao khung chat, tranh che toan bo khung hoi thoai <!-- done: 18/04/2026 by binhdev -->
-- [ ] DEV-MOBILE (Milestone A): UI/UX parity cho 1-1 call với Web (audio route, camera switch, background/foreground handling)
+- [x] DEV-MOBILE (Milestone A): UI/UX parity cho 1-1 call với Web (audio route, camera switch, background/foreground handling) <!-- done: 26/04/2026 by binhdev -->
 - [x] DEV-SECURITY: Bảo vệ call bằng access token ngắn hạn (ephemeral call token), chống join trái phép qua roomId đoán được <!-- done: 18/04/2026 by binhdev -->
 - [x] QC (Milestone A): E2E test 1-1 call (happy path, reject, missed, reconnect) <!-- done: 18/04/2026 by binhdev -->
 - [ ] QC (Milestone A): Test TURN bắt buộc trên mạng NAT/4G, xác nhận fallback audio-only khi mạng yếu
@@ -331,7 +331,7 @@ npm run dev:web
 - [x] Login screen (email + password)
 - [x] Register screen (email + OTP verification)
 - [x] Forgot password flow
-- [ ] Google Sign-In (expo-auth-session)
+- [x] Google Sign-In bỏ khỏi scope (không triển khai trên Mobile) <!-- removed: 27/04/2026 -->
 - [x] Splash screen + onboarding slides
 - [x] Auto-login flow (detect saved token → verify → redirect)
 
@@ -349,15 +349,15 @@ npm run dev:web
 
 ### Phase M4 – Mobile Friends & Groups (Lõi)
 - [x] Friends tab: search bar, friend requests (incoming/outgoing), friend list <!-- done: 12/04/2026 -->
-- [ ] Quick profile view (RN bottom sheet)
+- [x] Quick profile view (RN bottom sheet – ProfileBottomSheet) <!-- done: 26/04/2026 by binhdev -->
 - [x] Send/accept/reject friend request <!-- done: 17/04/2026  -->
-- [ ] Group management: create, add/remove members, disband
-- [ ] Group info screen
+- [x] Group management: create, add/remove members, disband <!-- done: 26/04/2026 by binhdev -->
+- [x] Group info screen <!-- done: 26/04/2026 by binhdev -->
 
 ### Phase M5 – Mobile Stories & Profile (Nặng – không ảnh hưởng lõi)
-- [ ] Story bar (horizontal FlatList, ring indicator)
-- [ ] Story viewer (full-screen modal, tap-to-advance, progress bar)
-- [ ] Story creation (text + image + video capture via expo-camera)
+- [x] Story bar (horizontal FlatList, ring indicator) <!-- done: 26/04/2026 by binhdev -->
+- [x] Story viewer (full-screen modal, tap-to-advance, progress bar) <!-- done: 26/04/2026 by binhdev -->
+- [x] Story creation (text + image via expo-image-picker) <!-- done: 26/04/2026 by binhdev -->
 - [x] Profile screen: edit profile, avatar upload via camera/gallery <!-- done: 12/04/2026 -->
 - [x] Real stats (bạn bè count, stories count, joined year) <!-- done: 12/04/2026 -->
 - [ ] Friend list in profile, mutual friends, view profile modal
@@ -507,7 +507,7 @@ npm run dev:web
 - [x] OX9.6: Giảm độ sáng trắng và tăng sắc xanh lá trong bộ token UI (Web + Mobile) để đồng bộ tone glass dịu mắt hơn <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.7: Đồng bộ lại web auth shell và khung chat dashboard theo shared tokens, tăng contrast light mode và cố định layout chat ở trung tâm <!-- done: 24/04/2026 -->
 
-### Phase R4 – Pivot Branding (Developer Community)
+### Phase R4 – Pivot Branding (Developer Community) ✅
 - [x] Bổ sung `discoverUsers()` service backend tìm developers nổi bật
 - [x] Sửa toàn bộ trang Onboarding (`/onboarding`) sang tiếng Việt có dấu, cải thiện form nhập liệu
 - [x] Cập nhật Onboarding redirect tại `/home` nếu user chưa hoàn thành `onboardingCompleted`
@@ -515,29 +515,91 @@ npm run dev:web
 - [x] Thay thế các emoji text bằng icon từ `lucide-react` toàn hệ thống (sidebar, community, explore, onboarding)
 - [x] Bổ sung Navigation cho "Cộng đồng" và "Khám phá" vào Dashboard sidebar
 
-### Phase N1 – Community Posts
+### Phase N1 – Community Posts ✅ (Web only – Mobile ở Plan A)
 - [x] Xây dựng `PostModel` và `CommentModel` hỗ trợ reply threads, tags, likes, bookmarks
 - [x] Phát triển `PostsService` hỗ trợ CRUD, feed pagination và trending posts
 - [x] Dựng UI `CommunityContent` component với các tabs phân loại feed (Mới nhất, Trending, Câu hỏi, TIL)
 - [x] Chức năng tạo bài viết mới (CreatePostForm) hỗ trợ phân loại (thảo luận, hỏi đáp, tutorial...)
 - [x] Chức năng Like, Bookmark và hiển thị Comment counts
 
-### Phase N3 – Explore & Discovery
+### Phase N3 – Explore & Discovery ✅ (Web only – Mobile ở Plan A)
 - [x] Sử dụng `getPublicChannels` và `discoverChannels` từ GroupsService cho API
 - [x] Dựng `ExploreContent` component với thanh tìm kiếm đa luồng (Channels, Users, Posts)
 - [x] User discovery cards với hiển thị kỹ năng (skills), bio, links (Github)
 - [x] Cơ chế Join channel public trực tiếp từ màn hình Khám phá
 
-### Master Plan: Community Pivot (Phase R1 - R7, N1 - N3)
-- [x] Phase R1: UX Redesign (Web & Mobile) - Light Theme, Shared Sidebar, Toast Notification, Font Inter/JetBrains Mono
-- [x] Phase R2: Mobile App Parity - Đồng bộ 100% tính năng Web lên Mobile (Forward, Action Menu, Story, Group, Settings, Profile, Notifications)
-- [ ] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC)
-- [x] Phase R4: Đổi tên thương hiệu (Zalo Clone -> Zync Community)
-- [x] Phase N1: Community Posts (Chức năng đăng bài cộng đồng)
-- [x] Phase N3: Khám phá & Gợi ý (Explore & Discovery)
-- [ ] Phase R5: Hoàn thiện tính năng AI Assistant Chatbot hiện có
-- [ ] Phase N2: "Killer Feature" - Developer DNA (Thẻ định danh phong cách code tạo từ AI)
-- [ ] Phase R6: Tối ưu hoá Hệ thống
+### Plan A – Hoàn thiện Chức năng Web + Mobile (~50-65h)
+
+> **File chi tiết:** `zync_plan/plan_A_feature_completion.md`
+> **Nguyên tắc UI:** Tạo bảng design tokens dùng chung (bảng màu, typography, spacing, border-radius) cho Web + Mobile. Không yêu cầu 100% đồng nhất UI, nhưng chức năng phải đồng nhất. Không dùng icon text, tất cả text trên UI phải là tiếng Việt có dấu.
+
+- [ ] A1: Mobile Community + Explore – Port tính năng Cộng đồng và Khám phá từ Web sang Mobile (~14-18h)
+  - [ ] A1.1: Community Posts trên Mobile (tab Cộng đồng, PostCard, CreatePostSheet, CommentSheet, post-detail)
+  - [ ] A1.2: Explore & Discovery trên Mobile (tìm kiếm kênh, developer, bài viết trending)
+  - [ ] A1.3: Refactor tab navigator Mobile (thêm tab Cộng đồng)
+- [ ] A2: Presence & Status System – Online/Offline/LastSeen trên cả Web + Mobile (~8-10h)
+  - [ ] A2.1: Backend presence (Redis heartbeat, broadcast cho friends, API `/api/users/:id/presence`)
+  - [ ] A2.2: Web presence UI (green dot, "Hoạt động X phút trước")
+  - [ ] A2.3: Mobile presence UI (green dot, lastSeen)
+- [ ] A3: Stories Hoàn thiện (~6-8h)
+  - [ ] A3.1: Web Story creation nâng cấp (background gradient, image crop, caption)
+  - [ ] A3.2: Backend story viewers (track viewedBy[], API danh sách người xem)
+  - [ ] A3.3: Verify + fix bugs Stories Mobile
+- [ ] A4: Chat Feature Gaps (~5-6h)
+  - [ ] A4.1: Push notification client Mobile (expo-notifications + FCM/APNs)
+  - [ ] A4.2: Mutual friends hiển thị + Friend list trong profile Mobile
+- [ ] A5: Cross-Platform UI Sync (~8-10h)
+  - [ ] A5.1: Tạo `packages/shared-design/tokens.json` – source of truth design tokens
+  - [ ] A5.2: Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
+  - [ ] A5.3: Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
+  - [ ] A5.4: Responsive + Accessibility (dark mode, font scaling, safe area)
+
+### Plan B – Chức năng AI (~45-55h, tóm tắt)
+
+> **File chi tiết:** `zync_plan/plan_B_ai_features.md`
+
+- [ ] B1: Semantic Search (AI-2) – Embedding worker + Hybrid search (MongoDB text + pgvector cosine) + Gemini re-rank (~12-15h)
+- [ ] B2: AI Personal Assistant (gộp R5 + AI-3) – Context builder cá nhân + 8 function calling + UI chat Web/Mobile (~18-22h)
+- [ ] B3: Developer DNA (N2) – Batch analysis + Radar chart + AI badges + Personality + Share card (~15-18h)
+
+### Plan C – Tối ưu & Nâng cấp Hệ thống trước Deploy (~35-45h)
+
+> **File chi tiết:** `zync_plan/plan_C_system_optimization.md`
+
+- [ ] C1: Performance Optimization (~10-12h)
+  - [ ] MongoDB atomic unread count (`$inc` thay read-modify-write loop)
+  - [ ] Redis pipeline cho presence operations
+  - [ ] Compound index `{conversationId:1, createdAt:-1, _id:-1}` cho messages
+  - [ ] Lazy join conversation rooms
+  - [ ] Image lazy loading + WebP format
+- [ ] C2: Security Hardening (~8-10h)
+  - [ ] XSS sanitization cho message + post content (package `xss`)
+  - [ ] Helmet CSP strict mode
+  - [ ] CORS strict cho production domains
+  - [ ] Rate limit per-conversation (chống spam)
+  - [ ] AI prompt injection hardening (15+ adversarial vectors)
+- [ ] C3: Code Quality & Testing (~10-12h)
+  - [ ] Error code standardization (AUTH_001, MSG_002, POST_001, AI_001)
+  - [ ] Chuẩn hóa reaction contract (thống nhất `reaction_updated` giữa Web/Mobile)
+  - [ ] Unit test coverage ≥ 60%
+  - [ ] Integration test: API + Socket + Kafka mock
+  - [ ] Load test: 500 CCU, 200 msg/s (Artillery/K6)
+- [ ] C4: Documentation & Observability (~7-10h)
+  - [ ] Swagger/OpenAPI auto-gen từ Zod schemas
+  - [ ] Deep health check `/health/ready` (MongoDB/Redis/Kafka/Neon/Gemini)
+  - [ ] Brand cleanup: đổi "Zalo Clone" → "ZYNC Dev Community" toàn hệ thống
+  - [ ] Prometheus metrics + Grafana dashboard
+
+### Master Plan: Tổng tiến độ (Cập nhật 27/04/2026)
+- [x] Phase R1: UX Redesign (Web & Mobile) ✅
+- [x] Phase R2: Mobile App Parity ✅
+- [x] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC) ✅ <!-- done: 26/04/2026 -->
+- [x] Phase R4: Pivot Branding (Zalo Clone → Zync Community) ✅
+- [x] Phase N1: Community Posts (Web) ✅
+- [x] Phase N3: Explore & Discovery (Web) ✅
+- [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳
+- [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳
+- [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳
 - [ ] Phase R7: Triển khai Production
 
 ---
