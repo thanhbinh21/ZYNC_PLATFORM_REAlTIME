@@ -11,7 +11,23 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  ArrowLeft,
+  CheckCheck,
+  ChevronRight,
+  HelpCircle,
+  Info,
+  KeyRound,
+  LogOut,
+  MessageCircle,
+  Moon,
+  Radio,
+  ShieldCheck,
+  User,
+  Users,
+  Volume2,
+  Zap,
+} from 'lucide-react-native';
 import { lightTheme } from '../src/theme/colors';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
@@ -59,19 +75,19 @@ export default function SettingsScreen() {
   // Muc cau hinh tai khoan
   const accountItems = [
     {
-      icon: 'person-outline' as const,
+      Icon: User,
       label: 'Chỉnh sửa hồ sơ',
       color: lightTheme.accent,
     },
     {
-      icon: 'key-outline' as const,
+      Icon: KeyRound,
       label: 'Đổi mật khẩu',
-      color: '#3b82f6',
+      color: lightTheme.info,
     },
     {
-      icon: 'shield-checkmark-outline' as const,
+      Icon: ShieldCheck,
       label: 'Bảo mật 2 bước',
-      color: '#f59e0b',
+      color: lightTheme.warning,
     },
   ];
 
@@ -80,7 +96,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={lightTheme.textPrimary} />
+          <ArrowLeft size={22} stroke={lightTheme.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Cài đặt</Text>
         <View style={{ width: 36 }} />
@@ -101,10 +117,10 @@ export default function SettingsScreen() {
                 style={[styles.menuItem, idx < accountItems.length - 1 && styles.menuItemBorder]}
               >
                 <View style={[styles.menuIconBox, { backgroundColor: `${item.color}15` }]}>
-                  <Ionicons name={item.icon} size={20} color={item.color} />
+                  <item.Icon size={20} stroke={item.color} />
                 </View>
                 <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={18} color={lightTheme.textTertiary} />
+                <ChevronRight size={18} stroke={lightTheme.textTertiary} />
               </TouchableOpacity>
             ))}
           </View>
@@ -116,14 +132,14 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.switchRow}>
               <View style={styles.switchInfo}>
-                <Ionicons name="moon-outline" size={20} color="#8b5cf6" />
+                <Moon size={20} stroke={lightTheme.violet} />
                 <Text style={styles.switchLabel}>Chế độ tối</Text>
               </View>
               <Switch
                 value={isDarkMode}
                 onValueChange={setIsDarkMode}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
           </View>
@@ -135,50 +151,50 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={[styles.switchRow, styles.menuItemBorder]}>
               <View style={styles.switchInfo}>
-                <Ionicons name="chatbubble-outline" size={20} color={lightTheme.accent} />
+                <MessageCircle size={20} stroke={lightTheme.accent} />
                 <Text style={styles.switchLabel}>Tin nhắn</Text>
               </View>
               <Switch
                 value={notifyMessages}
                 onValueChange={setNotifyMessages}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
             <View style={[styles.switchRow, styles.menuItemBorder]}>
               <View style={styles.switchInfo}>
-                <Ionicons name="people-outline" size={20} color="#3b82f6" />
+                <Users size={20} stroke={lightTheme.info} />
                 <Text style={styles.switchLabel}>Lời mời kết bạn</Text>
               </View>
               <Switch
                 value={notifyFriends}
                 onValueChange={setNotifyFriends}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
             <View style={[styles.switchRow, styles.menuItemBorder]}>
               <View style={styles.switchInfo}>
-                <Ionicons name="flash-outline" size={20} color="#f59e0b" />
+                <Zap size={20} stroke={lightTheme.warning} />
                 <Text style={styles.switchLabel}>Khoảnh khắc</Text>
               </View>
               <Switch
                 value={notifyStories}
                 onValueChange={setNotifyStories}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
             <View style={styles.switchRow}>
               <View style={styles.switchInfo}>
-                <Ionicons name="volume-high-outline" size={20} color="#ec4899" />
+                <Volume2 size={20} stroke={lightTheme.pink} />
                 <Text style={styles.switchLabel}>Âm thanh</Text>
               </View>
               <Switch
                 value={notifySounds}
                 onValueChange={setNotifySounds}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
           </View>
@@ -190,26 +206,26 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={[styles.switchRow, styles.menuItemBorder]}>
               <View style={styles.switchInfo}>
-                <Ionicons name="radio-button-on-outline" size={20} color={lightTheme.accent} />
+                <Radio size={20} stroke={lightTheme.accent} />
                 <Text style={styles.switchLabel}>Trạng thái online</Text>
               </View>
               <Switch
                 value={showOnlineStatus}
                 onValueChange={setShowOnlineStatus}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
             <View style={styles.switchRow}>
               <View style={styles.switchInfo}>
-                <Ionicons name="checkmark-done-outline" size={20} color="#3b82f6" />
+                <CheckCheck size={20} stroke={lightTheme.info} />
                 <Text style={styles.switchLabel}>Xác nhận đã đọc</Text>
               </View>
               <Switch
                 value={showReadReceipts}
                 onValueChange={setShowReadReceipts}
                 trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                thumbColor={lightTheme.textOnAccent}
               />
             </View>
           </View>
@@ -220,15 +236,15 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Thông tin</Text>
           <View style={styles.card}>
             <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
-              <View style={[styles.menuIconBox, { backgroundColor: '#06b6d415' }]}>
-                <Ionicons name="help-circle-outline" size={20} color="#06b6d4" />
+              <View style={[styles.menuIconBox, { backgroundColor: `${lightTheme.info}15` }]}>
+                <HelpCircle size={20} stroke={lightTheme.info} />
               </View>
               <Text style={styles.menuLabel}>Trợ giúp & Phản hồi</Text>
-              <Ionicons name="chevron-forward" size={18} color={lightTheme.textTertiary} />
+              <ChevronRight size={18} stroke={lightTheme.textTertiary} />
             </TouchableOpacity>
             <View style={styles.menuItem}>
-              <View style={[styles.menuIconBox, { backgroundColor: '#64748b15' }]}>
-                <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+              <View style={[styles.menuIconBox, { backgroundColor: `${lightTheme.neutral}15` }]}>
+                <Info size={20} stroke={lightTheme.neutral} />
               </View>
               <Text style={styles.menuLabel}>Phiên bản</Text>
               <Text style={styles.versionText}>1.0.0</Text>
@@ -238,7 +254,7 @@ export default function SettingsScreen() {
 
         {/* Dang xuat */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+          <LogOut size={20} stroke={lightTheme.danger} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -346,13 +362,13 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 30,
     paddingVertical: 14,
-    backgroundColor: '#fef2f215',
+    backgroundColor: lightTheme.dangerSoft,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#fca5a520',
+    borderColor: lightTheme.dangerBorder,
   },
   logoutText: {
-    color: '#ef4444',
+    color: lightTheme.danger,
     fontSize: 15,
     fontWeight: '600',
     fontFamily: 'BeVietnamPro_600SemiBold',

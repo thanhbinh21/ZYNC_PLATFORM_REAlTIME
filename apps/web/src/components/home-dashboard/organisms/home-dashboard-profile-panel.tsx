@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
 import type { DashboardIconName } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
 import { updateMyProfile, fetchFriendsCount, type MeUser } from '@/services/users';
@@ -115,9 +116,9 @@ export function HomeDashboardProfilePanel({
   // ─── Error state ─────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <section className="rounded-2xl border border-red-300 bg-red-50 p-5 text-red-800">
+      <section className="rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-5 text-[var(--danger-text)]">
         <p className="font-ui-title text-lg">Không tải được trang cá nhân</p>
-        <p className="mt-2 font-ui-content text-sm text-[#FCA5A5]">{error}</p>
+        <p className="mt-2 font-ui-content text-sm text-[var(--danger-text)]">{error}</p>
       </section>
     );
   }
@@ -401,7 +402,7 @@ export function HomeDashboardProfilePanel({
             </label>
           </div>
 
-          {saveError && <p className="mt-3 text-sm text-[#FCA5A5]">{saveError}</p>}
+          {saveError && <p className="mt-3 text-sm text-[var(--danger-text)]">{saveError}</p>}
 
           <div className="mt-4 flex items-center justify-end gap-3">
             <button
@@ -461,7 +462,7 @@ export function HomeDashboardProfilePanel({
               <div className="mt-4 space-y-3">
                 {personalInfoItems.map(({ label, value, icon }) => (
                   <div key={label} className="flex items-center gap-3 rounded-2xl bg-[var(--bg-hover)] p-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#0f3a2e]">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15">
                       <DashboardIcon name={icon} className="h-4 w-4 text-[var(--accent)]" />
                     </div>
                     <div>
@@ -510,8 +511,8 @@ export function HomeDashboardProfilePanel({
                       background: (profile.trustScore ?? 100) >= 70
                         ? 'linear-gradient(90deg, var(--accent), var(--accent))'
                         : (profile.trustScore ?? 100) >= 40
-                        ? '#f59e0b'
-                        : '#ef4444',
+                        ? 'var(--warning-strong)'
+                        : 'var(--danger-text)',
                     }}
                   />
                 </div>
@@ -524,8 +525,8 @@ export function HomeDashboardProfilePanel({
                   (profile.globalViolationCount ?? 0) === 0
                     ? 'text-[var(--accent)]'
                     : (profile.globalViolationCount ?? 0) < 3
-                    ? 'text-yellow-400'
-                    : 'text-red-400'
+                    ? 'text-[var(--warning-strong)]'
+                    : 'text-[var(--danger-text)]'
                 }`}>
                   {profile.globalViolationCount ?? 0}
                 </span>
@@ -533,12 +534,14 @@ export function HomeDashboardProfilePanel({
 
               {/* Warning */}
               {(profile.globalViolationCount ?? 0) >= 3 && (
-                <div className="mt-3 rounded-2xl border border-red-800/50 bg-red-900/20 px-3 py-2">
-                  <p className="font-ui-content text-xs text-red-300">
-                    ⚠️ Tài khoản có nguy cơ bị hạn chế do nhiều lần vi phạm. Hãy tuân thủ cộng đồng.
+                <div className="mt-3 rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2">
+                  <p className="font-ui-content flex items-center gap-1 text-xs text-[var(--danger-text)]">
+                    <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                    <span>Tài khoản có nguy cơ bị hạn chế do nhiều lần vi phạm. Hãy tuân thủ cộng đồng.</span>
                   </p>
                 </div>
               )}
+                      {saveError && <p className="mt-3 text-sm text-[var(--danger-text)]">{saveError}</p>}
             </section>
           </div>
 
@@ -681,7 +684,10 @@ export function HomeDashboardProfilePanel({
                     <p className="font-ui-title truncate text-sm text-[var(--text-primary)]">{group.displayName}</p>
                     <p className="font-ui-content text-xs text-[var(--text-secondary)]">{group.stories.length} story</p>
                   </div>
-                  <span className="font-ui-content text-xs text-[var(--accent)]">Xem →</span>
+                  <span className="font-ui-content inline-flex items-center gap-1 text-xs text-[var(--accent)]">
+                    Xem
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                  </span>
                 </button>
               ))}
             </div>

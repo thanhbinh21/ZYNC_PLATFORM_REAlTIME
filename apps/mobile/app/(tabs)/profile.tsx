@@ -10,7 +10,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Bell,
+  ChevronRight,
+  HelpCircle,
+  Lock,
+  LogOut,
+  Palette,
+  Settings,
+  ShieldCheck,
+} from 'lucide-react-native';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { socketService } from '../../src/services/socket';
 import api from '../../src/services/api';
@@ -77,11 +86,11 @@ export default function ProfileScreen() {
   };
 
   const menuOptions = [
-    { title: 'Tài khoản và Bảo mật', icon: 'shield-checkmark-outline', color: '#10b981' },
-    { title: 'Quyền riêng tư', icon: 'lock-closed-outline', color: '#3b82f6' },
-    { title: 'Thông báo', icon: 'notifications-outline', color: '#f59e0b' },
-    { title: 'Giao diện và Ngôn ngữ', icon: 'color-palette-outline', color: '#8b5cf6' },
-    { title: 'Trợ giúp & Phản hồi', icon: 'help-circle-outline', color: '#ec4899' },
+    { title: 'Tài khoản và Bảo mật', Icon: ShieldCheck, color: colors.success },
+    { title: 'Quyền riêng tư', Icon: Lock, color: colors.info },
+    { title: 'Thông báo', Icon: Bell, color: colors.warning },
+    { title: 'Giao diện và Ngôn ngữ', Icon: Palette, color: colors.violet },
+    { title: 'Trợ giúp & Phản hồi', Icon: HelpCircle, color: colors.pink },
   ];
 
   return (
@@ -108,7 +117,7 @@ export default function ProfileScreen() {
               <Text style={styles.editProfileText}>Chỉnh sửa hồ sơ</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
-              <Ionicons name="settings-outline" size={20} color="#fff" />
+              <Settings size={20} stroke={colors.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -136,17 +145,17 @@ export default function ProfileScreen() {
           {menuOptions.map((item, index) => (
             <TouchableOpacity key={index} style={styles.menuItem}>
               <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
-                <Ionicons name={item.icon as any} size={22} color={item.color} />
+                <item.Icon size={22} stroke={item.color} />
               </View>
               <Text style={styles.menuText}>{item.title}</Text>
-              <Ionicons name="chevron-forward" size={18} color="#475569" />
+              <ChevronRight size={18} stroke={colors.textSubtle} />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={22} color="#ef4444" style={{ marginRight: 10 }} />
+          <LogOut size={22} stroke={colors.error} style={{ marginRight: 10 }} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
 
@@ -176,31 +185,31 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 35,
-    backgroundColor: '#334155',
+    backgroundColor: colors.glassStrong,
     borderWidth: 3,
-    borderColor: '#10b981',
+    borderColor: colors.success,
     marginBottom: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#10b981',
+    color: colors.success,
     fontSize: 36,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   userName: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 22,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   userHandle: {
-    color: '#86efac',
+    color: colors.accentSoft,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_500Medium',
     marginTop: 4,
   },
   userEmail: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 5,
@@ -211,14 +220,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editProfileBtn: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
     paddingHorizontal: 25,
     paddingVertical: 10,
     borderRadius: 12,
     marginRight: 10,
   },
   editProfileText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
@@ -254,19 +263,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNumber: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 18,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   statLabel: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 2,
   },
   dividerVertical: {
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.divider,
     height: '60%',
     alignSelf: 'center',
   },
@@ -296,7 +305,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   menuText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_500Medium',
     flex: 1,
@@ -308,13 +317,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 30,
     paddingVertical: 15,
-    backgroundColor: 'rgba(127, 29, 29, 0.32)',
+    backgroundColor: colors.dangerSoft,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.36)',
+    borderColor: colors.dangerBorder,
   },
   logoutText: {
-    color: '#ef4444',
+    color: colors.error,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },

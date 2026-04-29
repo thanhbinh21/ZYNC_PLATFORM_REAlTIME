@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MessageCircle, UserPlus } from 'lucide-react-native';
 import { lightTheme } from '../theme/colors';
 import api from '../services/api';
 
@@ -145,7 +145,7 @@ export function ProfileBottomSheet({
                       onClose();
                     }}
                   >
-                    <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+                    <MessageCircle size={18} stroke={lightTheme.textOnAccent} />
                     <Text style={styles.primaryBtnText}>Nhắn tin</Text>
                   </TouchableOpacity>
 
@@ -159,11 +159,7 @@ export function ProfileBottomSheet({
                         <ActivityIndicator size="small" color={lightTheme.accent} />
                       ) : (
                         <>
-                          <Ionicons
-                            name="person-add-outline"
-                            size={18}
-                            color={lightTheme.accent}
-                          />
+                          <UserPlus size={18} stroke={lightTheme.accent} />
                           <Text style={styles.secondaryBtnText}>Kết bạn</Text>
                         </>
                       )}
@@ -286,7 +282,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   primaryBtnText: {
-    color: '#fff',
+    color: lightTheme.textOnAccent,
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'BeVietnamPro_600SemiBold',
