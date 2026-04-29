@@ -27,13 +27,13 @@ const TYPE_ICONS: Record<Notification['type'], string> = {
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'vua xong';
+  if (seconds < 60) return 'vừa xong';
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} phut truoc`;
+  if (minutes < 60) return `${minutes} phút trước`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} gio truoc`;
+  if (hours < 24) return `${hours} giờ trước`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ngay truoc`;
+  if (days < 7) return `${days} ngày trước`;
   return new Date(dateStr).toLocaleDateString('vi-VN');
 }
 
@@ -82,26 +82,26 @@ export function NotificationPanel({
       className="absolute right-0 top-[calc(100%+10px)] z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[1.6rem] zync-soft-glass"
       style={{ animation: 'panelSlide 0.2s ease-out' }}
       role="dialog"
-      aria-label="Danh sach thong bao"
+      aria-label="Danh sách thông báo"
     >
       <div className="flex items-center justify-between border-b border-border-light px-4 py-3">
         <div>
-          <h3 className="font-ui-title text-base text-text-primary">Thong bao</h3>
-          <p className="font-ui-content text-xs text-text-tertiary">{unreadCount} muc chua doc</p>
+          <h3 className="font-ui-title text-base text-text-primary">Thông báo</h3>
+          <p className="font-ui-content text-xs text-text-tertiary">{unreadCount} mục chưa đọc</p>
         </div>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button type="button" onClick={onMarkAllRead} className="zync-soft-button-ghost px-2.5 py-1 text-xs">
-              Doc het
+              Đọc hết
             </button>
           )}
-          <button type="button" onClick={onOpenSettings} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Cai dat thong bao">
+          <button type="button" onClick={onOpenSettings} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Cài đặt thông báo">
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
               <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
               <path d="M12 4.5v2.1M12 17.4v2.1M4.5 12h2.1M17.4 12h2.1M6.8 6.8l1.5 1.5M15.7 15.7l1.5 1.5M17.2 6.8l-1.5 1.5M8.3 15.7l-1.5 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
-          <button type="button" onClick={onClose} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Dong">
+          <button type="button" onClick={onClose} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Đóng">
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
             </svg>
@@ -113,7 +113,7 @@ export function NotificationPanel({
         {notifications.length === 0 && !isLoading && (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <span className="zync-soft-badge">Inbox zero</span>
-            <p className="font-ui-content text-sm text-text-secondary">Khong co thong bao nao</p>
+            <p className="font-ui-content text-sm text-text-secondary">Không có thông báo nào</p>
           </div>
         )}
 

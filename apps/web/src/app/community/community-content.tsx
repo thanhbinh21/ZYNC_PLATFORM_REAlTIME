@@ -48,7 +48,7 @@ const POST_TYPE_CONFIG: Record<PostType, PostTypeConfig> = {
 
 const FEED_TABS: { id: string; label: string; Icon: React.ElementType }[] = [
   { id: 'feed', label: 'Mới nhất', Icon: MessageSquare },
-  { id: 'trending', label: 'Trending', Icon: TrendingUp },
+  { id: 'trending', label: 'Thịnh hành', Icon: TrendingUp },
   { id: 'question', label: 'Câu hỏi', Icon: HelpCircle },
   { id: 'til', label: 'TIL', Icon: Lightbulb },
 ];
@@ -377,12 +377,12 @@ export default function CommunityContent() {
           <div className="mb-4">
             <h3 className="font-ui-title flex items-center gap-2 text-base text-text-primary">
               <TrendingUp className="h-4 w-4 text-accent" />
-              Trending hôm nay
+              Bài viết thịnh hành hôm nay
             </h3>
           </div>
           {trendingPosts.length === 0 ? (
             <div className="zync-soft-card-muted rounded-[1.4rem] p-4 text-center">
-              <p className="text-sm text-text-tertiary">Chưa có dữ liệu trending</p>
+              <p className="text-sm text-text-tertiary">Chưa có dữ liệu thịnh hành</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -406,7 +406,7 @@ export default function CommunityContent() {
           <div className="mt-6">
             <h3 className="font-ui-title mb-3 flex items-center gap-2 text-base text-text-primary">
               <Tag className="h-4 w-4 text-accent" />
-              Tags phổ biến
+              Thẻ phổ biến
             </h3>
             <div className="flex flex-wrap gap-1.5">
               {POPULAR_TAGS.map((tag) => (

@@ -75,7 +75,7 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
             <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <h3 className="font-ui-title text-sm text-text-primary">Cai dat thong bao</h3>
+        <h3 className="font-ui-title text-sm text-text-primary">Cài đặt thông báo</h3>
         <div className="w-8" />
       </div>
 
@@ -83,24 +83,24 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
         <Toggle
           checked={preferences.enablePush}
           onChange={(value) => onUpdate({ enablePush: value })}
-          label="Push notification"
+          label="Thông báo đẩy"
         />
         <Toggle
           checked={preferences.enableSound}
           onChange={(value) => onUpdate({ enableSound: value })}
-          label="Am thanh thong bao"
+          label="Âm thanh thông báo"
         />
         <Toggle
           checked={preferences.enableBadge}
           onChange={(value) => onUpdate({ enableBadge: value })}
-          label="Hien thi badge dem"
+          label="Hiển thị badge đếm"
         />
       </div>
 
       {preferences.mutedConversations.length > 0 && (
         <div className="border-t border-border-light px-4 py-3">
           <p className="font-ui-content text-xs text-text-secondary">
-            {preferences.mutedConversations.length} cuoc tro chuyen dang tat tieng
+            {preferences.mutedConversations.length} cuộc trò chuyện đang tắt tiếng
           </p>
         </div>
       )}

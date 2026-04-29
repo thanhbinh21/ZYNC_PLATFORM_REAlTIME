@@ -19,7 +19,7 @@ import {
   Heart,
   MessageSquare,
   Eye,
-  Github,
+  Link2,
 } from 'lucide-react';
 import {
   fetchExploreChannels,
@@ -137,7 +137,7 @@ function UserCard({ user }: { user: DiscoverUser }) {
         {user.githubUrl && (
           <a href={user.githubUrl} target="_blank" rel="noopener noreferrer"
             className="zync-soft-button-ghost flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs">
-            <Github className="h-3.5 w-3.5" />
+            <Link2 className="h-3.5 w-3.5" />
             GitHub
           </a>
         )}
@@ -180,9 +180,9 @@ function TrendingPostRow({ post, rank }: { post: Post; rank: number }) {
 }
 
 const SECTION_TABS = [
-  { id: 'channels' as const, label: 'Channels', Icon: FolderOpen },
-  { id: 'developers' as const, label: 'Developers', Icon: Users },
-  { id: 'posts' as const, label: 'Trending', Icon: TrendingUp },
+  { id: 'channels' as const, label: 'Kênh', Icon: FolderOpen },
+  { id: 'developers' as const, label: 'Nhà phát triển', Icon: Users },
+  { id: 'posts' as const, label: 'Thịnh hành', Icon: TrendingUp },
 ];
 
 const POPULAR_TAGS = ['react', 'nodejs', 'typescript', 'python', 'devops', 'ai-ml', 'docker', 'nextjs', 'rust', 'golang'];
@@ -246,7 +246,7 @@ export default function ExploreContent() {
               <Search className="h-5 w-5 text-accent" />
               Khám phá
             </h2>
-            <p className="font-ui-content mt-0.5 text-xs text-text-tertiary">Tìm channels, developers và bài viết nổi bật</p>
+            <p className="font-ui-content mt-0.5 text-xs text-text-tertiary">Tìm kênh, nhà phát triển và bài viết nổi bật</p>
           </div>
         </div>
 
@@ -255,7 +255,7 @@ export default function ExploreContent() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm channels, users, bài viết..."
+            placeholder="Tìm kênh, người dùng, bài viết..."
             className="zync-soft-input pl-9"
           />
         </div>
@@ -296,9 +296,9 @@ export default function ExploreContent() {
           filteredChannels.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <FolderOpen className="h-12 w-12 text-text-tertiary" />
-              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có channel công khai</p>
+              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có kênh công khai</p>
               <p className="font-ui-content mt-1.5 text-sm text-text-secondary">
-                {search ? 'Không tìm thấy channel phù hợp' : 'Hãy tạo channel đầu tiên!'}
+                {search ? 'Không tìm thấy kênh phù hợp' : 'Hãy tạo kênh đầu tiên!'}
               </p>
             </div>
           ) : (
@@ -317,7 +317,7 @@ export default function ExploreContent() {
           filteredUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Users className="h-12 w-12 text-text-tertiary" />
-              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có developer nổi bật</p>
+              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có nhà phát triển nổi bật</p>
               <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy hoàn thiện hồ sơ của bạn để xuất hiện ở đây!</p>
             </div>
           ) : (
@@ -329,8 +329,8 @@ export default function ExploreContent() {
           filteredPosts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <TrendingUp className="h-12 w-12 text-text-tertiary" />
-              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có bài viết trending</p>
-              <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy chia sẻ bài viết đầu tiên trong Cộng đồng!</p>
+              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có bài viết thịnh hành</p>
+              <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy chia sẻ bài viết đầu tiên trong cộng đồng!</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -345,7 +345,7 @@ export default function ExploreContent() {
         <div className="border-t border-border-light px-4 py-3 sm:px-6">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
             <Tag className="h-3 w-3" />
-            Tags phổ biến
+            Thẻ phổ biến
           </p>
           <div className="flex flex-wrap gap-1.5">
             {POPULAR_TAGS.map((tag) => (
