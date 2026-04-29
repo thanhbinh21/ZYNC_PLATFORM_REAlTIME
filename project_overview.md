@@ -244,6 +244,7 @@ npm run dev:web
 - [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
 - [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
 - [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
+- [x] Chuẩn hóa UI tab Dashboard Web (Tổng quan/Trò chuyện/Bạn bè/Cộng đồng/Khám phá) full-width và đồng bộ tiếng Việt có dấu <!-- done: 29/04/2026 -->
 - [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
 - [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
 - [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI

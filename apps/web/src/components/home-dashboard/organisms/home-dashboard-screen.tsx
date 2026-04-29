@@ -77,7 +77,7 @@ export function HomeDashboardScreen({
               </span>
               <div className="hidden sm:block">
                 <p className="font-ui-brand text-xl leading-none text-text-primary">{data.brand}</p>
-                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">Developer Community</p>
+                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">Cộng đồng nhà phát triển</p>
               </div>
             </div>
 
@@ -242,35 +242,35 @@ export function HomeDashboardScreen({
 
           <div className={`flex-1 ${isFullHeight ? 'overflow-hidden px-2 py-2 sm:px-4 sm:py-4' : 'overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6'}`}>
             {selectedNavId === 'chat' ? (
-              <div className="flex h-full w-full justify-center">
-                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="h-full w-full overflow-hidden">
                   {chatSlot}
                 </div>
               </div>
             ) : selectedNavId === 'settings' ? (
-              <div>{settingsSlot}</div>
+              <div className="h-full w-full">{settingsSlot}</div>
             ) : selectedNavId === 'profile' ? (
-              <div>{profileSlot}</div>
+              <div className="h-full w-full">{profileSlot}</div>
             ) : selectedNavId === 'friends' ? (
-              <div className="flex h-full w-full justify-center">
-                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="h-full w-full overflow-hidden">
                   {friendsSlot}
                 </div>
               </div>
             ) : selectedNavId === 'community' ? (
-              <div className="flex h-full w-full justify-center">
-                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="h-full w-full overflow-hidden">
                   {communitySlot}
                 </div>
               </div>
             ) : selectedNavId === 'explore' ? (
-              <div className="flex h-full w-full justify-center">
-                <div className="flex h-full w-full max-w-[1440px] overflow-hidden">
+              <div className="flex h-full w-full overflow-hidden">
+                <div className="h-full w-full overflow-hidden">
                   {exploreSlot}
                 </div>
               </div>
             ) : (
-              <div className="mx-auto max-w-6xl">
+              <div className="w-full">
                 <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">
                   {storySlot ?? (
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">

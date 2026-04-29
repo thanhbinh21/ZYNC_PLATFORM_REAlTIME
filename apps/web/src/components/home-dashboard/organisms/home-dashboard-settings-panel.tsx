@@ -72,7 +72,7 @@ export function HomeDashboardSettingsPanel({
       soundEnabled,
       readReceipts,
     ].filter(Boolean).length;
-    return `${enabled}/6 tuy chon dang bat`;
+    return `${enabled}/6 tùy chọn đang bật`;
   }, [
     allowFriendRequests,
     desktopNotifications,
@@ -85,36 +85,36 @@ export function HomeDashboardSettingsPanel({
   return (
     <section className="mt-5 space-y-5">
       <header className="zync-soft-card rounded-[1.8rem] px-5 py-5">
-        <p className="font-ui-meta text-xs uppercase tracking-wider text-accent-strong">Control center</p>
-        <h2 className="font-ui-title mt-2 text-2xl text-text-primary">Cai dat tai khoan</h2>
-        <p className="font-ui-content mt-2 max-w-2xl text-sm leading-7 text-text-secondary">
-          Dong bo theme, readability va cac toggle quan trong theo mot bo token chung cho light va dark mode.
+        <p className="font-ui-meta text-xs uppercase tracking-wider text-accent-strong">Trung tâm điều khiển</p>
+        <h2 className="font-ui-title mt-2 text-2xl text-text-primary">Cài đặt tài khoản</h2>
+          <p className="font-ui-content mt-2 max-w-2xl text-sm leading-7 text-text-secondary">
+          Đồng bộ theme, độ dễ đọc và các toggle quan trọng theo một bộ token chung cho light và dark mode.
         </p>
         <p className="font-ui-title mt-4 text-sm text-text-primary">{summary}</p>
       </header>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="zync-soft-card rounded-[1.8rem] p-4 sm:p-5">
-          <h3 className="font-ui-title text-lg text-text-primary">Quyen rieng tu</h3>
+          <h3 className="font-ui-title text-lg text-text-primary">Quyền riêng tư</h3>
 
           <div className="mt-4 space-y-3">
             <SettingSwitch
-              label="Hien thi trang thai hoat dong"
-              description="Cho phep ban be nhin thay khi ban dang online."
+              label="Hiển thị trạng thái hoạt động"
+              description="Cho phép bạn bè nhìn thấy khi bạn đang online."
               checked={showOnlineStatus}
               onChange={setShowOnlineStatus}
             />
 
             <SettingSwitch
-              label="Cho phep nhan loi moi ket ban"
-              description="Nguoi dung khac co the gui loi moi ket ban den ban."
+              label="Cho phép nhận lời mời kết bạn"
+              description="Người dùng khác có thể gửi lời mời kết bạn đến bạn."
               checked={allowFriendRequests}
               onChange={setAllowFriendRequests}
             />
 
             <SettingSwitch
-              label="Hien thi da xem"
-              description="Cho phep nguoi khac thay ban da doc tin nhan cua ho."
+              label="Hiển thị đã xem"
+              description="Cho phép người khác thấy bạn đã đọc tin nhắn của họ."
               checked={readReceipts}
               onChange={setReadReceipts}
             />
@@ -122,26 +122,26 @@ export function HomeDashboardSettingsPanel({
         </section>
 
         <section className="zync-soft-card rounded-[1.8rem] p-4 sm:p-5">
-          <h3 className="font-ui-title text-lg text-text-primary">Thong bao</h3>
+          <h3 className="font-ui-title text-lg text-text-primary">Thông báo</h3>
 
           <div className="mt-4 space-y-3">
             <SettingSwitch
-              label="Thong bao tren desktop"
-              description="Hien thi popup thong bao cho tin nhan moi tren trinh duyet."
+              label="Thông báo trên desktop"
+              description="Hiển thị popup thông báo cho tin nhắn mới trên trình duyệt."
               checked={desktopNotifications}
               onChange={setDesktopNotifications}
             />
 
             <SettingSwitch
-              label="Thong bao qua email"
-              description="Nhan email tong hop hoat dong quan trong moi ngay."
+              label="Thông báo qua email"
+              description="Nhận email tổng hợp hoạt động quan trọng mỗi ngày."
               checked={emailNotifications}
               onChange={setEmailNotifications}
             />
 
             <SettingSwitch
-              label="Am thanh tin nhan"
-              description="Phat am thanh khi co tin nhan moi hoac nhac nho."
+              label="Âm thanh tin nhắn"
+              description="Phát âm thanh khi có tin nhắn mới hoặc nhắc nhở."
               checked={soundEnabled}
               onChange={setSoundEnabled}
             />
@@ -150,15 +150,15 @@ export function HomeDashboardSettingsPanel({
       </div>
 
       <section className="zync-soft-card rounded-[1.8rem] p-4 sm:p-5">
-        <h3 className="font-ui-title text-lg text-text-primary">Giao dien hien thi</h3>
+        <h3 className="font-ui-title text-lg text-text-primary">Giao diện hiển thị</h3>
 
         <div className="mt-5 grid gap-6 lg:grid-cols-2">
           <div>
-            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-text-secondary">Theme mode</p>
+            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-text-secondary">Chế độ giao diện</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {[
-                { id: 'light', label: 'Light mode' },
-                { id: 'dark', label: 'Dark mode' },
+                { id: 'light', label: 'Sáng' },
+                { id: 'dark', label: 'Tối' },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -173,12 +173,12 @@ export function HomeDashboardSettingsPanel({
           </div>
 
           <div>
-            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-text-secondary">Co chu tin nhan</p>
+            <p className="font-ui-meta text-[0.68rem] uppercase tracking-[0.12em] text-text-secondary">Cỡ chữ tin nhắn</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {[
-                { id: 'small', label: 'Nho' },
-                { id: 'medium', label: 'Vua' },
-                { id: 'large', label: 'Lon' },
+                { id: 'small', label: 'Nhỏ' },
+                { id: 'medium', label: 'Vừa' },
+                { id: 'large', label: 'Lớn' },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -201,7 +201,7 @@ export function HomeDashboardSettingsPanel({
             }}
             className="zync-soft-button-ghost px-4 py-2.5 text-sm"
           >
-            Khoi phuc mac dinh
+            Khôi phục mặc định
           </button>
           <button
             type="button"
@@ -210,7 +210,7 @@ export function HomeDashboardSettingsPanel({
             }}
             className="zync-soft-button px-4 py-2.5 text-sm"
           >
-            Luu thay doi
+            Lưu thay đổi
           </button>
         </div>
       </section>

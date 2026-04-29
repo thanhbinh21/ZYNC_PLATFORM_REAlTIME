@@ -128,16 +128,16 @@ function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string
   return message.content && message.content.trim().length > 0
     ? message.content
     : message.type === 'image'
-      ? 'Da gui anh'
+      ? 'Đã gửi ảnh'
       : message.type === 'video'
-        ? 'Da gui video'
+        ? 'Đã gửi video'
         : message.type?.startsWith('file/')
-          ? 'Da gui tep dinh kem'
+          ? 'Đã gửi tệp đính kèm'
           : message.type === 'audio'
-            ? 'Da gui am thanh'
+            ? 'Đã gửi âm thanh'
             : message.type === 'sticker'
               ? 'Da gui sticker'
-              : 'Tin nhan media';
+              : 'Tin nhắn media';
 }
 
 function formatConversationPreview(lastMessage?: Conversation['lastMessage']): string {
@@ -154,7 +154,7 @@ function formatConversationPreview(lastMessage?: Conversation['lastMessage']): s
 }
 
 const REACTION_ACK_TIMEOUT_MS = 8000;
-const WEBRTC_INSECURE_CONTEXT_MESSAGE = 'Khong the chia se camera/man hinh va dong bo WebRTC khi truy cap bang HTTP LAN. Vui long dung https:// hoac localhost.';
+const WEBRTC_INSECURE_CONTEXT_MESSAGE = 'Không thể chia sẻ camera/màn hình và đồng bộ WebRTC khi truy cập bằng HTTP LAN. Vui lòng dùng https:// hoặc localhost.';
 const LAN_DEMO_WARN_ENABLED = process.env['NEXT_PUBLIC_LAN_DEMO_WARN'] === 'true';
 
 function getWebRtcInsecureContextMessage(): string | null {
@@ -1126,7 +1126,7 @@ export function useHomeDashboard() {
             const sender = conv.users?.find((u: any) => u._id === conv.lastMessage?.senderId);
 
             let title = sender?.displayName || 'Người dùng';
-            let messageStr = conv.lastMessage.content || 'Tin nhan media';
+            let messageStr = conv.lastMessage.content || 'Tin nhắn media';
 
             if (conv.type === 'group') {
               title = conv.name || 'Nhóm';
@@ -1917,7 +1917,7 @@ export function useHomeDashboard() {
             }));
           })
           .catch((error: unknown) => {
-            setCallError(resolveCallMediaErrorMessage(error, 'Khong the truy cap camera hoac microphone.'));
+            setCallError(resolveCallMediaErrorMessage(error, 'Không thể truy cập camera hoặc microphone.'));
           });
       }
 
@@ -2226,7 +2226,7 @@ export function useHomeDashboard() {
     } catch (error: unknown) {
       const message = resolveCallMediaErrorMessage(
         error,
-        'Khong the bat dau cuoc goi. Vui long kiem tra camera va microphone.',
+        'Không thể bắt đầu cuộc gọi. Vui lòng kiểm tra camera và microphone.',
       );
       if (message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
         notifyCallBlockingIssue(message);
@@ -2302,7 +2302,7 @@ export function useHomeDashboard() {
         };
       });
     } catch (error: unknown) {
-      const message = resolveCallMediaErrorMessage(error, 'Khong the chap nhan cuoc goi. Vui long thu lai.');
+      const message = resolveCallMediaErrorMessage(error, 'Không thể chấp nhận cuộc gọi. Vui lòng thử lại.');
       if (message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
         notifyCallBlockingIssue(message);
       } else {
@@ -2408,7 +2408,7 @@ export function useHomeDashboard() {
     }
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
-      setCallError('Khong the chia se man hinh tren trinh duyet hien tai.');
+      setCallError('Không thể chia sẻ màn hình trên trình duyệt hiện tại.');
       return;
     }
 
@@ -2435,11 +2435,11 @@ export function useHomeDashboard() {
 
       displayTrack.onended = () => {
         void ensureLocalMedia(isCameraEnabled).catch((error: unknown) => {
-          setCallError(resolveCallMediaErrorMessage(error, 'Khong the quay lai camera sau khi dung chia se man hinh.'));
+          setCallError(resolveCallMediaErrorMessage(error, 'Không thể quay lại camera sau khi dừng chia sẻ màn hình.'));
         });
       };
     } catch (error: unknown) {
-      const message = resolveCallMediaErrorMessage(error, 'Khong the bat chia se man hinh.');
+      const message = resolveCallMediaErrorMessage(error, 'Không thể bật chia sẻ màn hình.');
       if (message === WEBRTC_INSECURE_CONTEXT_MESSAGE) {
         notifyCallBlockingIssue(message);
       } else {
