@@ -1,6 +1,7 @@
 'use client';
 
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
@@ -762,7 +763,7 @@ function ChatPanel({
               </span>
             )}
             {isOnline && (
-              <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-[#33e2b3]" />
+              <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-accent" />
             )}
           </button>
           <div>
@@ -2179,7 +2180,9 @@ export function HomeDashboardChatPanel({
                               {media.type === 'image' ? (
                                 <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                               ) : (
-                                <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">▶</div>
+                                <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">
+                                  <Play className="h-3.5 w-3.5" aria-hidden />
+                                </div>
                               )}
                             </a>
                           ))
@@ -2263,7 +2266,9 @@ export function HomeDashboardChatPanel({
                               {media.type === 'image' ? (
                                 <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                               ) : (
-                                <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">▶</div>
+                                <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">
+                                  <Play className="h-3.5 w-3.5" aria-hidden />
+                                </div>
                               )}
                             </a>
                           ))
@@ -2328,7 +2333,10 @@ export function HomeDashboardChatPanel({
                             {media.type === 'image' ? (
                               <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">▶ Video</div>
+                              <div className="flex h-full w-full items-center justify-center gap-1 text-xs text-text-primary">
+                                <Play className="h-3.5 w-3.5" aria-hidden />
+                                <span>Video</span>
+                              </div>
                             )}
                           </a>
                         ))}
@@ -2465,7 +2473,7 @@ export function HomeDashboardChatPanel({
                 type="button"
                 onClick={() => { void handleTogglePinConversation(); }}
                 className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isConversationPinned
-                  ? 'border-[#89f7d7]/35 bg-accent text-text-primary'
+                  ? 'border-accent/35 bg-accent text-text-primary'
                   : 'border-transparent bg-bg-hover text-text-primary'}`}
               >
                 {isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}
@@ -2521,7 +2529,9 @@ export function HomeDashboardChatPanel({
                           {media.type === 'image' ? (
                             <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">▶</div>
+                            <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">
+                              <Play className="h-3.5 w-3.5" aria-hidden />
+                            </div>
                           )}
                         </a>
                       ))
@@ -2605,7 +2615,9 @@ export function HomeDashboardChatPanel({
                           {media.type === 'image' ? (
                             <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">▶</div>
+                            <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">
+                              <Play className="h-3.5 w-3.5" aria-hidden />
+                            </div>
                           )}
                         </a>
                       ))
@@ -2670,7 +2682,10 @@ export function HomeDashboardChatPanel({
                           {media.type === 'image' ? (
                             <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-text-primary">▶ Video</div>
+                            <div className="flex h-full w-full items-center justify-center gap-1 text-xs text-text-primary">
+                              <Play className="h-3.5 w-3.5" aria-hidden />
+                              <span>Video</span>
+                            </div>
                           )}
                         </a>
                       ))}
