@@ -19,7 +19,7 @@ import {
   Heart,
   MessageSquare,
   Eye,
-  Github,
+  Link2,
 } from 'lucide-react';
 import {
   fetchExploreChannels,
@@ -137,7 +137,7 @@ function UserCard({ user }: { user: DiscoverUser }) {
         {user.githubUrl && (
           <a href={user.githubUrl} target="_blank" rel="noopener noreferrer"
             className="zync-soft-button-ghost flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs">
-            <Github className="h-3.5 w-3.5" />
+            <Link2 className="h-3.5 w-3.5" />
             GitHub
           </a>
         )}

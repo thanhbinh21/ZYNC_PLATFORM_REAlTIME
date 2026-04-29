@@ -7,8 +7,7 @@ import {
   GraduationCap,
   Briefcase,
   UserCircle,
-  Github,
-  Linkedin,
+  Link2,
   Globe,
   ChevronRight,
   ChevronLeft,
@@ -289,7 +288,7 @@ export default function OnboardingPage() {
                 <div className="grid gap-5 lg:grid-cols-2">
                   <div>
                     <label className="font-ui-meta mb-2 flex items-center gap-1.5 text-[0.72rem] uppercase tracking-[0.18em] text-text-tertiary">
-                      <Github className="h-3.5 w-3.5" />
+                      <Link2 className="h-3.5 w-3.5" />
                       GitHub
                     </label>
                     <input
@@ -303,7 +302,7 @@ export default function OnboardingPage() {
 
                   <div>
                     <label className="font-ui-meta mb-2 flex items-center gap-1.5 text-[0.72rem] uppercase tracking-[0.18em] text-text-tertiary">
-                      <Linkedin className="h-3.5 w-3.5" />
+                      <Link2 className="h-3.5 w-3.5" />
                       LinkedIn
                     </label>
                     <input
