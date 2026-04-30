@@ -63,6 +63,50 @@ export function HomeDashboardSettingsPanel({
     setMessageFontSize(appearance.messageFontSize);
   }, [appearance.messageFontSize, appearance.theme]);
 
+  useEffect(() => {
+    const saved = globalThis.localStorage?.getItem('zync.dashboard.settings');
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as {
+        showOnlineStatus?: boolean;
+        allowFriendRequests?: boolean;
+        emailNotifications?: boolean;
+        desktopNotifications?: boolean;
+        soundEnabled?: boolean;
+        readReceipts?: boolean;
+      };
+      setShowOnlineStatus(parsed.showOnlineStatus ?? true);
+      setAllowFriendRequests(parsed.allowFriendRequests ?? true);
+      setEmailNotifications(parsed.emailNotifications ?? false);
+      setDesktopNotifications(parsed.desktopNotifications ?? true);
+      setSoundEnabled(parsed.soundEnabled ?? true);
+      setReadReceipts(parsed.readReceipts ?? true);
+    } catch {
+      // ignore invalid local storage payload
+    }
+  }, []);
+
+  useEffect(() => {
+    globalThis.localStorage?.setItem(
+      'zync.dashboard.settings',
+      JSON.stringify({
+        showOnlineStatus,
+        allowFriendRequests,
+        emailNotifications,
+        desktopNotifications,
+        soundEnabled,
+        readReceipts,
+      }),
+    );
+  }, [
+    allowFriendRequests,
+    desktopNotifications,
+    emailNotifications,
+    readReceipts,
+    showOnlineStatus,
+    soundEnabled,
+  ]);
+
   const summary = useMemo(() => {
     const enabled = [
       showOnlineStatus,
@@ -163,7 +207,11 @@ export function HomeDashboardSettingsPanel({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setTheme(item.id as DashboardThemeMode)}
+                  onClick={() => {
+                    const nextTheme = item.id as DashboardThemeMode;
+                    setTheme(nextTheme);
+                    onApplyAppearance({ theme: nextTheme, messageFontSize });
+                  }}
                   className={`zync-soft-step ${theme === item.id ? 'zync-soft-step-active' : ''}`}
                 >
                   {item.label}

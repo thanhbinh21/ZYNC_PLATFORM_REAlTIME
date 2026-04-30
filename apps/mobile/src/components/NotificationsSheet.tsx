@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Bell, CheckCheck, ChevronRight, Heart, MessageCircle, UserCheck, Users, X } from 'lucide-react-native';
 import type { AppNotification, NotificationAnchorRect } from '../services/notifications';
 import { colors } from '../theme/colors';
 
@@ -22,13 +22,13 @@ const HEADER_H = 44;
 const PANEL_MARGIN = 12;
 const LIST_MAX_CAP = 320;
 
-const TYPE_ICONS: Record<AppNotification['type'], string> = {
-  new_message: '💬',
-  friend_request: '🤝',
-  friend_accepted: '🎉',
-  group_invite: '👥',
-  story_reaction: '❤️',
-  story_reply: '💭',
+const TYPE_ICONS: Record<AppNotification['type'], React.ElementType> = {
+  new_message: MessageCircle,
+  friend_request: Users,
+  friend_accepted: UserCheck,
+  group_invite: Users,
+  story_reaction: Heart,
+  story_reply: MessageCircle,
 };
 
 function relativeTime(dateStr: string): string {
@@ -152,7 +152,12 @@ export function NotificationsSheet({
         <View style={styles.dotCol}>
           {!item.read ? <View style={styles.dot} /> : <View style={styles.dotPlaceholder} />}
         </View>
-        <Text style={styles.emoji}>{TYPE_ICONS[item.type] ?? '🔔'}</Text>
+        <View style={styles.iconWrap}>
+          {(() => {
+            const Icon = TYPE_ICONS[item.type] ?? Bell;
+            return <Icon size={16} color={item.read ? colors.textMuted : colors.accent} />;
+          })()}
+        </View>
         <View style={styles.textCol}>
           <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={2}>
             {item.title}
@@ -162,7 +167,7 @@ export function NotificationsSheet({
           </Text>
           <Text style={styles.time}>{relativeTime(item.createdAt)}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#4e8873" />
+        <ChevronRight size={18} color={colors.textMuted} />
       </TouchableOpacity>
     ),
     [handlePressItem],
@@ -189,18 +194,21 @@ export function NotificationsSheet({
             <View style={styles.headerActions}>
               {unreadCount > 0 && (
                 <TouchableOpacity onPress={onMarkAllRead} hitSlop={8}>
-                  <Text style={styles.markAll}>Đọc hết</Text>
+                  <View style={styles.markAllWrap}>
+                    <CheckCheck size={14} color={colors.accent} />
+                    <Text style={styles.markAll}>Đọc hết</Text>
+                  </View>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityLabel="Đóng">
-                <Ionicons name="close" size={22} color="#cdece0" />
+                <X size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>
 
           {notifications.length === 0 && !isLoading && (
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🔔</Text>
+              <Bell size={28} color={colors.textMuted} />
               <Text style={styles.emptyText}>Không có thông báo</Text>
             </View>
           )}
@@ -219,14 +227,14 @@ export function NotificationsSheet({
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
               isLoading && notifications.length > 0 ? (
-                <ActivityIndicator color="#30d7ab" style={{ paddingVertical: 12 }} />
+                <ActivityIndicator color={colors.accent} style={{ paddingVertical: 12 }} />
               ) : null
             }
           />
 
           {isLoading && notifications.length === 0 && (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#30d7ab" />
+              <ActivityIndicator size="large" color={colors.accent} />
             </View>
           )}
         </View>
@@ -259,10 +267,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(13, 50, 40, 0.85)',
+    borderBottomColor: colors.glassBorderSoft,
   },
   headerTitle: {
-    color: '#e4fff5',
+    color: colors.text,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
@@ -271,8 +279,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
+  markAllWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   markAll: {
-    color: '#43e6b8',
+    color: colors.accent,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_500Medium',
   },
@@ -286,11 +299,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(10, 46, 37, 0.65)',
+    borderBottomColor: colors.glassBorderSoft,
     gap: 8,
   },
   rowUnread: {
-    backgroundColor: 'rgba(8, 42, 34, 0.55)',
+    backgroundColor: colors.glassUltra,
   },
   dotCol: {
     width: 10,
@@ -300,38 +313,39 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#30d7ab',
+    backgroundColor: colors.accent,
   },
   dotPlaceholder: {
     width: 7,
     height: 7,
   },
-  emoji: {
-    fontSize: 16,
-    marginTop: 2,
+  iconWrap: {
+    marginTop: 1,
+    width: 20,
+    alignItems: 'center',
   },
   textCol: {
     flex: 1,
     minWidth: 0,
   },
   title: {
-    color: '#a3c7b9',
+    color: colors.textSecondary,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_600SemiBold',
     lineHeight: 18,
   },
   titleUnread: {
-    color: '#e4fff5',
+    color: colors.text,
   },
   body: {
-    color: '#7cb3a1',
+    color: colors.textMuted,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 3,
     lineHeight: 15,
   },
   time: {
-    color: '#4e8873',
+    color: colors.textSubtle,
     fontSize: 10,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 4,
@@ -341,13 +355,8 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     paddingHorizontal: 16,
   },
-  emptyEmoji: {
-    fontSize: 32,
-    opacity: 0.45,
-    marginBottom: 6,
-  },
   emptyText: {
-    color: '#6d9e8e',
+    color: colors.textMuted,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_400Regular',
   },

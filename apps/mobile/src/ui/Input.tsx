@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/fonts';
-import { Ionicons } from '@expo/vector-icons';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -51,11 +51,7 @@ export function Input({
             onPress={() => setShowPassword(!showPassword)}
             style={styles.eyeIcon}
           >
-            <Ionicons
-              name={showPassword ? 'eye-off' : 'eye'}
-              size={20}
-              color={colors.textMuted}
-            />
+            {showPassword ? <EyeOff size={18} color={colors.textMuted} /> : <Eye size={18} color={colors.textMuted} />}
           </TouchableOpacity>
         )}
       </View>
@@ -70,7 +66,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.caption,
-    color: '#d8efe7',
+    color: colors.textMuted,
     marginBottom: 8,
   },
   inputContainer: {
@@ -92,7 +88,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   inputFocused: {
-    borderColor: '#9effda',
+    borderColor: colors.accent,
     backgroundColor: colors.glassStrong,
     shadowColor: colors.glassGlow,
     shadowOpacity: 0.44,
@@ -107,7 +103,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: '#f5fffb',
+    color: colors.text,
     ...typography.body,
     height: '100%',
   },

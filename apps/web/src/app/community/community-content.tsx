@@ -33,17 +33,15 @@ import {
 interface PostTypeConfig {
   label: string;
   Icon: React.ElementType;
-  color: string;
-  bgColor: string;
 }
 
 const POST_TYPE_CONFIG: Record<PostType, PostTypeConfig> = {
-  discussion: { label: 'Thảo luận', Icon: MessageCircle, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-  question: { label: 'Câu hỏi', Icon: HelpCircle, color: 'text-amber-600', bgColor: 'bg-amber-50' },
-  til: { label: 'TIL', Icon: Lightbulb, color: 'text-purple-600', bgColor: 'bg-purple-50' },
-  showcase: { label: 'Showcase', Icon: Rocket, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
-  tutorial: { label: 'Hướng dẫn', Icon: BookOpen, color: 'text-orange-600', bgColor: 'bg-orange-50' },
-  job: { label: 'Tuyển dụng', Icon: Briefcase, color: 'text-rose-600', bgColor: 'bg-rose-50' },
+  discussion: { label: 'Thảo luận', Icon: MessageCircle },
+  question: { label: 'Câu hỏi', Icon: HelpCircle },
+  til: { label: 'TIL', Icon: Lightbulb },
+  showcase: { label: 'Showcase', Icon: Rocket },
+  tutorial: { label: 'Hướng dẫn', Icon: BookOpen },
+  job: { label: 'Tuyển dụng', Icon: Briefcase },
 };
 
 const FEED_TABS: { id: string; label: string; Icon: React.ElementType }[] = [
@@ -112,8 +110,8 @@ function CreatePostForm({ onClose, onSuccess }: CreatePostFormProps) {
                     onClick={() => setType(key)}
                     className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition ${
                       type === key
-                        ? 'bg-text-primary text-white shadow-sm'
-                        : 'border border-border bg-white/75 text-text-secondary hover:border-accent'
+                        ? 'bg-accent text-[var(--bg-primary)] shadow-sm'
+                        : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:border-accent'
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -189,7 +187,7 @@ function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: strin
             )}
             <span className="text-xs text-text-tertiary">{formatTimeAgo(post.createdAt)}</span>
           </div>
-          <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.bgColor} ${cfg.color}`}>
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-border bg-bg-hover px-2.5 py-0.5 text-xs font-medium text-text-secondary">
             <TypeIcon className="h-3 w-3" />
             {cfg.label}
           </span>
@@ -320,7 +318,7 @@ export default function CommunityContent() {
                   key={id}
                   onClick={() => handleTabChange(id)}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                    activeTab === id ? 'bg-text-primary text-white shadow-sm' : 'border border-border bg-white/70 text-text-secondary hover:text-text-primary'
+                    activeTab === id ? 'bg-accent text-[var(--bg-primary)] shadow-sm' : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
