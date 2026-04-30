@@ -22,7 +22,7 @@ export function RequestItem({
   const dateLabel = new Date(item.createdAt).toLocaleString('vi-VN');
 
   return (
-    <article className="rounded-[1.4rem] border border-border bg-white/70 p-4 shadow-sm">
+    <article className="rounded-[1.4rem] border border-border bg-[var(--surface-glass)] p-4 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <FriendsAvatar name={item.displayName} />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { Bell, Check, CheckCheck, MessageCircle, Settings, UserCheck, Users, X } from 'lucide-react';
 import type { Notification } from '@/services/notifications';
 
 interface NotificationPanelProps {
@@ -15,13 +16,13 @@ interface NotificationPanelProps {
   onOpenSettings: () => void;
 }
 
-const TYPE_ICONS: Record<Notification['type'], string> = {
-  new_message: 'DM',
-  friend_request: 'FR',
-  friend_accepted: 'OK',
-  group_invite: 'GR',
-  story_reaction: 'RT',
-  story_reply: 'RP',
+const TYPE_ICONS: Record<Notification['type'], React.ElementType> = {
+  new_message: MessageCircle,
+  friend_request: Users,
+  friend_accepted: UserCheck,
+  group_invite: Users,
+  story_reaction: Check,
+  story_reply: MessageCircle,
 };
 
 function relativeTime(dateStr: string): string {
@@ -96,15 +97,10 @@ export function NotificationPanel({
             </button>
           )}
           <button type="button" onClick={onOpenSettings} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Cài đặt thông báo">
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
-              <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M12 4.5v2.1M12 17.4v2.1M4.5 12h2.1M17.4 12h2.1M6.8 6.8l1.5 1.5M15.7 15.7l1.5 1.5M17.2 6.8l-1.5 1.5M8.3 15.7l-1.5 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <Settings className="h-4 w-4" />
           </button>
           <button type="button" onClick={onClose} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Đóng">
-            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -124,7 +120,7 @@ export function NotificationPanel({
             onClick={() => handleClickItem(notification)}
             className={`mb-2 flex w-full items-start gap-3 rounded-[1.2rem] border px-4 py-3 text-left transition ${
               notification.read
-                ? 'border-transparent bg-white/45 hover:border-border hover:bg-white/70'
+                ? 'border-transparent bg-[var(--surface-glass)] hover:border-border hover:bg-[var(--surface-glass-strong)]'
                 : 'border-border bg-accent-light hover:border-accent'
             }`}
           >
@@ -136,8 +132,11 @@ export function NotificationPanel({
               )}
             </div>
 
-            <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border bg-white/70 text-[0.66rem] font-semibold text-accent-strong">
-              {TYPE_ICONS[notification.type] ?? 'NT'}
+            <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-accent-strong">
+              {(() => {
+                const Icon = TYPE_ICONS[notification.type] ?? Bell;
+                return <Icon className="h-3.5 w-3.5" />;
+              })()}
             </span>
 
             <div className="min-w-0 flex-1">
@@ -151,7 +150,7 @@ export function NotificationPanel({
         {isLoading && (
           <div className="space-y-2 px-2 py-2">
             {[1, 2, 3].map((item) => (
-              <div key={item} className="rounded-[1.2rem] border border-border bg-white/60 px-4 py-3">
+              <div key={item} className="rounded-[1.2rem] border border-border bg-[var(--surface-glass)] px-4 py-3">
                 <div className="h-3 w-24 animate-pulse rounded bg-bg-hover" />
                 <div className="mt-2 h-3 w-3/4 animate-pulse rounded bg-bg-hover" />
               </div>

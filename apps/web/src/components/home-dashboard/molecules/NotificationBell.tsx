@@ -30,8 +30,8 @@ export function NotificationBell({ unreadCount, onClick, isOpen }: NotificationB
       onClick={onClick}
       className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
         isOpen
-          ? 'border-transparent bg-text-primary text-white shadow-sm'
-          : 'border-border bg-white/70 text-text-secondary hover:text-text-primary'
+          ? 'border-transparent bg-accent text-[var(--bg-primary)] shadow-sm'
+          : 'border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
       }`}
       aria-label={`Thong bao${unreadCount > 0 ? ` (${unreadCount} chua doc)` : ''}`}
     >

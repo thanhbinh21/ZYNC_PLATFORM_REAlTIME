@@ -64,7 +64,7 @@ export function Button({
     >
       {isLoading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? '#111827' : colors.primary}
+          color={variant === 'primary' ? colors.text : colors.accent}
         />
       ) : (
         <Text style={[styles.text, getTextStyle()]}>{title}</Text>
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   primaryContainer: {
     backgroundColor: colors.primary,
     borderWidth: 1,
-    borderColor: '#9effda',
+    borderColor: colors.accentSoft,
     shadowColor: colors.glassGlow,
     shadowOpacity: 0.45,
     shadowRadius: 16,
@@ -113,13 +113,13 @@ const styles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   primaryText: {
-    color: '#111827', // dark text on primary
+    color: colors.text,
   },
   secondaryText: {
     color: colors.text,
   },
   outlineText: {
-    color: '#a8ffe1',
+    color: colors.text,
   },
   disabled: {
     opacity: 0.5,
