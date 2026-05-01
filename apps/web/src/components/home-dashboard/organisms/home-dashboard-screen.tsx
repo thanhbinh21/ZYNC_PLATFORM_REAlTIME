@@ -89,8 +89,8 @@ export function HomeDashboardScreen({
                   onClick={() => handleSelectNav(item.id)}
                   className={`rounded-full px-4 py-2 text-sm transition ${
                     selectedNavId === item.id
-                      ? 'bg-text-primary text-white shadow-sm'
-                      : 'border border-border bg-white/65 text-text-secondary hover:text-text-primary'
+                      ? 'bg-accent text-[var(--bg-primary)] shadow-sm'
+                      : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -106,10 +106,10 @@ export function HomeDashboardScreen({
             <button
               type="button"
               onClick={onToggleTheme}
-              className="zync-soft-badge hidden text-xs sm:inline-flex"
+              className={`zync-soft-badge hidden text-xs sm:inline-flex ${theme === 'dark' ? 'zync-soft-badge-active' : ''}`}
               title="Chuyển đổi giao diện"
             >
-              {theme === 'dark' ? '☀️ Sáng' : '🌙 Tối'}
+              {theme === 'dark' ? 'Sáng' : 'Tối'}
             </button>
 
             {notificationSlot ?? (
@@ -126,8 +126,8 @@ export function HomeDashboardScreen({
                   onClick={() => handleSelectNav(item.id)}
                   className={`rounded-full px-3 py-2 text-sm transition ${
                     selectedNavId === item.id
-                      ? 'bg-text-primary text-white shadow-sm'
-                      : 'border border-border bg-white/65 text-text-secondary hover:text-text-primary'
+                      ? 'bg-accent text-[var(--bg-primary)] shadow-sm'
+                      : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
                   }`}
                   title={item.label}
                 >
@@ -142,7 +142,7 @@ export function HomeDashboardScreen({
             <button
               type="button"
               onClick={() => handleSelectNav('profile')}
-              className="flex items-center gap-2 rounded-full border border-border bg-white/70 p-1 pl-2 transition hover:bg-white/90"
+              className="flex items-center gap-2 rounded-full border border-border bg-[var(--surface-glass)] p-1 pl-2 transition hover:bg-[var(--surface-glass-strong)]"
             >
               <span className="font-ui-title hidden text-sm text-text-primary lg:block">{data.user.displayName}</span>
               <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent-light text-xs font-semibold text-accent-strong">
@@ -157,7 +157,7 @@ export function HomeDashboardScreen({
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white/65 text-text-secondary md:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary md:hidden"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
                 <path d="M4 7h16" />
@@ -178,7 +178,7 @@ export function HomeDashboardScreen({
                 <p className="font-ui-title mt-3 text-lg text-text-primary">Menu workspace</p>
               </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="zync-soft-button-ghost h-10 w-10 p-0 text-base">
-                ✕
+                <span className="font-ui-content text-xs">Đóng</span>
               </button>
             </div>
 
@@ -189,8 +189,8 @@ export function HomeDashboardScreen({
                   onClick={() => handleSelectNav(item.id)}
                   className={`flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left transition ${
                     selectedNavId === item.id
-                      ? 'bg-text-primary text-white shadow-sm'
-                      : 'border border-border bg-white/70 text-text-secondary'
+                      ? 'bg-accent text-[var(--bg-primary)] shadow-sm'
+                      : 'border border-border bg-[var(--surface-glass)] text-text-secondary'
                   }`}
                 >
                   <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" />
@@ -205,8 +205,8 @@ export function HomeDashboardScreen({
                     onClick={() => handleSelectNav(item.id)}
                     className={`flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left transition ${
                       selectedNavId === item.id
-                        ? 'bg-text-primary text-white shadow-sm'
-                        : 'border border-border bg-white/70 text-text-secondary'
+                        ? 'bg-accent text-[var(--bg-primary)] shadow-sm'
+                        : 'border border-border bg-[var(--surface-glass)] text-text-secondary'
                     }`}
                   >
                     <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" />

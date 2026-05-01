@@ -1,39 +1,48 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  Alert,
-  Platform,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { lightTheme } from '../src/theme/colors';
+import {
+  ArrowLeft,
+  CheckCheck,
+  ChevronRight,
+  HelpCircle,
+  Info,
+  KeyRound,
+  LogOut,
+  Moon,
+  Radio,
+  ShieldCheck,
+  User,
+  Users,
+  Volume2,
+  Zap,
+  MessageCircle,
+} from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
 import api from '../src/services/api';
+import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
+import { getAppTheme } from '../src/theme/get-app-theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const userInfo = useAuthStore((s) => s.userInfo);
   const logout = useAuthStore((s) => s.logout);
+  const appThemeMode = useAppPreferencesStore((s) => s.theme);
+  const hydrateTheme = useAppPreferencesStore((s) => s.hydrate);
+  const setTheme = useAppPreferencesStore((s) => s.setTheme);
+  const theme = getAppTheme(appThemeMode);
 
-  // Cau hinh giao dien
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Cau hinh thong bao
   const [notifyMessages, setNotifyMessages] = useState(true);
   const [notifyFriends, setNotifyFriends] = useState(true);
   const [notifyStories, setNotifyStories] = useState(true);
   const [notifySounds, setNotifySounds] = useState(true);
-
-  // Quyen rieng tu
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [showReadReceipts, setShowReadReceipts] = useState(true);
+
+  useEffect(() => {
+    hydrateTheme();
+  }, [hydrateTheme]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
@@ -56,190 +65,130 @@ export default function SettingsScreen() {
     ]);
   }, [logout, router]);
 
-  // Muc cau hinh tai khoan
   const accountItems = [
-    {
-      icon: 'person-outline' as const,
-      label: 'Chỉnh sửa hồ sơ',
-      color: lightTheme.accent,
-    },
-    {
-      icon: 'key-outline' as const,
-      label: 'Đổi mật khẩu',
-      color: '#3b82f6',
-    },
-    {
-      icon: 'shield-checkmark-outline' as const,
-      label: 'Bảo mật 2 bước',
-      color: '#f59e0b',
-    },
+    { Icon: User, label: 'Chỉnh sửa hồ sơ', color: theme.accent },
+    { Icon: KeyRound, label: 'Đổi mật khẩu', color: theme.info },
+    { Icon: ShieldCheck, label: 'Bảo mật hai bước', color: theme.warning },
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bgPrimary }]}>
+      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={lightTheme.textPrimary} />
+          <ArrowLeft size={22} stroke={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cài đặt</Text>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Cài đặt</Text>
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        {/* Thong tin tai khoan */}
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tài khoản</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Tài khoản</Text>
+          <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.borderLight }]}>
             {accountItems.map((item, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={[styles.menuItem, idx < accountItems.length - 1 && styles.menuItemBorder]}
+                style={[styles.menuItem, idx < accountItems.length - 1 && styles.menuItemBorder, idx < accountItems.length - 1 && { borderBottomColor: theme.borderLight }]}
               >
                 <View style={[styles.menuIconBox, { backgroundColor: `${item.color}15` }]}>
-                  <Ionicons name={item.icon} size={20} color={item.color} />
+                  <item.Icon size={20} stroke={item.color} />
                 </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={18} color={lightTheme.textTertiary} />
+                <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>{item.label}</Text>
+                <ChevronRight size={18} stroke={theme.textTertiary} />
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Giao dien */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Giao diện</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Giao diện</Text>
+          <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.borderLight }]}>
             <View style={styles.switchRow}>
               <View style={styles.switchInfo}>
-                <Ionicons name="moon-outline" size={20} color="#8b5cf6" />
-                <Text style={styles.switchLabel}>Chế độ tối</Text>
+                <Moon size={20} stroke={theme.violet} />
+                <Text style={[styles.switchLabel, { color: theme.textPrimary }]}>Chế độ tối</Text>
               </View>
               <Switch
-                value={isDarkMode}
-                onValueChange={setIsDarkMode}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
+                value={appThemeMode === 'dark'}
+                onValueChange={(value) => setTheme(value ? 'dark' : 'light')}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={theme.textOnAccent}
               />
             </View>
           </View>
         </View>
 
-        {/* Thong bao */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông báo</Text>
-          <View style={styles.card}>
-            <View style={[styles.switchRow, styles.menuItemBorder]}>
-              <View style={styles.switchInfo}>
-                <Ionicons name="chatbubble-outline" size={20} color={lightTheme.accent} />
-                <Text style={styles.switchLabel}>Tin nhắn</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Thông báo</Text>
+          <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.borderLight }]}>
+            {[
+              { Icon: MessageCircle, label: 'Tin nhắn', value: notifyMessages, setValue: setNotifyMessages, color: theme.accent },
+              { Icon: Users, label: 'Lời mời kết bạn', value: notifyFriends, setValue: setNotifyFriends, color: theme.info },
+              { Icon: Zap, label: 'Khoảnh khắc', value: notifyStories, setValue: setNotifyStories, color: theme.warning },
+              { Icon: Volume2, label: 'Âm thanh', value: notifySounds, setValue: setNotifySounds, color: theme.pink },
+            ].map((item, idx, arr) => (
+              <View key={item.label} style={[styles.switchRow, idx < arr.length - 1 && styles.menuItemBorder, idx < arr.length - 1 && { borderBottomColor: theme.borderLight }]}>
+                <View style={styles.switchInfo}>
+                  <item.Icon size={20} stroke={item.color} />
+                  <Text style={[styles.switchLabel, { color: theme.textPrimary }]}>{item.label}</Text>
+                </View>
+                <Switch
+                  value={item.value}
+                  onValueChange={item.setValue}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={theme.textOnAccent}
+                />
               </View>
-              <Switch
-                value={notifyMessages}
-                onValueChange={setNotifyMessages}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-            <View style={[styles.switchRow, styles.menuItemBorder]}>
-              <View style={styles.switchInfo}>
-                <Ionicons name="people-outline" size={20} color="#3b82f6" />
-                <Text style={styles.switchLabel}>Lời mời kết bạn</Text>
-              </View>
-              <Switch
-                value={notifyFriends}
-                onValueChange={setNotifyFriends}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-            <View style={[styles.switchRow, styles.menuItemBorder]}>
-              <View style={styles.switchInfo}>
-                <Ionicons name="flash-outline" size={20} color="#f59e0b" />
-                <Text style={styles.switchLabel}>Khoảnh khắc</Text>
-              </View>
-              <Switch
-                value={notifyStories}
-                onValueChange={setNotifyStories}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-            <View style={styles.switchRow}>
-              <View style={styles.switchInfo}>
-                <Ionicons name="volume-high-outline" size={20} color="#ec4899" />
-                <Text style={styles.switchLabel}>Âm thanh</Text>
-              </View>
-              <Switch
-                value={notifySounds}
-                onValueChange={setNotifySounds}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
+            ))}
           </View>
         </View>
 
-        {/* Quyen rieng tu */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quyền riêng tư</Text>
-          <View style={styles.card}>
-            <View style={[styles.switchRow, styles.menuItemBorder]}>
-              <View style={styles.switchInfo}>
-                <Ionicons name="radio-button-on-outline" size={20} color={lightTheme.accent} />
-                <Text style={styles.switchLabel}>Trạng thái online</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Quyền riêng tư</Text>
+          <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.borderLight }]}>
+            {[
+              { Icon: Radio, label: 'Trạng thái online', value: showOnlineStatus, setValue: setShowOnlineStatus, color: theme.accent },
+              { Icon: CheckCheck, label: 'Xác nhận đã đọc', value: showReadReceipts, setValue: setShowReadReceipts, color: theme.info },
+            ].map((item, idx) => (
+              <View key={item.label} style={[styles.switchRow, idx === 0 && styles.menuItemBorder, idx === 0 && { borderBottomColor: theme.borderLight }]}>
+                <View style={styles.switchInfo}>
+                  <item.Icon size={20} stroke={item.color} />
+                  <Text style={[styles.switchLabel, { color: theme.textPrimary }]}>{item.label}</Text>
+                </View>
+                <Switch
+                  value={item.value}
+                  onValueChange={item.setValue}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={theme.textOnAccent}
+                />
               </View>
-              <Switch
-                value={showOnlineStatus}
-                onValueChange={setShowOnlineStatus}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-            <View style={styles.switchRow}>
-              <View style={styles.switchInfo}>
-                <Ionicons name="checkmark-done-outline" size={20} color="#3b82f6" />
-                <Text style={styles.switchLabel}>Xác nhận đã đọc</Text>
-              </View>
-              <Switch
-                value={showReadReceipts}
-                onValueChange={setShowReadReceipts}
-                trackColor={{ false: lightTheme.border, true: lightTheme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
+            ))}
           </View>
         </View>
 
-        {/* Thong tin ung dung */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin</Text>
-          <View style={styles.card}>
-            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]}>
-              <View style={[styles.menuIconBox, { backgroundColor: '#06b6d415' }]}>
-                <Ionicons name="help-circle-outline" size={20} color="#06b6d4" />
+          <Text style={[styles.sectionTitle, { color: theme.textTertiary }]}>Thông tin</Text>
+          <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.borderLight }]}>
+            <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder, { borderBottomColor: theme.borderLight }]}>
+              <View style={[styles.menuIconBox, { backgroundColor: `${theme.info}15` }]}>
+                <HelpCircle size={20} stroke={theme.info} />
               </View>
-              <Text style={styles.menuLabel}>Trợ giúp & Phản hồi</Text>
-              <Ionicons name="chevron-forward" size={18} color={lightTheme.textTertiary} />
+              <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>Trợ giúp & Phản hồi</Text>
+              <ChevronRight size={18} stroke={theme.textTertiary} />
             </TouchableOpacity>
             <View style={styles.menuItem}>
-              <View style={[styles.menuIconBox, { backgroundColor: '#64748b15' }]}>
-                <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+              <View style={[styles.menuIconBox, { backgroundColor: `${theme.neutral}15` }]}>
+                <Info size={20} stroke={theme.neutral} />
               </View>
-              <Text style={styles.menuLabel}>Phiên bản</Text>
-              <Text style={styles.versionText}>1.0.0</Text>
+              <Text style={[styles.menuLabel, { color: theme.textPrimary }]}>Phiên bản</Text>
+              <Text style={[styles.versionText, { color: theme.textTertiary }]}>1.0.0</Text>
             </View>
           </View>
         </View>
 
-        {/* Dang xuat */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-          <Text style={styles.logoutText}>Đăng xuất</Text>
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: theme.dangerSoft, borderColor: theme.dangerBorder }]} onPress={handleLogout}>
+          <LogOut size={20} stroke={theme.danger} />
+          <Text style={[styles.logoutText, { color: theme.danger }]}>Đăng xuất</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -247,10 +196,7 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: lightTheme.bgPrimary,
-  },
+  safe: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -258,28 +204,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightTheme.borderLight,
   },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: lightTheme.textPrimary,
-    fontFamily: 'BeVietnamPro_600SemiBold',
-  },
-  scroll: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  section: {
-    marginTop: 24,
-  },
+  backBtn: { padding: 4 },
+  headerTitle: { fontSize: 17, fontFamily: 'BeVietnamPro_600SemiBold' },
+  scroll: { flex: 1, paddingHorizontal: 16 },
+  section: { marginTop: 24 },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: lightTheme.textTertiary,
     fontFamily: 'BeVietnamPro_600SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -287,10 +218,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   card: {
-    backgroundColor: lightTheme.bgCard,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: lightTheme.borderLight,
     overflow: 'hidden',
   },
   menuItem: {
@@ -299,10 +228,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
   },
-  menuItemBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightTheme.borderLight,
-  },
+  menuItemBorder: { borderBottomWidth: StyleSheet.hairlineWidth },
   menuIconBox: {
     width: 34,
     height: 34,
@@ -314,7 +240,6 @@ const styles = StyleSheet.create({
   menuLabel: {
     flex: 1,
     fontSize: 15,
-    color: lightTheme.textPrimary,
     fontFamily: 'BeVietnamPro_500Medium',
   },
   switchRow: {
@@ -324,21 +249,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  switchInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  switchLabel: {
-    fontSize: 15,
-    color: lightTheme.textPrimary,
-    fontFamily: 'BeVietnamPro_500Medium',
-  },
-  versionText: {
-    fontSize: 14,
-    color: lightTheme.textTertiary,
-    fontFamily: 'BeVietnamPro_400Regular',
-  },
+  switchInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  switchLabel: { fontSize: 15, fontFamily: 'BeVietnamPro_500Medium' },
+  versionText: { fontSize: 14, fontFamily: 'BeVietnamPro_400Regular' },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -346,15 +259,8 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 30,
     paddingVertical: 14,
-    backgroundColor: '#fef2f215',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#fca5a520',
   },
-  logoutText: {
-    color: '#ef4444',
-    fontSize: 15,
-    fontWeight: '600',
-    fontFamily: 'BeVietnamPro_600SemiBold',
-  },
+  logoutText: { fontSize: 15, fontFamily: 'BeVietnamPro_600SemiBold' },
 });

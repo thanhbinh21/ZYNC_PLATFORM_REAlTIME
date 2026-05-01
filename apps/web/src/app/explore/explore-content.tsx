@@ -266,7 +266,7 @@ export default function ExploreContent() {
               key={id}
               onClick={() => setActiveSection(id)}
               className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                activeSection === id ? 'bg-text-primary text-white shadow-sm' : 'border border-border bg-white/70 text-text-secondary hover:text-text-primary'
+                activeSection === id ? 'bg-accent text-[var(--bg-primary)] shadow-sm' : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
               }`}
             >
               <Icon className="h-3.5 w-3.5" />

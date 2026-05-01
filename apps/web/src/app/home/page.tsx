@@ -462,6 +462,7 @@ function HomePageContent() {
             profile={profile}
             loading={profileLoading}
             error={profileError}
+            syncedPenaltyScore={userPenaltyScore}
             myStories={myStories}
             feed={feed}
             friends={friendsForGroup}

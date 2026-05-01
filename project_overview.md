@@ -507,6 +507,11 @@ npm run dev:web
 - [x] OX9.5: Đồng bộ màu giữa các tab Dashboard Web (Chat/Profile/Settings) bằng shared glass tokens để thống nhất palette liên tab <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.6: Giảm độ sáng trắng và tăng sắc xanh lá trong bộ token UI (Web + Mobile) để đồng bộ tone glass dịu mắt hơn <!-- done: 17/04/2026 by binhdev -->
 - [x] OX9.7: Đồng bộ lại web auth shell và khung chat dashboard theo shared tokens, tăng contrast light mode và cố định layout chat ở trung tâm <!-- done: 24/04/2026 -->
+- [x] OX9.8: Đồng bộ màu info/settings/profile (Web + Mobile), bỏ hardcode và chuyển icon sang Lucide <!-- done: 29/04/2026 -->
+- [x] OX9.9: Hoàn thiện Settings/Profile parity Web + Mobile: bật tắt giao diện sáng/tối tức thì, sửa contrast chữ nền ở dark/light, đồng bộ trust score + vi phạm và mở rộng mục Bảo mật <!-- done: 30/04/2026 -->
+- [x] OX9.10: Tăng tương phản dark mode cho Web/Mobile (tab select/unselect, input, button), loại bỏ nền xám hardcode gây chìm chữ và đồng bộ tab icons Mobile sang Lucide <!-- done: 30/04/2026 -->
+- [x] OX9.11: Chuẩn hóa màu các cụm Friends/Theme/Notifications/Trusted Circle (Web + Mobile), thay icon text/emoji sang Lucide và loại bỏ các trạng thái xám khó đọc ở dark mode <!-- done: 30/04/2026 -->
+- [x] OX9.12: Hotfix Friends dark contrast: bỏ nền trắng/xám hardcode ở card danh sách bạn bè/lời mời/kết quả tìm kiếm và giữ kích thước nút toggle Sáng/Tối cố định khi đổi trạng thái <!-- done: 30/04/2026 -->
 
 ### Phase R4 – Pivot Branding (Developer Community) ✅
 - [x] Bổ sung `discoverUsers()` service backend tìm developers nổi bật

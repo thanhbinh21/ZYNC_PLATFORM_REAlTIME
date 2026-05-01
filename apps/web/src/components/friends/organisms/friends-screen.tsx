@@ -1,4 +1,5 @@
 import type { FriendsScreenProps } from '../friends.types';
+import { Bell, Search, Users } from 'lucide-react';
 import { FriendItem } from '../molecules/friend-item';
 import { RequestItem } from '../molecules/request-item';
 import { SearchResultItem } from '../molecules/search-result-item';
@@ -41,7 +42,10 @@ export function FriendsScreen({
           <div className="zync-soft-card zync-soft-card-elevated rounded-[1.8rem] p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-ui-title text-xl text-text-primary">Loi moi ket ban ({pendingTotal})</h2>
-              <span className="zync-soft-badge text-xs">Incoming</span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-glass)] px-3 py-1 text-xs text-text-primary">
+                <Bell className="h-3.5 w-3.5 text-accent" />
+                Incoming
+              </span>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -85,7 +89,10 @@ export function FriendsScreen({
           <div className="zync-soft-card zync-soft-card-elevated rounded-[1.8rem] p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-ui-title text-xl text-text-primary">Tim nguoi de ket ban</h2>
-              <span className="zync-soft-badge text-xs">Discover</span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-glass)] px-3 py-1 text-xs text-text-primary">
+                <Search className="h-3.5 w-3.5 text-accent" />
+                Discover
+              </span>
             </div>
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -127,7 +134,10 @@ export function FriendsScreen({
         <section className="zync-soft-card mt-6 rounded-[1.8rem] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-ui-title text-xl text-text-primary">Danh sach ban be ({friends.length})</h2>
-            <span className="zync-soft-badge text-xs">Trusted Circle</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-glass)] px-3 py-1 text-xs text-text-primary">
+              <Users className="h-3.5 w-3.5 text-accent" />
+              Trusted Circle
+            </span>
           </div>
 
           <div className="mt-4 space-y-3">

@@ -12,7 +12,7 @@ import {
   Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Check, Mail, MessageCircle, Search, UserPlus, Users, X, XCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
 import api from '../../src/services/api';
@@ -148,23 +148,23 @@ export default function FriendsScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Danh bạ</Text>
           <TouchableOpacity style={styles.actionBtn}>
-            <Ionicons name="person-add-outline" size={24} color="#10b981" />
+            <UserPlus size={22} color={colors.accent} />
           </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#64748b" style={styles.searchIcon} />
+          <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput 
             style={styles.searchInput}
             placeholder="Tìm theo @username hoặc email..."
-            placeholderTextColor="#64748b"
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={handleSearch}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-              <Ionicons name="close-circle" size={18} color="#64748b" />
+              <XCircle size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -186,7 +186,7 @@ export default function FriendsScreen() {
                   style={styles.addFriendBtn}
                   onPress={() => sendFriendRequest(user.id || user._id)}
                 >
-                  <Ionicons name="person-add" size={16} color="#10b981" />
+                  <UserPlus size={16} color={colors.accent} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -221,7 +221,7 @@ export default function FriendsScreen() {
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#10b981" />
+            <ActivityIndicator size="large" color={colors.accent} />
           </View>
         ) : activeTab === 'friends' ? (
           /* Friends List */
@@ -230,7 +230,7 @@ export default function FriendsScreen() {
             keyExtractor={(item, index) => item._id || item.id || index.toString()}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10b981" colors={['#10b981']} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />
             }
             renderItem={({ item }) => (
               <TouchableOpacity style={styles.friendItem}>
@@ -242,13 +242,13 @@ export default function FriendsScreen() {
                   <Text style={styles.friendStatus}>{item.status || 'Offline'}</Text>
                 </View>
                 <TouchableOpacity style={styles.callBtn}>
-                  <Ionicons name="chatbubble-outline" size={20} color="#10b981" />
+                  <MessageCircle size={18} color={colors.accent} />
                 </TouchableOpacity>
               </TouchableOpacity>
             )}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Ionicons name="people-outline" size={64} color="#334155" />
+                <Users size={56} color={colors.textSubtle} />
                 <Text style={styles.emptyText}>Chưa có bạn bè</Text>
                 <Text style={styles.emptySubtext}>Tìm kiếm và gửi lời mời kết bạn</Text>
               </View>
@@ -279,20 +279,20 @@ export default function FriendsScreen() {
                     style={styles.acceptBtn}
                     onPress={() => acceptRequest(item._id)}
                   >
-                    <Ionicons name="checkmark" size={18} color="#fff" />
+                    <Check size={18} color={colors.text} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.rejectBtn}
                     onPress={() => rejectRequest(item._id)}
                   >
-                    <Ionicons name="close" size={18} color="#ef4444" />
+                    <X size={18} color={colors.error} />
                   </TouchableOpacity>
                 </View>
               </View>
             )}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Ionicons name="mail-outline" size={64} color="#334155" />
+                <Mail size={56} color={colors.textSubtle} />
                 <Text style={styles.emptyText}>Không có lời mời</Text>
                 <Text style={styles.emptySubtext}>Bạn chưa nhận được lời mời kết bạn nào</Text>
               </View>
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   title: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 24,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: '#fff',
+    color: colors.text,
     fontFamily: 'BeVietnamPro_400Regular',
     fontSize: 15,
   },
@@ -373,16 +373,16 @@ const styles = StyleSheet.create({
     borderColor: colors.glassBorderSoft,
   },
   tabActive: {
-    backgroundColor: colors.glassUltra,
-    borderColor: colors.glassBorder,
+    backgroundColor: colors.accentLight,
+    borderColor: colors.accent,
   },
   tabText: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_500Medium',
   },
   tabTextActive: {
-    color: '#10b981',
+    color: colors.accent,
   },
   // ─ Search Results ─
   searchResultsBox: {
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
   },
   // ─ Friend Items ─
   listTitle: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_600SemiBold',
     textTransform: 'uppercase',
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -426,12 +426,12 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   friendName: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   friendStatus: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 2,
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#10b981',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -482,14 +482,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: colors.dangerSoft,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: colors.dangerBorder,
   },
   requestBadge: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.error,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -499,13 +499,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   badgeText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 10,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glassBorderSoft,
     marginVertical: 10,
   },
   // ─ States ─
@@ -520,13 +520,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#475569',
+    color: colors.textSecondary,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_600SemiBold',
     marginTop: 16,
   },
   emptySubtext: {
-    color: '#64748b',
+    color: colors.textMuted,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 4,
