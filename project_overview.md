@@ -596,13 +596,36 @@ npm run dev:web
   - [ ] Brand cleanup: đổi "Zalo Clone" → "ZYNC Dev Community" toàn hệ thống
   - [ ] Prometheus metrics + Grafana dashboard
 
-### Master Plan: Tổng tiến độ (Cập nhật 27/04/2026)
+### Phase X – Chuẩn hóa Kiến trúc & Hạ tầng (Backend Refactoring) 🔧
+
+> **Tài liệu chi tiết:** `zync_plan/output/unified_execution_plan.md`  
+> **Ngày bắt đầu:** 02/05/2026  
+> **Mục tiêu:** Loại bỏ nợ kỹ thuật, thiết lập nền tảng vững chắc trước khi mở rộng Plan A/B.
+
+#### X.1. Backend Refactoring (Critical)
+- [x] **IoC Container (Awilix):** Cài `awilix`, tạo `src/container.ts`, đăng ký `MessageRepository`, `PostRepository`, `CommentRepository` dưới dạng Singleton. <!-- done: 02/05/2026 -->
+- [x] **Repository Pattern:** Tạo `BaseRepository` generic + `MessageRepository` (cursor pagination, idempotency check, soft delete, recall) + `PostRepository` (feed, trending, toggleLike, toggleBookmark) + `CommentRepository`. <!-- done: 02/05/2026 -->
+- [x] **Global Error Handler:** `error-handler.middleware.ts` chuẩn hóa 5 loại lỗi (AppError, ZodError, MongoDB 11000, JWT, Unknown) với format `ErrorResponse` thống nhất. <!-- done: 02/05/2026 -->
+- [x] **Schema-driven Validation:** Zod đã có sẵn + `validate.middleware.ts` hoạt động. <!-- done: 02/05/2026 -->
+- [x] **Migrate MessagesService:** Inject `MessageRepository`, thay `MessageModel.findOne/find` trực tiếp bằng repo methods (backward-compatible API). <!-- done: 02/05/2026 -->
+- [ ] **Migrate PostsService:** Inject `PostRepository + CommentRepository`.
+
+#### X.2. Infrastructure Optimization
+- [x] **Kafka DLQ & Retry:** Thêm topics `raw-messages.retry` + `raw-messages.dlq` + `notifications.retry` + `notifications.dlq`. Worker subscribe cả main topic và retry topic. Max 3 retries với exponential backoff → auto route sang DLQ. <!-- done: 02/05/2026 -->
+- [x] **Socket Modularization – Call:** Tách toàn bộ Call + WebRTC events (8 handlers) ra `socket/call.controller.ts`. <!-- done: 02/05/2026 -->
+- [x] **Socket Modularization – Chat:** Tách `send_message`, `message_read`, `message_delivered`, `delete_message_for_me`, `recall_message`, `forward_message` ra `socket/chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng**. <!-- done: 02/05/2026 -->
+- [ ] **Socket Modularization – Reaction & Story:** Tách Reaction events và Story events thành các sub-controller riêng.
+
+---
+
+### Master Plan: Tổng tiến độ (Cập nhật 02/05/2026)
 - [x] Phase R1: UX Redesign (Web & Mobile) ✅
 - [x] Phase R2: Mobile App Parity ✅
 - [x] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC) ✅ <!-- done: 26/04/2026 -->
 - [x] Phase R4: Pivot Branding (Zalo Clone → Zync Community) ✅
 - [x] Phase N1: Community Posts (Web) ✅
 - [x] Phase N3: Explore & Discovery (Web) ✅
+- [ ] **Phase X: Chuẩn hóa Kiến trúc & Hạ tầng** 🔧 *(~80% hoàn thành – còn PostsService migration + Reaction/Story controller)*
 - [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳
 - [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳
 - [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳

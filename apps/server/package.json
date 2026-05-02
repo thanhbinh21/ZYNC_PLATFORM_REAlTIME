@@ -24,6 +24,7 @@
     "@neondatabase/serverless": "^0.10.4",
     "@socket.io/redis-adapter": "^8.3.0",
     "@zync/shared-types": "*",
+    "awilix": "^13.0.3",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.3.0",
     "cookie-parser": "^1.4.6",

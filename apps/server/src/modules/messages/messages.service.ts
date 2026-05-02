@@ -10,6 +10,7 @@ import { getRedis } from '../../infrastructure/redis';
 import { v4 as uuidv4 } from 'uuid';
 import { MessageReactionsService } from './message-reaction.service';
 import { UserModel } from '../users/user.model';
+import { MessageRepository } from '../../shared/repositories/message.repository';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -54,6 +55,8 @@ interface ReadParticipant {
 
 export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
+  /** Repository singleton – all DB queries go through here */
+  private static readonly repo = new MessageRepository();
 
   private static getLastMessagePreview(
     content: string,
@@ -206,7 +209,7 @@ export class MessagesService {
     replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
-    const existing = await MessageModel.findOne({ idempotencyKey }).lean();
+    const existing = await MessagesService.repo.findByIdempotencyKey(idempotencyKey);
     if (existing) {
       logger.debug(`[InsertMetadata] Message already exists: ${idempotencyKey}`);
       return existing as unknown as IMessage;
@@ -384,25 +387,23 @@ export class MessagesService {
     limit: number = 20,
   ): Promise<PaginatedMessages> {
     try {
-      let query: any = { conversationId };
 
       // Decode cursor nếu có
+      let cursorObj: { createdAt: Date; messageId: string } | undefined;
       if (cursor) {
         const [createdAtStr, messageId] = Buffer.from(cursor, 'base64').toString().split('_');
-        const cursorDate = new Date(parseInt(createdAtStr));
-
-        query = {
-          ...query,
-          $or: [
-            { createdAt: { $lt: cursorDate } },
-            { createdAt: cursorDate, _id: { $lt: messageId } },
-          ],
-        };
+        cursorObj = { createdAt: new Date(parseInt(createdAtStr)), messageId };
       }
 
-      // Fetch limit + 1 để check hasMore
-      const messages = await MessageModel
-        .find(query)
+      // Fetch limit + 1 để check hasMore (dùng Repository)
+      const messages = await MessagesService.repo['model']
+        .find(cursorObj ? {
+          conversationId,
+          $or: [
+            { createdAt: { $lt: cursorObj.createdAt } },
+            { createdAt: cursorObj.createdAt, _id: { $lt: cursorObj.messageId } },
+          ],
+        } : { conversationId })
         .sort({ createdAt: -1, _id: -1 })
         .limit(limit + 1)
         .lean();
@@ -420,6 +421,7 @@ export class MessagesService {
           `${(lastMessage.createdAt as any).getTime()}_${lastMessage._id}`,
         ).toString('base64');
       }
+
 
       // ─── Filter based on deletion ───
       const filteredMessages = messages
