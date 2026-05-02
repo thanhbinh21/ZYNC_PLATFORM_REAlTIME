@@ -17,9 +17,9 @@ import { moderationAdminRouter } from './modules/ai/moderation/moderation.contro
 import { callsRouter } from './modules/calls/calls.routes';
 import { stickersRouter } from './modules/stickers/sticker.routes';
 import { postsRouter } from './modules/posts/posts.routes';
-import { AppError } from './shared/errors/app-error';
 import { logger } from './shared/logger';
 import { renderMetrics } from './shared/metrics';
+import { globalErrorHandler } from './shared/middleware/error-handler.middleware';
 
 export function createApp(): Application {
   const app = express();
@@ -77,18 +77,16 @@ export function createApp(): Application {
 
   // Xử lý route không tồn tại
   app.use((_req: Request, res: Response) => {
-    res.status(404).json({ success: false, error: 'Not found' });
+    res.status(404).json({
+      success: false,
+      error: { message: 'Not found', code: 'NOT_FOUND' },
+      statusCode: 404,
+      timestamp: new Date().toISOString(),
+    });
   });
 
-  // Bộ xử lý lỗi toàn cục
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    if (err instanceof AppError) {
-      res.status(err.statusCode).json({ success: false, error: err.message });
-      return;
-    }
-    logger.error('Unhandled error', err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  });
+  // ✅ Global Error Handler - chuẩn hóa format lỗi toàn hệ thống
+  app.use(globalErrorHandler);
 
   return app;
 }

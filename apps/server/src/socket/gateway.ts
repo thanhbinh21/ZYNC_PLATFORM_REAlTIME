@@ -28,6 +28,10 @@ import {
   applyPenaltyScore,
   refreshPenaltyWindow,
 } from '../modules/ai/moderation/penalty-policy';
+// ✅ Sub-controllers (Phase 1 Refactoring)
+import { registerCallController } from './call.controller';
+import { registerChatController, setChatKafkaFailureMode } from './chat.controller';
+
 
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
@@ -98,6 +102,7 @@ export function getIO(): Server | null {
 export function setKafkaFailureMode(failed: boolean): void {
   if (failed !== kafkaFailureMode) {
     kafkaFailureMode = failed;
+    setChatKafkaFailureMode(failed); // sync to ChatController
     logger.warn(`[Gateway] Kafka failure mode: ${failed ? 'ENABLED' : 'DISABLED'}`);
   }
 }
@@ -238,15 +243,8 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
-    // Sự kiện gửi tin nhắn
-    socket.on('send_message', async (payload: unknown) => {
-      try {
-        await handleSendMessage(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('send_message error', err);
-        socket.emit('error', { message: 'Failed to send message' });
-      }
-    });
+    // ✅ Chat Events – delegated to ChatController sub-module
+    registerChatController(io, socket as AuthSocket);
 
     // Sự kiện bắt đầu gõ phím
     socket.on('typing_start', async (payload: unknown) => {
@@ -314,26 +312,6 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
-    // Sự kiện đánh dấu đã đọc tin nhắn
-    socket.on('message_read', async (payload: unknown) => {
-      try {
-        await handleMessageRead(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('message_read error', err);
-        socket.emit('error', { message: 'Failed to update message status' });
-      }
-    });
-
-    // Sự kiện đánh dấu tin nhắn đã được gửi tới (delivered)
-    socket.on('message_delivered', async (payload: unknown) => {
-      try {
-        await handleMessageDelivered(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('message_delivered error', err);
-        socket.emit('error', { message: 'Failed to mark message as delivered' });
-      }
-    });
-
     socket.on('reaction_upsert', async (payload: unknown) => {
       try {
         await handleReactionUpsert(io, socket as AuthSocket, payload);
@@ -364,109 +342,9 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
-    socket.on('call_invite', async (payload: unknown) => {
-      try {
-        await handleCallInvite(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('call_invite error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to invite call' });
-      }
-    });
+    // ✅ Call & WebRTC Events – delegated to CallController sub-module
+    registerCallController(io, socket as AuthSocket);
 
-    socket.on('call_group_invite', async (payload: unknown) => {
-      try {
-        await handleCallGroupInvite(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('call_group_invite error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to invite group call' });
-      }
-    });
-
-    socket.on('call_accept', async (payload: unknown) => {
-      try {
-        await handleCallAccept(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('call_accept error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to accept call' });
-      }
-    });
-
-    socket.on('call_reject', async (payload: unknown) => {
-      try {
-        await handleCallReject(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('call_reject error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to reject call' });
-      }
-    });
-
-    socket.on('call_end', async (payload: unknown) => {
-      try {
-        await handleCallEnd(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('call_end error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to end call' });
-      }
-    });
-
-    socket.on('webrtc_offer', async (payload: unknown) => {
-      try {
-        await handleWebRtcOffer(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('webrtc_offer error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay offer' });
-      }
-    });
-
-    socket.on('webrtc_answer', async (payload: unknown) => {
-      try {
-        await handleWebRtcAnswer(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('webrtc_answer error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay answer' });
-      }
-    });
-
-    socket.on('webrtc_ice_candidate', async (payload: unknown) => {
-      try {
-        await handleWebRtcIceCandidate(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('webrtc_ice_candidate error', err);
-        socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay ICE candidate' });
-      }
-    });
-
-    // ─── Delete & Recall Events ───
-
-    // Delete message for sender only
-    socket.on('delete_message_for_me', async (payload: unknown) => {
-      try {
-        await handleDeleteMessageForMe(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('delete_message_for_me error', err);
-        socket.emit('error', { message: 'Failed to delete message' });
-      }
-    });
-
-    // Recall message (delete everywhere)
-    socket.on('recall_message', async (payload: unknown) => {
-      try {
-        await handleRecallMessage(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('recall_message error', err);
-        socket.emit('error', { message: 'Failed to recall message' });
-      }
-    });
-
-    // Forward message to another conversation
-    socket.on('forward_message', async (payload: unknown) => {
-      try {
-        await handleForwardMessage(io, socket as AuthSocket, payload);
-      } catch (err) {
-        logger.error('forward_message error', err);
-        socket.emit('error', { message: 'Failed to forward message' });
-      }
-    });
 
     // Xử lý ngắt kết nối
     socket.on('disconnect', () => {
