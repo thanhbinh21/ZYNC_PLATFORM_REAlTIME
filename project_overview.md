@@ -8,7 +8,7 @@
 
 ## Mục tiêu & Phạm vi
 
-Hệ thống nhắn tin tức thời quy mô vài nghìn người dùng, hỗ trợ chat 1-1, nhóm, chia sẻ media, story 24h và quản lý bạn bè. Mục tiêu thay thế ứng dụng chat thương mại với khả năng kiểm soát dữ liệu nội bộ và tối ưu chi phí.
+Hệ thống nhắn tin tức thời quy mô vài nghìn người dùng, hỗ trợ chat 1-1, nhóm, chia sẻ media và quản lý bạn bè. Mục tiêu thay thế ứng dụng chat thương mại với khả năng kiểm soát dữ liệu nội bộ và tối ưu chi phí.
 
 **Phạm vi bao gồm:**
 - Web app (Next.js/React) và Mobile (React Native)
@@ -237,21 +237,21 @@ npm run dev:web
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
-- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
-- [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
-- [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
-- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
-- [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
-- [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
-- [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
-- [x] Chuẩn hóa UI tab Dashboard Web (Tổng quan/Trò chuyện/Bạn bè/Cộng đồng/Khám phá) full-width và đồng bộ tiếng Việt có dấu <!-- done: 29/04/2026 -->
-- [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
-- [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
-- [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
-- [ ] Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)
-- [x] Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance) <!-- done: 17/04/2026  -->
-- [x] Web UI: Story bar trên dashboard (horizontal scroll, ring indicator) <!-- done: 17/04/2026  -->
-- [ ] Danh sách người đã xem story (Web UI cho story owner)
+>- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
+>- [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
+>- [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
+>- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
+>- [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
+>- [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
+>- [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
+>- [x] Chuẩn hóa UI tab Dashboard Web (Tổng quan/Trò chuyện/Bạn bè/Cộng đồng/Khám phá) full-width và đồng bộ tiếng Việt có dấu <!-- done: 29/04/2026 -->
+>- [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
+>- [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
+>- [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
+>- [x] ~~Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)~~ <!-- removed: 04/05/2026 – Stories feature deferred -->
+>- [x] ~~Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance)~~ <!-- removed: 04/05/2026 -->
+>- [x] ~~Web UI: Story bar trên dashboard (horizontal scroll, ring indicator)~~ <!-- removed: 04/05/2026 -->
+>- [ ] ~~Danh sách người đã xem story (Web UI cho story owner)~~ <!-- removed: 04/05/2026 – Stories feature deferred -->
 
 ### Phase 7 – Notifications (Module F26)
 - [x] Implement `notification.worker.ts` – Kafka consumer topic `notifications` <!-- done: 12/04/2026 -->
@@ -548,9 +548,9 @@ npm run dev:web
   - [ ] A2.2: Web presence UI (green dot, "Hoạt động X phút trước")
   - [ ] A2.3: Mobile presence UI (green dot, lastSeen)
 - [ ] A3: Stories Hoàn thiện (~6-8h)
-  - [ ] A3.1: Web Story creation nâng cấp (background gradient, image crop, caption)
-  - [ ] A3.2: Backend story viewers (track viewedBy[], API danh sách người xem)
-  - [ ] A3.3: Verify + fix bugs Stories Mobile
+  - [ ] ~~A3.1: Web Story creation nâng cấp (background gradient, image crop, caption)~~ <!-- removed: 04/05/2026 -->
+  - [ ] ~~A3.2: Backend story viewers (track viewedBy[], API danh sách người xem)~~ <!-- removed: 04/05/2026 -->
+  - [ ] ~~A3.3: Verify + fix bugs Stories Mobile~~ <!-- removed: 04/05/2026 -->
 - [ ] A4: Chat Feature Gaps (~5-6h)
   - [ ] A4.1: Push notification client Mobile (expo-notifications + FCM/APNs)
   - [ ] A4.2: Mutual friends hiển thị + Friend list trong profile Mobile
@@ -608,13 +608,13 @@ npm run dev:web
 - [x] **Global Error Handler:** `error-handler.middleware.ts` chuẩn hóa 5 loại lỗi (AppError, ZodError, MongoDB 11000, JWT, Unknown) với format `ErrorResponse` thống nhất. <!-- done: 02/05/2026 -->
 - [x] **Schema-driven Validation:** Zod đã có sẵn + `validate.middleware.ts` hoạt động. <!-- done: 02/05/2026 -->
 - [x] **Migrate MessagesService:** Inject `MessageRepository`, thay `MessageModel.findOne/find` trực tiếp bằng repo methods (backward-compatible API). <!-- done: 02/05/2026 -->
-- [ ] **Migrate PostsService:** Inject `PostRepository + CommentRepository`.
+- [x] **Migrate PostsService:** Inject `PostRepository + CommentRepository`, thay PostModel/CommentModel bằng repo methods (backward-compatible API). <!-- done: 04/05/2026 -->
 
 #### X.2. Infrastructure Optimization
 - [x] **Kafka DLQ & Retry:** Thêm topics `raw-messages.retry` + `raw-messages.dlq` + `notifications.retry` + `notifications.dlq`. Worker subscribe cả main topic và retry topic. Max 3 retries với exponential backoff → auto route sang DLQ. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Call:** Tách toàn bộ Call + WebRTC events (8 handlers) ra `socket/call.controller.ts`. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Chat:** Tách `send_message`, `message_read`, `message_delivered`, `delete_message_for_me`, `recall_message`, `forward_message` ra `socket/chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng**. <!-- done: 02/05/2026 -->
-- [ ] **Socket Modularization – Reaction & Story:** Tách Reaction events và Story events thành các sub-controller riêng.
+- [x] **Socket Modularization – Reaction & Story:** Tách `reaction_upsert`, `reaction_remove_all_mine` ra `socket/reaction.controller.ts` và Story emit functions ra `socket/story.controller.ts`. `gateway.ts` giảm thêm ~370 dòng. <!-- done: 04/05/2026 -->
 
 ---
 
@@ -625,7 +625,7 @@ npm run dev:web
 - [x] Phase R4: Pivot Branding (Zalo Clone → Zync Community) ✅
 - [x] Phase N1: Community Posts (Web) ✅
 - [x] Phase N3: Explore & Discovery (Web) ✅
-- [ ] **Phase X: Chuẩn hóa Kiến trúc & Hạ tầng** 🔧 *(~80% hoàn thành – còn PostsService migration + Reaction/Story controller)*
+- [ ] **Phase X: Chuẩn hóa Kiến trúc & Hạ tầng** 🔧 *(~100% hoàn thành – PostsService migrated + Reaction/Story controller)*
 - [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳
 - [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳
 - [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳
@@ -672,6 +672,7 @@ npm run dev:web
 
 ## Feature Notes
 
+- **Token Storage:** Access token được lưu trong `httpOnly` cookie (`accessToken`) do server set, không thể đọc bằng JavaScript (XSS-resistant). Refresh token trong `httpOnly` cookie (`refreshToken`). Client đọc access token qua `GET /api/auth/current-token` endpoint. <!-- done: 04/05/2026 -->
 - **Idempotency:** Client phải tự sinh UUID cho mỗi `send_message`. Server check Redis 5 phút trước khi ghi MongoDB.
 - **Cursor pagination:** Dùng `createdAt` + `_id` làm cursor, tránh `skip()`.
 - **Story expiry:** MongoDB TTL index trên `expiresAt`, không cần cronjob riêng.

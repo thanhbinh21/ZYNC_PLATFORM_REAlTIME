@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { HomeDashboardScreen } from '@/components/home-dashboard/organisms/home-dashboard-screen';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
@@ -14,15 +14,10 @@ import { ForwardMessageModal } from '@/components/home-dashboard/molecules/forwa
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
 import { MessagePreviewPopup } from '@/components/home-dashboard/organisms/MessagePreviewPopup';
 import { useMessagePreview } from '@/hooks/use-message-preview';
-import { StoryBar } from '@/components/stories/organisms/StoryBar';
-import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
-import { StoryHighlights } from '@/components/stories/organisms/StoryHighlights';
-import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModal';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
-import { useStories } from '@/hooks/use-stories';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { fetchMyProfile, type MeUser } from '@/services/users';
-import type { StoryReactionType, StoryFeedGroup, StoryHighlight } from '@/components/stories/stories.types';
+import { PageLoading } from '@/components/shared/page-loading';
 import FriendsPage from '../friends/page';
 import CommunityContent from '../community/community-content';
 import ExploreContent from '../explore/explore-content';
@@ -34,7 +29,7 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 
 export default function HomePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <HomePageContent />
     </Suspense>
   );
@@ -114,18 +109,6 @@ function HomePageContent() {
     userPenaltyScore,
     userMutedUntil,
   } = useHomeDashboard();
-  const {
-    feed,
-    myStories,
-    isFeedLoading,
-    loadFeed,
-    loadMyStories,
-    onCreate,
-    onDelete,
-    onView,
-    onReact,
-    onReply,
-  } = useStories();
 
   const {
     previews,
@@ -140,9 +123,6 @@ function HomePageContent() {
 
   const { onLogout } = useLoginForm();
 
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerGroupIdx, setViewerGroupIdx] = useState(0);
-  const [createOpen, setCreateOpen] = useState(false);
   const [activeNavId, setActiveNavId] = useState('home');
   const openNotificationsSignal = searchParams.get('openNotifications');
   const [profile, setProfile] = useState<MeUser | null>(null);
@@ -151,13 +131,6 @@ function HomePageContent() {
   const [appearanceSettings, setAppearanceSettings] =
     useState<DashboardAppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS);
   const [profileViewUserId, setProfileViewUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (userId) {
-      loadFeed();
-      loadMyStories();
-    }
-  }, [userId, loadFeed, loadMyStories]);
 
   useEffect(() => {
     const savedTheme = globalThis.localStorage?.getItem('zync.dashboard.theme');
@@ -224,31 +197,6 @@ function HomePageContent() {
     return () => clearTimeout(t);
   }, [openNotificationsSignal, router]);
 
-  const allFeed: StoryFeedGroup[] = useMemo(() => {
-    const groups: StoryFeedGroup[] = [];
-    if (myStories.length > 0) {
-      groups.push({
-        userId,
-        displayName: data.user.displayName,
-        stories: myStories.map((s) => ({
-          _id: s._id,
-          userId: s.userId,
-          mediaType: s.mediaType as StoryFeedGroup['stories'][number]['mediaType'],
-          mediaUrl: s.mediaUrl,
-          content: s.content,
-          backgroundColor: s.backgroundColor,
-          fontStyle: s.fontStyle,
-          viewerIds: s.viewerIds,
-          reactions: s.reactions,
-          expiresAt: s.expiresAt,
-          createdAt: s.createdAt,
-        })),
-      });
-    }
-    groups.push(...feed);
-    return groups;
-  }, [myStories, feed, userId, data.user.displayName]);
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-primary">
@@ -256,8 +204,6 @@ function HomePageContent() {
       </div>
     );
   }
-
-  const myStoryGroupOffset = myStories.length > 0 ? 1 : 0;
 
   const handleNavSelect = async (navId: string) => {
     setActiveNavId(navId);
@@ -294,45 +240,6 @@ function HomePageContent() {
       DEFAULT_APPEARANCE_SETTINGS.messageFontSize,
     );
   };
-
-  const handleOpenViewer = (feedIndex: number) => {
-    setViewerGroupIdx(feedIndex + myStoryGroupOffset);
-    setViewerOpen(true);
-  };
-
-  const handleViewMyStory = () => {
-    setViewerGroupIdx(0);
-    setViewerOpen(true);
-  };
-
-  // Mock highlights (replace with real API data when available)
-  const highlights: StoryHighlight[] = [];
-
-  const storySlot = (
-    <div className="space-y-2">
-      {isFeedLoading && (
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
-          <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
-          <div className="h-16 w-16 animate-pulse rounded-full bg-bg-hover" />
-        </div>
-      )}
-
-      <StoryBar
-        feed={feed}
-        myStories={myStories}
-        currentUserId={userId}
-        currentUserName={data.user.displayName}
-        loading={isFeedLoading}
-        onViewStory={handleOpenViewer}
-        onViewMyStory={handleViewMyStory}
-        onCreateStory={() => setCreateOpen(true)}
-      />
-      {highlights.length > 0 && (
-        <StoryHighlights highlights={highlights} onViewHighlight={() => {}} />
-      )}
-    </div>
-  );
 
   return (
     <>
@@ -455,7 +362,7 @@ function HomePageContent() {
             onResetAppearance={handleResetAppearance}
           />
         }
-        storySlot={storySlot}
+        storySlot={undefined}
         onViewUserProfile={(uid) => setProfileViewUserId(uid)}
         profileSlot={
           <HomeDashboardProfilePanel
@@ -463,22 +370,7 @@ function HomePageContent() {
             loading={profileLoading}
             error={profileError}
             syncedPenaltyScore={userPenaltyScore}
-            myStories={myStories}
-            feed={feed}
             friends={friendsForGroup}
-            onOpenCreateStory={() => setCreateOpen(true)}
-            onViewStoryFeed={(feedIndex) => {
-              setViewerGroupIdx(feedIndex + myStoryGroupOffset);
-              setViewerOpen(true);
-            }}
-            onViewUserProfile={(uid) => setProfileViewUserId(uid)}
-            onProfileUpdated={(updatedProfile) => {
-              setProfile(updatedProfile);
-              onPatchDashboardUser({
-                displayName: updatedProfile.displayName,
-                avatarUrl: updatedProfile.avatarUrl,
-              });
-            }}
           />
         }
         friendsSlot={<FriendsPage />}
@@ -505,32 +397,6 @@ function HomePageContent() {
         isLoading={forwardLoading}
         onClose={onCloseForwardModal}
         onForward={(message, toConversationId) => onExecuteForward(toConversationId)}
-      />
-
-      {viewerOpen && allFeed.length > 0 && (
-        <StoryViewer
-          feed={allFeed}
-          initialGroupIndex={viewerGroupIdx}
-          currentUserId={userId}
-          onClose={() => setViewerOpen(false)}
-          onReact={(storyId, emoji) => onReact(storyId, emoji as StoryReactionType)}
-          onReply={onReply}
-          onView={onView}
-          onDelete={(storyId) => {
-            onDelete(storyId);
-            loadMyStories();
-          }}
-          onShare={() => { /* TODO: implement share */ }}
-        />
-      )}
-
-      <StoryCreateModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={async (payload) => {
-          await onCreate(payload);
-          await Promise.all([loadFeed(), loadMyStories()]);
-        }}
       />
     </>
   );

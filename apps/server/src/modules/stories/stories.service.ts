@@ -6,7 +6,7 @@ import { ConversationMemberModel } from '../conversations/conversation-member.mo
 import { MessageModel } from '../messages/message.model';
 import { UserModel } from '../users/user.model';
 import { ForbiddenError, NotFoundError } from '../../shared/errors';
-import { emitStoryReaction, emitStoryReply } from '../../socket/gateway';
+import { emitStoryReaction, emitStoryReply } from '../../socket/story.controller';
 import { produceNotificationEvent } from '../notifications/notifications.service';
 import { logger } from '../../shared/logger';
 import type { CreateStoryDto } from './stories.schema';

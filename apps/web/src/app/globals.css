@@ -1562,3 +1562,108 @@ body.story-viewer-open {
 		animation: none !important;
 	}
 }
+
+/* ─── Toast Animations ─── */
+
+@keyframes toast-slide-in {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, -12px);
+	}
+	100% {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+}
+
+@keyframes toast-slide-out {
+	0% {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+	100% {
+		opacity: 0;
+		transform: translate(-50%, -12px);
+	}
+}
+
+.animate-toast-slide-in {
+	animation: toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-slide-out {
+	animation: toast-slide-out 0.25s ease-in forwards;
+}
+
+/* ─── Chat Bubble Animations ─── */
+
+@keyframes bubble-in-right {
+	0% {
+		opacity: 0;
+		transform: translateY(10px) scale(0.96);
+	}
+	60% {
+		transform: translateY(-2px) scale(1.01);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+@keyframes bubble-in-left {
+	0% {
+		opacity: 0;
+		transform: translateY(10px) scale(0.96);
+	}
+	60% {
+		transform: translateY(-2px) scale(1.01);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/*
+ * Wrapper divs in ChatPanel receive animation classes.
+ * display: inline-block makes the wrapper fit its content (not stretch),
+ * which is critical for correct 3-dot menu button positioning
+ * (absolute -left-7 / -right-7 is relative to this div's edge).
+ */
+.message-bubble-own {
+	display: inline-block;
+	width: 100%;
+	animation: bubble-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.message-bubble-other {
+	display: inline-block;
+	width: 100%;
+	animation: bubble-in-left 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Scrollbar Chat ─── */
+
+.chat-messages-scroll::-webkit-scrollbar {
+	width: 4px;
+}
+
+.chat-messages-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.chat-messages-scroll::-webkit-scrollbar-thumb {
+	background: var(--border);
+	border-radius: 9999px;
+}
+
+.chat-messages-scroll::-webkit-scrollbar-thumb:hover {
+	background: var(--text-tertiary);
+}
+
+/* ─── Input Focus Glow ─── */
+
+.chat-input-glow:focus-within {
+	box-shadow: 0 0 0 3px var(--ring-soft), 0 4px 20px rgba(15, 157, 142, 0.08);
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { getSocket, sendQuickReply } from '@/services/socket';
+import { getAccessToken } from '@/utils/auth-token';
 import type { Notification } from '@/services/notifications';
 
 export interface MessagePreviewItem {
@@ -98,9 +99,7 @@ export function useMessagePreview({
   );
 
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)[
-      '__accessToken'
-    ] as string | undefined;
+    const token = getAccessToken();
     if (!token) return;
 
     const socket = getSocket(token);

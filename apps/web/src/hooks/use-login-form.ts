@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 import type {
   AuthMode,
   AuthStep,
@@ -17,6 +18,7 @@ import {
   verifyOtp,
   verifyPasswordOtp,
 } from '@/services/auth';
+import { clearAccessToken } from '@/utils/auth-token';
 
 const DEFAULT_FORM: LoginFormValues = {
   identifier: '',
@@ -86,6 +88,30 @@ export function useLoginForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastVariant, setToastVariant] = useState<'info' | 'success' | 'error'>('info');
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Đang xử lý...');
+
+  const showToast = (message: string, variant: 'info' | 'success' | 'error' = 'info') => {
+    setToastMessage(message);
+    setToastVariant(variant);
+  };
+
+  const dismissToast = () => {
+    setToastMessage(null);
+  };
+
+  const showModal = (message: string) => {
+    setLoadingMessage(message);
+    setShowLoadingModal(true);
+  };
+
+  const hideModal = () => {
+    setShowLoadingModal(false);
+  };
 
   const canRequestOtp = useMemo(() => {
     const hasMinimumIdentifierLength = values.identifier.trim().length >= 5;
@@ -202,6 +228,8 @@ export function useLoginForm() {
       setErrorMessage(null);
       const email = normalizeEmail(values.identifier);
 
+      showModal('Đang gửi mã OTP...');
+
       if (mode === 'register') {
         await requestOtp({
           email,
@@ -218,6 +246,7 @@ export function useLoginForm() {
         });
       }
 
+      hideModal();
       setStep('verify');
       setPendingIdentifier(email);
       setInfoMessage(
@@ -227,6 +256,7 @@ export function useLoginForm() {
       );
       setValues((prev) => ({ ...prev, identifier: email, otp: '' }));
     } catch (error: unknown) {
+      hideModal();
       const fallbackMessage = 'Không thể gửi OTP. Vui lòng thử lại.';
       const message =
         typeof error === 'object' &&
@@ -235,6 +265,7 @@ export function useLoginForm() {
         typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
           ? (error as { response: { data: { error: string } } }).response.data.error
           : fallbackMessage;
+      showToast(message, 'error');
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -251,6 +282,9 @@ export function useLoginForm() {
       setIsSubmitting(true);
       setErrorMessage(null);
       const verifyEmail = pendingIdentifier ?? normalizeEmail(values.identifier);
+
+      showModal('Đang xác thực...');
+
       if (isRecoveryFlow) {
         await resetForgotPassword({
           email: verifyEmail,
@@ -258,10 +292,12 @@ export function useLoginForm() {
           newPassword: values.password,
         });
 
+        hideModal();
         setIsRecoveryFlow(false);
         setPendingIdentifier(null);
         setStep('input');
         setValues((prev) => ({ ...prev, otp: '' }));
+        showToast('Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.', 'success');
         setInfoMessage('Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.');
         setErrorMessage(null);
         return;
@@ -286,18 +322,19 @@ export function useLoginForm() {
             platform: 'web',
           });
 
-      (globalThis as Record<string, unknown>)['__accessToken'] = response.accessToken;
+      hideModal();
       setCurrentUserName(response.user.displayName);
-      setPendingIdentifier(null);
+      showToast('Xác thực thành công! Đang chuyển hướng...', 'success');
       setInfoMessage('Xác thực thành công. Bạn đã đăng nhập vào hệ thống.');
       setErrorMessage(null);
-      
+
       if (!response.user.onboardingCompleted) {
         router.push('/onboarding');
       } else {
         router.push('/home');
       }
     } catch (error: unknown) {
+      hideModal();
       const fallbackMessage = 'Xác thực OTP thất bại. Vui lòng thử lại.';
       const message =
         typeof error === 'object' &&
@@ -307,8 +344,10 @@ export function useLoginForm() {
           ? (error as { response: { data: { error: string } } }).response.data.error
           : fallbackMessage;
       if (message === 'Invalid or expired OTP' || message.includes('OTP không hợp lệ')) {
+        showToast('OTP không hợp lệ hoặc đã hết hạn. Hãy bấm "Đổi thông tin" và gửi lại OTP mới.', 'error');
         setErrorMessage('OTP không hợp lệ hoặc đã hết hạn. Hãy bấm "Đổi thông tin" và gửi lại OTP mới.');
       } else {
+        showToast(message, 'error');
         setErrorMessage(message);
       }
     } finally {
@@ -323,11 +362,13 @@ export function useLoginForm() {
 
     const clientId = process.env['NEXT_PUBLIC_GOOGLE_CLIENT_ID'];
     if (!clientId) {
+      showToast('Thiếu cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID cho đăng nhập Google.', 'error');
       setErrorMessage('Thiếu cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID cho đăng nhập Google.');
       return;
     }
 
     if (typeof window === 'undefined' || !window.google?.accounts?.id) {
+      showToast('Google Identity chưa sẵn sàng. Vui lòng thử lại sau vài giây.', 'error');
       setErrorMessage('Google Identity chưa sẵn sàng. Vui lòng thử lại sau vài giây.');
       return;
     }
@@ -336,9 +377,11 @@ export function useLoginForm() {
       setIsSubmitting(true);
       setErrorMessage(null);
 
+      showModal('Đang đăng nhập Google...');
+
       const credential = await new Promise<string>((resolve, reject) => {
         const timeout = window.setTimeout(() => {
-          reject(new Error('Không nhận được Google credential.'));
+          reject(new Error('TIMEOUT'));
         }, 15000);
 
         window.google?.accounts.id.initialize({
@@ -346,7 +389,7 @@ export function useLoginForm() {
           callback: (response) => {
             window.clearTimeout(timeout);
             if (!response.credential) {
-              reject(new Error('Không lấy được Google credential.'));
+              reject(new Error('NO_CREDENTIAL'));
               return;
             }
             resolve(response.credential);
@@ -363,25 +406,60 @@ export function useLoginForm() {
         platform: 'web',
       });
 
-      (globalThis as Record<string, unknown>)['__accessToken'] = response.accessToken;
+      hideModal();
       setCurrentUserName(response.user.displayName);
-      setInfoMessage('Đăng nhập Google thành công.');
-      
+      showToast('Đăng nhập Google thành công!', 'success');
+
       if (!response.user.onboardingCompleted) {
         router.push('/onboarding');
       } else {
         router.push('/home');
       }
     } catch (error: unknown) {
-      const fallbackMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
-      const message =
+      hideModal();
+      if (
         typeof error === 'object' &&
         error !== null &&
         'response' in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
-          ? (error as { response: { data: { error: string } } }).response.data.error
-          : fallbackMessage;
-      setErrorMessage(message);
+        typeof (error as { response?: { data?: { code?: string } } }).response?.data?.code === 'string'
+      ) {
+        const code = (error as { response: { data: { code: string } } }).response.data.code;
+        if (code === 'GOOGLE_TOKEN_INVALID') {
+          showToast('Token Google không hợp lệ hoặc đã hết hạn. Vui lòng thử đăng nhập lại.', 'error');
+          setErrorMessage('Token Google không hợp lệ hoặc đã hết hạn. Vui lòng thử đăng nhập lại.');
+        } else if (code === 'GOOGLE_EMAIL_NOT_VERIFIED') {
+          showToast('Email Google chưa được xác minh. Vui lòng xác minh email trong tài khoản Google trước.', 'error');
+          setErrorMessage('Email Google chưa được xác minh. Vui lòng xác minh email trong tài khoản Google trước.');
+        } else if (code === 'GOOGLE_CLIENT_NOT_CONFIGURED') {
+          showToast('Dịch vụ đăng nhập Google đang gặp sự cố. Vui lòng thử lại sau.', 'error');
+          setErrorMessage('Dịch vụ đăng nhập Google đang gặp sự cố. Vui lòng thử lại sau.');
+        } else if (code === 'ACCOUNT_EXISTS_WITH_PASSWORD') {
+          showToast('Tài khoản đã tồn tại với email này. Vui lòng đăng nhập bằng email + mật khẩu + OTP.', 'error');
+          setErrorMessage('Tài khoản đã tồn tại với email này. Vui lòng đăng nhập bằng email + mật khẩu + OTP.');
+        } else {
+          showToast('Đăng nhập Google thất bại. Vui lòng thử lại.', 'error');
+          setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.');
+        }
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        (error as { message?: string }).message === 'TIMEOUT'
+      ) {
+        showToast('Yêu cầu đăng nhập Google bị gián đoạn. Vui lòng thử lại.', 'error');
+        setErrorMessage('Yêu cầu đăng nhập Google bị gián đoạn. Vui lòng thử lại.');
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        (error as { message?: string }).message === 'NO_CREDENTIAL'
+      ) {
+        showToast('Không nhận được phản hồi từ Google. Vui lòng thử lại.', 'error');
+        setErrorMessage('Không nhận được phản hồi từ Google. Vui lòng thử lại.');
+      } else {
+        showToast('Đăng nhập Google thất bại. Vui lòng thử lại.', 'error');
+        setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -391,16 +469,20 @@ export function useLoginForm() {
     try {
       setIsSubmitting(true);
       const deviceToken = resolveDeviceToken();
+      showModal('Đang đăng xuất...');
       await logout({ deviceToken });
-      (globalThis as Record<string, unknown>)['__accessToken'] = undefined;
+      clearAccessToken();
+      hideModal();
       setCurrentUserName(null);
       setPendingIdentifier(null);
       setStep('input');
       setValues((prev) => ({ ...prev, otp: '' }));
+      showToast('Bạn đã đăng xuất khỏi hệ thống.', 'success');
       setInfoMessage('Bạn đã đăng xuất khỏi hệ thống.');
       setErrorMessage(null);
       router.push('/login');
     } catch {
+      hideModal();
       setErrorMessage('Đăng xuất thất bại. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
@@ -429,5 +511,10 @@ export function useLoginForm() {
     onGoogleLogin,
     onBackToInput,
     onLogout,
+    toastMessage,
+    toastVariant,
+    onToastDismiss: dismissToast,
+    showLoadingModal,
+    loadingMessage,
   };
 }

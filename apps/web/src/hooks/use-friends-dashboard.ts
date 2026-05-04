@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getSocket } from '@/services/socket';
+import { getAccessToken } from '@/utils/auth-token';
 import {
   acceptFriendRequest,
   blockUser,
@@ -165,7 +166,7 @@ export function useFriendsDashboard() {
   const pendingTotal = useMemo(() => incomingRequests.length + outgoingRequests.length, [incomingRequests, outgoingRequests]);
 
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
+    const token = getAccessToken();
     if (!token) return;
 
     const socket = getSocket(token);

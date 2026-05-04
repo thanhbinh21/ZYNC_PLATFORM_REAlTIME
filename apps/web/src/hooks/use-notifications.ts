@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSocket } from '@/services/socket';
+import { getAccessToken } from '@/utils/auth-token';
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -138,7 +139,7 @@ export function useNotifications() {
 
   // I1.4 – Subscribe to Socket.IO `new_notification` event
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
+    const token = getAccessToken();
     if (!token) return;
 
     const socket = getSocket(token);

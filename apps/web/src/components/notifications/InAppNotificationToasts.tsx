@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { getSocket } from '@/services/socket';
+import { getAccessToken } from '@/utils/auth-token';
 import type { Notification } from '@/services/notifications';
 import { markAsRead } from '@/services/notifications';
 import { MessageCircle, UserPlus, UserCheck, Users, Heart, MessageSquare, Bell } from 'lucide-react';
@@ -90,7 +91,7 @@ export function InAppNotificationToasts() {
   }, [router]);
 
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
+    const token = getAccessToken();
     if (!token) return;
 
     const socket = getSocket(token);

@@ -3,6 +3,9 @@ import { PostModel, type PostType } from './post.model';
 import { CommentModel } from './comment.model';
 import { UserModel } from '../users/user.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
+import { PostRepository } from '../../shared/repositories/post.repository';
+import { CommentRepository } from '../../shared/repositories/post.repository';
+import container from '../../container';
 
 export interface PostAuthor {
   _id: string;
@@ -60,7 +63,10 @@ async function enrichWithAuthor(authorId: string): Promise<PostAuthor | undefine
 }
 
 export class PostsService {
-  /** Tạo bài viết mới */
+  private static readonly postRepo = (container as unknown as { postRepository: PostRepository }).postRepository;
+  private static readonly commentRepo = (container as unknown as { commentRepository: CommentRepository }).commentRepository;
+
+  /** Tao bai viet moi */
   static async createPost(
     authorId: string,
     input: {
@@ -88,35 +94,29 @@ export class PostsService {
     return formatPost(post.toObject(), authorId, author);
   }
 
-  /** Feed cá nhân – cursor pagination */
+  /** Feed ca nhan – cursor pagination */
   static async getFeed(
     requesterId: string,
     cursor?: string,
     limit = 20,
   ): Promise<{ posts: PostSummary[]; nextCursor?: string }> {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
-    const query: Record<string, unknown> = { status: 'published' };
-    if (cursor) {
-      const decoded = new Date(parseInt(cursor, 10));
-      query['createdAt'] = { $lt: decoded };
-    }
+    const cursorDate = cursor ? new Date(parseInt(cursor, 10)) : undefined;
 
-    const posts = await PostModel.find(query)
-      .sort({ createdAt: -1 })
-      .limit(safeLimit + 1)
-      .lean();
+    const posts = await PostsService.postRepo.findFeed(cursorDate, safeLimit + 1);
 
     const hasMore = posts.length > safeLimit;
     const paginated = hasMore ? posts.slice(0, safeLimit) : posts;
 
-    const authorIds = [...new Set(paginated.map((p) => p.authorId as string))];
+    const authorIds = [...new Set(paginated.map((p) => (p as unknown as Record<string, unknown>)['authorId'] as string))];
     const users = await UserModel.find({ _id: { $in: authorIds } })
       .select('displayName avatarUrl devRole skills')
       .lean();
     const authorMap = new Map(users.map((u) => [u._id.toString(), u]));
 
     const result = paginated.map((p) => {
-      const user = authorMap.get(p.authorId as string);
+      const raw = p as unknown as Record<string, unknown>;
+      const user = authorMap.get(raw['authorId'] as string);
       const author: PostAuthor | undefined = user
         ? {
             _id: user._id.toString(),
@@ -130,29 +130,26 @@ export class PostsService {
     });
 
     const nextCursor = hasMore
-      ? String(new Date(paginated[paginated.length - 1]!.createdAt as Date).getTime())
+      ? String(new Date((paginated[paginated.length - 1] as unknown as Record<string, Date>)['createdAt']).getTime())
       : undefined;
 
     return { posts: result, nextCursor };
   }
 
-  /** Trending posts – dựa vào engagement score */
+  /** Trending posts – dua vao engagement score */
   static async getTrending(requesterId: string, limit = 10): Promise<PostSummary[]> {
     const safeLimit = Math.min(limit, 30);
-    // Use likesCount + commentsCount * 2 + viewsCount * 0.1 implicitly via sort
-    const posts = await PostModel.find({ status: 'published' })
-      .sort({ likesCount: -1, commentsCount: -1, createdAt: -1 })
-      .limit(safeLimit)
-      .lean();
+    const posts = await PostsService.postRepo.findTrending(safeLimit);
 
-    const authorIds = [...new Set(posts.map((p) => p.authorId as string))];
+    const authorIds = [...new Set(posts.map((p) => (p as unknown as Record<string, unknown>)['authorId'] as string))];
     const users = await UserModel.find({ _id: { $in: authorIds } })
       .select('displayName avatarUrl devRole skills')
       .lean();
     const authorMap = new Map(users.map((u) => [u._id.toString(), u]));
 
     return posts.map((p) => {
-      const user = authorMap.get(p.authorId as string);
+      const raw = p as unknown as Record<string, unknown>;
+      const user = authorMap.get(raw['authorId'] as string);
       const author: PostAuthor | undefined = user
         ? {
             _id: user._id.toString(),
@@ -165,19 +162,18 @@ export class PostsService {
     });
   }
 
-  /** Chi tiết bài viết + tăng view count */
+  /** Chi tiet bai viet + tang view count */
   static async getPostById(postId: string, requesterId: string): Promise<PostSummary> {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
 
-    const post = await PostModel.findByIdAndUpdate(
-      postId,
-      { $inc: { viewsCount: 1 } },
-      { new: true },
-    ).lean();
+    const post = await PostsService.postRepo.incrementViews(postId);
 
-    if (!post || post.status !== 'published') throw new NotFoundError('Post not found');
+    if (!post || (post as unknown as Record<string, unknown>)['status'] !== 'published') {
+      throw new NotFoundError('Post not found');
+    }
 
-    const author = await enrichWithAuthor(post.authorId as string);
+    const authorId = (post as unknown as Record<string, unknown>)['authorId'] as string;
+    const author = await enrichWithAuthor(authorId);
     return formatPost(post, requesterId, author);
   }
 
@@ -214,76 +210,61 @@ export class PostsService {
   /** Like/unlike toggle */
   static async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; likesCount: number }> {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
-    const post = await PostModel.findById(postId);
-    if (!post) throw new NotFoundError('Post not found');
-
-    const alreadyLiked = (post.likedBy as string[]).includes(userId);
-    if (alreadyLiked) {
-      post.likedBy = (post.likedBy as string[]).filter((id) => id !== userId);
-      post.likesCount = Math.max(0, post.likesCount - 1);
-    } else {
-      (post.likedBy as string[]).push(userId);
-      post.likesCount = post.likesCount + 1;
-    }
-    await post.save();
-    return { liked: !alreadyLiked, likesCount: post.likesCount };
+    const result = await PostsService.postRepo.toggleLike(postId, userId);
+    if (!result) throw new NotFoundError('Post not found');
+    return result;
   }
 
   /** Bookmark toggle */
   static async toggleBookmark(postId: string, userId: string): Promise<{ bookmarked: boolean }> {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
-    const post = await PostModel.findById(postId);
-    if (!post) throw new NotFoundError('Post not found');
-
-    const alreadyBookmarked = (post.bookmarkedBy as string[]).includes(userId);
-    if (alreadyBookmarked) {
-      post.bookmarkedBy = (post.bookmarkedBy as string[]).filter((id) => id !== userId);
-    } else {
-      (post.bookmarkedBy as string[]).push(userId);
-    }
-    await post.save();
-    return { bookmarked: !alreadyBookmarked };
+    const result = await PostsService.postRepo.toggleBookmark(postId, userId);
+    if (!result) throw new NotFoundError('Post not found');
+    return result;
   }
 
-  /** Thêm comment */
+  /** Them comment */
   static async addComment(
     postId: string,
     authorId: string,
     input: { content: string; codeSnippet?: string; parentId?: string },
   ): Promise<CommentSummary> {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
-    const post = await PostModel.findById(postId);
-    if (!post) throw new NotFoundError('Post not found');
+    // Kiem tra post ton tai qua postRepo
+    const postExists = await PostsService.postRepo.exists({ _id: postId } as unknown as Record<string, unknown>);
+    if (!postExists) throw new NotFoundError('Post not found');
 
-    const comment = await CommentModel.create({
+    const comment = await PostsService.commentRepo.create({
       postId,
       authorId,
       content: input.content.trim(),
       codeSnippet: input.codeSnippet,
       parentId: input.parentId,
-    });
+    } as unknown as Record<string, unknown>);
 
-    await PostModel.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+    // Tang commentsCount truc tiep
+    await PostsService.postRepo.updateOne(
+      { _id: postId } as unknown as Record<string, unknown>,
+      { $inc: { commentsCount: 1 } },
+    );
 
     const author = await enrichWithAuthor(authorId);
-    return formatComment(comment.toObject(), authorId, author);
+    return formatComment(comment as unknown as Record<string, unknown>, authorId, author);
   }
 
-  /** Lấy danh sách comments */
+  /** Lay danh sach comments */
   static async getComments(postId: string, requesterId: string): Promise<CommentSummary[]> {
-    const comments = await CommentModel.find({ postId })
-      .sort({ createdAt: 1 })
-      .limit(100)
-      .lean();
+    const comments = await PostsService.commentRepo.findByPost(postId, 100);
 
-    const authorIds = [...new Set(comments.map((c) => c.authorId as string))];
+    const authorIds = [...new Set(comments.map((c) => (c as unknown as Record<string, unknown>)['authorId'] as string))];
     const users = await UserModel.find({ _id: { $in: authorIds } })
       .select('displayName avatarUrl devRole')
       .lean();
     const authorMap = new Map(users.map((u) => [u._id.toString(), u]));
 
     return comments.map((c) => {
-      const user = authorMap.get(c.authorId as string);
+      const raw = c as unknown as Record<string, unknown>;
+      const user = authorMap.get(raw['authorId'] as string);
       const author: PostAuthor | undefined = user
         ? { _id: user._id.toString(), displayName: user.displayName as string, avatarUrl: user.avatarUrl as string | undefined }
         : undefined;

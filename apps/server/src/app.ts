@@ -9,7 +9,6 @@ import { friendsRouter } from './modules/friends/friends.routes';
 import { groupsRouter } from './modules/groups/groups.routes';
 import { conversationsRouter } from './modules/conversations/conversations.routes';
 import { messagesRouter } from './modules/messages/messages.routes';
-import { storiesRouter } from './modules/stories/stories.routes';
 import { uploadRouter } from './modules/upload/upload.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { aiRouter } from './modules/ai/ai.routes';
@@ -66,7 +65,6 @@ export function createApp(): Application {
   app.use('/api/groups', groupsRouter);
   app.use('/api/conversations', conversationsRouter);
   app.use('/api/messages', messagesRouter);
-  app.use('/api/stories', storiesRouter);
   app.use('/api/upload', uploadRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/ai', aiRouter);

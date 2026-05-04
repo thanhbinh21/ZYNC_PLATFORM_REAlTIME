@@ -15,12 +15,12 @@
 
 ### 1.1.1 Còn lại (Service Migration)
 - [x] **Migrate MessagesService:** Inject `MessageRepository`, thay `MessageModel.findOne/find` bằng `repo.findByIdempotencyKey()` + `repo['model'].find()`. Static methods giữ nguyên API (backward-compatible).
-- [ ] **Migrate PostsService:** Inject `PostRepository + CommentRepository` (cần làm tiếp).
+- [x] **Migrate PostsService:** Inject `PostRepository + CommentRepository`, thay `PostModel/CommentModel` bằng `postRepo.findFeed/findTrending/toggleLike/toggleBookmark/incrementViews` và `commentRepo.create/findByPost`. Static methods giữ nguyên API (backward-compatible).
 
 ### 1.2. Infrastructure Optimization
 - [x] **Kafka Resiliency:** Triển khai Dead Letter Queue (DLQ) + Retry Topics. Worker subscribe cả `raw-messages` và `raw-messages.retry`. Max 3 retries → auto route sang DLQ.
-- [x] **Socket Modularization:** Tách Call + WebRTC events ra `call.controller.ts` và Chat events (send_message, read, delivered, delete, recall, forward) ra `chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng** (-123 dòng).
-- [ ] **Socket Modularization tiếp:** Tách Reaction events và Story events.
+- [x] **Socket Modularization:** Tách Call + WebRTC events ra `call.controller.ts` và Chat events (send_message, read, delivered, delete, recall, forward) ra `chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng**.
+- [x] **Socket Modularization:** Tách Reaction events (`reaction_upsert`, `reaction_remove_all_mine`) ra `reaction.controller.ts` và Story emit functions (`emitStoryReaction`, `emitStoryReply`) ra `story.controller.ts`. `gateway.ts` giảm thêm ~370 dòng, còn **~1300 dòng**.
 
 ---
 

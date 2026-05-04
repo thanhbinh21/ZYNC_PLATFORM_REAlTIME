@@ -64,4 +64,9 @@ export interface LoginScreenProps {
   onGoogleLogin: () => Promise<void>;
   onBackToInput: () => void;
   onLogout: () => Promise<void>;
+  loadingMessage?: string;
+  showLoadingModal?: boolean;
+  toastMessage?: string | null;
+  toastVariant?: 'info' | 'success' | 'error';
+  onToastDismiss?: () => void;
 }

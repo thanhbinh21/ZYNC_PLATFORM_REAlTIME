@@ -13,7 +13,40 @@ import {
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
+const ACCESS_TOKEN_COOKIE = 'accessToken';
+const ACCESS_TOKEN_CLIENT_COOKIE = 'accessToken_client'; // non-httpOnly side-channel for Socket.IO client
 const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 ngày (ms)
+
+function setAccessTokenCookie(res: Response, accessToken: string): void {
+  // httpOnly cookie for REST API auth (cannot be read by JS)
+  res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+    maxAge: 15 * 60 * 1000, // 15 phút, matching ACCESS_TOKEN_TTL
+  });
+
+  // non-httpOnly side-channel cookie so Socket.IO client can read the token.
+  // accessToken is short-lived (15m) so this is acceptable for Socket.IO only.
+  res.cookie(ACCESS_TOKEN_CLIENT_COOKIE, accessToken, {
+    httpOnly: false,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+    maxAge: 15 * 60 * 1000,
+  });
+}
+
+function clearAccessTokenCookie(res: Response): void {
+  res.clearCookie(ACCESS_TOKEN_COOKIE, {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+  });
+  res.clearCookie(ACCESS_TOKEN_CLIENT_COOKIE, {
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+  });
+}
 
 // ─── POST /api/auth/register ─────────────────────────────────────────────────
 
@@ -54,7 +87,9 @@ export async function verifyOtpHandler(
       platform,
     });
 
-    // Lưu refresh token vào http-only cookie 
+    setAccessTokenCookie(res, result.accessToken);
+
+    // Lưu refresh token vào http-only cookie
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
@@ -115,6 +150,8 @@ export async function loginPasswordVerifyOtpHandler(
       deviceToken,
       platform,
     });
+
+    setAccessTokenCookie(res, result.accessToken);
 
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
@@ -193,6 +230,8 @@ export async function googleLoginHandler(
 
     const result = await loginWithGoogle(idToken, { deviceToken, platform });
 
+    setAccessTokenCookie(res, result.accessToken);
+
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
@@ -232,6 +271,33 @@ export async function refreshHandler(
     }
 
     const accessToken = await refreshAccessToken(refreshToken);
+
+    setAccessTokenCookie(res, accessToken);
+
+    res.json({ success: true, accessToken });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /api/auth/current-token ────────────────────────────────────────────
+
+/**
+ * Tra ve access token hien tai tu httpOnly cookie.
+ * Dung cho Socket.IO client de lay token ma khong can access token truoc do.
+ * Client goi endpoint nay de lay token moi moi khi socket disconnect/reconnect.
+ */
+export async function currentTokenHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const accessToken = req.cookies[ACCESS_TOKEN_COOKIE] as string | undefined;
+    if (!accessToken) {
+      res.status(401).json({ success: false, error: 'Access token not found' });
+      return;
+    }
     res.json({ success: true, accessToken });
   } catch (err) {
     next(err);
@@ -253,7 +319,9 @@ export async function logoutHandler(
 
     await logout(accessToken, refreshToken, deviceToken);
 
-    // Xoá refresh token cookie
+    clearAccessTokenCookie(res);
+
+    // Xóa refresh token cookie
     res.clearCookie(REFRESH_TOKEN_COOKIE, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',

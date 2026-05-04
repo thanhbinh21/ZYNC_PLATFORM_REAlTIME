@@ -12,12 +12,16 @@ export async function authenticate(
   _res: Response,
   next: NextFunction,
 ): Promise<void> {
+  // Ưu tiên đọc từ Authorization header (client gửi kèm)
+  // Fallback đọc từ httpOnly cookie 'accessToken' (server set sau login)
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
+  const cookieToken = req.cookies['accessToken'] as string | undefined;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : cookieToken;
+
+  if (!token) {
     return next(new UnauthorizedError('Missing or invalid Authorization header'));
   }
 
-  const token = header.slice(7);
   const secret = process.env['JWT_SECRET'];
   if (!secret) throw new Error('JWT_SECRET not configured');
 

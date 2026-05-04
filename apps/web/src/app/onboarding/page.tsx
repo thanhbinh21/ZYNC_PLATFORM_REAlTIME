@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Code2,
@@ -19,6 +19,7 @@ import {
   PenLine,
 } from 'lucide-react';
 import { apiClient } from '@/services/api';
+import { PageLoading } from '@/components/shared/page-loading';
 
 const SKILL_TAGS = [
   'javascript', 'typescript', 'react', 'nextjs', 'vue', 'angular', 'svelte',
@@ -68,6 +69,14 @@ const STEP_META = [
 ];
 
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <OnboardingPageContent />
+    </Suspense>
+  );
+}
+
+function OnboardingPageContent() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
