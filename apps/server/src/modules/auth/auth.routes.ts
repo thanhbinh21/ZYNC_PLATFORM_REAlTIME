@@ -20,6 +20,7 @@ import {
   forgotPasswordResetHandler,
   googleLoginHandler,
   refreshHandler,
+  currentTokenHandler,
   logoutHandler,
 } from './auth.controller';
 
@@ -66,6 +67,9 @@ authRouter.post('/google', validateBody(GoogleLoginSchema), googleLoginHandler);
 
 // POST /api/auth/refresh – refresh access token using http-only cookie
 authRouter.post('/refresh', refreshHandler);
+
+// GET /api/auth/current-token – lay access token tu httpOnly cookie (dung cho Socket.IO)
+authRouter.get('/current-token', currentTokenHandler);
 
 // POST /api/auth/logout – revoke token + clear cookie
 authRouter.post('/logout', validateBody(LogoutSchema), logoutHandler);

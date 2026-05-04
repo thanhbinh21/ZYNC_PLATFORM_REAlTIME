@@ -8,7 +8,7 @@
 
 ## Mục tiêu & Phạm vi
 
-Hệ thống nhắn tin tức thời quy mô vài nghìn người dùng, hỗ trợ chat 1-1, nhóm, chia sẻ media, story 24h và quản lý bạn bè. Mục tiêu thay thế ứng dụng chat thương mại với khả năng kiểm soát dữ liệu nội bộ và tối ưu chi phí.
+Hệ thống nhắn tin tức thời quy mô vài nghìn người dùng, hỗ trợ chat 1-1, nhóm, chia sẻ media và quản lý bạn bè. Mục tiêu thay thế ứng dụng chat thương mại với khả năng kiểm soát dữ liệu nội bộ và tối ưu chi phí.
 
 **Phạm vi bao gồm:**
 - Web app (Next.js/React) và Mobile (React Native)
@@ -237,21 +237,21 @@ npm run dev:web
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
 ### Phase 6 – Presence & Stories (Module F22–F25)
-- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
-- [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
-- [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
-- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
-- [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
-- [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
-- [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
-- [x] Chuẩn hóa UI tab Dashboard Web (Tổng quan/Trò chuyện/Bạn bè/Cộng đồng/Khám phá) full-width và đồng bộ tiếng Việt có dấu <!-- done: 29/04/2026 -->
-- [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
-- [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
-- [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
-- [ ] Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)
-- [x] Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance) <!-- done: 17/04/2026  -->
-- [x] Web UI: Story bar trên dashboard (horizontal scroll, ring indicator) <!-- done: 17/04/2026  -->
-- [ ] Danh sách người đã xem story (Web UI cho story owner)
+>- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
+>- [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
+>- [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
+>- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
+>- [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
+>- [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
+>- [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
+>- [x] Chuẩn hóa UI tab Dashboard Web (Tổng quan/Trò chuyện/Bạn bè/Cộng đồng/Khám phá) full-width và đồng bộ tiếng Việt có dấu <!-- done: 29/04/2026 -->
+>- [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
+>- [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
+>- [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
+>- [x] ~~Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)~~ <!-- removed: 04/05/2026 – Stories feature deferred -->
+>- [x] ~~Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance)~~ <!-- removed: 04/05/2026 -->
+>- [x] ~~Web UI: Story bar trên dashboard (horizontal scroll, ring indicator)~~ <!-- removed: 04/05/2026 -->
+>- [ ] ~~Danh sách người đã xem story (Web UI cho story owner)~~ <!-- removed: 04/05/2026 – Stories feature deferred -->
 
 ### Phase 7 – Notifications (Module F26)
 - [x] Implement `notification.worker.ts` – Kafka consumer topic `notifications` <!-- done: 12/04/2026 -->
@@ -548,9 +548,9 @@ npm run dev:web
   - [ ] A2.2: Web presence UI (green dot, "Hoạt động X phút trước")
   - [ ] A2.3: Mobile presence UI (green dot, lastSeen)
 - [ ] A3: Stories Hoàn thiện (~6-8h)
-  - [ ] A3.1: Web Story creation nâng cấp (background gradient, image crop, caption)
-  - [ ] A3.2: Backend story viewers (track viewedBy[], API danh sách người xem)
-  - [ ] A3.3: Verify + fix bugs Stories Mobile
+  - [ ] ~~A3.1: Web Story creation nâng cấp (background gradient, image crop, caption)~~ <!-- removed: 04/05/2026 -->
+  - [ ] ~~A3.2: Backend story viewers (track viewedBy[], API danh sách người xem)~~ <!-- removed: 04/05/2026 -->
+  - [ ] ~~A3.3: Verify + fix bugs Stories Mobile~~ <!-- removed: 04/05/2026 -->
 - [ ] A4: Chat Feature Gaps (~5-6h)
   - [ ] A4.1: Push notification client Mobile (expo-notifications + FCM/APNs)
   - [ ] A4.2: Mutual friends hiển thị + Friend list trong profile Mobile
@@ -672,6 +672,7 @@ npm run dev:web
 
 ## Feature Notes
 
+- **Token Storage:** Access token được lưu trong `httpOnly` cookie (`accessToken`) do server set, không thể đọc bằng JavaScript (XSS-resistant). Refresh token trong `httpOnly` cookie (`refreshToken`). Client đọc access token qua `GET /api/auth/current-token` endpoint. <!-- done: 04/05/2026 -->
 - **Idempotency:** Client phải tự sinh UUID cho mỗi `send_message`. Server check Redis 5 phút trước khi ghi MongoDB.
 - **Cursor pagination:** Dùng `createdAt` + `_id` làm cursor, tránh `skip()`.
 - **Story expiry:** MongoDB TTL index trên `expiresAt`, không cần cronjob riêng.

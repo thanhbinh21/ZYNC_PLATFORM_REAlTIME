@@ -30,9 +30,6 @@ import {
 import { registerCallController } from './call.controller';
 import { registerChatController, setChatKafkaFailureMode } from './chat.controller';
 import { registerReactionController } from './reaction.controller';
-import { registerStoryController } from './story.controller';
-
-
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
 
@@ -89,8 +86,6 @@ export function setKafkaFailureMode(failed: boolean): void {
     logger.warn(`[Gateway] Kafka failure mode: ${failed ? 'ENABLED' : 'DISABLED'}`);
   }
 }
-
-export { emitStoryReaction, emitStoryReply } from './story.controller';
 
 export function emitNotification(
   userId: string,
@@ -219,9 +214,6 @@ export function initSocketGateway(httpServer: HttpServer): Server {
 
     // ✅ Reaction Events – delegated to ReactionController sub-module
     registerReactionController(io, socket as AuthSocket);
-
-    // ✅ Story Events – delegated to StoryController sub-module
-    registerStoryController(io, socket as AuthSocket);
 
     // ✅ Call & WebRTC Events – delegated to CallController sub-module
     registerCallController(io, socket as AuthSocket);

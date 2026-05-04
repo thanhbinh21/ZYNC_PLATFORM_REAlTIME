@@ -126,19 +126,48 @@ async function upsertDeviceToken(
   );
 }
 
+export interface VerifyOtpResult {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    username?: string;
+    displayName: string;
+    email?: string;
+    avatarUrl?: string;
+    onboardingCompleted: boolean;
+  };
+}
+
+/**
+ * Trả về user info cho login response, bao gồm onboardingCompleted
+ * de client redirect dung sau khi dang nhap.
+ */
+function buildLoginUser(user: { id: string; username?: string; displayName: string; email?: string; avatarUrl?: string; onboardingCompleted?: boolean }): VerifyOtpResult['user'] {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    onboardingCompleted: user.onboardingCompleted ?? false,
+  };
+}
+
 function toVerifyOtpResult(user: {
   id: string;
   username?: string;
   displayName: string;
   email?: string;
   avatarUrl?: string;
+  onboardingCompleted?: boolean;
 }): VerifyOtpResult {
   const { accessToken, refreshToken } = issueTokenPair(user.id);
 
   return {
     accessToken,
     refreshToken,
-    user,
+    user: buildLoginUser(user),
   };
 }
 
@@ -189,18 +218,6 @@ export async function register(email: string, username: string): Promise<void> {
 
 // ─── Verify OTP ──────────────────────────────────────────────────────────────
 
-export interface VerifyOtpResult {
-  accessToken: string;
-  refreshToken: string;
-  user: {
-    id: string;
-    username?: string;
-    displayName: string;
-    email?: string;
-    avatarUrl?: string;
-  };
-}
-
 /**
  * Xác thực OTP và upsert user. Nếu user chưa tồn tại, tạo mới.
  * Trả về JWT pair.
@@ -249,6 +266,7 @@ export async function verifyOtpAndLogin(
     displayName: user.displayName,
     email: user.email,
     avatarUrl: user.avatarUrl,
+    onboardingCompleted: user.onboardingCompleted,
   });
 }
 
@@ -304,6 +322,7 @@ export async function verifyLoginWithPasswordAndOtp(
     displayName: user.displayName,
     email: user.email,
     avatarUrl: user.avatarUrl,
+    onboardingCompleted: user.onboardingCompleted,
   });
 }
 
@@ -348,7 +367,7 @@ export async function loginWithGoogle(
 ): Promise<VerifyOtpResult> {
   const audience = process.env['GOOGLE_CLIENT_ID'];
   if (!audience) {
-    throw new BadRequestError('GOOGLE_CLIENT_ID chưa được cấu hình');
+    throw new BadRequestError('GOOGLE_CLIENT_ID chưa được cấu hình', 'GOOGLE_CLIENT_NOT_CONFIGURED');
   }
 
   let ticket: { getPayload: () => { email?: string; email_verified?: boolean; name?: string; picture?: string } | undefined };
@@ -360,7 +379,7 @@ export async function loginWithGoogle(
       audience,
     });
   } catch {
-    throw new UnauthorizedError('Google token không hợp lệ');
+    throw new UnauthorizedError('Google token không hợp lệ', 'GOOGLE_TOKEN_INVALID');
   }
 
   const payload = ticket.getPayload();
@@ -368,15 +387,24 @@ export async function loginWithGoogle(
   const emailVerified = payload?.email_verified;
 
   if (!email || !emailVerified) {
-    throw new UnauthorizedError('Tài khoản Google chưa xác thực email');
+    throw new UnauthorizedError('Tài khoản Google chưa xác thực email', 'GOOGLE_EMAIL_NOT_VERIFIED');
   }
 
   const displayName = payload?.name?.trim() || email.split('@')[0] || 'Google User';
   const avatarUrl = payload?.picture;
 
-  let user = await UserModel.findOne({ email });
+  const existingUser = await UserModel.findOne({ email });
 
-  if (!user) {
+  let user: InstanceType<typeof UserModel>;
+
+  if (existingUser?.passwordHash) {
+    throw new UnauthorizedError(
+      'Tài khoản đã tồn tại với email này. Vui lòng đăng nhập bằng email + mật khẩu + OTP.',
+      'ACCOUNT_EXISTS_WITH_PASSWORD',
+    );
+  }
+
+  if (!existingUser) {
     const username = await generateUniqueUsername(email.split('@')[0] || displayName);
     user = await UserModel.create({
       email,
@@ -385,14 +413,14 @@ export async function loginWithGoogle(
       avatarUrl,
     });
   } else {
-    user.displayName = displayName;
-    user.avatarUrl = avatarUrl;
+    existingUser.displayName = displayName;
+    existingUser.avatarUrl = avatarUrl;
 
-    if (!user.username) {
-      user.username = await generateUniqueUsername(email.split('@')[0] || displayName, user.id as string);
+    if (!existingUser.username) {
+      existingUser.username = await generateUniqueUsername(email.split('@')[0] || displayName, existingUser.id as string);
     }
 
-    await user.save();
+    user = await existingUser.save();
   }
 
   await upsertDeviceToken(user.id as string, deviceInfo);
@@ -403,6 +431,7 @@ export async function loginWithGoogle(
     displayName: user.displayName,
     email: user.email,
     avatarUrl: user.avatarUrl,
+    onboardingCompleted: user.onboardingCompleted,
   });
 }
 

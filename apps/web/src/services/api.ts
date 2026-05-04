@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import Cookies from 'js-cookie';
 
 function resolveApiBaseUrl(): string {
   const explicitUrl = process.env['NEXT_PUBLIC_API_URL'];
@@ -33,16 +34,17 @@ function resolveApiBaseUrl(): string {
 
 const apiBaseUrl = resolveApiBaseUrl();
 
+const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
+
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
-  withCredentials: true, // send http-only cookie for refresh token
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach access token from memory store
+// Attach access token from httpOnly cookie (read via js-cookie)
 apiClient.interceptors.request.use((config) => {
-  // Access token is stored in memory (not localStorage) for security
-  const token = (globalThis as Record<string, unknown>)['__accessToken'] as string | undefined;
+  const token = Cookies.get(ACCESS_TOKEN_COOKIE_KEY);
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 });
@@ -60,9 +62,16 @@ apiClient.interceptors.response.use(
           {},
           { withCredentials: true },
         );
-        (globalThis as Record<string, unknown>)['__accessToken'] = data.accessToken;
+        Cookies.set(ACCESS_TOKEN_COOKIE_KEY, data.accessToken, {
+          httpOnly: false,
+          secure: process.env['NODE_ENV'] === 'production',
+          sameSite: 'strict',
+          maxAge: 15 * 60,
+        });
         return apiClient(err.config ?? { url: '/' });
       } catch {
+        Cookies.remove(ACCESS_TOKEN_COOKIE_KEY);
+        Cookies.remove('refreshToken');
         return Promise.reject(error);
       }
     }

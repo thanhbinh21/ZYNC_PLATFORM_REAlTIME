@@ -119,6 +119,12 @@ async function clearScopedData(userIds: string[]): Promise<void> {
   await ConversationModel.deleteMany({ _id: { $in: conversationIds } });
 }
 
+async function deleteSeedUsers(userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+  await UserModel.deleteMany({ _id: { $in: userIds } });
+  logger.info(`Deleted ${userIds.length} seed users`);
+}
+
 async function createDirectConversation(
   userA: SeededUser,
   userB: SeededUser,
@@ -264,9 +270,9 @@ async function seedUsers(): Promise<void> {
     logger.info('Connected to DB for user seed');
 
     const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-    const createdUsers: SeededUser[] = [];
-    const usersByUsername = new Map<string, SeededUser>();
 
+    // Step 1: Upsert users (so we can collect their IDs), then hard-delete them
+    const tempUsers: SeededUser[] = [];
     for (const item of SEED_USERS) {
       const username = normalizeUsername(item.username);
       const email = resolveEmail(item.email, username);
@@ -281,16 +287,38 @@ async function seedUsers(): Promise<void> {
             bio: `Tài khoản seed cho ${item.displayName.trim()}`,
             passwordHash,
           },
-          $unset: {
-            avatarUrl: 1,
-          },
+          $unset: { avatarUrl: 1 },
         },
-        {
-          upsert: true,
-          new: true,
-          setDefaultsOnInsert: true,
-        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
       );
+
+      tempUsers.push({
+        id: user._id.toString(),
+        displayName: user.displayName,
+        username: user.username ?? username,
+        email: user.email,
+      });
+    }
+
+    // Hard-delete all seed users so they get recreated fresh with correct schema
+    await deleteSeedUsers(tempUsers.map((u) => u.id));
+
+    // Step 2: Create fresh users with explicit passwordHash + onboardingCompleted
+    const recreatedUsers: SeededUser[] = [];
+    const usersByUsername = new Map<string, SeededUser>();
+
+    for (const item of SEED_USERS) {
+      const username = normalizeUsername(item.username);
+      const email = resolveEmail(item.email, username);
+
+      const user = await UserModel.create({
+        email,
+        username,
+        displayName: item.displayName.trim(),
+        bio: `Tài khoản seed cho ${item.displayName.trim()}`,
+        passwordHash,
+        onboardingCompleted: false,
+      });
 
       const seededUser: SeededUser = {
         id: user._id.toString(),
@@ -299,48 +327,49 @@ async function seedUsers(): Promise<void> {
         email: user.email,
       };
 
-      createdUsers.push(seededUser);
+      recreatedUsers.push(seededUser);
       usersByUsername.set(username, seededUser);
     }
 
-    const binhdev = usersByUsername.get('binhdev');
-    const minhdu = usersByUsername.get('minhdu');
-    const quangminh = usersByUsername.get('quangminh');
-    const nhatanh = usersByUsername.get('nhatanh');
-    const thulinh = usersByUsername.get('thulinh');
+    const freshBinhdev = usersByUsername.get('binhdev');
+    const freshMinhdu = usersByUsername.get('minhdu');
+    const freshQuangminh = usersByUsername.get('quangminh');
+    const freshNhatanh = usersByUsername.get('nhatanh');
+    const freshThulinh = usersByUsername.get('thulinh');
 
-    if (!binhdev || !minhdu || !quangminh || !nhatanh || !thulinh) {
+    if (!freshBinhdev || !freshMinhdu || !freshQuangminh || !freshNhatanh || !freshThulinh) {
       throw new Error('Thiếu user seed bắt buộc để tạo dữ liệu quan hệ/chat');
     }
 
-    await clearScopedData(createdUsers.map((user) => user.id));
+    // Step 3: Clear related data and create relationships + conversations
+    await clearScopedData(recreatedUsers.map((u) => u.id));
 
     await FriendshipModel.insertMany([
-      { userId: binhdev.id, friendId: minhdu.id, status: 'accepted' },
-      { userId: minhdu.id, friendId: binhdev.id, status: 'accepted' },
+      { userId: freshBinhdev.id, friendId: freshMinhdu.id, status: 'accepted' },
+      { userId: freshMinhdu.id, friendId: freshBinhdev.id, status: 'accepted' },
 
-      { userId: binhdev.id, friendId: quangminh.id, status: 'accepted' },
-      { userId: quangminh.id, friendId: binhdev.id, status: 'accepted' },
+      { userId: freshBinhdev.id, friendId: freshQuangminh.id, status: 'accepted' },
+      { userId: freshQuangminh.id, friendId: freshBinhdev.id, status: 'accepted' },
 
-      { userId: nhatanh.id, friendId: binhdev.id, status: 'pending' },
-      { userId: binhdev.id, friendId: thulinh.id, status: 'blocked' },
+      { userId: freshNhatanh.id, friendId: freshBinhdev.id, status: 'pending' },
+      { userId: freshBinhdev.id, friendId: freshThulinh.id, status: 'blocked' },
     ]);
 
-    await createDirectConversation(binhdev, minhdu, [
+    await createDirectConversation(freshBinhdev, freshMinhdu, [
       {
-        senderId: binhdev.id,
+        senderId: freshBinhdev.id,
         content: 'Hello Du, chiều nay review roadmap nhé.',
         minutesAgo: 95,
         receiverStatus: 'read',
       },
       {
-        senderId: minhdu.id,
+        senderId: freshMinhdu.id,
         content: 'Ok Bình, mình đã cập nhật xong phần auth.',
         minutesAgo: 84,
         receiverStatus: 'read',
       },
       {
-        senderId: binhdev.id,
+        senderId: freshBinhdev.id,
         content: 'Mình gửi bạn ảnh flow mới.',
         type: 'image',
         mediaUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
@@ -348,28 +377,28 @@ async function seedUsers(): Promise<void> {
         receiverStatus: 'read',
       },
       {
-        senderId: minhdu.id,
+        senderId: freshMinhdu.id,
         content: 'Đã nhận, mình sẽ phản hồi trong tối nay.',
         minutesAgo: 12,
         receiverStatus: 'delivered',
       },
     ]);
 
-    await createDirectConversation(binhdev, quangminh, [
+    await createDirectConversation(freshBinhdev, freshQuangminh, [
       {
-        senderId: quangminh.id,
+        senderId: freshQuangminh.id,
         content: 'Mình vừa push branch friends-search.',
         minutesAgo: 130,
         receiverStatus: 'read',
       },
       {
-        senderId: binhdev.id,
+        senderId: freshBinhdev.id,
         content: 'Good job, để mình test trên mobile luôn.',
         minutesAgo: 110,
         receiverStatus: 'read',
       },
       {
-        senderId: quangminh.id,
+        senderId: freshQuangminh.id,
         content: 'Ok, có bug gì báo mình fix ngay.',
         minutesAgo: 9,
         receiverStatus: 'delivered',
@@ -377,44 +406,45 @@ async function seedUsers(): Promise<void> {
     ]);
 
     await createGroupConversation(
-      binhdev,
-      [minhdu, quangminh, nhatanh],
+      freshBinhdev,
+      [freshMinhdu, freshQuangminh, freshNhatanh],
       [
         {
-          senderId: binhdev.id,
+          senderId: freshBinhdev.id,
           content: 'Chào team, hôm nay mình chốt kế hoạch release.',
           minutesAgo: 170,
-          readByUserIds: [minhdu.id, quangminh.id, nhatanh.id],
+          readByUserIds: [freshMinhdu.id, freshQuangminh.id, freshNhatanh.id],
         },
         {
-          senderId: nhatanh.id,
+          senderId: freshNhatanh.id,
           content: 'Em đang test luồng upload media cho app.',
           minutesAgo: 120,
-          readByUserIds: [binhdev.id, minhdu.id],
+          readByUserIds: [freshBinhdev.id, freshMinhdu.id],
         },
         {
-          senderId: quangminh.id,
+          senderId: freshQuangminh.id,
           content: 'Mình gửi file checklist QC vào nhóm.',
           type: 'file/checklist-qc.xlsx',
           mediaUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
           minutesAgo: 55,
-          readByUserIds: [binhdev.id],
+          readByUserIds: [freshBinhdev.id],
         },
         {
-          senderId: minhdu.id,
+          senderId: freshMinhdu.id,
           content: 'Ok, mình sẽ follow checklist và báo lại.',
           minutesAgo: 7,
-          readByUserIds: [binhdev.id],
+          readByUserIds: [freshBinhdev.id],
         },
       ],
     );
 
     logger.info('Seed users completed successfully');
     logger.info(`Mật khẩu chung: ${DEFAULT_PASSWORD}`);
-    for (const user of createdUsers) {
+    for (const user of recreatedUsers) {
       logger.info(`- ${user.displayName} | @${user.username} | ${user.email}`);
     }
     logger.info('Đã tạo dữ liệu đa dạng: bạn bè accepted/pending/blocked, chat 1-1, nhóm và lịch sử tin nhắn.');
+    logger.info('Luồng đăng nhập: Email + Mật khẩu + OTP (yêu cầu mã OTP sau khi nhập mật khẩu)');
   } catch (error) {
     logger.error('Seed users failed', error);
     process.exitCode = 1;

@@ -226,14 +226,11 @@ export function LoginCard({
         <span className="h-px flex-1 bg-border-light" />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <SocialButton
-          label="Google"
-          onClick={onGoogleLogin}
-          disabled={isSubmitting}
-        />
-        <SocialButton label="Apple" disabled />
-      </div>
+      <SocialButton
+        label="Google"
+        onClick={onGoogleLogin}
+        disabled={isSubmitting}
+      />
 
       <p className="font-ui-content mt-8 text-center text-sm text-text-secondary">
         {isRegister ? loginHint : registerHint}{' '}

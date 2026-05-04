@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 import type {
   AuthMode,
   AuthStep,
@@ -17,6 +18,7 @@ import {
   verifyOtp,
   verifyPasswordOtp,
 } from '@/services/auth';
+import { clearAccessToken } from '@/utils/auth-token';
 
 const DEFAULT_FORM: LoginFormValues = {
   identifier: '',
@@ -286,12 +288,11 @@ export function useLoginForm() {
             platform: 'web',
           });
 
-      (globalThis as Record<string, unknown>)['__accessToken'] = response.accessToken;
       setCurrentUserName(response.user.displayName);
       setPendingIdentifier(null);
       setInfoMessage('Xác thực thành công. Bạn đã đăng nhập vào hệ thống.');
       setErrorMessage(null);
-      
+
       if (!response.user.onboardingCompleted) {
         router.push('/onboarding');
       } else {
@@ -338,7 +339,7 @@ export function useLoginForm() {
 
       const credential = await new Promise<string>((resolve, reject) => {
         const timeout = window.setTimeout(() => {
-          reject(new Error('Không nhận được Google credential.'));
+          reject(new Error('TIMEOUT'));
         }, 15000);
 
         window.google?.accounts.id.initialize({
@@ -346,7 +347,7 @@ export function useLoginForm() {
           callback: (response) => {
             window.clearTimeout(timeout);
             if (!response.credential) {
-              reject(new Error('Không lấy được Google credential.'));
+              reject(new Error('NO_CREDENTIAL'));
               return;
             }
             resolve(response.credential);
@@ -363,25 +364,50 @@ export function useLoginForm() {
         platform: 'web',
       });
 
-      (globalThis as Record<string, unknown>)['__accessToken'] = response.accessToken;
       setCurrentUserName(response.user.displayName);
       setInfoMessage('Đăng nhập Google thành công.');
-      
+
       if (!response.user.onboardingCompleted) {
         router.push('/onboarding');
       } else {
         router.push('/home');
       }
     } catch (error: unknown) {
-      const fallbackMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
-      const message =
+      if (
         typeof error === 'object' &&
         error !== null &&
         'response' in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
-          ? (error as { response: { data: { error: string } } }).response.data.error
-          : fallbackMessage;
-      setErrorMessage(message);
+        typeof (error as { response?: { data?: { code?: string } } }).response?.data?.code === 'string'
+      ) {
+        const code = (error as { response: { data: { code: string } } }).response.data.code;
+        if (code === 'GOOGLE_TOKEN_INVALID') {
+          setErrorMessage('Token Google không hợp lệ hoặc đã hết hạn. Vui lòng thử đăng nhập lại.');
+        } else if (code === 'GOOGLE_EMAIL_NOT_VERIFIED') {
+          setErrorMessage('Email Google chưa được xác minh. Vui lòng xác minh email trong tài khoản Google trước.');
+        } else if (code === 'GOOGLE_CLIENT_NOT_CONFIGURED') {
+          setErrorMessage('Dịch vụ đăng nhập Google đang gặp sự cố. Vui lòng thử lại sau.');
+        } else if (code === 'ACCOUNT_EXISTS_WITH_PASSWORD') {
+          setErrorMessage('Tài khoản đã tồn tại với email này. Vui lòng đăng nhập bằng email + mật khẩu + OTP.');
+        } else {
+          setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.');
+        }
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        (error as { message?: string }).message === 'TIMEOUT'
+      ) {
+        setErrorMessage('Yêu cầu đăng nhập Google bị gián đoạn. Vui lòng thử lại.');
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        (error as { message?: string }).message === 'NO_CREDENTIAL'
+      ) {
+        setErrorMessage('Không nhận được phản hồi từ Google. Vui lòng thử lại.');
+      } else {
+        setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -392,7 +418,7 @@ export function useLoginForm() {
       setIsSubmitting(true);
       const deviceToken = resolveDeviceToken();
       await logout({ deviceToken });
-      (globalThis as Record<string, unknown>)['__accessToken'] = undefined;
+      clearAccessToken();
       setCurrentUserName(null);
       setPendingIdentifier(null);
       setStep('input');

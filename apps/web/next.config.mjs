@@ -7,6 +7,9 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: ['zync-media.s3.ap-southeast-1.amazonaws.com', 'res.cloudinary.com'],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+    ],
   },
   webpack: (config) => {
     config.resolve.alias = {

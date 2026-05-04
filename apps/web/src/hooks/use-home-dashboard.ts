@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
 import { fetchFriends, type FriendUser } from '@/services/friends';
+import { getAccessToken } from '@/utils/auth-token';
 import {
   emitCallAccept,
   emitCallEnd,
@@ -660,7 +661,7 @@ export function useHomeDashboard() {
   } = useChat({
     conversationId: selectedConversationId,
     userId,
-    token: (globalThis as Record<string, unknown>)['__accessToken'] as string,
+    token: getAccessToken() ?? '',
     displayName: data.user.displayName,
   });
 
@@ -1249,7 +1250,7 @@ export function useHomeDashboard() {
   };
 
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
+    const token = getAccessToken();
     if (!token || !userId) {
       return;
     }
@@ -1677,7 +1678,7 @@ export function useHomeDashboard() {
   }, [conversations, friendsForGroup]);
 
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
+    const token = getAccessToken();
     if (!token || !userId) {
       return;
     }
@@ -1809,7 +1810,7 @@ export function useHomeDashboard() {
   }, [ensureConversationAvailable, selectedConversationId, userId]);
 
   useEffect(() => {
-    const token = (globalThis as Record<string, unknown>)['__accessToken'] as string;
+    const token = getAccessToken();
     if (!token || !userId) {
       return;
     }

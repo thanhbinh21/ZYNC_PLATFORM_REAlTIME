@@ -1,8 +1,16 @@
 import { MessageType } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
+import Cookies from 'js-cookie';
 
 let socket: Socket | null = null;
 let currentToken: string | null = null;
+
+const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
+
+function getTokenFromCookie(): string | null {
+  if (typeof window === 'undefined') return null;
+  return Cookies.get(ACCESS_TOKEN_COOKIE_KEY) ?? null;
+}
 
 function resolveWebSocketUrl(): string {
   const explicitUrl = process.env['NEXT_PUBLIC_WS_URL'];
@@ -45,9 +53,14 @@ function resolveWebSocketUrl(): string {
  * connecting). Only creates a new socket when there is no instance at all
  * or when the token has changed (re-login).
  */
-export function getSocket(token: string): Socket {
+export function getSocket(token?: string): Socket {
+  const resolvedToken = token ?? getTokenFromCookie();
+  if (!resolvedToken) {
+    throw new Error('No access token available. Please log in.');
+  }
+
   // Return existing socket if it exists and token hasn't changed
-  if (socket && currentToken === token) {
+  if (socket && currentToken === resolvedToken) {
     // If disconnected but instance exists, reconnect instead of creating new
     if (socket.disconnected && !socket.active) {
       socket.connect();
@@ -56,13 +69,13 @@ export function getSocket(token: string): Socket {
   }
 
   // Token changed (re-login) – disconnect old socket first
-  if (socket && currentToken !== token) {
+  if (socket && currentToken !== resolvedToken) {
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
   }
 
-  currentToken = token;
+  currentToken = resolvedToken;
 
   socket = io(resolveWebSocketUrl(), {
     auth: { token },
