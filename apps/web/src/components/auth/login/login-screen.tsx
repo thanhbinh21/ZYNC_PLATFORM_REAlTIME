@@ -6,6 +6,8 @@ import type { LoginScreenProps } from './login.types';
 import { ShellFooter } from './molecules/shell-footer';
 import { LoginCard } from './organisms/login-card';
 import { LoginHero } from './organisms/login-hero';
+import { LoginSubmitToast } from './atoms/login-submit-toast';
+import { LoginLoadingModal } from './atoms/login-loading-modal';
 
 export function LoginScreen({
   mockData,
@@ -30,6 +32,11 @@ export function LoginScreen({
   onGoogleLogin,
   onBackToInput,
   onLogout,
+  loadingMessage,
+  showLoadingModal,
+  toastMessage,
+  toastVariant,
+  onToastDismiss,
 }: LoginScreenProps) {
   return (
     <main className="zync-auth-shell min-h-screen text-white">
@@ -52,8 +59,6 @@ export function LoginScreen({
             isRecoveryFlow={isRecoveryFlow}
             values={values}
             isSubmitting={isSubmitting}
-            infoMessage={infoMessage}
-            errorMessage={errorMessage}
             currentUserName={currentUserName}
             onModeChange={onModeChange}
             onStartRecovery={onStartRecovery}
@@ -85,6 +90,23 @@ export function LoginScreen({
         links={mockData.footer.links}
         statusLabel={mockData.footer.statusLabel}
       />
+
+      {/* Floating toast */}
+      <LoginSubmitToast
+        message={toastMessage ?? null}
+        variant={toastVariant ?? 'info'}
+        onDismiss={onToastDismiss ?? (() => {})}
+      />
+
+      {/* Loading modal */}
+      <LoginLoadingModal open={showLoadingModal ?? false} message={loadingMessage} />
+
+      <style jsx>{`
+        @keyframes loginToastSlide {
+          from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </main>
   );
 }

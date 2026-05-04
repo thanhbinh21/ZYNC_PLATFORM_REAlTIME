@@ -14,20 +14,35 @@ import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
 const ACCESS_TOKEN_COOKIE = 'accessToken';
+const ACCESS_TOKEN_CLIENT_COOKIE = 'accessToken_client'; // non-httpOnly side-channel for Socket.IO client
 const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 ngày (ms)
 
 function setAccessTokenCookie(res: Response, accessToken: string): void {
+  // httpOnly cookie for REST API auth (cannot be read by JS)
   res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
     httpOnly: true,
     secure: process.env['NODE_ENV'] === 'production',
     sameSite: 'strict',
     maxAge: 15 * 60 * 1000, // 15 phút, matching ACCESS_TOKEN_TTL
   });
+
+  // non-httpOnly side-channel cookie so Socket.IO client can read the token.
+  // accessToken is short-lived (15m) so this is acceptable for Socket.IO only.
+  res.cookie(ACCESS_TOKEN_CLIENT_COOKIE, accessToken, {
+    httpOnly: false,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+    maxAge: 15 * 60 * 1000,
+  });
 }
 
 function clearAccessTokenCookie(res: Response): void {
   res.clearCookie(ACCESS_TOKEN_COOKIE, {
     httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'strict',
+  });
+  res.clearCookie(ACCESS_TOKEN_CLIENT_COOKIE, {
     secure: process.env['NODE_ENV'] === 'production',
     sameSite: 'strict',
   });

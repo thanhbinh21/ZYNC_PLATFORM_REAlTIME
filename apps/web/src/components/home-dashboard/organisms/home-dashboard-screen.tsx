@@ -232,10 +232,14 @@ export function HomeDashboardScreen({
             <header className="border-b border-border-light px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Tổng quan hàng ngày</p>
-                  <h1 className="font-ui-title mt-2 text-2xl text-text-primary">{data.greeting}</h1>
+                  <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-text-tertiary">Trung tâm</p>
+                  <h1 className="font-ui-title mt-1.5 text-2xl text-text-primary">{data.greeting}</h1>
+                  <p className="font-ui-content mt-1 text-sm text-text-secondary">Chúc bạn một ngày làm việc hiệu quả</p>
                 </div>
-                <span className="zync-soft-badge">ZYNC Workspace</span>
+                <span className="zync-soft-badge">
+                  <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Trực tuyến
+                </span>
               </div>
             </header>
           )}
@@ -270,40 +274,61 @@ export function HomeDashboardScreen({
                 </div>
               </div>
             ) : (
-              <div className="w-full">
-                <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">
-                  {storySlot ?? (
+              <div className="w-full space-y-6">
+                {/* Stories — hidden when empty */}
+                {data.stories.length > 0 && (
+                  <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                       {data.stories.map((item) => (
                         <DashboardStoryItemRow key={item.id} item={item} />
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                <div className="mt-6 grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Stats Grid */}
+                <div className="grid shrink-0 grid-cols-3 gap-3 sm:gap-4">
                   {data.stats.map((item) => (
                     <DashboardStatCard key={item.id} item={item} />
                   ))}
                 </div>
 
-                <section className="mt-8 shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
+                {/* Activity Feed */}
+                <section className="shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
                   <div className="mb-4 flex items-center justify-between gap-3 border-b border-border-light pb-3">
-                    <h2 className="font-ui-title text-xl text-text-primary">{data.activityTitle}</h2>
-                    <Link href="/friends" className="zync-soft-badge text-sm hover:text-text-primary">
-                      {data.activityCtaLabel}
-                    </Link>
+                    <h2 className="font-ui-title text-lg text-text-primary">{data.activityTitle}</h2>
+                    {data.activities.length > 0 && (
+                      <Link href="/friends" className="zync-soft-badge text-sm hover:text-text-primary">
+                        {data.activityCtaLabel}
+                      </Link>
+                    )}
                   </div>
 
-                  <div className="space-y-1">
-                    {data.activities.map((item) => (
-                      <DashboardActivityItemRow
-                        key={item.id}
-                        item={item}
-                        onClick={onActivityClick}
-                      />
-                    ))}
-                  </div>
+                  {data.activities.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-10 text-center">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                        <svg className="h-6 w-6 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-ui-title text-sm text-text-primary">Chưa có hoạt động nào</p>
+                        <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                          Bắt đầu trò chuyện để xem tin nhắn tại đây
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {data.activities.map((item) => (
+                        <DashboardActivityItemRow
+                          key={item.id}
+                          item={item}
+                          onClick={onActivityClick}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </section>
                 <div className="h-10 shrink-0" tabIndex={-1} />
               </div>

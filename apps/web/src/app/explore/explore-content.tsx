@@ -239,14 +239,15 @@ export default function ExploreContent() {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header + Search */}
-      <div className="border-b border-border-light px-4 py-3 sm:px-6">
-        <div className="mb-3 flex items-center justify-between">
+      <div className="border-b border-border-light px-4 py-4 sm:px-6">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-ui-title flex items-center gap-2 text-xl text-text-primary">
+            <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Khám phá</p>
+            <h2 className="font-ui-title mt-1 flex items-center gap-2 text-xl text-text-primary">
               <Search className="h-5 w-5 text-accent" />
               Khám phá
             </h2>
-            <p className="font-ui-content mt-0.5 text-xs text-text-tertiary">Tìm kênh, nhà phát triển và bài viết nổi bật</p>
+            <p className="font-ui-content mt-0.5 text-xs text-text-secondary">Tìm kênh, người dùng và bài viết nổi bật</p>
           </div>
         </div>
 
@@ -255,12 +256,13 @@ export default function ExploreContent() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') setSearch(e.target.value); }}
             placeholder="Tìm kênh, người dùng, bài viết..."
-            className="zync-soft-input pl-9"
+            className="zync-soft-input w-full pl-9"
           />
         </div>
 
-        <div className="mt-3 flex gap-1 overflow-x-auto scrollbar-hide">
+        <div className="mt-3 flex gap-1.5 overflow-x-auto scrollbar-hide">
           {SECTION_TABS.map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -294,12 +296,18 @@ export default function ExploreContent() {
           </div>
         ) : activeSection === 'channels' ? (
           filteredChannels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <FolderOpen className="h-12 w-12 text-text-tertiary" />
-              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có kênh công khai</p>
-              <p className="font-ui-content mt-1.5 text-sm text-text-secondary">
-                {search ? 'Không tìm thấy kênh phù hợp' : 'Hãy tạo kênh đầu tiên!'}
-              </p>
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                <FolderOpen className="h-6 w-6 text-text-tertiary" />
+              </div>
+              <div>
+                <p className="font-ui-title text-sm text-text-primary">
+                  {search ? 'Không tìm thấy kênh' : 'Chưa có kênh công khai'}
+                </p>
+                <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                  {search ? 'Thử từ khóa khác' : 'Hãy tạo kênh đầu tiên!'}
+                </p>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -315,10 +323,14 @@ export default function ExploreContent() {
           )
         ) : activeSection === 'developers' ? (
           filteredUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Users className="h-12 w-12 text-text-tertiary" />
-              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có nhà phát triển nổi bật</p>
-              <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy hoàn thiện hồ sơ của bạn để xuất hiện ở đây!</p>
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                <Users className="h-6 w-6 text-text-tertiary" />
+              </div>
+              <div>
+                <p className="font-ui-title text-sm text-text-primary">Chưa có nhà phát triển nổi bật</p>
+                <p className="font-ui-content mt-1 text-xs text-text-secondary">Hãy hoàn thiện hồ sơ để xuất hiện ở đây!</p>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -327,10 +339,14 @@ export default function ExploreContent() {
           )
         ) : (
           filteredPosts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <TrendingUp className="h-12 w-12 text-text-tertiary" />
-              <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có bài viết thịnh hành</p>
-              <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy chia sẻ bài viết đầu tiên trong cộng đồng!</p>
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                <TrendingUp className="h-6 w-6 text-text-tertiary" />
+              </div>
+              <div>
+                <p className="font-ui-title text-sm text-text-primary">Chưa có bài viết thịnh hành</p>
+                <p className="font-ui-content mt-1 text-xs text-text-secondary">Hãy chia sẻ bài viết đầu tiên trong cộng đồng!</p>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -342,17 +358,17 @@ export default function ExploreContent() {
 
       {/* Tags cloud */}
       {!loading && (
-        <div className="border-t border-border-light px-4 py-3 sm:px-6">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+        <div className="border-t border-border-light px-4 py-4 sm:px-6">
+          <p className="font-ui-meta mb-2.5 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
             <Tag className="h-3 w-3" />
             Thẻ phổ biến
           </p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {POPULAR_TAGS.map((tag) => (
               <button
                 key={tag}
                 onClick={() => setSearch(tag)}
-                className="rounded-full border border-border bg-bg-hover px-3 py-0.5 text-xs text-text-secondary transition hover:border-accent hover:text-accent"
+                className="rounded-full border border-border bg-bg-hover px-3 py-1 text-xs text-text-secondary transition hover:border-accent hover:text-accent"
               >
                 #{tag}
               </button>

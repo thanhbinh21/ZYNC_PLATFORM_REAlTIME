@@ -297,22 +297,23 @@ export default function CommunityContent() {
       <div className="flex h-full w-full overflow-hidden">
         {/* Feed */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="border-b border-border-light px-4 py-3 sm:px-6">
-            <div className="flex items-center justify-between gap-3">
+          <div className="border-b border-border-light px-4 py-4 sm:px-6">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="font-ui-title flex items-center gap-2 text-xl text-text-primary">
+                <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Khám phá</p>
+                <h2 className="font-ui-title mt-1 flex items-center gap-2 text-xl text-text-primary">
                   <Globe className="h-5 w-5 text-accent" />
                   Cộng đồng
                 </h2>
-                <p className="font-ui-content mt-0.5 text-xs text-text-tertiary">Nơi developer chia sẻ kiến thức</p>
+                <p className="font-ui-content mt-0.5 text-xs text-text-secondary">Chia sẻ kiến thức và kết nối</p>
               </div>
-              <button onClick={() => setShowCreateForm(true)} className="zync-soft-button flex items-center gap-2 px-4 py-2 text-sm">
+              <button onClick={() => setShowCreateForm(true)} className="zync-soft-button flex shrink-0 items-center gap-2 px-4 py-2 text-sm">
                 <PenLine className="h-4 w-4" />
                 Viết bài
               </button>
             </div>
 
-            <div className="mt-3 flex gap-1 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
               {FEED_TABS.map(({ id, label, Icon }) => (
                 <button
                   key={id}
@@ -346,11 +347,18 @@ export default function CommunityContent() {
                 ))}
               </div>
             ) : posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <MessageSquare className="h-12 w-12 text-text-tertiary" />
-                <p className="font-ui-title mt-3 text-lg text-text-primary">Chưa có bài viết nào</p>
-                <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy là người đầu tiên chia sẻ kiến thức!</p>
-                <button onClick={() => setShowCreateForm(true)} className="zync-soft-button mt-5 flex items-center gap-2 px-5 py-2.5 text-sm">
+              <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-border bg-bg-hover">
+                  <svg className="h-8 w-8 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    <line x1="9" y1="10" x2="15" y2="10"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-ui-title text-base text-text-primary">Chưa có bài viết nào</p>
+                  <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy là người đầu tiên chia sẻ kiến thức!</p>
+                </div>
+                <button onClick={() => setShowCreateForm(true)} className="zync-soft-button mt-2 flex items-center gap-2 px-5 py-2.5 text-sm">
                   <PenLine className="h-4 w-4" />
                   Viết bài đầu tiên
                 </button>
@@ -402,11 +410,11 @@ export default function CommunityContent() {
           )}
 
           <div className="mt-6">
-            <h3 className="font-ui-title mb-3 flex items-center gap-2 text-base text-text-primary">
-              <Tag className="h-4 w-4 text-accent" />
+            <p className="font-ui-meta mb-3 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
+              <Tag className="h-3 w-3" />
               Thẻ phổ biến
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
+            </p>
+            <div className="flex flex-wrap gap-2">
               {POPULAR_TAGS.map((tag) => (
                 <span key={tag} className="cursor-pointer rounded-full border border-border bg-bg-hover px-3 py-1 text-xs text-text-secondary transition hover:border-accent hover:text-accent">
                   #{tag}

@@ -260,54 +260,73 @@ function ConversationList({
 
   return (
     <aside className="h-full min-h-0 overflow-y-auto border-r border-border bg-bg-card p-4">
-      <h2 className="text-2xl font-bold text-text-primary mb-4">Tin nhắn</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Trò chuyện</p>
+          <h2 className="font-ui-title mt-1 text-xl text-text-primary">Tin nhắn</h2>
+        </div>
+      </div>
 
       {/* Search */}
-      <label className="mb-4 flex h-11 items-center gap-2 rounded-xl bg-bg-hover px-3 text-text-secondary border border-border-light">
+      <label className="mb-4 flex h-11 items-center gap-2 rounded-2xl border border-border-light bg-bg-hover px-3 text-text-secondary transition focus-within:border-accent focus-within:bg-bg-card">
         <SearchIcon />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm kiếm cuộc hội thoại"
+          placeholder="Tìm cuộc hội thoại..."
           className="w-full bg-transparent text-[15px] font-medium text-text-primary outline-none placeholder:text-text-tertiary"
         />
       </label>
 
       {/* Search Results */}
       {normalizedQuery && (
-        <div className="mb-4 space-y-2 rounded-2xl border border-border bg-bg-hover p-2">
-          <p className="px-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Kết quả tìm kiếm</p>
-          {filteredSearchTargets.length === 0 ? (
-            <p className="px-2 py-2 text-sm text-text-tertiary">Không có bạn bè hoặc nhóm phù hợp.</p>
-          ) : (
-            filteredSearchTargets.map((target) => (
-              <button
-                key={`${target.type}-${target.id}`}
-                type="button"
-                onClick={() => {
-                  onSelectSearchTarget(target);
-                  setQuery('');
-                }}
-                className="flex w-full items-center justify-between rounded-xl bg-bg-card px-3 py-2 text-left hover:bg-bg-active"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-text-primary">{target.name}</p>
-                  <p className="text-xs text-text-secondary">{target.type === 'group' ? 'Nhóm' : 'Bạn bè'}</p>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-white">
-                  {(target.avatar || target.name).substring(0, 2).toUpperCase()}
-                </span>
-              </button>
-            ))
-          )}
+        <div className="mb-4 space-y-2">
+          <p className="font-ui-meta px-2 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Kết quả tìm kiếm</p>
+          <div className="rounded-2xl border border-border-light bg-bg-hover p-2">
+            {filteredSearchTargets.length === 0 ? (
+              <p className="px-2 py-3 text-sm text-text-secondary">Không tìm thấy bạn bè hoặc nhóm phù hợp.</p>
+            ) : (
+              filteredSearchTargets.map((target) => (
+                <button
+                  key={`${target.type}-${target.id}`}
+                  type="button"
+                  onClick={() => {
+                    onSelectSearchTarget(target);
+                    setQuery('');
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-bg-active active:scale-[0.99]"
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
+                    {(target.avatar || target.name).substring(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-ui-title text-sm text-text-primary">{target.name}</p>
+                    <p className="font-ui-content text-xs text-text-tertiary">{target.type === 'group' ? 'Nhóm' : 'Bạn bè'}</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
 
       {/* Conversations */}
       {filteredConversations.length === 0 ? (
-        <div className="flex items-center justify-center h-40 text-text-tertiary text-center">
-          <p>{normalizedQuery ? 'Không tìm thấy hội thoại phù hợp.' : 'Không có cuộc hội thoại nào. Bắt đầu trò chuyện!'}</p>
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+            <svg className="h-6 w-6 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <div>
+            <p className="font-ui-title text-sm text-text-primary">
+              {normalizedQuery ? 'Không tìm thấy' : 'Chưa có cuộc trò chuyện'}
+            </p>
+            <p className="font-ui-content mt-0.5 text-xs text-text-secondary">
+              {normalizedQuery ? 'Thử từ khóa khác' : 'Bắt đầu nhắn tin với bạn bè'}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -319,19 +338,19 @@ function ConversationList({
             <button
               key={item.id}
               onClick={() => onSelectConversation(item.id)}
-              className={`w-full rounded-2xl border px-3 py-2 text-left transition ${
+              className={`w-full rounded-2xl border px-3 py-3 text-left transition active:scale-[0.99] ${
                 selectedId === item.id
-                  ? 'border-accent bg-bg-active text-text-primary'
-                  : 'border-transparent hover:border-border hover:bg-bg-hover'
+                  ? 'border-accent bg-accent/8 text-text-primary'
+                  : 'border-transparent hover:border-border-light hover:bg-bg-hover'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="relative h-11 w-11 rounded-full bg-accent text-white flex-shrink-0">
+                <div className="relative h-12 w-12 flex-shrink-0 rounded-2xl bg-accent text-white">
                   <span className="flex h-full w-full items-center justify-center text-sm font-semibold">
                     {item.avatar}
                   </span>
                   {item.online && (
-                    <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-green-500" />
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-bg-card bg-emerald-400" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -481,6 +500,21 @@ function ChatPanel({
     };
   }, []);
   const [activeSpeakerUserId, setActiveSpeakerUserId] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const errorToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync error prop to local toast state with auto-dismiss
+  useEffect(() => {
+    if (error) {
+      setErrorToast(error);
+      if (errorToastTimeoutRef.current) {
+        clearTimeout(errorToastTimeoutRef.current);
+      }
+      errorToastTimeoutRef.current = setTimeout(() => {
+        setErrorToast(null);
+      }, 5000);
+    }
+  }, [error]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -747,89 +781,177 @@ function ChatPanel({
   return (
     <article className="relative mx-auto flex h-full w-full max-w-[1440px] min-h-0 min-w-0 flex-col overflow-hidden rounded-[2rem] border border-border bg-bg-card shadow-sm">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-border bg-bg-card px-5 py-3">
-        <div className="flex items-center gap-3">
+      <header className="relative flex items-center justify-between border-b border-border bg-bg-card/80 px-5 py-3 backdrop-blur-sm">
+        {/* Gradient accent line */}
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent opacity-60" />
+
+        <div className="flex items-center gap-3.5">
           <button
             type="button"
-            className={`relative h-11 w-11 overflow-hidden rounded-full bg-accent-light ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
+            className={`relative h-11 w-11 overflow-hidden rounded-full bg-gradient-to-br from-accent to-accent-hover shadow-sm ${
+              isGroupConversation ? 'cursor-pointer hover:shadow-md hover:scale-105 transition-all' : 'cursor-default'
+            }`}
             onClick={isGroupConversation ? onAvatarClick : undefined}
-            title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
+            title={isGroupConversation ? 'Doi anh nhom' : undefined}
           >
             {participantAvatarUrl ? (
               <img src={participantAvatarUrl} alt={participantName} className="h-full w-full object-cover" />
             ) : (
-              <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-accent">
+              <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white">
                 {participantAvatar ? participantAvatar[0] : participantName[0]}
               </span>
             )}
-            {isOnline && (
-              <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-accent" />
-            )}
+            {/* Online indicator */}
+            <span className={`absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-bg-card ${
+              isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-text-tertiary'
+            }`} />
           </button>
+
           <div>
             <button
               type="button"
-              className={`text-left text-lg font-bold text-text-primary ${isGroupConversation ? 'cursor-pointer hover:text-accent' : 'cursor-default'}`}
+              className={`text-left text-base font-bold text-text-primary transition-colors ${
+                isGroupConversation ? 'cursor-pointer hover:text-accent' : 'cursor-default'
+              }`}
               onClick={isGroupConversation ? onNameClick : undefined}
-              title={isGroupConversation ? 'Đổi tên nhóm' : undefined}
+              title={isGroupConversation ? 'Doi ten nhom' : undefined}
             >
               {participantName}
             </button>
-            <p className="text-[13px] font-medium text-text-tertiary">
-              {isOnline ? 'đang hoạt động' : 'ngoại tuyến'}
+            <p className="flex items-center gap-1.5 text-[12px] text-text-tertiary">
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${
+                isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-text-tertiary'
+              }`} />
+              {isOnline ? 'Dang hoat dong' : 'Ngoai tuyen'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-text-secondary">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1.5 text-text-secondary">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bg-hover transition-colors hover:bg-border-light disabled:cursor-not-allowed disabled:opacity-45"
-            title="Gọi thoại"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-bg-hover transition-all hover:bg-border hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            title="Goi thoai"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
-            <PhoneIcon className="w-5 h-5" />
+            <PhoneIcon className="w-[18px] h-[18px]" />
           </button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bg-hover transition-colors hover:bg-border-light disabled:cursor-not-allowed disabled:opacity-45"
-            title="Gọi video"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-bg-hover transition-all hover:bg-border hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            title="Goi video"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
-            <VideoIcon className="w-5 h-5" />
+            <VideoIcon className="w-[18px] h-[18px]" />
           </button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-bg-hover transition-colors hover:bg-border-light"
-            title="Info"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-bg-hover transition-all hover:bg-border hover:text-accent"
+            title="Thong tin"
             onClick={onInfoClick}
           >
-            <InfoIcon className="w-5 h-5" />
+            <InfoIcon className="w-[18px] h-[18px]" />
           </button>
         </div>
       </header>
       
       {/* Report Notification Toast */}
       {reportStatus && (
-        <div className="bg-bg-active border-b border-border px-5 py-2 text-sm text-text-primary flex items-center justify-between">
-          <span>{reportStatus}</span>
-          <button onClick={() => setReportStatus(null)} className="text-text-secondary hover:text-text-primary">✕</button>
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate-toast-slide-in">
+          <div className={`flex items-center gap-3 rounded-2xl border px-5 py-3 shadow-xl backdrop-blur-md ${
+            reportStatus.startsWith('🚫')
+              ? 'border-red-500/30 bg-red-950/90'
+              : reportStatus.startsWith('✅')
+              ? 'border-emerald-500/30 bg-emerald-950/90'
+              : 'border-red-500/30 bg-red-950/90'
+          }`}>
+            <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
+              reportStatus.startsWith('🚫')
+                ? 'bg-red-500/20'
+                : reportStatus.startsWith('✅')
+                ? 'bg-emerald-500/20'
+                : 'bg-red-500/20'
+            }`}>
+              {reportStatus.startsWith('🚫') ? (
+                <svg className="h-4 w-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              ) : (
+                <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              )}
+            </div>
+            <p className={`text-sm font-medium ${
+              reportStatus.startsWith('🚫') || reportStatus.startsWith('❌')
+                ? 'text-red-300'
+                : reportStatus.startsWith('✅')
+                ? 'text-emerald-300'
+                : 'text-red-300'
+            }`}>{reportStatus}</p>
+            <button
+              type="button"
+              onClick={() => setReportStatus(null)}
+              className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-text-tertiary hover:bg-white/10 transition-colors"
+              aria-label="Dong thong bao"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
       {jumpStatus && (
-        <div className="bg-bg-hover border-b border-border px-5 py-2 text-sm text-text-secondary flex items-center justify-between">
-          <span>{jumpStatus}</span>
-          <button onClick={() => setJumpStatus(null)} className="text-text-tertiary hover:text-text-primary">✕</button>
+        <div className="bg-bg-hover/90 border-b border-border px-5 py-2.5 text-sm text-text-secondary backdrop-blur-sm flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 animate-pulse text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="17 11 12 6 7 11"/>
+              <polyline points="17 18 12 13 7 18"/>
+            </svg>
+            <span>{jumpStatus}</span>
+          </div>
+          <button onClick={() => setJumpStatus(null)} className="flex h-6 w-6 items-center justify-center rounded-full text-text-tertiary hover:bg-border hover:text-text-primary transition-colors">
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-900/30 border-b border-red-700 px-6 py-2 text-sm text-red-400">
-          {error}
+      {/* Error Toast */}
+      {errorToast && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate-toast-slide-in">
+          <div className="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-950/90 px-5 py-3 shadow-xl backdrop-blur-md">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-500/20">
+              <svg className="h-4 w-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-red-300">{errorToast}</p>
+            <button
+              type="button"
+              onClick={() => setErrorToast(null)}
+              className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-red-400 hover:bg-red-500/20 transition-colors"
+              aria-label="Dong thong bao"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
@@ -1023,25 +1145,61 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto space-y-2 px-5 py-4"
+        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-5 py-4 chat-messages-scroll"
       >
         {/* Load More Button */}
         {messages.length > 0 && hasMoreMessages && (
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-6">
             <button
               onClick={onLoadMore}
               disabled={isLoading}
-              className="load-more-button zync-glass-subtle rounded-lg px-4 py-2 text-sm"
+              className="zync-glass-subtle rounded-xl px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-accent transition-all hover:shadow-sm"
             >
-              {isLoading ? 'Loading...' : 'Load more messages'}
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Dang tai...
+                </span>
+              ) : (
+                'Tin nhan cu hon'
+              )}
             </button>
           </div>
         )}
 
-        {/* Messages */}
+        {/* Empty State */}
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-text-tertiary">
-            <p>No messages yet. Start the conversation!</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center py-16">
+            {/* Animated Icon */}
+            <div className="relative">
+              <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-bg-hover shadow-inner">
+                <svg className="h-10 w-10 text-accent/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              {/* Decorative ring */}
+              <div className="absolute -inset-3 rounded-full border border-dashed border-accent/20 animate-pulse" />
+            </div>
+
+            {/* Text */}
+            <div className="space-y-1">
+              <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
+              <p className="text-sm text-text-tertiary max-w-[220px]">
+                Nhan tin ngay de bat dau tro chuyen voi <span className="font-medium text-accent">{participantName}</span>
+              </p>
+            </div>
+
+            {/* Quick hint */}
+            <div className="flex items-center gap-2 rounded-full border border-border bg-bg-hover px-4 py-2 text-xs text-text-tertiary">
+              <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              Nhan Enter de gui tin nhan
+            </div>
           </div>
         ) : (
           <>
@@ -1056,6 +1214,7 @@ function ChatPanel({
                 ref={(node) => {
                   messageRowRefs.current[message._id] = node;
                 }}
+                className={String(message.senderId) === String(currentUserId) ? 'message-bubble-own' : 'message-bubble-other'}
               >
                 <MessageItem
                   message={message}
@@ -1090,28 +1249,41 @@ function ChatPanel({
         )}
       </div>
 
-      {/* Moderation Penalty Bar */}
-      <div className="border-t border-border bg-bg-hover px-4 py-1.5">
-        <div className="mb-1 flex items-center justify-between text-[11px] text-text-secondary">
-          <span>Mức độ vi phạm tiêu chuẩn cộng đồng</span>
-          <span className={userPenaltyScore >= 80 ? 'font-semibold text-red-500' : ''}>
+      {/* Moderation Bar */}
+      <div className="border-t border-border/60 bg-gradient-to-r from-bg-hover/50 to-bg-card/50 px-5 py-2">
+        <div className="mb-1.5 flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1.5 text-text-tertiary">
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <span>Muc do vi pham tieu chuan cong dong</span>
+          </div>
+          <span className={`font-semibold ${
+            userPenaltyScore >= 80 ? 'text-red-500' :
+            userPenaltyScore >= 50 ? 'text-orange-500' :
+            userPenaltyScore > 0 ? 'text-yellow-500' : 'text-text-tertiary'
+          }`}>
             {userPenaltyScore}%
           </span>
         </div>
-        <div className="h-1 w-full overflow-hidden rounded-full bg-border">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-border/60">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
-              userPenaltyScore >= 80 ? 'bg-red-500' :
-              userPenaltyScore >= 50 ? 'bg-orange-500' :
-              userPenaltyScore > 0 ? 'bg-yellow-500' : 'bg-accent'
+              userPenaltyScore >= 80 ? 'bg-gradient-to-r from-red-500 to-red-400' :
+              userPenaltyScore >= 50 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
+              userPenaltyScore > 0 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' : 'bg-gradient-to-r from-accent to-accent-hover'
             }`}
             style={{ width: `${Math.min(Math.max(userPenaltyScore, 0), 100)}%` }}
           />
         </div>
         {userMutedUntil && new Date(userMutedUntil) > new Date() && (
-          <p className="mt-1 text-[11px] font-medium text-red-500">
-            Bạn đang bị cấm chat đến {new Date(userMutedUntil).toLocaleTimeString('vi-VN')}
-          </p>
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/30 px-3 py-2 text-[11px] font-medium text-red-400">
+            <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+            Ban dang bi cam chat den {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+          </div>
         )}
       </div>
 

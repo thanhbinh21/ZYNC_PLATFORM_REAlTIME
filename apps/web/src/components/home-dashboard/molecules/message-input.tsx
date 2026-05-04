@@ -429,60 +429,73 @@ export function MessageInput({
   };
 
   return (
-    <div className="relative border-t border-border bg-bg-card p-4">
+    <div className="border-t border-border/60 bg-bg-card/80 p-4 backdrop-blur-sm">
+      {/* Reply Banner */}
       {replyingTo && (
-        <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-bg-hover px-3 py-2">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-accent">Dang tra loi</p>
-            <p className="truncate text-sm text-text-primary">{replyingTo.contentPreview || '[Tin nhan]'}</p>
+        <div className="mb-3 flex items-center justify-between rounded-xl border border-accent/20 bg-accent/5 px-4 py-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-accent/10">
+              <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinecap="round">
+                <polyline points="9 17 4 12 9 7"/>
+                <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Dang tra loi</p>
+              <p className="truncate text-[13px] text-text-secondary">{replyingTo.contentPreview || '[Tin nhan]'}</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onCancelReply}
-            className="ml-3 rounded-md bg-bg-primary px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-border-light"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-text-tertiary hover:bg-border hover:text-text-primary transition-all"
+            title="Huy tra loi"
           >
-            Huy
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
         </div>
       )}
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-1 mb-3">
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isLoading}
-          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
-          title="Attachment"
+          className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-bg-hover disabled:opacity-40 text-text-tertiary hover:text-accent"
+          title="Dinh kem tep"
         >
-          <PaperclipIcon className="w-5 h-5" />
+          <PaperclipIcon className="w-[18px] h-[18px]" />
         </button>
 
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || isLoading}
-          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
-          title="Images/Videos"
+          className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-bg-hover disabled:opacity-40 text-text-tertiary hover:text-accent"
+          title="Gui hinh anh"
         >
-          <ImageIcon className="w-5 h-5" />
+          <ImageIcon className="w-[18px] h-[18px]" />
         </button>
 
         <button
           onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
           disabled={disabled || isLoading}
-          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
-          title="Emoji"
+          className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all disabled:opacity-40 text-text-tertiary hover:text-accent ${isEmojiPickerOpen ? 'bg-accent/10 text-accent' : 'hover:bg-bg-hover'}`}
+          title="Bieu tuong cam xuc"
         >
-          <EmojiIcon className="w-5 h-5" />
+          <EmojiIcon className="w-[18px] h-[18px]" />
         </button>
 
         <button
           ref={stickerButtonRef}
           onClick={() => setShowStickerPicker(true)}
           disabled={disabled || isLoading || isSending}
-          className="rounded-lg p-2 transition-colors hover:bg-bg-hover disabled:opacity-50 text-text-secondary hover:text-text-primary"
+          className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-bg-hover disabled:opacity-40 text-text-tertiary hover:text-accent"
           title="Sticker"
         >
-          <StickerIcon className="w-5 h-5" />
+          <StickerIcon className="w-[18px] h-[18px]" />
         </button>
 
         <input
@@ -495,13 +508,13 @@ export function MessageInput({
       </div>
 
       {isEmojiPickerOpen && (
-        <div className="emoji-picker-container mb-3 flex flex-wrap gap-2 rounded-lg border p-2 shadow-sm">
+        <div className="emoji-picker-container mb-3 flex flex-wrap gap-1.5 rounded-2xl border border-border bg-bg-card p-3 shadow-lg">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => handleSendEmoji(emoji)}
-              className="emoji-button inline-flex h-9 w-9 items-center justify-center rounded-md text-lg hover:scale-110 transition-transform"
+              className="emoji-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-xl hover:bg-bg-hover hover:scale-110 transition-all active:scale-95"
             >
               {emoji}
             </button>
@@ -519,16 +532,16 @@ export function MessageInput({
       )}
 
       {/* Input Area */}
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-2.5">
         <textarea
           value={input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder="Nhập tin nhắn..."
+          placeholder="Nhap tin nhan..."
           disabled={disabled || isLoading}
           rows={1}
-          className="flex-1 rounded-xl bg-bg-hover px-4 py-3 text-[15px] font-medium text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent-light disabled:opacity-50 border border-border-light"
+          className="chat-input-glow flex-1 rounded-2xl bg-bg-hover border border-border-light px-4 py-3 text-[15px] font-medium text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none disabled:opacity-50 transition-all"
           style={{
             minHeight: '46px',
             maxHeight: '120px',
@@ -540,7 +553,11 @@ export function MessageInput({
             void handleSend();
           }}
           disabled={isButtonDisabled}
-          className="p-3 bg-accent hover:bg-accent-hover text-white rounded-full transition-all disabled:bg-bg-hover disabled:text-text-tertiary disabled:cursor-not-allowed mb-0.5"
+          className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl transition-all shadow-sm ${
+            isButtonDisabled
+              ? 'bg-bg-hover text-text-tertiary cursor-not-allowed'
+              : 'bg-gradient-to-br from-accent to-accent-hover text-white hover:shadow-md hover:scale-105 active:scale-95'
+          }`}
         >
           <SendIcon className="w-5 h-5" />
         </button>
@@ -553,49 +570,62 @@ export function MessageInput({
             <img
               src={uploadedMedia.previewUrl}
               alt="Preview"
-              className={`max-w-xs rounded-lg ${uploading ? 'opacity-50' : ''}`}
+              className={`max-w-[240px] rounded-2xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
             />
           ) : uploadedMedia.type === 'video' ? (
             <video
               src={uploadedMedia.previewUrl}
               controls={!uploading}
-              className={`max-w-xs rounded-lg ${uploading ? 'opacity-50' : ''}`}
+              className={`max-w-[240px] rounded-2xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
             />
           ) : (
-            <div className={`inline-flex max-w-xs items-center rounded-lg border border-border bg-bg-hover px-3 py-2 text-sm text-text-primary ${uploading ? 'opacity-50' : ''}`}>
-              {uploadedMedia.fileName || 'Tệp đính kèm'}
+            <div className={`inline-flex max-w-xs items-center gap-2 rounded-xl border border-border bg-bg-hover px-4 py-2.5 text-sm text-text-primary shadow-sm ${uploading ? 'opacity-50' : ''}`}>
+              <svg className="h-5 w-5 text-accent flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <span className="truncate">{uploadedMedia.fileName || 'Tep dinh kem'}</span>
             </div>
           )}
 
-          {/* Spinner only after user pressed Send */}
+          {/* Spinner overlay when uploading */}
           {uploading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
-              <div className="w-10 h-10 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/20 backdrop-blur-[2px]">
+              <div className="h-10 w-10 rounded-full border-[3px] border-white/30 border-t-white animate-spin shadow-lg" />
             </div>
           )}
 
+          {/* Remove button */}
           <button
             onClick={() => {
               if (queuedMediaSendRef.current) {
                 return;
               }
-
               if (uploadedMedia.previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(uploadedMedia.previewUrl);
               }
               setUploadedMedia(null);
             }}
             disabled={Boolean(queuedMediaSend)}
-            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 w-7 h-7 flex items-center justify-center"
-            title="Remove media"
+            className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white shadow-md transition-all hover:bg-red-600 hover:scale-110 disabled:opacity-50"
+            title="Xoa tep"
           >
-            ✕
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
         </div>
       )}
 
       {uploadedMedia && queuedMediaSend && uploading && (
-        <p className="mt-2 text-xs text-text-tertiary">Dang tai media sau khi gui...</p>
+        <p className="mt-2 flex items-center gap-2 text-xs text-text-tertiary">
+          <svg className="h-3.5 w-3.5 animate-spin text-accent" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Dang tai media...
+        </p>
       )}
     </div>
   );

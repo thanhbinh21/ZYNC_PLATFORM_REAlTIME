@@ -1,5 +1,5 @@
 import type { FriendsScreenProps } from '../friends.types';
-import { Bell, Search, Users } from 'lucide-react';
+import { Bell, Search, Users, UserPlus, Clock, CheckCircle2, X, UserX } from 'lucide-react';
 import { FriendItem } from '../molecules/friend-item';
 import { RequestItem } from '../molecules/request-item';
 import { SearchResultItem } from '../molecules/search-result-item';
@@ -26,157 +26,217 @@ export function FriendsScreen({
   onUnblock,
 }: FriendsScreenProps) {
   return (
-    <div className="flex h-full w-full flex-col overflow-y-auto px-4 py-5 text-text-primary sm:px-6 lg:px-8">
-      <section className="w-full">
-        <header className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex h-full w-full flex-col overflow-hidden">
+      {/* Header */}
+      <div className="border-b border-border-light px-4 py-4 sm:px-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <span className="zync-soft-kicker">Network Hub</span>
-            <h1 className="font-ui-title mt-4 text-[clamp(2rem,4vw,3.1rem)] text-text-primary">Trung tam ban be</h1>
-            <p className="font-ui-content mt-2 max-w-2xl text-base text-text-secondary">
-              Quan ly ket noi, loi moi va danh sach ban be trong mot khong gian sang, ro va de theo doi hon.
+            <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Quản lý</p>
+            <h1 className="font-ui-title mt-1 text-2xl text-text-primary">Bạn bè</h1>
+            <p className="font-ui-content mt-1 text-sm text-text-secondary">
+              {friends.length} kết nối · {pendingTotal} lời mời chờ
             </p>
           </div>
-        </header>
-
-        <section className="mt-7 grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <div className="zync-soft-card zync-soft-card-elevated rounded-[1.8rem] p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-ui-title text-xl text-text-primary">Loi moi ket ban ({pendingTotal})</h2>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-glass)] px-3 py-1 text-xs text-text-primary">
-                <Bell className="h-3.5 w-3.5 text-accent" />
-                Incoming
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {incomingRequests.length === 0 ? (
-                <p className="font-ui-meta text-sm text-text-tertiary">Chua co loi moi den.</p>
-              ) : (
-                incomingRequests.map((item) => (
-                  <RequestItem
-                    key={item.requestId}
-                    item={item}
-                    type="incoming"
-                    isLoading={isLoading}
-                    onAcceptRequest={onAcceptRequest}
-                    onRejectRequest={onRejectRequest}
-                    onUnblock={onUnblock}
-                  />
-                ))
-              )}
-            </div>
-
-            <h3 className="font-ui-title mt-7 text-base text-text-primary">Loi moi da gui</h3>
-            <div className="mt-3 space-y-3">
-              {outgoingRequests.length === 0 ? (
-                <p className="font-ui-meta text-sm text-text-tertiary">Ban chua gui loi moi nao.</p>
-              ) : (
-                outgoingRequests.map((item) => (
-                  <RequestItem
-                    key={item.requestId}
-                    item={item}
-                    type="outgoing"
-                    isLoading={isLoading}
-                    onAcceptRequest={onAcceptRequest}
-                    onRejectRequest={onRejectRequest}
-                    onUnblock={onUnblock}
-                  />
-                ))
-              )}
-            </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {pendingTotal > 0 && (
+              <div className="relative">
+                <Bell className="h-5 w-5 text-accent" />
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                  {pendingTotal > 9 ? '9+' : pendingTotal}
+                </span>
+              </div>
+            )}
           </div>
+        </div>
+      </div>
 
-          <div className="zync-soft-card zync-soft-card-elevated rounded-[1.8rem] p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-ui-title text-xl text-text-primary">Tim nguoi de ket ban</h2>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-glass)] px-3 py-1 text-xs text-text-primary">
-                <Search className="h-3.5 w-3.5 text-accent" />
-                Discover
-              </span>
+      <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        <div className="mx-auto max-w-5xl space-y-5">
+          {/* Pending Requests */}
+          {incomingRequests.length > 0 || outgoingRequests.length > 0 ? (
+            <section className="zync-soft-card rounded-[1.8rem] p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="font-ui-title text-lg text-text-primary">Lời mời kết bạn</h2>
+                {pendingTotal > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                    <span className="font-ui-meta text-[10px] uppercase tracking-wider text-accent-strong">
+                      {pendingTotal} đang chờ
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {incomingRequests.length > 0 && (
+                <div className="space-y-3">
+                  <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
+                    Nhận được
+                  </p>
+                  <div className="space-y-2">
+                    {incomingRequests.map((item) => (
+                      <RequestItem
+                        key={item.requestId}
+                        item={item}
+                        type="incoming"
+                        isLoading={isLoading}
+                        onAcceptRequest={onAcceptRequest}
+                        onRejectRequest={onRejectRequest}
+                        onUnblock={onUnblock}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {outgoingRequests.length > 0 && (
+                <div className={`space-y-3 ${incomingRequests.length > 0 ? 'mt-5' : ''}`}>
+                  <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
+                    Đã gửi
+                  </p>
+                  <div className="space-y-2">
+                    {outgoingRequests.map((item) => (
+                      <RequestItem
+                        key={item.requestId}
+                        item={item}
+                        type="outgoing"
+                        isLoading={isLoading}
+                        onAcceptRequest={onAcceptRequest}
+                        onRejectRequest={onRejectRequest}
+                        onUnblock={onUnblock}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          ) : (
+            <section className="zync-soft-card-muted rounded-[1.8rem] p-6 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                <UserPlus className="h-5 w-5 text-text-tertiary" />
+              </div>
+              <p className="font-ui-title mt-3 text-sm text-text-primary">Không có lời mời nào</p>
+              <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                Tìm người quen để kết nối
+              </p>
+            </section>
+          )}
+
+          {/* Search */}
+          <section className="zync-soft-card rounded-[1.8rem] p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-ui-title text-lg text-text-primary">Tìm bạn</h2>
             </div>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <input
-                value={searchKeyword}
-                onChange={(event) => onSearchKeywordChange(event.target.value)}
-                placeholder="Nhap @username hoac email"
-                className="zync-soft-input"
-              />
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+                <input
+                  value={searchKeyword}
+                  onChange={(event) => onSearchKeywordChange(event.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void onSearch(); }}
+                  placeholder="Nhập @username hoặc email"
+                  className="zync-soft-input w-full pl-9"
+                />
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  void onSearch();
-                }}
-                disabled={isLoading}
-                className="zync-soft-button h-12 px-5 text-sm"
+                onClick={() => { void onSearch(); }}
+                disabled={isLoading || !searchKeyword.trim()}
+                className="zync-soft-button flex h-11 shrink-0 items-center gap-2 px-5 text-sm disabled:opacity-50"
               >
-                Tim
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">Tìm kiếm</span>
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
-              {searchResults.length === 0 ? (
-                <p className="font-ui-meta text-sm text-text-tertiary">Chua co ket qua tim kiem.</p>
-              ) : (
-                searchResults.map((user) => (
+            {searchResults.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {searchResults.map((user) => (
                   <SearchResultItem
                     key={user.id}
                     user={user}
                     isLoading={isLoading}
                     onSendRequest={onSendRequest}
                   />
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="zync-soft-card mt-6 rounded-[1.8rem] p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-ui-title text-xl text-text-primary">Danh sach ban be ({friends.length})</h2>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-[var(--surface-glass)] px-3 py-1 text-xs text-text-primary">
-              <Users className="h-3.5 w-3.5 text-accent" />
-              Trusted Circle
-            </span>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {friends.length === 0 ? (
-              <p className="font-ui-meta text-sm text-text-tertiary">Ban chua co ban be nao.</p>
-            ) : (
-              friends.map((friend) => (
-                <FriendItem
-                  key={friend.id}
-                  friend={friend}
-                  onUnfriend={onUnfriend}
-                  onBlock={onBlock}
-                  isLoading={isLoading}
-                />
-              ))
+                ))}
+              </div>
             )}
-          </div>
 
-          {nextCursor ? (
-            <button
-              type="button"
-              onClick={() => {
-                void onLoadMoreFriends();
-              }}
-              disabled={isLoading}
-              className="zync-soft-button-secondary mt-5 h-10 px-4 text-sm"
-            >
-              Tai them ban be
-            </button>
-          ) : null}
-        </section>
+            {searchKeyword.trim() && searchResults.length === 0 && !isLoading && (
+              <div className="mt-4 flex flex-col items-center gap-2 py-6 text-center">
+                <UserX className="h-8 w-8 text-text-tertiary" />
+                <p className="font-ui-content text-sm text-text-secondary">
+                  Không tìm thấy người dùng phù hợp
+                </p>
+              </div>
+            )}
+          </section>
 
-        {infoMessage ? (
-          <p className="zync-soft-notice mt-4 rounded-2xl px-4 py-3 text-sm font-medium">{infoMessage}</p>
-        ) : null}
-        {errorMessage ? (
-          <p className="zync-soft-notice-danger mt-3 rounded-2xl px-4 py-3 text-sm font-medium">{errorMessage}</p>
-        ) : null}
-      </section>
+          {/* Friends List */}
+          <section className="zync-soft-card rounded-[1.8rem] p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-accent" />
+                <h2 className="font-ui-title text-lg text-text-primary">Danh sách bạn bè</h2>
+                <span className="font-ui-meta rounded-full bg-bg-hover px-2 py-0.5 text-xs text-text-secondary">
+                  {friends.length}
+                </span>
+              </div>
+            </div>
+
+            {friends.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                  <Users className="h-6 w-6 text-text-tertiary" />
+                </div>
+                <div>
+                  <p className="font-ui-title text-sm text-text-primary">Chưa có bạn bè nào</p>
+                  <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                    Tìm kiếm và kết nối với mọi người
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {friends.map((friend) => (
+                  <FriendItem
+                    key={friend.id}
+                    friend={friend}
+                    onUnfriend={onUnfriend}
+                    onBlock={onBlock}
+                    isLoading={isLoading}
+                  />
+                ))}
+              </div>
+            )}
+
+            {nextCursor && friends.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { void onLoadMoreFriends(); }}
+                disabled={isLoading}
+                className="zync-soft-button-secondary mt-4 flex w-full items-center justify-center gap-2 py-2.5 text-sm"
+              >
+                <Clock className="h-4 w-4" />
+                Tải thêm bạn bè
+              </button>
+            )}
+          </section>
+
+          {/* Feedback messages */}
+          {infoMessage && (
+            <div className="flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" />
+              <p className="font-ui-content text-sm text-accent-strong">{infoMessage}</p>
+            </div>
+          )}
+          {errorMessage && (
+            <div className="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <X className="h-4 w-4 shrink-0 text-red-400" />
+              <p className="font-ui-content text-sm text-red-400">{errorMessage}</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

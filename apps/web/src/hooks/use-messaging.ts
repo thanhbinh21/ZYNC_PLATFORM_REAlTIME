@@ -540,8 +540,11 @@ export function useChat({
       mediaUrl?: string,
       options?: SendMessageOptions,
     ) => {
+      // Kiem tra ket noi SOCKET truoc khi thuc hien bat ky thu gi
+      // Neu chua ket noi, hien thong bao loi va khong tao optimistic bubble
       if (!isConnected()) {
-        setError("Not connected to messaging service");
+        setError("Mat ket noi voi may chu. Vui long doi ket noi...");
+        console.warn("[useChat] Cannot send: socket not connected");
         return null;
       }
 
@@ -549,15 +552,17 @@ export function useChat({
       const shouldEmitNow = !options?.deferEmit;
       const timestamp = new Date().toISOString();
 
+      console.debug(`[useChat] handleSendMessage: content="${content.substring(0, 30)}...", type=${type}, shouldEmitNow=${shouldEmitNow}`);
+
       try {
         if (shouldEmitNow) {
           setIsLoading(true);
         }
         setError(null);
 
-        // Optimistic update
+        // Chi tao optimistic message neu thuc su co the gui
         const optimisticMessage: Message = {
-          _id: idempotencyKey, // Temporary ID
+          _id: idempotencyKey,
           conversationId,
           senderId: userId,
           content,
@@ -596,7 +601,6 @@ export function useChat({
         }));
 
         if (shouldEmitNow) {
-          // Send via socket only when media is ready or message is plain text
           emitSendMessage(
             conversationId,
             content,
@@ -606,14 +610,27 @@ export function useChat({
             options?.replyTo,
           );
 
-          // Clear pending typing indicator immediately (don't wait 3s)
           emitClearPendingTyping(conversationId);
         }
 
         return idempotencyKey;
       } catch (err) {
+        // Rollback optimistic message khi co loi
+        setMessages((prev) =>
+          prev.filter(
+            (msg) =>
+              msg.idempotencyKey !== idempotencyKey &&
+              msg._id !== idempotencyKey,
+          ),
+        );
+        setMessageStatus((prev) => {
+          const next = { ...prev };
+          delete next[idempotencyKey];
+          return next;
+        });
+
         const errorMsg =
-          err instanceof Error ? err.message : "Failed to send message";
+          err instanceof Error ? err.message : "Khong the gui tin nhan";
         setError(errorMsg);
         console.error("Send message error:", err);
         return null;

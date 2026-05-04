@@ -2632,7 +2632,9 @@ export function useHomeDashboard() {
 
       try {
         // Use sendMessage from useChat hook
-        return await sendMessage(content, type, mediaUrl, options);
+        const result = await sendMessage(content, type, mediaUrl, options);
+        console.debug('[handleSendMessage] sent, idempotencyKey:', result);
+        return result;
       } catch (error) {
         console.error('Failed to send message:', error);
         return null;

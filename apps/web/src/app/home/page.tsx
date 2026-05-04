@@ -17,6 +17,7 @@ import { useMessagePreview } from '@/hooks/use-message-preview';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { fetchMyProfile, type MeUser } from '@/services/users';
+import { PageLoading } from '@/components/shared/page-loading';
 import FriendsPage from '../friends/page';
 import CommunityContent from '../community/community-content';
 import ExploreContent from '../explore/explore-content';
@@ -28,7 +29,7 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 
 export default function HomePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageLoading />}>
       <HomePageContent />
     </Suspense>
   );

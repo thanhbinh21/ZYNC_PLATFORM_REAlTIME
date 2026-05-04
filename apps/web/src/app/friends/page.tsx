@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { FriendsScreen } from '@/components/friends/organisms/friends-screen';
 import { useFriendsDashboard } from '@/hooks/use-friends-dashboard';
+import { PageLoading } from '@/components/shared/page-loading';
 
-export default function FriendsPage() {
+function FriendsPageContent() {
   const dashboard = useFriendsDashboard();
   const { loadData } = dashboard;
 
@@ -34,5 +35,13 @@ export default function FriendsPage() {
       onBlock={dashboard.onBlock}
       onUnblock={dashboard.onUnblock}
     />
+  );
+}
+
+export default function FriendsPage() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <FriendsPageContent />
+    </Suspense>
   );
 }
