@@ -608,13 +608,13 @@ npm run dev:web
 - [x] **Global Error Handler:** `error-handler.middleware.ts` chuẩn hóa 5 loại lỗi (AppError, ZodError, MongoDB 11000, JWT, Unknown) với format `ErrorResponse` thống nhất. <!-- done: 02/05/2026 -->
 - [x] **Schema-driven Validation:** Zod đã có sẵn + `validate.middleware.ts` hoạt động. <!-- done: 02/05/2026 -->
 - [x] **Migrate MessagesService:** Inject `MessageRepository`, thay `MessageModel.findOne/find` trực tiếp bằng repo methods (backward-compatible API). <!-- done: 02/05/2026 -->
-- [ ] **Migrate PostsService:** Inject `PostRepository + CommentRepository`.
+- [x] **Migrate PostsService:** Inject `PostRepository + CommentRepository`, thay PostModel/CommentModel bằng repo methods (backward-compatible API). <!-- done: 04/05/2026 -->
 
 #### X.2. Infrastructure Optimization
 - [x] **Kafka DLQ & Retry:** Thêm topics `raw-messages.retry` + `raw-messages.dlq` + `notifications.retry` + `notifications.dlq`. Worker subscribe cả main topic và retry topic. Max 3 retries với exponential backoff → auto route sang DLQ. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Call:** Tách toàn bộ Call + WebRTC events (8 handlers) ra `socket/call.controller.ts`. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Chat:** Tách `send_message`, `message_read`, `message_delivered`, `delete_message_for_me`, `recall_message`, `forward_message` ra `socket/chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng**. <!-- done: 02/05/2026 -->
-- [ ] **Socket Modularization – Reaction & Story:** Tách Reaction events và Story events thành các sub-controller riêng.
+- [x] **Socket Modularization – Reaction & Story:** Tách `reaction_upsert`, `reaction_remove_all_mine` ra `socket/reaction.controller.ts` và Story emit functions ra `socket/story.controller.ts`. `gateway.ts` giảm thêm ~370 dòng. <!-- done: 04/05/2026 -->
 
 ---
 
@@ -625,7 +625,7 @@ npm run dev:web
 - [x] Phase R4: Pivot Branding (Zalo Clone → Zync Community) ✅
 - [x] Phase N1: Community Posts (Web) ✅
 - [x] Phase N3: Explore & Discovery (Web) ✅
-- [ ] **Phase X: Chuẩn hóa Kiến trúc & Hạ tầng** 🔧 *(~80% hoàn thành – còn PostsService migration + Reaction/Story controller)*
+- [ ] **Phase X: Chuẩn hóa Kiến trúc & Hạ tầng** 🔧 *(~100% hoàn thành – PostsService migrated + Reaction/Story controller)*
 - [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳
 - [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳
 - [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳
