@@ -1,18 +1,22 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { 
+import {
   useFonts,
   BeVietnamPro_400Regular,
   BeVietnamPro_500Medium,
   BeVietnamPro_600SemiBold,
-  BeVietnamPro_700Bold 
+  BeVietnamPro_700Bold
 } from '@expo-google-fonts/be-vietnam-pro';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
 import { NotificationsProvider } from '../src/context/notifications-context';
-
+import {
+  configureNotificationHandler,
+  addNotificationResponseListener,
+} from '../src/services/push-notifications';
 import { IncomingCallOverlay } from '../src/components/IncomingCallOverlay';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -38,6 +42,20 @@ export default function RootLayout() {
     }
   }, [isAuthenticated]);
 
+  // Configure push notification handler and tap listener
+  useEffect(() => {
+    configureNotificationHandler();
+
+    const subscription = addNotificationResponseListener((conversationId, type) => {
+      // Navigation from notification tap is handled by NotificationsProvider's router logic
+      console.log('[Push] Notification tapped:', conversationId, type);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
@@ -55,6 +73,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="chat-room" options={{ headerShown: false }} />
+          <Stack.Screen name="post-detail" options={{ headerShown: false }} />
+          <Stack.Screen name="explore" options={{ headerShown: false }} />
           <Stack.Screen name="call-screen" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         </Stack>
         <IncomingCallOverlay />

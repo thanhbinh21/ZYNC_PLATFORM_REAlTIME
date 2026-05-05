@@ -30,5 +30,8 @@
   "devDependencies": {
     "expo": "^54.0.33",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "expo-device": "^55.0.15"
   }
 }

@@ -12,30 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { lightTheme } from '../src/theme/colors';
+import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
+import { getAppTheme } from '../src/theme/get-app-theme';
 import { useNotifications } from '../src/hooks/useNotifications';
 import { useAuthStore } from '../src/store/useAuthStore';
 import type { AppNotification } from '../src/services/notifications';
-
-// Icon va mau theo loai thong bao
-function getNotificationMeta(type: AppNotification['type']) {
-  switch (type) {
-    case 'new_message':
-      return { icon: 'chatbubble', color: '#3b82f6' };
-    case 'friend_request':
-      return { icon: 'person-add', color: '#10b981' };
-    case 'friend_accepted':
-      return { icon: 'people', color: '#8b5cf6' };
-    case 'group_invite':
-      return { icon: 'chatbubbles', color: '#f59e0b' };
-    case 'story_reaction':
-      return { icon: 'heart', color: '#ef4444' };
-    case 'story_reply':
-      return { icon: 'chatbox', color: '#ec4899' };
-    default:
-      return { icon: 'notifications', color: '#64748b' };
-  }
-}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -52,6 +33,8 @@ function timeAgo(dateStr: string): string {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const mode = useAppPreferencesStore((s) => s.theme);
+  const theme = getAppTheme(mode);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const {
     notifications,
@@ -78,14 +61,11 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   }, [loadNotifications]);
 
-  // Tap vao thong bao -> danh dau da doc va dieu huong
   const handlePress = useCallback(
     (item: AppNotification) => {
       if (!item.read) {
         void markRead([item._id]);
       }
-
-      // Dieu huong theo loai
       if (item.conversationId && (item.type === 'new_message' || item.type === 'group_invite')) {
         router.push({
           pathname: '/chat-room',
@@ -100,45 +80,54 @@ export default function NotificationsScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: AppNotification }) => {
-      const meta = getNotificationMeta(item.type);
+      let icon = 'notifications';
+      let color = theme.textTertiary;
+      switch (item.type) {
+        case 'new_message': icon = 'chatbubble'; color = theme.info; break;
+        case 'friend_request': icon = 'person-add'; color = theme.accent; break;
+        case 'friend_accepted': icon = 'people'; color = theme.violet; break;
+        case 'group_invite': icon = 'chatbubbles'; color = theme.warning; break;
+        case 'story_reaction': icon = 'heart'; color = theme.danger; break;
+        case 'story_reply': icon = 'chatbox'; color = theme.pink; break;
+      }
       return (
         <TouchableOpacity
-          style={[styles.item, !item.read && styles.itemUnread]}
+          style={[styles.item, !item.read && { backgroundColor: theme.bgActive }]}
           activeOpacity={0.7}
           onPress={() => handlePress(item)}
         >
-          <View style={[styles.iconBox, { backgroundColor: `${meta.color}15` }]}>
-            <Ionicons name={meta.icon as any} size={20} color={meta.color} />
+          <View style={[styles.iconBox, { backgroundColor: `${color}15` }]}>
+            <Ionicons name={icon as any} size={20} color={color} />
           </View>
           <View style={styles.itemContent}>
             <Text style={[styles.itemTitle, !item.read && styles.itemTitleBold]} numberOfLines={1}>
               {item.title}
             </Text>
-            <Text style={styles.itemBody} numberOfLines={2}>
+            <Text style={[styles.itemBody, { color: theme.textSecondary }]} numberOfLines={2}>
               {item.body}
             </Text>
-            <Text style={styles.itemTime}>{timeAgo(item.createdAt)}</Text>
+            <Text style={[styles.itemTime, { color: theme.textTertiary }]}>{timeAgo(item.createdAt)}</Text>
           </View>
-          {!item.read && <View style={styles.unreadDot} />}
+          {!item.read && <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
       );
     },
-    [handlePress],
+    [handlePress, theme],
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bgPrimary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={lightTheme.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
           Thông báo{unreadCount > 0 ? ` (${unreadCount})` : ''}
         </Text>
         {unreadCount > 0 ? (
           <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn}>
-            <Text style={styles.markAllText}>Đọc hết</Text>
+            <Text style={[styles.markAllText, { color: theme.accent }]}>Đọc hết</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 50 }} />
@@ -153,8 +142,8 @@ export default function NotificationsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={lightTheme.accent}
-            colors={[lightTheme.accent]}
+            tintColor={theme.accent}
+            colors={[theme.accent]}
           />
         }
         onEndReached={loadMore}
@@ -163,13 +152,13 @@ export default function NotificationsScreen() {
           isLoading ? (
             <ActivityIndicator
               size="large"
-              color={lightTheme.accent}
+              color={theme.accent}
               style={{ marginTop: 80 }}
             />
           ) : (
             <View style={styles.emptyContainer}>
-              <Ionicons name="notifications-off-outline" size={48} color={lightTheme.textTertiary} />
-              <Text style={styles.emptyText}>Không có thông báo nào</Text>
+              <Ionicons name="notifications-off-outline" size={48} color={theme.textTertiary} />
+              <Text style={[styles.emptyText, { color: theme.textTertiary }]}>Không có thông báo nào</Text>
             </View>
           )
         }
@@ -177,22 +166,22 @@ export default function NotificationsScreen() {
           hasMore && notifications.length > 0 ? (
             <ActivityIndicator
               size="small"
-              color={lightTheme.accent}
+              color={theme.accent}
               style={{ paddingVertical: 20 }}
             />
           ) : null
         }
         contentContainerStyle={{ paddingBottom: 30 }}
+        ItemSeparatorComponent={() => (
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.borderLight }} />
+        )}
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: lightTheme.bgPrimary,
-  },
+  safe: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -200,24 +189,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightTheme.borderLight,
   },
-  backBtn: {
-    padding: 4,
-  },
+  backBtn: { padding: 4 },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: lightTheme.textPrimary,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
-  markAllBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
+  markAllBtn: { paddingHorizontal: 10, paddingVertical: 4 },
   markAllText: {
     fontSize: 13,
-    color: lightTheme.accent,
     fontWeight: '600',
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
@@ -226,11 +207,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: lightTheme.borderLight,
-  },
-  itemUnread: {
-    backgroundColor: lightTheme.bgActive,
   },
   iconBox: {
     width: 40,
@@ -240,27 +216,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  itemContent: {
-    flex: 1,
-  },
+  itemContent: { flex: 1 },
   itemTitle: {
     fontSize: 14,
-    color: lightTheme.textPrimary,
     fontFamily: 'BeVietnamPro_500Medium',
   },
-  itemTitleBold: {
-    fontWeight: '700',
-    fontFamily: 'BeVietnamPro_700Bold',
-  },
+  itemTitleBold: { fontWeight: '700', fontFamily: 'BeVietnamPro_700Bold' },
   itemBody: {
     fontSize: 13,
-    color: lightTheme.textSecondary,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 2,
   },
   itemTime: {
     fontSize: 11,
-    color: lightTheme.textTertiary,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 4,
   },
@@ -268,7 +236,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: lightTheme.accent,
     marginLeft: 8,
   },
   emptyContainer: {
@@ -278,7 +245,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
-    color: lightTheme.textTertiary,
     fontFamily: 'BeVietnamPro_400Regular',
   },
 });

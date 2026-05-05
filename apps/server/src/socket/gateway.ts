@@ -26,6 +26,13 @@ import {
   applyPenaltyScore,
   refreshPenaltyWindow,
 } from '../modules/ai/moderation/penalty-policy';
+import {
+  setPresenceOnline,
+  setPresenceOffline,
+  refreshPresenceOnline,
+  getFriendIds,
+  getBulkPresence,
+} from '../modules/users/presence.service';
 // Sub-controllers (Phase 1 Refactoring)
 import { registerCallController } from './call.controller';
 import { registerChatController, setChatKafkaFailureMode } from './chat.controller';
@@ -33,9 +40,31 @@ import { registerReactionController } from './reaction.controller';
 
 // Rate limits: normal (300/500ms) vs fallback (200/500ms)
 
+const HEARTBEAT_INTERVAL_MS = 30000;
+
 let ioInstance: Server | null = null;
 let kafkaFailureMode = false; // Track if Kafka batch insert is failing
 const callTimeoutRegistry = new Map<string, NodeJS.Timeout>();
+
+/** Broadcast presence change only to friends of the user */
+async function broadcastPresenceChanged(
+  io: Server,
+  userId: string,
+  online: boolean,
+): Promise<void> {
+  try {
+    const friendIds = await getFriendIds(userId);
+    for (const friendId of friendIds) {
+      io.to(`user:${friendId}`).emit('presence_changed', {
+        userId,
+        status: online ? 'online' : 'offline',
+        lastSeen: online ? null : new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    logger.error('[Presence] broadcast error', err);
+  }
+}
 
 interface AuthSocket extends Socket {
   userId: string;
@@ -160,8 +189,16 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     // Tham gia room cá nhân để nhận tin nhắn trực tiếp
     void socket.join(`user:${userId}`);
 
-    // Đánh dấu user đang online trong Redis
-    void setUserOnline(userId);
+    // Đánh dấu user đang online trong Redis và broadcast cho bạn bè
+    void (async () => {
+      await setPresenceOnline(userId);
+      await broadcastPresenceChanged(io, userId, true);
+    })();
+
+    // Heartbeat: client gui `heartbeat` moi 30s de giu online
+    socket.on('heartbeat', async () => {
+      await refreshPresenceOnline(userId);
+    });
 
     socket.on('join_conversation', async (payload: { conversationId?: string }) => {
       const conversationId = payload?.conversationId;
@@ -287,10 +324,10 @@ export function initSocketGateway(httpServer: HttpServer): Server {
 
     // ✅ Call & WebRTC Events – delegated to CallController sub-module
     registerCallController(io, socket as AuthSocket);
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       logger.debug(`Socket disconnected: ${userId}`);
-      void removeUserOnline(userId);
-      io.emit('user_online', { userId, online: false, lastSeen: new Date().toISOString() });
+      await setPresenceOffline(userId);
+      await broadcastPresenceChanged(io, userId, false);
     });
 
     // Thông báo bạn bè user vừa online

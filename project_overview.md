@@ -238,22 +238,16 @@ npm run dev:web
 
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
-### Phase 6 – Presence & Stories (Module F22–F25)
+### Phase 6 – Presence & Online Status (Module F22–F25)
 >- [x] Tìm kiếm bạn bè theo tên/@username/email trên thanh search Dashboard <!-- done: 06/04/2026 -->
 >- [x] Xem nhanh profile người dùng từ kết quả tìm kiếm (UserProfileModal) <!-- done: 06/04/2026 -->
 >- [x] API `GET /api/friends/count` – đếm tổng bạn bè <!-- done: 06/04/2026 -->
 >- [x] API `GET /api/users/:userId` trả thêm username + email masked + friendCount + mutualFriends <!-- done: 06/04/2026 -->
->- [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, stories, joined date) <!-- done: 06/04/2026 -->
->- [x] Profile tabs: Thông tin / Danh sách bạn bè / Stories feed bạn bè <!-- done: 06/04/2026 -->
->- [x] Tích hợp Stories vào Home Dashboard Web: StoryBar + StoryViewer + StoryCreateModal + hook use-stories + services/stories <!-- done: 17/04/2026  -->
+>- [x] Profile panel bỏ mock data, dùng dữ liệu thật (friends count, joined date) <!-- done: 06/04/2026 -->
 >- [x] Chuẩn hóa UI tab Dashboard Web (Tổng quan/Trò chuyện/Bạn bè/Cộng đồng/Khám phá) full-width và đồng bộ tiếng Việt có dấu <!-- done: 29/04/2026 -->
 >- [ ] Broadcast online/offline status chỉ cho friends (filter qua friends list Redis cache)
 >- [ ] API `GET /api/users/:id/presence` – trả `{online, lastSeen}`
 >- [ ] Lưu `lastSeen` vào Redis khi disconnect, hiển thị "Hoạt động lần cuối" trên UI
->- [x] ~~Web UI: Story creation page (text + image upload, TTL 24h với MongoDB TTL index)~~ <!-- removed: 04/05/2026 – Stories feature deferred -->
->- [x] ~~Web UI: Story viewer (full-screen modal, progress bar, tap-to-advance)~~ <!-- removed: 04/05/2026 -->
->- [x] ~~Web UI: Story bar trên dashboard (horizontal scroll, ring indicator)~~ <!-- removed: 04/05/2026 -->
->- [ ] ~~Danh sách người đã xem story (Web UI cho story owner)~~ <!-- removed: 04/05/2026 – Stories feature deferred -->
 
 ### Phase 7 – Notifications (Module F26)
 - [x] Implement `notification.worker.ts` – Kafka consumer topic `notifications` <!-- done: 12/04/2026 -->
@@ -536,7 +530,7 @@ npm run dev:web
 - [x] User discovery cards với hiển thị kỹ năng (skills), bio, links (Github)
 - [x] Cơ chế Join channel public trực tiếp từ màn hình Khám phá
 
-### Plan A – Hoàn thiện Chức năng Web + Mobile (~50-65h)
+### Plan A – Hoàn thiện Chức năng Web + Mobile (~42-52h)
 
 > **File chi tiết:** `zync_plan/plan_A_feature_completion.md`
 > **Nguyên tắc UI:** Tạo bảng design tokens dùng chung (bảng màu, typography, spacing, border-radius) cho Web + Mobile. Không yêu cầu 100% đồng nhất UI, nhưng chức năng phải đồng nhất. Không dùng icon text, tất cả text trên UI phải là tiếng Việt có dấu.
@@ -544,23 +538,20 @@ npm run dev:web
 - [ ] A1: Mobile Community + Explore – Port tính năng Cộng đồng và Khám phá từ Web sang Mobile (~14-18h)
   - [ ] A1.1: Community Posts trên Mobile (tab Cộng đồng, PostCard, CreatePostSheet, CommentSheet, post-detail)
   - [ ] A1.2: Explore & Discovery trên Mobile (tìm kiếm kênh, developer, bài viết trending)
-  - [ ] A1.3: Refactor tab navigator Mobile (thêm tab Cộng đồng)
+  - [ ] A1.3: Refactor tab navigator Mobile (thêm tab Cộng động)
 - [ ] A2: Presence & Status System – Online/Offline/LastSeen trên cả Web + Mobile (~8-10h)
   - [ ] A2.1: Backend presence (Redis heartbeat, broadcast cho friends, API `/api/users/:id/presence`)
   - [ ] A2.2: Web presence UI (green dot, "Hoạt động X phút trước")
   - [ ] A2.3: Mobile presence UI (green dot, lastSeen)
-- [ ] A3: Stories Hoàn thiện (~6-8h)
-  - [ ] ~~A3.1: Web Story creation nâng cấp (background gradient, image crop, caption)~~ <!-- removed: 04/05/2026 -->
-  - [ ] ~~A3.2: Backend story viewers (track viewedBy[], API danh sách người xem)~~ <!-- removed: 04/05/2026 -->
-  - [ ] ~~A3.3: Verify + fix bugs Stories Mobile~~ <!-- removed: 04/05/2026 -->
-- [ ] A4: Chat Feature Gaps (~5-6h)
-  - [ ] A4.1: Push notification client Mobile (expo-notifications + FCM/APNs)
-  - [ ] A4.2: Mutual friends hiển thị + Friend list trong profile Mobile
-- [ ] A5: Cross-Platform UI Sync (~8-10h)
-  - [ ] A5.1: Tạo `packages/shared-design/tokens.json` – source of truth design tokens
-  - [ ] A5.2: Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
-  - [ ] A5.3: Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
-  - [ ] A5.4: Responsive + Accessibility (dark mode, font scaling, safe area)
+- [ ] A3: Chat Feature Gaps (~5-6h)
+  - [ ] A3.1: Push notification client Mobile (expo-notifications + FCM/APNs)
+  - [ ] A3.2: Mutual friends hiển thị + Friend list trong profile Mobile
+  - [ ] A3.3: Chuẩn hóa reaction contract (`reaction_updated` thống nhất giữa Web/Mobile) <!-- đang làm -->
+- [ ] A4: Cross-Platform UI Sync (~8-10h)
+  - [ ] A4.1: Tạo `packages/shared-design/tokens.json` – source of truth design tokens
+  - [ ] A4.2: Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
+  - [ ] A4.3: Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
+  - [ ] A4.4: Responsive + Accessibility (dark mode, font scaling, safe area)
 
 ### Plan B – Chức năng AI (~45-55h, tóm tắt)
 
@@ -598,13 +589,14 @@ npm run dev:web
   - [ ] Brand cleanup: đổi "Zalo Clone" → "ZYNC Dev Community" toàn hệ thống
   - [ ] Prometheus metrics + Grafana dashboard
 
-### Phase X – Chuẩn hóa Kiến trúc & Hạ tầng (Backend Refactoring) 🔧
+### Phase X – Chuẩn hóa Kiến trúc & Hạ tầng (Backend Refactoring) ✅
 
-> **Tài liệu chi tiết:** `zync_plan/output/unified_execution_plan.md`  
-> **Ngày bắt đầu:** 02/05/2026  
+> **Tài liệu chi tiết:** `zync_plan/output/unified_execution_plan.md`
+> **Ngày bắt đầu:** 02/05/2026
+> **Ngày hoàn thành:** 04/05/2026
 > **Mục tiêu:** Loại bỏ nợ kỹ thuật, thiết lập nền tảng vững chắc trước khi mở rộng Plan A/B.
 
-#### X.1. Backend Refactoring (Critical)
+#### X.1. Backend Refactoring (Critical) ✅
 - [x] **IoC Container (Awilix):** Cài `awilix`, tạo `src/container.ts`, đăng ký `MessageRepository`, `PostRepository`, `CommentRepository` dưới dạng Singleton. <!-- done: 02/05/2026 -->
 - [x] **Repository Pattern:** Tạo `BaseRepository` generic + `MessageRepository` (cursor pagination, idempotency check, soft delete, recall) + `PostRepository` (feed, trending, toggleLike, toggleBookmark) + `CommentRepository`. <!-- done: 02/05/2026 -->
 - [x] **Global Error Handler:** `error-handler.middleware.ts` chuẩn hóa 5 loại lỗi (AppError, ZodError, MongoDB 11000, JWT, Unknown) với format `ErrorResponse` thống nhất. <!-- done: 02/05/2026 -->
@@ -612,7 +604,7 @@ npm run dev:web
 - [x] **Migrate MessagesService:** Inject `MessageRepository`, thay `MessageModel.findOne/find` trực tiếp bằng repo methods (backward-compatible API). <!-- done: 02/05/2026 -->
 - [x] **Migrate PostsService:** Inject `PostRepository + CommentRepository`, thay PostModel/CommentModel bằng repo methods (backward-compatible API). <!-- done: 04/05/2026 -->
 
-#### X.2. Infrastructure Optimization
+#### X.2. Infrastructure Optimization ✅
 - [x] **Kafka DLQ & Retry:** Thêm topics `raw-messages.retry` + `raw-messages.dlq` + `notifications.retry` + `notifications.dlq`. Worker subscribe cả main topic và retry topic. Max 3 retries với exponential backoff → auto route sang DLQ. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Call:** Tách toàn bộ Call + WebRTC events (8 handlers) ra `socket/call.controller.ts`. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Chat:** Tách `send_message`, `message_read`, `message_delivered`, `delete_message_for_me`, `recall_message`, `forward_message` ra `socket/chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng**. <!-- done: 02/05/2026 -->
@@ -620,17 +612,17 @@ npm run dev:web
 
 ---
 
-### Master Plan: Tổng tiến độ (Cập nhật 02/05/2026)
+### Master Plan: Tổng tiến độ (Cập nhật 05/05/2026)
 - [x] Phase R1: UX Redesign (Web & Mobile) ✅
 - [x] Phase R2: Mobile App Parity ✅
 - [x] Phase R3: Mobile Video Call (Expo Dev Client + WebRTC) ✅ <!-- done: 26/04/2026 -->
 - [x] Phase R4: Pivot Branding (Zalo Clone → Zync Community) ✅
 - [x] Phase N1: Community Posts (Web) ✅
 - [x] Phase N3: Explore & Discovery (Web) ✅
-- [ ] **Phase X: Chuẩn hóa Kiến trúc & Hạ tầng** 🔧 *(~100% hoàn thành – PostsService migrated + Reaction/Story controller)*
-- [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳
-- [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳
-- [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳
+- [x] Phase X: Chuẩn hóa Kiến trúc & Hạ tầng (Backend Refactoring) ✅ <!-- done: 04/05/2026 -->
+- [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳ <!-- chi tiết: zync_plan/plan_A_feature_completion.md -->
+- [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳ <!-- chi tiết: zync_plan/plan_B_ai_features.md -->
+- [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳ <!-- chi tiết: zync_plan/plan_C_system_optimization.md -->
 - [ ] Phase R7: Triển khai Production
 
 ---
