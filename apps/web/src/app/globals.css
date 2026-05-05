@@ -548,15 +548,13 @@ html {
 
 /* Message Bubble Styling */
 .message-bubble-other {
-	background: var(--bg-white-light, white);
-	color: var(--text-primary);
-	border: 1px solid var(--border-light);
+	background: transparent;
+	border: 0;
 }
 
 [data-zync-theme='dark'] .message-bubble-other {
-	background: rgba(34, 199, 181, 0.12);
-	color: var(--accent-strong);
-	border: 1px solid rgba(34, 199, 181, 0.24);
+	background: transparent;
+	border: 0;
 }
 
 /* Emoji Picker Styling */

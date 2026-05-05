@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { lightTheme } from '../theme/colors';
+import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
+import { getAppTheme } from '../theme/get-app-theme';
 import api from '../services/api';
-import { socketService } from '../services/socket';
 
 interface Story {
   _id: string;
@@ -42,7 +42,6 @@ interface StoryBarProps {
   onViewMyStory: () => void;
 }
 
-// Hook lay du lieu story tu API
 function useStoryFeed(currentUserId: string) {
   const [feed, setFeed] = useState<StoryFeedGroup[]>([]);
   const [myStories, setMyStories] = useState<Story[]>([]);
@@ -88,14 +87,16 @@ export function StoryBar({
   onViewStory,
   onViewMyStory,
 }: StoryBarProps) {
+  const mode = useAppPreferencesStore((s) => s.theme);
+  const theme = getAppTheme(mode);
   const { feed, myStories, loading } = useStoryFeed(currentUserId);
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.shimmer} />
-        <View style={styles.shimmer} />
-        <View style={styles.shimmer} />
+        <View style={[styles.shimmer, { backgroundColor: theme.bgHover }]} />
+        <View style={[styles.shimmer, { backgroundColor: theme.bgHover }]} />
+        <View style={[styles.shimmer, { backgroundColor: theme.bgHover }]} />
       </View>
     );
   }
@@ -116,18 +117,23 @@ export function StoryBar({
             <View
               style={[
                 styles.avatarCircle,
-                myStories.length > 0 ? styles.avatarRingActive : styles.avatarRingAdd,
+                {
+                  backgroundColor: theme.bgHover,
+                  borderWidth: myStories.length > 0 ? 2.5 : 1.5,
+                  borderColor: myStories.length > 0 ? theme.accent : theme.border,
+                  borderStyle: myStories.length > 0 ? 'solid' : 'dashed',
+                },
               ]}
             >
               {myStories.length > 0 ? (
-                <Text style={styles.avatarInitial}>
+                <Text style={[styles.avatarInitial, { color: theme.textPrimary }]}>
                   {currentUserName.charAt(0).toUpperCase()}
                 </Text>
               ) : (
-                <Ionicons name="add" size={24} color={lightTheme.accent} />
+                <Ionicons name="add" size={24} color={theme.accent} />
               )}
             </View>
-            <Text style={styles.storyName} numberOfLines={1}>
+            <Text style={[styles.storyName, { color: theme.textSecondary }]} numberOfLines={1}>
               {myStories.length > 0 ? 'Của bạn' : 'Thêm tin'}
             </Text>
           </TouchableOpacity>
@@ -146,19 +152,20 @@ export function StoryBar({
               <View
                 style={[
                   styles.avatarCircle,
-                  hasUnviewed ? styles.avatarRingActive : styles.avatarRingViewed,
+                  {
+                    backgroundColor: theme.bgHover,
+                    borderWidth: hasUnviewed ? 2.5 : 2,
+                    borderColor: hasUnviewed ? theme.accent : theme.borderLight,
+                  },
                 ]}
               >
                 {item.avatarUrl ? (
-                  <Image
-                    source={{ uri: item.avatarUrl }}
-                    style={styles.avatarImage}
-                  />
+                  <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
                 ) : (
-                  <Text style={styles.avatarInitial}>{initial}</Text>
+                  <Text style={[styles.avatarInitial, { color: theme.textPrimary }]}>{initial}</Text>
                 )}
               </View>
-              <Text style={styles.storyName} numberOfLines={1}>
+              <Text style={[styles.storyName, { color: theme.textSecondary }]} numberOfLines={1}>
                 {item.displayName}
               </Text>
             </TouchableOpacity>
@@ -179,7 +186,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: lightTheme.bgHover,
     marginRight: 12,
   },
   storyItem: {
@@ -194,20 +200,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
-    backgroundColor: lightTheme.bgHover,
-  },
-  avatarRingActive: {
-    borderWidth: 2.5,
-    borderColor: lightTheme.accent,
-  },
-  avatarRingViewed: {
-    borderWidth: 2,
-    borderColor: lightTheme.borderLight,
-  },
-  avatarRingAdd: {
-    borderWidth: 1.5,
-    borderColor: lightTheme.border,
-    borderStyle: 'dashed',
   },
   avatarImage: {
     width: 50,
@@ -217,11 +209,9 @@ const styles = StyleSheet.create({
   avatarInitial: {
     fontSize: 18,
     fontWeight: '600',
-    color: lightTheme.textPrimary,
   },
   storyName: {
     fontSize: 11,
-    color: lightTheme.textSecondary,
     fontFamily: 'BeVietnamPro_400Regular',
     textAlign: 'center',
   },

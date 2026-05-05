@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -18,9 +18,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
+import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
+import { getAppTheme } from '../../src/theme/get-app-theme';
 import api from '../../src/services/api';
 import { socketService } from '../../src/services/socket';
 import { useAuthStore } from '../../src/store/useAuthStore';
+import { usePresence } from '../../src/hooks/usePresence';
 
 // ───────── Types ─────────
 interface ConversationMember {
@@ -156,6 +159,8 @@ function formatRelativeTime(dateStr?: string): string {
 
 export default function ChatScreen() {
   const router = useRouter();
+  const mode = useAppPreferencesStore((s) => s.theme);
+  const theme = getAppTheme(mode);
   const userInfo = useAuthStore((s) => s.userInfo);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const userId = String(userInfo?._id || userInfo?.id || '');
@@ -362,6 +367,21 @@ export default function ChatScreen() {
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const isSearchMode = normalizedSearch.length > 0;
 
+  // Collect peer user IDs from 1-1 conversations for presence tracking
+  const peerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const conv of conversations) {
+      if (conv.type !== 'group') {
+        for (const u of conv.users ?? []) {
+          if (u._id !== userId) ids.add(u._id);
+        }
+      }
+    }
+    return Array.from(ids);
+  }, [conversations, userId]);
+
+  const { getPresence } = usePresence(peerIds);
+
   const searchTargets = useMemo<SearchTarget[]>(() => {
     if (!isSearchMode) {
       return [];
@@ -480,45 +500,46 @@ export default function ChatScreen() {
   });
 
   const listData: ChatListItem[] = isSearchMode ? searchTargets : sortedConversations;
+  const s = useStyles(theme);
 
   return (
     <LinearGradient
-      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
-      style={styles.safeArea}
+      colors={[theme.backgroundSoft, theme.backgroundMid, theme.backgroundDeep]}
+      style={s.safeArea}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={s.safeArea}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        <View style={styles.container}>
+        <View style={s.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Tin nhắn</Text>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Ionicons name="create-outline" size={24} color="#10b981" />
+        <View style={s.header}>
+          <Text style={s.title}>Tin nhắn</Text>
+          <TouchableOpacity style={s.actionBtn}>
+            <Ionicons name="create-outline" size={24} color={theme.accent} />
           </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#64748b" style={styles.searchIcon} />
+        <View style={s.searchContainer}>
+          <Ionicons name="search-outline" size={20} color={theme.textTertiary} style={s.searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={s.searchInput}
             placeholder="Tìm kiếm cuộc trò chuyện..."
-            placeholderTextColor="#64748b"
+            placeholderTextColor={theme.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#64748b" />
+              <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
 
         {/* Chat List */}
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#10b981" />
-            <Text style={styles.loadingText}>Đang tải hội thoại...</Text>
+          <View style={s.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.accent} />
+            <Text style={s.loadingText}>Đang tải hội thoại...</Text>
           </View>
         ) : (
           <FlatList<ChatListItem>
@@ -529,35 +550,35 @@ export default function ChatScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#10b981"
-                colors={['#10b981']}
+                tintColor={theme.accent}
+                colors={[theme.accent]}
               />
             }
             renderItem={({ item }) => {
               if (isSearchTarget(item)) {
                 const target = item;
                 return (
-                  <TouchableOpacity style={styles.chatItem} onPress={() => { void openSearchTarget(target); }}>
-                    <View style={styles.avatarContainer}>
-                      <View style={[styles.avatar, target.type === 'group' && styles.groupAvatar]}>
+                  <TouchableOpacity style={s.chatItem} onPress={() => { void openSearchTarget(target); }}>
+                    <View style={s.avatarContainer}>
+                      <View style={[s.avatar, target.type === 'group' && s.groupAvatar]}>
                         {target.avatarUrl ? (
-                          <Image source={{ uri: target.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                          <Image source={{ uri: target.avatarUrl }} style={s.avatarImage} resizeMode="cover" />
                         ) : (
-                          <Text style={styles.avatarText}>{target.name.charAt(0).toUpperCase()}</Text>
+                          <Text style={s.avatarText}>{target.name.charAt(0).toUpperCase()}</Text>
                         )}
                         {target.type === 'group' && (
-                          <View style={styles.groupBadge}>
-                            <Ionicons name="people" size={10} color="#fff" />
+                          <View style={s.groupBadge}>
+                            <Ionicons name="people" size={10} color={theme.textOnAccent} />
                           </View>
                         )}
                       </View>
                     </View>
-                    <View style={styles.chatInfo}>
-                      <View style={styles.chatHeader}>
-                        <Text style={styles.chatName}>{target.name}</Text>
+                    <View style={s.chatInfo}>
+                      <View style={s.chatHeader}>
+                        <Text style={s.chatName}>{target.name}</Text>
                       </View>
-                      <View style={styles.chatFooter}>
-                        <Text style={styles.lastMsg} numberOfLines={1}>
+                      <View style={s.chatFooter}>
+                        <Text style={s.lastMsg} numberOfLines={1}>
                           {target.type === 'group' ? 'Nhom' : 'Ban be'}
                         </Text>
                       </View>
@@ -572,49 +593,56 @@ export default function ChatScreen() {
               const hasUnread = unread > 0;
 
               return (
-                <TouchableOpacity style={styles.chatItem} onPress={() => openChatRoom(conversationItem)}>
-                  <View style={styles.avatarContainer}>
-                    <View style={[styles.avatar, conversationItem.type === 'group' && styles.groupAvatar]}>
+                <TouchableOpacity style={s.chatItem} onPress={() => openChatRoom(conversationItem)}>
+                  <View style={s.avatarContainer}>
+                    <View style={[s.avatar, conversationItem.type === 'group' && s.groupAvatar]}>
                       {conversationItem.avatarUrl ? (
-                        <Image source={{ uri: conversationItem.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                        <Image source={{ uri: conversationItem.avatarUrl }} style={s.avatarImage} resizeMode="cover" />
                       ) : (
-                        <Text style={styles.avatarText}>
+                        <Text style={s.avatarText}>
                           {displayName.charAt(0).toUpperCase()}
                         </Text>
                       )}
+                      {conversationItem.type !== 'group' && (() => {
+                        const peerId = conversationItem.users?.find((u) => u._id !== userId)?._id;
+                        const presence = peerId ? getPresence(peerId) : undefined;
+                        return presence?.online ? (
+                          <View style={s.onlineDot} />
+                        ) : null;
+                      })()}
                       {conversationItem.type === 'group' && (
-                        <View style={styles.groupBadge}>
-                          <Ionicons name="people" size={10} color="#fff" />
+                        <View style={s.groupBadge}>
+                          <Ionicons name="people" size={10} color={theme.textOnAccent} />
                         </View>
                       )}
                     </View>
                   </View>
-                  <View style={styles.chatInfo}>
-                    <View style={styles.chatHeader}>
-                      <Text style={[styles.chatName, hasUnread && styles.chatNameBold]}>
+                  <View style={s.chatInfo}>
+                    <View style={s.chatHeader}>
+                      <Text style={[s.chatName, hasUnread && s.chatNameBold]}>
                         {displayName}
                       </Text>
-                      <View style={styles.timeColumn}>
-                        <Text style={[styles.chatTime, hasUnread && styles.chatTimeActive]}>
+                      <View style={s.timeColumn}>
+                        <Text style={[s.chatTime, hasUnread && s.chatTimeActive]}>
                           {formatRelativeTime(conversationItem.lastMessage?.sentAt || conversationItem.updatedAt)}
                         </Text>
                         {pinnedSet.has(conversationItem._id) && (
-                          <View style={styles.pinBadge}>
-                            <Ionicons name="pin" size={10} color="#b8ffe9" />
+                          <View style={s.pinBadge}>
+                            <Ionicons name="pin" size={10} color={theme.accentLight} />
                           </View>
                         )}
                       </View>
                     </View>
-                    <View style={styles.chatFooter}>
+                    <View style={s.chatFooter}>
                       <Text
-                        style={[styles.lastMsg, hasUnread && styles.lastMsgBold]}
+                        style={[s.lastMsg, hasUnread && s.lastMsgBold]}
                         numberOfLines={1}
                       >
                         {getLastMessagePreview(conversationItem.lastMessage)}
                       </Text>
                       {hasUnread && (
-                        <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadText}>
+                        <View style={s.unreadBadge}>
+                          <Text style={s.unreadText}>
                             {unread > 99 ? '99+' : unread}
                           </Text>
                         </View>
@@ -625,10 +653,10 @@ export default function ChatScreen() {
               );
             }}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="chatbubbles-outline" size={64} color="#334155" />
-                <Text style={styles.emptyTitle}>{isSearchMode ? 'Khong tim thay ket qua' : 'Chưa có cuộc trò chuyện'}</Text>
-                <Text style={styles.emptySubtext}>{isSearchMode ? 'Thu tim voi tu khoa khac.' : 'Bắt đầu trò chuyện với bạn bè nhé!'}</Text>
+              <View style={s.emptyContainer}>
+                <Ionicons name="chatbubbles-outline" size={64} color={theme.textTertiary} />
+                <Text style={s.emptyTitle}>{isSearchMode ? 'Khong tim thay ket qua' : 'Chưa có cuộc trò chuyện'}</Text>
+                <Text style={s.emptySubtext}>{isSearchMode ? 'Thu tim voi tu khoa khac.' : 'Bắt đầu trò chuyện với bạn bè nhé!'}</Text>
               </View>
             }
             contentContainerStyle={(isSearchMode ? searchTargets.length : sortedConversations.length) === 0 ? { flex: 1 } : { paddingBottom: 100 }}
@@ -640,200 +668,186 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 29,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontFamily: 'BeVietnamPro_700Bold',
-  },
-  actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.glassPanel,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.glassPanel,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    paddingHorizontal: 15,
-    height: 45,
-    marginBottom: 20,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#fff',
-    fontFamily: 'BeVietnamPro_400Regular',
-    fontSize: 15,
-  },
-  // ─ Loading ─
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#64748b',
-    fontFamily: 'BeVietnamPro_400Regular',
-    marginTop: 12,
-    fontSize: 14,
-  },
-  // ─ Chat Items ─
-  chatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: colors.glassSoft,
-    borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 55,
-    height: 55,
-    borderRadius: 20,
-    backgroundColor: colors.glassPanelStrong,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  groupAvatar: {
-    backgroundColor: colors.glassSoft,
-  },
-  avatarText: {
-    color: '#94a3b8',
-    fontSize: 18,
-    fontFamily: 'BeVietnamPro_700Bold',
-  },
-  groupBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#3b82f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#0f172a',
-  },
-  chatInfo: {
-    flex: 1,
-    marginLeft: 15,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 5,
-  },
-  timeColumn: {
-    alignItems: 'flex-end',
-  },
-  chatName: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'BeVietnamPro_500Medium',
-  },
-  chatNameBold: {
-    fontFamily: 'BeVietnamPro_700Bold',
-  },
-  chatTime: {
-    color: '#64748b',
-    fontSize: 12,
-    fontFamily: 'BeVietnamPro_400Regular',
-  },
-  chatTimeActive: {
-    color: '#10b981',
-  },
-  pinBadge: {
-    marginTop: 3,
-    borderRadius: 8,
-    backgroundColor: '#145140',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  chatFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  lastMsg: {
-    color: '#94a3b8',
-    fontSize: 14,
-    fontFamily: 'BeVietnamPro_400Regular',
-    flex: 1,
-    marginRight: 10,
-  },
-  lastMsgBold: {
-    color: '#e2e8f0',
-    fontFamily: 'BeVietnamPro_500Medium',
-  },
-  unreadBadge: {
-    backgroundColor: '#10b981',
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadText: {
-    color: '#fff',
-    fontSize: 11,
-    fontFamily: 'BeVietnamPro_700Bold',
-  },
-  // ─ Empty State ─
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    color: '#475569',
-    fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    color: '#64748b',
-    fontSize: 14,
-    fontFamily: 'BeVietnamPro_400Regular',
-    marginTop: 4,
-  },
-});
+const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: 'transparent' },
+    avatarImage: { width: '100%', height: '100%', borderRadius: 29 },
+    container: { flex: 1, paddingHorizontal: 20 },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 20,
+    },
+    title: {
+      color: theme.textPrimary,
+      fontSize: 24,
+      fontFamily: 'BeVietnamPro_700Bold',
+    },
+    actionBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.glassBorder ?? colors.glassBorder,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.glassBorder ?? colors.glassBorder,
+      paddingHorizontal: 15,
+      height: 45,
+      marginBottom: 20,
+    },
+    searchIcon: { marginRight: 10 },
+    searchInput: {
+      flex: 1,
+      color: theme.textPrimary,
+      fontFamily: 'BeVietnamPro_400Regular',
+      fontSize: 15,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      color: theme.textTertiary,
+      fontFamily: 'BeVietnamPro_400Regular',
+      marginTop: 12,
+      fontSize: 14,
+    },
+    chatItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+      borderRadius: 16,
+      backgroundColor: theme.glassSoft ?? colors.glassSoft,
+      borderWidth: 1,
+      borderColor: theme.glassBorderSoft ?? colors.glassBorderSoft,
+    },
+    avatarContainer: { position: 'relative' },
+    avatar: {
+      width: 55,
+      height: 55,
+      borderRadius: 20,
+      backgroundColor: theme.glassPanelStrong ?? colors.glassPanelStrong,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    groupAvatar: {
+      backgroundColor: theme.glassSoft ?? colors.glassSoft,
+    },
+    avatarText: {
+      color: theme.textTertiary,
+      fontSize: 18,
+      fontFamily: 'BeVietnamPro_700Bold',
+    },
+    groupBadge: {
+      position: 'absolute',
+      bottom: -2,
+      right: -2,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: theme.info,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: theme.bgCard,
+    },
+    onlineDot: {
+      position: 'absolute',
+      bottom: -2,
+      right: -2,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: theme.accent,
+      borderWidth: 2,
+      borderColor: theme.bgCard,
+    },
+    chatInfo: { flex: 1, marginLeft: 15 },
+    chatHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 5,
+    },
+    timeColumn: { alignItems: 'flex-end' },
+    chatName: {
+      color: theme.textPrimary,
+      fontSize: 16,
+      fontFamily: 'BeVietnamPro_500Medium',
+    },
+    chatNameBold: { fontFamily: 'BeVietnamPro_700Bold' },
+    chatTime: {
+      color: theme.textTertiary,
+      fontSize: 12,
+      fontFamily: 'BeVietnamPro_400Regular',
+    },
+    chatTimeActive: { color: theme.accent },
+    pinBadge: {
+      marginTop: 3,
+      borderRadius: 8,
+      backgroundColor: theme.glassSoft,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+    },
+    chatFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    lastMsg: {
+      color: theme.textTertiary,
+      fontSize: 14,
+      fontFamily: 'BeVietnamPro_400Regular',
+      flex: 1,
+      marginRight: 10,
+    },
+    lastMsgBold: {
+      color: theme.textSecondary,
+      fontFamily: 'BeVietnamPro_500Medium',
+    },
+    unreadBadge: {
+      backgroundColor: theme.accent,
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+    },
+    unreadText: {
+      color: theme.textOnAccent,
+      fontSize: 11,
+      fontFamily: 'BeVietnamPro_700Bold',
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emptyTitle: {
+      color: theme.textTertiary,
+      fontSize: 16,
+      fontFamily: 'BeVietnamPro_600SemiBold',
+      marginTop: 16,
+    },
+    emptySubtext: {
+      color: theme.textTertiary,
+      fontSize: 14,
+      fontFamily: 'BeVietnamPro_400Regular',
+      marginTop: 4,
+    },
+  });
 

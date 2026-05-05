@@ -8,6 +8,12 @@ import {
   upsertDeviceToken,
   discoverUsers,
 } from './users.service';
+import {
+  getUserPresence,
+  getBulkPresence,
+  getFriendIds,
+  formatLastSeen,
+} from './presence.service';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
 
 // ─── GET /api/users/me ────────────────────────────────────────────────────────
@@ -103,6 +109,57 @@ export async function discoverUsersHandler(
     const { userId } = req as AuthRequest;
     const users = await discoverUsers(userId);
     res.json({ success: true, data: users });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /api/users/:userId/presence ──────────────────────────────────────
+
+export async function getUserPresenceHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const presence = await getUserPresence(req.params['userId'] as string);
+    res.json({
+      success: true,
+      online: presence.online,
+      lastSeen: presence.lastSeen,
+      lastSeenFormatted: formatLastSeen(presence.lastSeen),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /api/users/presence/bulk ────────────────────────────────────────────
+
+export async function getBulkPresenceHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const friendIds = await getFriendIds(userId);
+    if (friendIds.length === 0) {
+      res.json({ success: true, presence: {} });
+      return;
+    }
+
+    const presenceMap = await getBulkPresence(friendIds);
+    const result: Record<string, { online: boolean; lastSeen: string | null; lastSeenFormatted: string }> = {};
+    for (const [uid, info] of presenceMap) {
+      result[uid] = {
+        online: info.online,
+        lastSeen: info.lastSeen,
+        lastSeenFormatted: formatLastSeen(info.lastSeen),
+      };
+    }
+
+    res.json({ success: true, presence: result });
   } catch (err) {
     next(err);
   }

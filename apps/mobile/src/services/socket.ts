@@ -56,4 +56,9 @@ export const socketService = {
     });
     return true;
   },
+
+  emitHeartbeat: () => {
+    if (!socket?.connected) return;
+    socket.emit('heartbeat', { timestamp: Date.now() });
+  },
 };

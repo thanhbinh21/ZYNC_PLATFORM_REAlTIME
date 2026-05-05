@@ -9,6 +9,8 @@ import {
   updateProfileHandler,
   upsertDeviceTokenHandler,
   discoverUsersHandler,
+  getUserPresenceHandler,
+  getBulkPresenceHandler,
 } from './users.controller';
 
 export const usersRouter = Router();
@@ -27,6 +29,12 @@ usersRouter.get('/discover', discoverUsersHandler);
 
 // GET /api/users/:userId – get user profile (public)
 usersRouter.get('/:userId', getUserByIdHandler);
+
+// GET /api/users/presence/bulk – batch presence for friend list
+usersRouter.get('/presence/bulk', getBulkPresenceHandler);
+
+// GET /api/users/:userId/presence – presence for single user
+usersRouter.get('/:userId/presence', getUserPresenceHandler);
 
 // PATCH /api/users/me – update own profile
 usersRouter.patch('/me', validateBody(UpdateProfileSchema), updateProfileHandler);

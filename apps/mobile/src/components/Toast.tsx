@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { Animated, StyleSheet, Text, View, SafeAreaView } from 'react-native';
-import { lightTheme } from '../theme/colors'; // Defaulting to light theme for now
+import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
+import { getAppTheme } from '../theme/get-app-theme';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -23,6 +24,8 @@ const ToastContext = createContext<ToastContextData>({
 export const useToast = () => useContext(ToastContext);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const mode = useAppPreferencesStore((s) => s.theme);
+  const theme = getAppTheme(mode);
   const [toast, setToast] = useState<ToastOptions | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-20)).current;
@@ -70,21 +73,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getBackgroundColor = (type?: ToastType) => {
     switch (type) {
-      case 'success':
-        return lightTheme.accent;
-      case 'error':
-        return '#ef4444';
-      case 'warning':
-        return '#f59e0b';
+      case 'success': return theme.accent;
+      case 'error': return theme.danger;
+      case 'warning': return theme.warning;
       case 'info':
-      default:
-        return lightTheme.bgCard;
+      default: return theme.bgCard;
     }
   };
 
   const getTextColor = (type?: ToastType) => {
-    if (type === 'info' || !type) return lightTheme.textPrimary;
-    return '#FFFFFF';
+    if (type === 'info' || !type) return theme.textPrimary;
+    return theme.textOnAccent;
   };
 
   return (

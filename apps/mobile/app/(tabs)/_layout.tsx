@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Grid3X3, MessageCircle, UserRound, Users } from 'lucide-react-native';
+import { Grid3X3, MessageCircle, UserRound, Users, Compass } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../../src/theme/get-app-theme';
 
@@ -54,6 +54,13 @@ export default function TabLayout() {
         options={{
           title: 'Tin nhắn',
           tabBarIcon: ({ color }) => <MessageCircle size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: 'Cộng đồng',
+          tabBarIcon: ({ color }) => <Compass size={22} color={color} />,
         }}
       />
       <Tabs.Screen

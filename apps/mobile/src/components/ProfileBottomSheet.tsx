@@ -10,7 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { MessageCircle, UserPlus } from 'lucide-react-native';
-import { lightTheme } from '../theme/colors';
+import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
+import { getAppTheme } from '../theme/get-app-theme';
 import api from '../services/api';
 
 interface UserProfile {
@@ -41,6 +42,8 @@ export function ProfileBottomSheet({
   onClose,
   onSendMessage,
 }: ProfileBottomSheetProps) {
+  const mode = useAppPreferencesStore((s) => s.theme);
+  const theme = getAppTheme(mode);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -68,7 +71,6 @@ export function ProfileBottomSheet({
     try {
       setActionLoading(true);
       await api.post('/friends/request', { toUserId: userId });
-      // Refresh profile de cap nhat trang thai
       void loadProfile();
     } catch (err) {
       console.error('Send friend request failed:', err);
@@ -85,14 +87,14 @@ export function ProfileBottomSheet({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { backgroundColor: theme.bgCard }]}>
           {/* Handle bar */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
           {loading ? (
             <ActivityIndicator
               size="large"
-              color={lightTheme.accent}
+              color={theme.accent}
               style={{ marginVertical: 60 }}
             />
           ) : profile ? (
@@ -102,35 +104,35 @@ export function ProfileBottomSheet({
                 {profile.avatarUrl ? (
                   <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} />
                 ) : (
-                  <View style={[styles.avatar, styles.avatarFallback]}>
-                    <Text style={styles.avatarLetter}>{initial}</Text>
+                  <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: theme.accentLight }]}>
+                    <Text style={[styles.avatarLetter, { color: theme.accent }]}>{initial}</Text>
                   </View>
                 )}
-                <Text style={styles.displayName}>{profile.displayName}</Text>
+                <Text style={[styles.displayName, { color: theme.textPrimary }]}>{profile.displayName}</Text>
                 {profile.username && (
-                  <Text style={styles.username}>@{profile.username}</Text>
+                  <Text style={[styles.username, { color: theme.textTertiary }]}>@{profile.username}</Text>
                 )}
-                {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+                {profile.bio && <Text style={[styles.bio, { color: theme.textSecondary }]}>{profile.bio}</Text>}
               </View>
 
               {/* Stats */}
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{profile.friendCount ?? 0}</Text>
-                  <Text style={styles.statLabel}>Bạn bè</Text>
+                  <Text style={[styles.statValue, { color: theme.textPrimary }]}>{profile.friendCount ?? 0}</Text>
+                  <Text style={[styles.statLabel, { color: theme.textTertiary }]}>Bạn bè</Text>
                 </View>
                 {profile.mutualFriends !== undefined && !isMe && (
                   <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{profile.mutualFriends}</Text>
-                    <Text style={styles.statLabel}>Bạn chung</Text>
+                    <Text style={[styles.statValue, { color: theme.textPrimary }]}>{profile.mutualFriends}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textTertiary }]}>Bạn chung</Text>
                   </View>
                 )}
                 {profile.createdAt && (
                   <View style={styles.statItem}>
-                    <Text style={styles.statValue}>
+                    <Text style={[styles.statValue, { color: theme.textPrimary }]}>
                       {new Date(profile.createdAt).getFullYear()}
                     </Text>
-                    <Text style={styles.statLabel}>Tham gia</Text>
+                    <Text style={[styles.statLabel, { color: theme.textTertiary }]}>Tham gia</Text>
                   </View>
                 )}
               </View>
@@ -139,28 +141,28 @@ export function ProfileBottomSheet({
               {!isMe && (
                 <View style={styles.actions}>
                   <TouchableOpacity
-                    style={styles.primaryBtn}
+                    style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
                     onPress={() => {
                       onSendMessage?.(profile._id);
                       onClose();
                     }}
                   >
-                    <MessageCircle size={18} stroke={lightTheme.textOnAccent} />
-                    <Text style={styles.primaryBtnText}>Nhắn tin</Text>
+                    <MessageCircle size={18} color={theme.textOnAccent} />
+                    <Text style={[styles.primaryBtnText, { color: theme.textOnAccent }]}>Nhắn tin</Text>
                   </TouchableOpacity>
 
                   {!profile.isFriend && (
                     <TouchableOpacity
-                      style={styles.secondaryBtn}
+                      style={[styles.secondaryBtn, { backgroundColor: theme.accentLight }]}
                       onPress={handleSendFriendRequest}
                       disabled={actionLoading}
                     >
                       {actionLoading ? (
-                        <ActivityIndicator size="small" color={lightTheme.accent} />
+                        <ActivityIndicator size="small" color={theme.accent} />
                       ) : (
                         <>
-                          <UserPlus size={18} stroke={lightTheme.accent} />
-                          <Text style={styles.secondaryBtnText}>Kết bạn</Text>
+                          <UserPlus size={18} color={theme.accent} />
+                          <Text style={[styles.secondaryBtnText, { color: theme.accent }]}>Kết bạn</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -170,11 +172,11 @@ export function ProfileBottomSheet({
 
               {/* Close */}
               <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                <Text style={styles.closeBtnText}>Đóng</Text>
+                <Text style={[styles.closeBtnText, { color: theme.textTertiary }]}>Đóng</Text>
               </TouchableOpacity>
             </ScrollView>
           ) : (
-            <Text style={styles.errorText}>Không thể tải thông tin</Text>
+            <Text style={[styles.errorText, { color: theme.textTertiary }]}>Không thể tải thông tin</Text>
           )}
         </View>
       </View>
@@ -189,7 +191,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: lightTheme.bgCard,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -200,7 +201,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: lightTheme.border,
     alignSelf: 'center',
     marginTop: 12,
     marginBottom: 16,
@@ -216,34 +216,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatarFallback: {
-    backgroundColor: lightTheme.accentLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarLetter: {
     fontSize: 30,
     fontWeight: '600',
-    color: lightTheme.accent,
   },
   displayName: {
     fontSize: 20,
     fontWeight: '700',
-    color: lightTheme.textPrimary,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   username: {
     fontSize: 14,
-    color: lightTheme.textTertiary,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 2,
   },
   bio: {
     fontSize: 13,
-    color: lightTheme.textSecondary,
-    fontFamily: 'BeVietnamPro_400Regular',
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 20,
+    fontFamily: 'BeVietnamPro_400Regular',
   },
   statsRow: {
     flexDirection: 'row',
@@ -257,12 +252,10 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: lightTheme.textPrimary,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   statLabel: {
     fontSize: 11,
-    color: lightTheme.textTertiary,
     fontFamily: 'BeVietnamPro_400Regular',
     marginTop: 2,
   },
@@ -277,12 +270,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: lightTheme.accent,
     borderRadius: 12,
     paddingVertical: 12,
   },
   primaryBtnText: {
-    color: lightTheme.textOnAccent,
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'BeVietnamPro_600SemiBold',
@@ -293,12 +284,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: lightTheme.accentLight,
     borderRadius: 12,
     paddingVertical: 12,
   },
   secondaryBtnText: {
-    color: lightTheme.accent,
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'BeVietnamPro_600SemiBold',
@@ -309,12 +298,10 @@ const styles = StyleSheet.create({
   },
   closeBtnText: {
     fontSize: 14,
-    color: lightTheme.textTertiary,
     fontFamily: 'BeVietnamPro_500Medium',
   },
   errorText: {
     textAlign: 'center',
-    color: lightTheme.textTertiary,
     marginVertical: 40,
     fontSize: 14,
   },

@@ -12,7 +12,7 @@ function FileMessagePreview({ filename, mediaUrl }: { filename: string; mediaUrl
       href={mediaUrl}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-3 rounded-lg border border-border-light bg-bg-hover px-3 py-2 text-sm text-text-primary hover:bg-border transition-colors"
+      className="inline-flex items-center gap-3 rounded-lg border border-border-light bg-bg-card px-3 py-2 text-sm text-text-primary shadow-sm transition-colors hover:bg-bg-hover"
     >
       <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
         <GetFileIcon extension={extension} />
@@ -96,14 +96,10 @@ export function MessageBubble({
           <button
             type="button"
             onClick={() => onJumpToMessage?.(replyTo.messageRef)}
-            className={`mb-1.5 w-full max-w-[240px] rounded-xl border px-3 py-2 text-left text-xs transition-all ${
-              isOwn
-                ? 'border-accent/30 bg-accent/10 text-text-primary hover:bg-accent/20'
-                : 'border-border bg-bg-hover text-text-primary hover:bg-border-light'
-            }`}
+            className="mb-1.5 w-full max-w-[240px] rounded-xl border border-border-light bg-bg-card px-3 py-2 text-left text-xs text-text-primary shadow-sm transition-colors hover:bg-bg-hover"
             title="Di den tin nhan goc"
           >
-            <p className={`mb-0.5 text-[10px] uppercase tracking-wide font-semibold ${isOwn ? 'text-accent' : 'text-text-tertiary'}`}>
+            <p className="mb-0.5 text-[10px] uppercase tracking-wide font-semibold text-text-tertiary">
               <svg className="inline h-3 w-3 mr-1 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 17 4 12 9 7"/>
                 <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
@@ -176,11 +172,7 @@ export function MessageBubble({
         {/* Text Bubble */}
         {content && (
           <div
-            className={`px-4 py-2.5 rounded-2xl break-words shadow-sm ${
-              isOwn
-                ? 'bg-gradient-to-br from-accent to-accent-hover text-white rounded-br-sm'
-                : 'rounded-bl-sm border bg-bg-card'
-            }`}
+            className="px-4 py-2.5 rounded-2xl border border-border-light bg-bg-card text-text-primary break-words shadow-sm"
           >
             <p className="text-[15px] leading-[1.45] font-medium">{content}</p>
           </div>
