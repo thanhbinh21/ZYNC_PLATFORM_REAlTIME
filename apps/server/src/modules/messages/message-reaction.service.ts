@@ -380,39 +380,44 @@ export class MessageReactionsService {
     const emoji = this.ensureReactionEmoji(input.emoji);
     const delta = this.ensureDelta(input.delta);
 
-    const userDoc = await MessageReactionUserModel.findOne({
+    // Lay document hien tai de tinh emojiCounts moi (khong lock de tranh doi)
+    const currentUserDoc = await MessageReactionUserModel.findOne({
       messageId: input.messageId,
       userId: input.userId,
-    });
+    }).lean();
 
-    const userCounts = this.normalizeEmojiCounts(userDoc?.emojiCounts);
+    const userCounts = this.normalizeEmojiCounts(currentUserDoc?.emojiCounts);
     this.applyDelta(userCounts, emoji, delta);
 
-    const persistedUser = userDoc ?? new MessageReactionUserModel({
-      messageId: input.messageId,
-      conversationId: input.conversationId,
-      userId: input.userId,
-    });
+    // Su dung upsert de tranh loi duplicate key khi nhieu request chay dong thoi
+    const persistedUser = await MessageReactionUserModel.findOneAndUpdate(
+      { messageId: input.messageId, userId: input.userId },
+      {
+        $set: {
+          conversationId: input.conversationId,
+          lastEmoji: emoji,
+          emojiCounts: new Map<string, number>(Object.entries(userCounts)),
+        },
+        $inc: { totalCount: delta },
+      },
+      { upsert: true, new: true, runValidators: true },
+    );
 
-    persistedUser.conversationId = input.conversationId;
-    persistedUser.emojiCounts = new Map<string, number>(Object.entries(userCounts));
-    persistedUser.totalCount = this.sumCounts(userCounts);
-    persistedUser.lastEmoji = emoji;
-    await persistedUser.save();
-
-    const summaryDoc = await MessageReactionSummaryModel.findOne({ messageId: input.messageId });
+    const summaryDoc = await MessageReactionSummaryModel.findOne({ messageId: input.messageId }).lean();
     const summaryCounts = this.normalizeEmojiCounts(summaryDoc?.emojiCounts);
     this.applyDelta(summaryCounts, emoji, delta);
 
-    const persistedSummary = summaryDoc ?? new MessageReactionSummaryModel({
-      messageId: input.messageId,
-      conversationId: input.conversationId,
-    });
-
-    persistedSummary.conversationId = input.conversationId;
-    persistedSummary.emojiCounts = new Map<string, number>(Object.entries(summaryCounts));
-    persistedSummary.totalCount = this.sumCounts(summaryCounts);
-    await persistedSummary.save();
+    const persistedSummary = await MessageReactionSummaryModel.findOneAndUpdate(
+      { messageId: input.messageId },
+      {
+        $set: {
+          conversationId: input.conversationId,
+          emojiCounts: new Map<string, number>(Object.entries(summaryCounts)),
+        },
+        $inc: { totalCount: delta },
+      },
+      { upsert: true, new: true, runValidators: true },
+    );
 
     return {
       messageId: input.messageId,
@@ -423,7 +428,7 @@ export class MessageReactionsService {
       },
       userState: {
         userId: input.userId,
-        lastEmoji: persistedUser.lastEmoji,
+        lastEmoji: emoji,
         totalCount: persistedUser.totalCount,
         emojiCounts: userCounts,
       },

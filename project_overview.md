@@ -233,6 +233,8 @@ npm run dev:web
 - [x] Hotfix UI chat: khôi phục danh sách hội thoại và header khung chat sau khi chỉnh layout chiều ngang <!-- done: 05/04/2026 -->
 - [x] Thay thế mock data trong Chat Info Panel bằng dữ liệu thông tin thực (Pin, Mute) <!-- done: 12/04/2026 -->
 - [x] Hotfix căn lề bubble chat: tin nhắn gửi bên phải, nhận bên trái trên Web dashboard <!-- done: 16/04/2026 -->
+- [x] Hotfix bubble chat: bỏ nền trắng, đồng bộ style gửi/nhận trên Web dashboard <!-- done: 05/05/2026 -->
+- [x] Hotfix chat list: bỏ nền khung wrapper tin nhắn để không che action hover <!-- done: 05/05/2026 -->
 
 - [ ] Bổ sung dữ liệu seed media message (image/video/file) để test upload + render đa loại message
 
