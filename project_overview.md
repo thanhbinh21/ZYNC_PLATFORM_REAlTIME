@@ -530,28 +530,28 @@ npm run dev:web
 - [x] User discovery cards với hiển thị kỹ năng (skills), bio, links (Github)
 - [x] Cơ chế Join channel public trực tiếp từ màn hình Khám phá
 
-### Plan A – Hoàn thiện Chức năng Web + Mobile (~42-52h)
+### Plan A – Hoàn thiện Chức năng Web + Mobile (~42-52h) ✅ <!-- done: 05/05/2026 -->
 
 > **File chi tiết:** `zync_plan/plan_A_feature_completion.md`
 > **Nguyên tắc UI:** Tạo bảng design tokens dùng chung (bảng màu, typography, spacing, border-radius) cho Web + Mobile. Không yêu cầu 100% đồng nhất UI, nhưng chức năng phải đồng nhất. Không dùng icon text, tất cả text trên UI phải là tiếng Việt có dấu.
 
-- [ ] A1: Mobile Community + Explore – Port tính năng Cộng đồng và Khám phá từ Web sang Mobile (~14-18h)
-  - [ ] A1.1: Community Posts trên Mobile (tab Cộng đồng, PostCard, CreatePostSheet, CommentSheet, post-detail)
-  - [ ] A1.2: Explore & Discovery trên Mobile (tìm kiếm kênh, developer, bài viết trending)
-  - [ ] A1.3: Refactor tab navigator Mobile (thêm tab Cộng động)
-- [ ] A2: Presence & Status System – Online/Offline/LastSeen trên cả Web + Mobile (~8-10h)
-  - [ ] A2.1: Backend presence (Redis heartbeat, broadcast cho friends, API `/api/users/:id/presence`)
-  - [ ] A2.2: Web presence UI (green dot, "Hoạt động X phút trước")
-  - [ ] A2.3: Mobile presence UI (green dot, lastSeen)
-- [ ] A3: Chat Feature Gaps (~5-6h)
-  - [ ] A3.1: Push notification client Mobile (expo-notifications + FCM/APNs)
-  - [ ] A3.2: Mutual friends hiển thị + Friend list trong profile Mobile
-  - [ ] A3.3: Chuẩn hóa reaction contract (`reaction_updated` thống nhất giữa Web/Mobile) <!-- đang làm -->
-- [ ] A4: Cross-Platform UI Sync (~8-10h)
-  - [ ] A4.1: Tạo `packages/shared-design/tokens.json` – source of truth design tokens
-  - [ ] A4.2: Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
-  - [ ] A4.3: Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
-  - [ ] A4.4: Responsive + Accessibility (dark mode, font scaling, safe area)
+- [x] A1: Mobile Community + Explore – Port tính năng Cộng đồng và Khám phá từ Web sang Mobile (~14-18h)
+  - [x] A1.1: Community Posts trên Mobile (tab Cộng đồng, PostCard, CreatePostSheet, CommentSheet, post-detail)
+  - [x] A1.2: Explore & Discovery trên Mobile (tìm kiếm kênh, developer, bài viết trending)
+  - [x] A1.3: Refactor tab navigator Mobile (thêm tab Cộng động)
+- [x] A2: Presence & Status System – Online/Offline/LastSeen trên cả Web + Mobile (~8-10h)
+  - [x] A2.1: Backend presence (Redis heartbeat, broadcast cho friends, API `/api/users/:id/presence`)
+  - [x] A2.2: Web presence UI (green dot, "Hoạt động X phút trước")
+  - [x] A2.3: Mobile presence UI (green dot, lastSeen)
+- [x] A3: Chat Feature Gaps (~5-6h)
+  - [x] A3.1: Push notification client Mobile (expo-notifications + FCM/APNs)
+  - [x] A3.2: Mutual friends hiển thị + Friend list trong profile Mobile
+  - [x] A3.3: Chuẩn hoá reaction contract (`reaction_updated` thống nhất giữa Web/Mobile)
+- [x] A4: Cross-Platform UI Sync (~8-10h)
+  - [x] A4.1: Tạo `packages/shared-design/tokens.json` – source of truth design tokens
+  - [x] A4.2: Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
+  - [x] A4.3: Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
+  - [x] A4.4: Responsive + Accessibility (dark mode, font scaling, safe area)
 
 ### Plan B – Chức năng AI (~45-55h, tóm tắt)
 
@@ -620,7 +620,7 @@ npm run dev:web
 - [x] Phase N1: Community Posts (Web) ✅
 - [x] Phase N3: Explore & Discovery (Web) ✅
 - [x] Phase X: Chuẩn hóa Kiến trúc & Hạ tầng (Backend Refactoring) ✅ <!-- done: 04/05/2026 -->
-- [ ] **Plan A: Hoàn thiện chức năng Web + Mobile** ⏳ <!-- chi tiết: zync_plan/plan_A_feature_completion.md -->
+- [x] **Plan A: Hoàn thiện chức năng Web + Mobile** ✅ <!-- done: 05/05/2026 -->
 - [ ] **Plan B: Chức năng AI (Search + Assistant + DNA)** ⏳ <!-- chi tiết: zync_plan/plan_B_ai_features.md -->
 - [ ] **Plan C: Tối ưu & hardening trước deploy** ⏳ <!-- chi tiết: zync_plan/plan_C_system_optimization.md -->
 - [ ] Phase R7: Triển khai Production

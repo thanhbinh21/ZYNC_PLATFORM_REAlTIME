@@ -17,7 +17,7 @@
 | Phase N1: Community Posts (Web) | ✅ Hoàn thành | |
 | Phase N3: Explore & Discovery | ✅ Hoàn thành | |
 | **Phase X: Backend Refactoring** | **✅ Hoàn thành** | **04/05/2026** |
-| **Plan A: Feature Parity Web + Mobile** | ⏳ Sắp tới | ~42-52h |
+| **Plan A: Feature Parity Web + Mobile** | ✅ Hoàn thành | 05/05/2026 |
 | Plan B: AI Features | ⏳ Sắp tới | ~45-55h |
 | Plan C: Optimization + Hardening | ⏳ Sắp tới | ~35-45h |
 | Phase R7: Production Deploy | ⏳ Sắp tới | |
@@ -42,32 +42,32 @@
 
 ---
 
-## Giai đoạn 2: Hoàn thiện tính năng (Plan A – Feature Parity Web + Mobile)
+## Giai đoạn 2: Hoàn thiện tính năng (Plan A – Feature Parity Web + Mobile) ✅
 
 > **File chi tiết:** `zync_plan/plan_A_feature_completion.md`
-> **Effort:** ~42-52h
-> **Ưu tiên:** 🔴 P0 – Phải hoàn thành trước Phase R7
+> **Ngày hoàn thành:** 05/05/2026
+> **Effort thực tế:** ~42-52h
 
-### 2.1. A1: Mobile Community & Explore (~14-18h)
-- [ ] **A1.1:** Community Posts trên Mobile (Community tab, PostCard, CreatePostSheet, CommentSheet, post-detail)
-- [ ] **A1.2:** Explore & Discovery trên Mobile (tìm kiếm kênh, developer, bài viết trending)
-- [ ] **A1.3:** Refactor tab navigator Mobile (thêm tab Cộng đồng)
+### 2.1. A1: Mobile Community & Explore ✅ (~14-18h)
+- [x] **A1.1:** Community Posts trên Mobile (Community tab, PostCard, CreatePostSheet, CommentSheet, post-detail)
+- [x] **A1.2:** Explore & Discovery trên Mobile (tìm kiếm kênh, developer, bài viết trending)
+- [x] **A1.3:** Refactor tab navigator Mobile (thêm tab Cộng đồng)
 
-### 2.2. A2: Presence & Status System (~8-10h)
-- [ ] **A2.1:** Backend presence (Redis heartbeat, broadcast cho friends, API `/api/users/:id/presence`)
-- [ ] **A2.2:** Web presence UI (green dot, "Hoạt động X phút trước")
-- [ ] **A2.3:** Mobile presence UI (green dot, lastSeen)
+### 2.2. A2: Presence & Status System ✅ (~8-10h)
+- [x] **A2.1:** Backend presence (Redis heartbeat, broadcast cho friends, API `/api/users/:id/presence`)
+- [x] **A2.2:** Web presence UI (green dot, "Hoạt động X phút trước")
+- [x] **A2.3:** Mobile presence UI (green dot, lastSeen)
 
-### 2.3. A3: Chat Feature Gaps (~5-6h)
-- [ ] **A3.1:** Push notification client Mobile (expo-notifications + FCM/APNs)
-- [ ] **A3.2:** Mutual friends hiển thị + Friend list trong profile Mobile
-- [ ] **A3.3:** Chuẩn hoá reaction contract (`reaction_updated` thống nhất giữa Web/Mobile) — đang làm
+### 2.3. A3: Chat Feature Gaps ✅ (~5-6h)
+- [x] **A3.1:** Push notification client Mobile (expo-notifications + FCM/APNs)
+- [x] **A3.2:** Mutual friends hiển thị + Friend list trong profile Mobile
+- [x] **A3.3:** Chuẩn hoá reaction contract (`reaction_updated` thống nhất giữa Web/Mobile)
 
-### 2.4. A4: Cross-Platform UI Sync (~8-10h)
-- [ ] **A4.1:** Tạo `packages/shared-design/tokens.json` — source of truth design tokens
-- [ ] **A4.2:** Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
-- [ ] **A4.3:** Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
-- [ ] **A4.4:** Responsive + Accessibility (dark mode, font scaling, safe area)
+### 2.4. A4: Cross-Platform UI Sync ✅ (~8-10h)
+- [x] **A4.1:** Tạo `packages/shared-design/tokens.json` — source of truth design tokens
+- [x] **A4.2:** Đồng bộ `globals.css` (Web) ↔ `colors.ts` (Mobile) từ tokens.json
+- [x] **A4.3:** Đảm bảo navigation parity (tất cả mục trên Web có trên Mobile)
+- [x] **A4.4:** Responsive + Accessibility (dark mode, font scaling, safe area)
 
 ---
 
@@ -118,22 +118,16 @@
 
 ```mermaid
 graph LR
-    A1["A1: Mobile Community + Explore\n~14-18h"] --> A2["A2: Presence System\n~8-10h"]
-    A2 --> A3["A3: Chat Gaps + Reaction\n~5-6h"]
-    A3 --> A4["A4: Cross-Platform Sync\n~8-10h"]
-    A4 --> B["Plan B: AI Features\n~45-55h"]
+    A["Plan A: Feature Parity ✅\n~42-52h"] --> B["Plan B: AI Features\n~45-55h"]
     B --> C["Plan C: Optimization\n~35-45h"]
     C --> R7["Phase R7: Production Deploy"]
 
-    style A1 fill:#2DA44E,color:#fff
-    style A2 fill:#4A90D9,color:#fff
-    style A3 fill:#E8833A,color:#fff
-    style A4 fill:#D4A017,color:#fff
+    style A fill:#2DA44E,color:#fff
     style B fill:#FF6B6B,color:#fff
     style C fill:#6C757D,color:#fff
 ```
 
-> **A1 (Mobile Community) phải làm đầu tiên** vì đây là gap lớn nhất — Web đã có đầy đủ nhưng Mobile hoàn toàn trống.
+> **Plan A đã hoàn thành** (05/05/2026) – Tất cả chức năng Web + Mobile đã đồng bộ. Tiếp theo là Plan B: AI Features.
 
 ---
 
