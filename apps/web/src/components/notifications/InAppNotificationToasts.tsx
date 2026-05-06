@@ -77,8 +77,7 @@ export function InAppNotificationToasts() {
       }
 
       if (n.conversationId) {
-        // Deep link into Home dashboard chat
-        router.push(`/home?nav=chat&conversationId=${encodeURIComponent(n.conversationId)}`);
+        router.push(`/chat?conversationId=${encodeURIComponent(n.conversationId)}`);
       } else {
         router.push('/home');
       }
@@ -97,12 +96,8 @@ export function InAppNotificationToasts() {
     const socket = getSocket(token);
 
     const handler = (notification: Notification) => {
-      // Avoid duplicate UX on /home only when user is currently in Chat view.
-      // Friends/Profile inside /home should still receive toasts.
-      const activeNavId = (globalThis as Record<string, unknown>)['__zyncActiveNavId'] as
-        | string
-        | undefined;
-      if (pathname?.startsWith('/home') && notification.type === 'new_message' && activeNavId === 'chat') {
+      // Avoid duplicate UX when user is currently in Chat view
+      if (pathname?.startsWith('/chat') && notification.type === 'new_message') {
         return;
       }
 

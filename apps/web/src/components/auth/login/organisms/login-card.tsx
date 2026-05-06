@@ -94,16 +94,22 @@ export function LoginCard({
   };
 
   return (
-    <section className="zync-soft-card zync-soft-card-elevated relative z-10 w-full max-w-[332px] rounded-[28px] p-8 sm:max-w-[430px] sm:p-9">
-      <h2 className="font-ui-title max-w-[12ch] text-balance text-[clamp(2.6rem,4.2vw,4.1rem)] font-semibold leading-[1.03] tracking-[-0.008em] text-text-primary">{title}</h2>
-      <p className="font-ui-content mt-3 max-w-[32ch] text-balance text-[clamp(0.95rem,1.35vw,1.25rem)] leading-[1.45] text-text-secondary">{subtitle}</p>
+    <section className="zync-glass-panel relative z-10 w-full max-w-[380px] rounded-3xl p-6 sm:max-w-[420px] sm:p-8">
+      <h2 className="font-ui-title text-[clamp(1.75rem,3vw,2.25rem)] font-semibold leading-tight tracking-tight text-text-primary">
+        {title}
+      </h2>
+      <p className="font-ui-content mt-2 text-[0.95rem] leading-relaxed text-text-secondary">
+        {subtitle}
+      </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-border-light bg-bg-hover p-1.5">
+      <div className="mt-6 flex rounded-xl border border-border-light bg-bg-hover p-1">
         <button
           type="button"
           onClick={() => onModeChange('login')}
-          className={`font-ui-title h-9 rounded-lg text-sm font-semibold transition ${
-            mode === 'login' ? 'bg-text-primary text-white shadow-sm' : 'text-text-secondary hover:bg-white/70 hover:text-text-primary'
+          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+            mode === 'login'
+              ? 'bg-surface-card-strong text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           {loginTabLabel}
@@ -111,8 +117,10 @@ export function LoginCard({
         <button
           type="button"
           onClick={() => onModeChange('register')}
-          className={`font-ui-title h-9 rounded-lg text-sm font-semibold transition ${
-            mode === 'register' ? 'bg-text-primary text-white shadow-sm' : 'text-text-secondary hover:bg-white/70 hover:text-text-primary'
+          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+            mode === 'register'
+              ? 'bg-surface-card-strong text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-text-secondary'
           }`}
         >
           {registerTabLabel}
@@ -120,7 +128,7 @@ export function LoginCard({
       </div>
 
       <form
-        className="mt-7 space-y-5"
+        className="mt-6 space-y-4"
         onSubmit={(event) => {
           event.preventDefault();
           void onSubmit();
@@ -176,7 +184,7 @@ export function LoginCard({
               <button
                 type="button"
                 onClick={onBackToInput}
-                className="text-[11px] font-medium text-accent transition hover:text-accent-strong"
+                className="text-[11px] font-medium text-text-link transition hover:text-accent-strong"
               >
                 {isRecoveryFlow ? 'Hủy khôi phục' : 'Đổi thông tin'}
               </button>
@@ -188,31 +196,40 @@ export function LoginCard({
           <button
             type="button"
             onClick={isRecoveryFlow ? onCancelRecovery : onStartRecovery}
-            className="font-ui-content text-sm text-text-secondary transition hover:text-text-primary"
+            className="font-ui-content -mt-1 text-sm text-text-link transition hover:text-accent-strong"
           >
             {isRecoveryFlow ? 'Quay lại đăng nhập' : 'Quên mật khẩu?'}
           </button>
         ) : null}
 
         {infoMessage ? (
-          <p className="font-ui-content rounded-lg border border-border-light bg-accent-light px-3 py-2 text-sm text-text-primary">{infoMessage}</p>
+          <p className="zync-soft-notice rounded-lg px-4 py-3 text-sm">
+            {infoMessage}
+          </p>
         ) : null}
 
         {errorMessage ? (
-          <p className="font-ui-content rounded-lg border border-danger-border bg-danger-bg px-3 py-2 text-sm text-danger-text">{errorMessage}</p>
+          <p className="zync-soft-notice-danger rounded-lg px-4 py-3 text-sm">
+            {errorMessage}
+          </p>
         ) : null}
 
         <PrimaryButton isSubmitting={isSubmitting} label={submitLabel} />
 
         {currentUserName ? (
-          <div className="space-y-3 rounded-2xl border border-border-light bg-bg-hover p-3">
-            <p className="font-ui-content text-sm text-text-primary">Đang đăng nhập với tài khoản: <span className="font-ui-title font-semibold text-accent-strong">{currentUserName}</span></p>
+          <div className="space-y-3 rounded-xl border border-border-light bg-bg-hover p-4">
+            <p className="font-ui-content text-sm text-text-primary">
+              Đang đăng nhập với tài khoản:{' '}
+              <span className="font-ui-title font-semibold text-accent-strong">
+                {currentUserName}
+              </span>
+            </p>
             <button
               type="button"
               onClick={() => {
                 void onLogout();
               }}
-              className="font-ui-title h-9 w-full rounded-lg border border-border-light text-sm font-semibold text-text-primary transition hover:bg-white/70"
+              className="zync-soft-button-secondary h-10 w-full rounded-lg text-sm font-semibold"
             >
               Đăng xuất
             </button>
@@ -220,24 +237,22 @@ export function LoginCard({
         ) : null}
       </form>
 
-      <div className="font-ui-meta my-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-text-tertiary">
-        <span className="h-px flex-1 bg-border-light" />
-        <span>{socialTitle}</span>
-        <span className="h-px flex-1 bg-border-light" />
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 border-t border-border-light" />
+        <span className="font-ui-meta text-[11px] uppercase tracking-[0.12em] text-text-tertiary">
+          {socialTitle}
+        </span>
+        <span className="h-px flex-1 border-t border-border-light" />
       </div>
 
-      <SocialButton
-        label="Google"
-        onClick={onGoogleLogin}
-        disabled={isSubmitting}
-      />
+      <SocialButton label="Google" onClick={onGoogleLogin} disabled={isSubmitting} />
 
-      <p className="font-ui-content mt-8 text-center text-sm text-text-secondary">
+      <p className="font-ui-content mt-6 text-center text-sm text-text-secondary">
         {isRegister ? loginHint : registerHint}{' '}
         <button
           type="button"
           onClick={() => onModeChange(isRegister ? 'login' : 'register')}
-          className="font-ui-title font-semibold text-accent transition hover:text-accent-strong"
+          className="font-semibold text-text-link transition hover:text-accent-strong"
         >
           {isRegister ? loginHintAction : registerHintAction}
         </button>

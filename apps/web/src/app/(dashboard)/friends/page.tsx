@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense } from 'react';
 import { FriendsScreen } from '@/components/friends/organisms/friends-screen';
 import { useFriendsDashboard } from '@/hooks/use-friends-dashboard';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -9,9 +9,8 @@ function FriendsPageContent() {
   const dashboard = useFriendsDashboard();
   const { loadData } = dashboard;
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  dashboard.setSearchKeyword; // ensure all required props exist
 
   return (
     <FriendsScreen

@@ -513,20 +513,24 @@ html {
 	isolation: isolate;
 }
 
-.zync-glass-panel::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
+/* Light mode: minimal reflection */
+[data-zync-theme='light'] .zync-glass-panel::before {
+	background: linear-gradient(120deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.1) 32%, transparent 62%);
+	opacity: 0.6;
+}
+
+[data-zync-theme='light'] .zync-glass-panel::after {
+	background: radial-gradient(120% 80% at 84% 18%, rgba(15, 157, 142, 0.12), rgba(15, 157, 142, 0) 52%);
+	opacity: 0.5;
+}
+
+/* Dark mode: teal glow */
+[data-zync-theme='dark'] .zync-glass-panel::before {
 	background: linear-gradient(120deg, rgba(214, 255, 236, 0.16), rgba(178, 255, 222, 0.05) 32%, transparent 62%);
 	opacity: 0.3;
 }
 
-.zync-glass-panel::after {
-	content: '';
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
+[data-zync-theme='dark'] .zync-glass-panel::after {
 	background: radial-gradient(120% 80% at 84% 18%, rgba(126, 255, 201, 0.24), rgba(126, 255, 201, 0) 52%);
 	opacity: 0.44;
 }
@@ -1664,4 +1668,67 @@ body.story-viewer-open {
 
 .chat-input-glow:focus-within {
 	box-shadow: 0 0 0 3px var(--ring-soft), 0 4px 20px rgba(15, 157, 142, 0.08);
+}
+
+/* ─── Auth Page Ambient Background ─── */
+
+.auth-glow {
+	position: absolute;
+	border-radius: 999px;
+	pointer-events: none;
+}
+
+.auth-glow-1 {
+	width: min(600px, 60vw);
+	height: min(600px, 60vw);
+	top: -15%;
+	left: -20%;
+	background: radial-gradient(circle, var(--accent-light) 0%, transparent 70%);
+	opacity: 0.5;
+	animation: authFloat1 20s ease-in-out infinite;
+}
+
+.auth-glow-2 {
+	width: min(500px, 50vw);
+	height: min(500px, 50vw);
+	bottom: -10%;
+	right: -15%;
+	background: radial-gradient(circle, var(--page-glow-1) 0%, transparent 70%);
+	opacity: 0.4;
+	animation: authFloat2 25s ease-in-out infinite;
+}
+
+.auth-glow-3 {
+	width: min(400px, 40vw);
+	height: min(400px, 40vw);
+	top: 40%;
+	left: 30%;
+	background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+	opacity: 0.15;
+	animation: authFloat3 18s ease-in-out infinite;
+}
+
+@keyframes authFloat1 {
+	0%, 100% { transform: translate(0, 0) scale(1); }
+	33% { transform: translate(30px, 20px) scale(1.05); }
+	66% { transform: translate(-20px, 30px) scale(0.95); }
+}
+
+@keyframes authFloat2 {
+	0%, 100% { transform: translate(0, 0) scale(1); }
+	33% { transform: translate(-25px, -15px) scale(1.08); }
+	66% { transform: translate(15px, -25px) scale(0.92); }
+}
+
+@keyframes authFloat3 {
+	0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.15; }
+	50% { transform: translate(40px, -20px) scale(1.1); opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.auth-glow-1,
+	.auth-glow-2,
+	.auth-glow-3 {
+		animation: none;
+	}
 }

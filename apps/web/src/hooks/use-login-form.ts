@@ -480,7 +480,7 @@ export function useLoginForm() {
       showToast('Bạn đã đăng xuất khỏi hệ thống.', 'success');
       setInfoMessage('Bạn đã đăng xuất khỏi hệ thống.');
       setErrorMessage(null);
-      router.push('/login');
+      router.push('/auth');
     } catch {
       hideModal();
       setErrorMessage('Đăng xuất thất bại. Vui lòng thử lại.');

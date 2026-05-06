@@ -427,4 +427,3 @@ export default function CommunityContent() {
     </div>
   );
 }
-
