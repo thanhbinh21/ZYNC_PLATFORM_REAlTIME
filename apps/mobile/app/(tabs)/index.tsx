@@ -306,7 +306,7 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={[theme.backgroundSoft, theme.backgroundMid, theme.backgroundDeep]}
+      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
       style={s.safeArea}
     >
       <SafeAreaView style={s.safeArea}>
