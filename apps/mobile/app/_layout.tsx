@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import {
@@ -47,7 +47,6 @@ export default function RootLayout() {
     configureNotificationHandler();
 
     const subscription = addNotificationResponseListener((conversationId, type) => {
-      // Navigation from notification tap is handled by NotificationsProvider's router logic
       console.log('[Push] Notification tapped:', conversationId, type);
     });
 

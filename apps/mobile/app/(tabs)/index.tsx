@@ -8,6 +8,7 @@ import {
   StatusBar,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ import { getAppTheme } from '../../src/theme/get-app-theme';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api from '../../src/services/api';
 import { useNotificationsContext } from '../../src/context/notifications-context';
+import { StoryBar } from '../../src/components/StoryBar';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -38,10 +40,10 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 25,
+      marginBottom: 20,
     },
     welcomeText: {
-      color: theme.textTertiary,
+      color: theme.textSecondary,
       fontSize: 14,
       fontFamily: 'BeVietnamPro_400Regular',
     },
@@ -54,10 +56,10 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       width: 45,
       height: 45,
       borderRadius: 12,
-      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      backgroundColor: theme.glassPanel,
       borderWidth: 1,
-      borderColor: theme.glassBorder ?? colors.glassBorder,
-      shadowColor: theme.glassShadow ?? colors.glassShadow,
+      borderColor: theme.glassBorder,
+      shadowColor: theme.glassShadow,
       shadowOpacity: 0.35,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 5 },
@@ -88,91 +90,57 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       fontSize: 9,
       fontFamily: 'BeVietnamPro_700Bold',
     },
-    section: { marginBottom: 25 },
+    section: { marginBottom: 24 },
     sectionTitle: {
       color: theme.textPrimary,
       fontSize: 18,
       fontFamily: 'BeVietnamPro_600SemiBold',
-      marginBottom: 15,
-    },
-    storyContainer: { flexDirection: 'row' },
-    addStory: { alignItems: 'center', marginRight: 15 },
-    addStoryCircle: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      backgroundColor: theme.glassSoft ?? colors.glassSoft,
-      borderWidth: 1,
-      borderStyle: 'dashed',
-      borderColor: theme.accentLight,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    storyItem: { alignItems: 'center', marginRight: 15 },
-    storyCircle: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      backgroundColor: theme.glassPanelStrong ?? colors.glassPanelStrong,
-      borderWidth: 2,
-      borderColor: theme.accent,
-      marginBottom: 8,
-    },
-    storyLabel: {
-      color: theme.textTertiary,
-      fontSize: 12,
-      fontFamily: 'BeVietnamPro_400Regular',
-      width: 60,
-      textAlign: 'center',
+      marginBottom: 12,
     },
     statsGrid: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 25,
+      marginBottom: 24,
     },
     statCard: {
-      width: '30%',
-      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      flex: 1,
+      backgroundColor: theme.glassPanel,
       borderRadius: 16,
-      padding: 15,
+      padding: 16,
       alignItems: 'center',
+      marginHorizontal: 4,
       borderWidth: 1,
-      borderColor: theme.glassBorder ?? colors.glassBorder,
-      shadowColor: theme.glassShadow ?? colors.glassShadow,
-      shadowOpacity: 0.3,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 8 },
+      borderColor: theme.glassBorder,
     },
     statValue: {
       color: theme.textPrimary,
-      fontSize: 18,
+      fontSize: 20,
       fontFamily: 'BeVietnamPro_700Bold',
       marginTop: 8,
     },
     statLabel: {
-      color: theme.textTertiary,
+      color: theme.textSecondary,
       fontSize: 12,
       fontFamily: 'BeVietnamPro_400Regular',
       marginTop: 4,
+      textAlign: 'center',
     },
     quickGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
-      rowGap: 12,
     },
     quickAction: { width: '18%', alignItems: 'center' },
     quickIcon: {
-      width: 50,
-      height: 50,
+      width: 52,
+      height: 52,
       borderRadius: 16,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 8,
     },
     quickLabel: {
-      color: theme.textTertiary,
+      color: theme.textSecondary,
       fontSize: 11,
       fontFamily: 'BeVietnamPro_500Medium',
       textAlign: 'center',
@@ -180,21 +148,17 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     aboutCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      backgroundColor: theme.glassPanel,
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
-      borderColor: theme.glassBorder ?? colors.glassBorder,
-      shadowColor: theme.glassShadow ?? colors.glassShadow,
-      shadowOpacity: 0.26,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
+      borderColor: theme.glassBorder,
     },
     aboutIcon: {
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: theme.glassSoft ?? colors.glassSoft,
+      backgroundColor: theme.glassSoft,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: 12,
@@ -206,11 +170,51 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     },
     aboutDesc: {
       fontSize: 12,
-      color: theme.textTertiary,
+      color: theme.textSecondary,
       fontFamily: 'BeVietnamPro_400Regular',
       marginTop: 2,
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 32,
+    },
+    errorText: {
+      color: theme.textSecondary,
+      fontSize: 14,
+      fontFamily: 'BeVietnamPro_400Regular',
+      textAlign: 'center',
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    retryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.accent,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 12,
+      gap: 8,
+    },
+    retryText: {
+      color: theme.textOnAccent,
+      fontSize: 14,
+      fontFamily: 'BeVietnamPro_600SemiBold',
+    },
+    bottomSpacer: { height: 100 },
   });
+
+interface Stats {
+  friends: number;
+  conversations: number;
+  unread: number;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -223,6 +227,14 @@ export default function HomeScreen() {
   const { unreadCount: notificationUnread, openNotificationSheet, refreshUnreadCount } =
     useNotificationsContext();
   const notificationBtnRef = useRef<View>(null);
+
+  const [stats, setStats] = useState<Stats>({ friends: 0, conversations: 0, unread: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const displayName = userInfo?.displayName || userInfo?.username || 'User';
+  const currentUserId = userInfo?._id || userInfo?.id || '';
 
   const onPressNotificationBell = useCallback(() => {
     const v = notificationBtnRef.current;
@@ -245,64 +257,96 @@ export default function HomeScreen() {
     }, [refreshUnreadCount]),
   );
 
-  const [friendCount, setFriendCount] = useState(0);
-  const [conversationCount, setConversationCount] = useState(0);
-  const [unreadTotal, setUnreadTotal] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const displayName = userInfo?.displayName || 'Zync User';
-
   const loadStats = useCallback(async () => {
     try {
-      const friendsRes = await api.get('/friends/count').catch(() => ({ data: { count: 0 } }));
-      setFriendCount(friendsRes.data?.count || 0);
+      setStatsError(null);
+      
+      const [friendsRes, convsRes] = await Promise.allSettled([
+        api.get('/friends/count'),
+        api.get('/conversations'),
+      ]);
 
-      const convsRes = await api.get('/conversations').catch(() => ({ data: { conversations: [] } }));
-      const convs = convsRes.data?.conversations || [];
-      setConversationCount(convs.length);
-      const totalUnread = convs.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
-      setUnreadTotal(totalUnread);
+      let friends = 0;
+      if (friendsRes.status === 'fulfilled') {
+        friends = friendsRes.value.data?.count || 0;
+      }
+
+      let conversations = 0;
+      let unread = 0;
+      if (convsRes.status === 'fulfilled') {
+        const convs = convsRes.value.data?.conversations || convsRes.value.data?.data || [];
+        conversations = convs.length;
+        unread = convs.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
+      }
+
+      setStats({ friends, conversations, unread });
     } catch (e) {
       console.error('Stats load error:', e);
+      setStatsError('Không thể tải dữ liệu');
     } finally {
-      setIsLoading(false);
+      setStatsLoading(false);
       setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && isHydrated) {
       void loadStats();
-    } else if (isHydrated) {
-      setIsLoading(false);
+    } else if (isHydrated && !isAuthenticated) {
+      setStatsLoading(false);
     }
-  }, [isAuthenticated, isHydrated]);
+  }, [isAuthenticated, isHydrated, loadStats]);
+
+  useEffect(() => {
+    if (isHydrated && !isAuthenticated) {
+      router.replace('/(auth)/welcome');
+    }
+  }, [isHydrated, isAuthenticated, router]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     void loadStats();
   }, [loadStats]);
 
-  useEffect(() => {
-    if (isHydrated && !isAuthenticated) {
-      router.replace('/(auth)/login');
-    }
-  }, [isHydrated, isAuthenticated, router]);
+  const handleCreateStory = useCallback(() => {
+    router.push('/create-story');
+  }, [router]);
 
-  const stats = [
-    { label: 'Bạn bè', value: friendCount.toLocaleString(), icon: 'people-outline', color: theme.accent },
-    { label: 'Hội thoại', value: conversationCount.toLocaleString(), icon: 'chatbubbles-outline', color: theme.info },
-    { label: 'Chưa đọc', value: unreadTotal.toLocaleString(), icon: 'mail-unread-outline', color: theme.warning },
-  ];
+  const handleViewStory = useCallback((feedIndex: number) => {
+    router.push({ pathname: '/create-story', params: { feedIndex: String(feedIndex) } });
+  }, [router]);
+
+  const handleViewMyStory = useCallback(() => {
+    router.push('/create-story');
+  }, [router]);
+
+  const handleRetry = () => {
+    setStatsLoading(true);
+    void loadStats();
+  };
 
   const quickActions = [
-    { label: 'Tin nhắn', icon: 'chatbubble-ellipses', color: theme.accent, action: () => router.push('/(tabs)/chat') },
-    { label: 'Danh bạ', icon: 'people', color: theme.info, action: () => router.push('/(tabs)/friends') },
-    { label: 'Cộng đồng', icon: 'globe', color: theme.violet, action: () => router.push('/(tabs)/community') },
-    { label: 'Khám phá', icon: 'compass', color: theme.warning, action: () => router.push('/explore') },
-    { label: 'Tạo nhóm', icon: 'add-circle', color: theme.pink, action: () => router.push('/create-group') },
+    { label: 'Tin nhắn', icon: 'chatbubble-ellipses', color: theme.accent, route: '/(tabs)/chat' },
+    { label: 'Danh bạ', icon: 'people', color: theme.info, route: '/(tabs)/friends' },
+    { label: 'Cộng đồng', icon: 'globe', color: theme.violet, route: '/(tabs)/community' },
+    { label: 'Khám phá', icon: 'compass', color: theme.warning, route: '/explore' },
+    { label: 'Tạo nhóm', icon: 'add-circle', color: theme.pink, route: '/create-group' },
   ];
+
+  if (!isAuthenticated) {
+    return (
+      <LinearGradient
+        colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
+        style={s.safeArea}
+      >
+        <SafeAreaView style={s.safeArea}>
+          <View style={s.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.accent} />
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient
@@ -348,38 +392,75 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Story Bar Placeholder */}
+          {/* Stories Bar - Fetched from API */}
           <View style={s.section}>
             <Text style={s.sectionTitle}>Khoảnh khắc</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.storyContainer}>
-              <TouchableOpacity style={s.addStory} onPress={() => router.push('/create-story')}>
-                <View style={s.addStoryCircle}>
-                  <Ionicons name="add" size={24} color={theme.accent} />
-                </View>
-                <Text style={s.storyLabel}>Thêm tin</Text>
-              </TouchableOpacity>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <View key={i} style={s.storyItem}>
-                  <View style={s.storyCircle} />
-                  <Text style={s.storyLabel} numberOfLines={1}>User {i}</Text>
-                </View>
-              ))}
-            </ScrollView>
+            <StoryBar
+              currentUserId={currentUserId}
+              currentUserName={displayName}
+              onCreateStory={handleCreateStory}
+              onViewStory={handleViewStory}
+              onViewMyStory={handleViewMyStory}
+            />
           </View>
 
           {/* Stats Grid */}
-          <View style={s.statsGrid}>
-            {stats.map((item, idx) => (
-              <TouchableOpacity key={idx} style={s.statCard}>
-                <Ionicons name={item.icon as any} size={24} color={item.color} />
-                {isLoading ? (
-                  <ActivityIndicator size="small" color={item.color} style={{ marginTop: 8 }} />
-                ) : (
-                  <Text style={s.statValue}>{item.value}</Text>
-                )}
-                <Text style={s.statLabel}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Thống kê</Text>
+            {statsError ? (
+              <View style={s.errorContainer}>
+                <Ionicons name="cloud-offline-outline" size={48} color={theme.textSecondary} />
+                <Text style={s.errorText}>{statsError}</Text>
+                <TouchableOpacity style={s.retryButton} onPress={handleRetry}>
+                  <Ionicons name="refresh-outline" size={18} color={theme.textOnAccent} />
+                  <Text style={s.retryText}>Thử lại</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.statsGrid}>
+                <View style={s.statCard}>
+                  {statsLoading ? (
+                    <ActivityIndicator size="small" color={theme.accent} />
+                  ) : (
+                    <Ionicons name="people-outline" size={24} color={theme.accent} />
+                  )}
+                  {statsLoading ? (
+                    <ActivityIndicator size="small" color={theme.accent} style={{ marginTop: 8 }} />
+                  ) : (
+                    <Text style={s.statValue}>{stats.friends}</Text>
+                  )}
+                  <Text style={s.statLabel}>Bạn bè</Text>
+                </View>
+
+                <View style={s.statCard}>
+                  {statsLoading ? (
+                    <ActivityIndicator size="small" color={theme.info} />
+                  ) : (
+                    <Ionicons name="chatbubbles-outline" size={24} color={theme.info} />
+                  )}
+                  {statsLoading ? (
+                    <ActivityIndicator size="small" color={theme.info} style={{ marginTop: 8 }} />
+                  ) : (
+                    <Text style={s.statValue}>{stats.conversations}</Text>
+                  )}
+                  <Text style={s.statLabel}>Hội thoại</Text>
+                </View>
+
+                <View style={s.statCard}>
+                  {statsLoading ? (
+                    <ActivityIndicator size="small" color={theme.warning} />
+                  ) : (
+                    <Ionicons name="mail-unread-outline" size={24} color={theme.warning} />
+                  )}
+                  {statsLoading ? (
+                    <ActivityIndicator size="small" color={theme.warning} style={{ marginTop: 8 }} />
+                  ) : (
+                    <Text style={s.statValue}>{stats.unread}</Text>
+                  )}
+                  <Text style={s.statLabel}>Chưa đọc</Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Quick Actions */}
@@ -390,7 +471,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={idx}
                   style={s.quickAction}
-                  onPress={item.action}
+                  onPress={() => router.push(item.route as any)}
                 >
                   <View style={[s.quickIcon, { backgroundColor: `${item.color}15` }]}>
                     <Ionicons name={item.icon as any} size={24} color={item.color} />
@@ -403,7 +484,11 @@ export default function HomeScreen() {
 
           {/* About Zync */}
           <View style={s.section}>
-            <View style={s.aboutCard}>
+            <TouchableOpacity 
+              style={s.aboutCard} 
+              onPress={() => router.push('/(tabs)/profile')}
+              activeOpacity={0.7}
+            >
               <View style={s.aboutIcon}>
                 <Ionicons name="sparkles" size={20} color={theme.accent} />
               </View>
@@ -411,11 +496,11 @@ export default function HomeScreen() {
                 <Text style={s.aboutTitle}>Zync Platform</Text>
                 <Text style={s.aboutDesc}>Nhắn tin thời gian thực, kết nối mọi lúc mọi nơi</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-            </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
           </View>
 
-          <View style={{ height: 100 }} />
+          <View style={s.bottomSpacer} />
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
