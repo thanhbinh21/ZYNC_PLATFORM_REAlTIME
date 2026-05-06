@@ -10,6 +10,12 @@ for (const name of Object.keys(nets)) {
     // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
     if (net.family === 'IPv4' && !net.internal) {
       const lowerName = name.toLowerCase();
+      
+      // Skip virtual/WSL adapters
+      if (lowerName.includes('wsl') || lowerName.includes('virtual') || lowerName.includes('vethernet')) {
+        continue;
+      }
+
       // Prioritize Wi-Fi and Ethernet over virtual adapters (like Docker or WSL)
       if (lowerName.includes('wi-fi') || lowerName.includes('wifi') || lowerName.includes('wireless') || lowerName.includes('ethernet') || lowerName.includes('en0') || lowerName.includes('eth0')) {
         localIp = net.address;

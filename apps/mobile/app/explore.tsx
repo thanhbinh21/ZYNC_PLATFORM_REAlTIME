@@ -15,14 +15,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Search, TrendingUp, Users, Hash } from 'lucide-react-native';
-import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
-import { colors } from '../../src/theme/colors';
-import { fonts } from '../../src/theme/fonts';
-import { ChannelCard } from '../../src/components/ChannelCard';
-import { DeveloperCard } from '../../src/components/DeveloperCard';
-import { useExplore } from '../../src/hooks/useExplore';
-import { fetchTrendingPosts, type Post } from '../../src/services/posts';
+import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
+import { getAppTheme } from '../src/theme/get-app-theme';
+import { colors } from '../src/theme/colors';
+import { fonts } from '../src/theme/fonts';
+import { ChannelCard } from '../src/components/ChannelCard';
+import { DeveloperCard } from '../src/components/DeveloperCard';
+import { useExplore } from '../src/hooks/useExplore';
+import { fetchTrendingPosts, type Post } from '../src/services/posts';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

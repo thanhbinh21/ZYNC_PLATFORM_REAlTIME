@@ -3,9 +3,7 @@ import { PostModel, type PostType } from './post.model';
 import { CommentModel } from './comment.model';
 import { UserModel } from '../users/user.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
-import { PostRepository } from '../../shared/repositories/post.repository';
-import { CommentRepository } from '../../shared/repositories/post.repository';
-import container from '../../container';
+import { PostRepository, CommentRepository, postRepository, commentRepository } from '../../shared/repositories/post.repository';
 
 export interface PostAuthor {
   _id: string;
@@ -63,8 +61,8 @@ async function enrichWithAuthor(authorId: string): Promise<PostAuthor | undefine
 }
 
 export class PostsService {
-  private static readonly postRepo = (container as unknown as { postRepository: PostRepository }).postRepository;
-  private static readonly commentRepo = (container as unknown as { commentRepository: CommentRepository }).commentRepository;
+  private static readonly postRepo: PostRepository = postRepository;
+  private static readonly commentRepo: CommentRepository = commentRepository;
 
   /** Tao bai viet moi */
   static async createPost(

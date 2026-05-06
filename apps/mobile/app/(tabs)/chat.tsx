@@ -18,12 +18,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
+import { typography } from '../../src/theme/fonts';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../../src/theme/get-app-theme';
 import api from '../../src/services/api';
 import { socketService } from '../../src/services/socket';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { usePresence } from '../../src/hooks/usePresence';
+import { MessageSquare } from 'lucide-react-native';
 
 // ───────── Types ─────────
 interface ConversationMember {
@@ -504,7 +506,7 @@ export default function ChatScreen() {
 
   return (
     <LinearGradient
-      colors={[theme.backgroundSoft, theme.backgroundMid, theme.backgroundDeep]}
+      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
       style={s.safeArea}
     >
       <SafeAreaView style={s.safeArea}>
@@ -512,10 +514,23 @@ export default function ChatScreen() {
         <View style={s.container}>
         {/* Header */}
         <View style={s.header}>
-          <Text style={s.title}>Tin nhắn</Text>
-          <TouchableOpacity style={s.actionBtn}>
-            <Ionicons name="create-outline" size={24} color={theme.accent} />
-          </TouchableOpacity>
+          <View style={s.headerLeft}>
+            <View style={s.logoContainer}>
+              <MessageSquare size={20} color={colors.accent} strokeWidth={2.5} />
+            </View>
+            <Text style={s.title}>Tin nhắn</Text>
+          </View>
+          <View style={s.headerRight}>
+            <TouchableOpacity 
+              style={s.actionBtn}
+              onPress={() => router.push('/create-group')}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.actionBtn}>
+              <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search Bar */}
@@ -678,21 +693,42 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingVertical: 20,
+      paddingHorizontal: 4,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    logoContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.glassPanel,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
     },
     title: {
-      color: theme.textPrimary,
+      color: colors.text,
       fontSize: 24,
       fontFamily: 'BeVietnamPro_700Bold',
     },
     actionBtn: {
       width: 40,
       height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      borderRadius: 12,
+      backgroundColor: colors.glassPanel,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: theme.glassBorder ?? colors.glassBorder,
+      borderColor: colors.glassBorder,
     },
     searchContainer: {
       flexDirection: 'row',
