@@ -10,19 +10,30 @@ interface SearchResultItemProps {
 
 export function SearchResultItem({ user, isLoading, onSendRequest }: SearchResultItemProps) {
   return (
-    <article className="rounded-[1.4rem] border border-border bg-[var(--surface-glass)] p-4 shadow-sm">
+    <article className="rounded-[1.4rem] border border-border bg-[var(--surface-glass)] p-4 shadow-sm transition-all hover:border-border-hover">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <FriendsAvatar name={user.displayName} />
-          <div>
+          <FriendsAvatar
+            name={user.displayName}
+            avatarUrl={user.avatarUrl}
+          />
+          <div className="min-w-0 flex-1">
             <p className="font-ui-title text-base text-text-primary">{user.displayName}</p>
-            {user.username ? <p className="font-ui-meta text-xs text-text-tertiary">@{user.username}</p> : null}
-            {user.email ? <p className="font-ui-meta text-xs text-text-tertiary">{user.email}</p> : null}
-            {user.bio ? <p className="font-ui-content text-xs text-text-secondary">{user.bio}</p> : null}
+            {user.username && (
+              <p className="font-ui-meta text-xs text-text-tertiary">@{user.username}</p>
+            )}
+            {user.email && !user.username && (
+              <p className="font-ui-meta text-xs text-text-tertiary">{user.email}</p>
+            )}
+            {user.bio ? (
+              <p className="font-ui-content mt-0.5 text-xs text-text-secondary line-clamp-1">
+                {user.bio}
+              </p>
+            ) : null}
           </div>
         </div>
         <FriendsActionButton
-          label="Ket ban"
+          label="Kết bạn"
           variant="primary"
           disabled={isLoading}
           onClick={() => {

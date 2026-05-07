@@ -21,8 +21,8 @@ export function PageLoading({ minDurationMs, mode = 'page', className }: PageLoa
 
   const containerClassName = [
     mode === 'panel'
-      ? 'flex h-full w-full items-center justify-center px-4 text-text-primary'
-      : 'zync-page-shell flex min-h-screen items-center justify-center px-4 text-text-primary',
+      ? 'flex h-full w-full items-center justify-center px-4 text-text-primary bg-[var(--surface-card)]'
+      : 'flex min-h-screen w-full items-center justify-center px-4 text-text-primary bg-[var(--bg-primary)]',
     className,
   ]
     .filter(Boolean)

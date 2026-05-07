@@ -7,10 +7,6 @@ import { PageLoading } from '@/components/shared/page-loading';
 
 function FriendsPageContent() {
   const dashboard = useFriendsDashboard();
-  const { loadData } = dashboard;
-
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  dashboard.setSearchKeyword; // ensure all required props exist
 
   return (
     <FriendsScreen
@@ -22,14 +18,17 @@ function FriendsPageContent() {
       pendingTotal={dashboard.pendingTotal}
       nextCursor={dashboard.nextCursor}
       isLoading={dashboard.isLoading}
+      isLoadingMore={dashboard.isLoadingMore}
       infoMessage={dashboard.infoMessage}
       errorMessage={dashboard.errorMessage}
       onSearchKeywordChange={dashboard.setSearchKeyword}
       onSearch={dashboard.onSearch}
+      onClearSearch={dashboard.onClearSearch}
       onLoadMoreFriends={dashboard.loadMoreFriends}
       onSendRequest={dashboard.onSendRequest}
       onAcceptRequest={dashboard.onAcceptRequest}
       onRejectRequest={dashboard.onRejectRequest}
+      onCancelRequest={dashboard.onCancelRequest}
       onUnfriend={dashboard.onUnfriend}
       onBlock={dashboard.onBlock}
       onUnblock={dashboard.onUnblock}
