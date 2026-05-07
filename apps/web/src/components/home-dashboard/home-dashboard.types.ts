@@ -58,6 +58,43 @@ export interface DashboardActivityItem {
   conversationId?: string;
 }
 
+/**
+ * Loại thông báo hiển thị trên dashboard
+ */
+export type NotificationType = 'new_message' | 'friend_request' | 'friend_accepted' | 'group_invite' | 'story_reaction' | 'story_reply' | 'system';
+
+/**
+ * Item thông báo hiển thị trên trang chủ
+ */
+export interface DashboardNotificationItem {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  timeLabel: string;
+  initials: string;
+  toneClass: string;
+  isRead: boolean;
+  avatarUrl?: string;
+  conversationId?: string;
+  fromUserId?: string;
+}
+
+/**
+ * Item hoạt động của bạn bè
+ */
+export interface DashboardFriendActivityItem {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  initials: string;
+  toneClass: string;
+  action: 'online' | 'offline' | 'posted' | 'reacted' | 'commented' | 'shared';
+  target?: string;
+  timeLabel: string;
+}
+
 export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | string;
 
 export interface DashboardHomeMockData {
@@ -73,5 +110,15 @@ export interface DashboardHomeMockData {
   activityTitle: string;
   activityCtaLabel: string;
   activities: DashboardActivityItem[];
+  /** Tiêu đề phần thông báo */
+  notificationsTitle: string;
+  /** Danh sách thông báo */
+  notifications: DashboardNotificationItem[];
+  /** Số thông báo chưa đọc */
+  unreadNotificationCount: number;
+  /** Tiêu đề phần hoạt động bạn bè */
+  friendActivityTitle: string;
+  /** Danh sách hoạt động bạn bè */
+  friendActivities: DashboardFriendActivityItem[];
 }
 

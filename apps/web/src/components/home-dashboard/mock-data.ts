@@ -30,4 +30,11 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
   activityTitle: 'Hoạt động gần đây',
   activityCtaLabel: 'Xem tất cả',
   activities: [],
+  // Thông báo
+  notificationsTitle: 'Thông báo',
+  notifications: [],
+  unreadNotificationCount: 0,
+  // Hoạt động bạn bè
+  friendActivityTitle: 'Hoạt động bạn bè',
+  friendActivities: [],
 };

@@ -70,9 +70,14 @@ import {
   unmuteConversation,
   unpinConversation,
 } from '@/services/notifications';
+import { fetchNotifications, fetchUnreadCount, type Notification } from '@/services/notifications';
 import { getSocket } from '@/services/socket';
 import { useChat, useMessageHistory, type SendMessageOptions } from '@/hooks/use-messaging';
-import type { DashboardHomeMockData } from '@/components/home-dashboard/home-dashboard.types';
+import type {
+  DashboardHomeMockData,
+  DashboardNotificationItem,
+  DashboardFriendActivityItem,
+} from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import type { MessageType } from '@zync/shared-types';
 
@@ -157,6 +162,25 @@ function formatConversationPreview(lastMessage?: Conversation['lastMessage']): s
 const REACTION_ACK_TIMEOUT_MS = 8000;
 const WEBRTC_INSECURE_CONTEXT_MESSAGE = 'Không thể chia sẻ camera/màn hình và đồng bộ WebRTC khi truy cập bằng HTTP LAN. Vui lòng dùng https:// hoặc localhost.';
 const LAN_DEMO_WARN_ENABLED = process.env['NEXT_PUBLIC_LAN_DEMO_WARN'] === 'true';
+
+/**
+ * Format thời gian tương đối cho notification
+ */
+function formatTimeLabel(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return 'Vừa xong';
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+}
 
 function getWebRtcInsecureContextMessage(): string | null {
   if (!LAN_DEMO_WARN_ENABLED) {
@@ -1063,11 +1087,13 @@ export function useHomeDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [meRes, requestsRes, convosRes, prefs] = await Promise.all([
+        const [meRes, requestsRes, convosRes, prefs, notifRes, friendsRes] = await Promise.all([
           apiClient.get('/api/users/me'),
           apiClient.get('/api/friends/requests'),
           apiClient.get('/api/conversations'),
           fetchPreferences(),
+          fetchNotifications(undefined, 10),
+          fetchFriends(),
         ]);
 
         const user = meRes.data.user;
@@ -1089,12 +1115,15 @@ export function useHomeDashboard() {
         setMutedUntilByConversation(mutedMap);
 
         const allFriends: FriendUser[] = [];
-        let cursor: string | undefined;
-        do {
-          const page = await fetchFriends(cursor);
-          allFriends.push(...page.friends);
-          cursor = page.nextCursor ?? undefined;
-        } while (cursor);
+        allFriends.push(...friendsRes.friends);
+
+        // Fetch all friends for group creation
+        let friendCursor: string | undefined = friendsRes.nextCursor ?? undefined;
+        while (friendCursor) {
+          const morePage = await fetchFriends(friendCursor);
+          allFriends.push(...morePage.friends);
+          friendCursor = morePage.nextCursor ?? undefined;
+        }
         setFriendsForGroup(allFriends);
 
         // Select first conversation (pinned first, then latest updated)
@@ -1157,6 +1186,49 @@ export function useHomeDashboard() {
           }
         });
 
+        // Transform notifications for dashboard
+        const notificationTones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
+        const dashboardNotifications: DashboardNotificationItem[] = notifRes.notifications.slice(0, 8).map((notif: Notification, idx: number) => ({
+          id: notif._id,
+          type: notif.type as DashboardNotificationItem['type'],
+          title: notif.title,
+          body: notif.body,
+          timeLabel: formatTimeLabel(notif.createdAt),
+          initials: notif.title.substring(0, 2).toUpperCase() || 'NT',
+          toneClass: notificationTones[idx % notificationTones.length],
+          isRead: notif.read,
+          avatarUrl: notif.data?.avatarUrl,
+          conversationId: notif.conversationId,
+          fromUserId: notif.fromUserId,
+        }));
+
+        // Transform friend activities
+        const friendTones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
+        const dashboardFriendActivities: DashboardFriendActivityItem[] = allFriends.slice(0, 6).map((friend: FriendUser, idx: number) => {
+          const friendNameParts = friend.displayName.split(' ');
+          const friendInitials = friendNameParts.length > 1
+            ? `${friendNameParts[0][0]}${friendNameParts[friendNameParts.length - 1][0]}`.toUpperCase()
+            : friend.displayName.substring(0, 2).toUpperCase();
+
+          // Random activity for demo - in real app this would come from API
+          const actions: DashboardFriendActivityItem['action'][] = ['online', 'posted', 'reacted'];
+          const randomAction = actions[idx % actions.length];
+
+          return {
+            id: `friend-act-${friend.id}`,
+            userId: friend.id,
+            userName: friend.displayName,
+            userAvatar: friend.avatarUrl,
+            initials: friendInitials,
+            toneClass: friendTones[idx % friendTones.length],
+            action: randomAction,
+            target: randomAction === 'posted' ? 'bài viết mới' : randomAction === 'reacted' ? 'tin nhắn của bạn' : undefined,
+            timeLabel: `${Math.floor(Math.random() * 60) + 1} phút trước`,
+          };
+        });
+
+        const unreadNotificationCount = dashboardNotifications.filter(n => !n.isRead).length;
+
         const userInitials = user.displayName.split(' ').length > 1
           ? `${user.displayName.split(' ')[0][0]}${user.displayName.split(' ').slice(-1)[0][0]}`.toUpperCase()
           : user.displayName.substring(0, 2).toUpperCase();
@@ -1194,6 +1266,9 @@ export function useHomeDashboard() {
             },
           ],
           activities: activities.slice(0, 5),
+          notifications: dashboardNotifications,
+          unreadNotificationCount,
+          friendActivities: dashboardFriendActivities,
         }));
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
@@ -2913,6 +2988,35 @@ export function useHomeDashboard() {
     };
   }, [clearCallResetTimer, resetCallUi]);
 
+  // Refresh notifications
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const notifRes = await fetchNotifications(undefined, 10);
+      const notificationTones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
+      const dashboardNotifications: DashboardNotificationItem[] = notifRes.notifications.slice(0, 8).map((notif: Notification, idx: number) => ({
+        id: notif._id,
+        type: notif.type as DashboardNotificationItem['type'],
+        title: notif.title,
+        body: notif.body,
+        timeLabel: formatTimeLabel(notif.createdAt),
+        initials: notif.title.substring(0, 2).toUpperCase() || 'NT',
+        toneClass: notificationTones[idx % notificationTones.length],
+        isRead: notif.read,
+        avatarUrl: notif.data?.avatarUrl,
+        conversationId: notif.conversationId,
+        fromUserId: notif.fromUserId,
+      }));
+
+      setData(prev => ({
+        ...prev,
+        notifications: dashboardNotifications,
+        unreadNotificationCount: dashboardNotifications.filter(n => !n.isRead).length,
+      }));
+    } catch (error) {
+      console.error('Failed to refresh notifications', error);
+    }
+  }, []);
+
   return {
     data,
     loading,
@@ -2986,6 +3090,7 @@ export function useHomeDashboard() {
     },
     onExecuteForward: handleExecuteForward,
     onLoadMore: messageHistory.loadMore,
+    onRefreshNotifications: refreshNotifications,
     onPatchDashboardUser: (payload: DashboardUserPatch) => {
       setData((prev) => {
         const displayName = payload.displayName ?? prev.user.displayName;
