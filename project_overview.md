@@ -526,7 +526,10 @@ npm run dev:web
 - [x] Phát triển `PostsService` hỗ trợ CRUD, feed pagination và trending posts
 - [x] Dựng UI `CommunityContent` component với các tabs phân loại feed (Mới nhất, Trending, Câu hỏi, TIL)
 - [x] Chức năng tạo bài viết mới (CreatePostForm) hỗ trợ phân loại (thảo luận, hỏi đáp, tutorial...)
-- [x] Chức năng Like, Bookmark và hiển thị Comment counts
+- [x] Chức năng Like, Bookmark, Comment (full panel với reply thread) và Favorites toggle
+- [x] Thông báo đến bạn bè khi có bài viết mới (`community_post` notification type)
+- [x] Notification types mới: `post_like`, `post_comment`, `post_bookmark`, `community_post`
+- [x] Real-time notification toast hỗ trợ community events (navigate to community page)
 
 ### Phase N3 – Explore & Discovery ✅ (Web only – Mobile ở Plan A)
 - [x] Sử dụng `getPublicChannels` và `discoverChannels` từ GroupsService cho API

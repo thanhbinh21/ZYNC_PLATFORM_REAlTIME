@@ -27,6 +27,10 @@ function IconForType({ type, isSummary }: { type?: Notification['type'], isSumma
     case 'group_invite': return <Users className="h-5 w-5 text-indigo-400" />;
     case 'story_reaction': return <Heart className="h-5 w-5 text-rose-400" />;
     case 'story_reply': return <MessageSquare className="h-5 w-5 text-purple-400" />;
+    case 'post_like': return <Heart className="h-5 w-5 text-rose-400" />;
+    case 'post_comment': return <MessageSquare className="h-5 w-5 text-purple-400" />;
+    case 'post_bookmark': return <MessageSquare className="h-5 w-5 text-amber-400" />;
+    case 'community_post': return <Bell className="h-5 w-5 text-accent" />;
     default: return <Bell className="h-5 w-5 text-text-secondary" />;
   }
 }
@@ -73,6 +77,12 @@ export function InAppNotificationToasts() {
 
       if (n.type === 'friend_request' || n.type === 'friend_accepted') {
         router.push('/friends');
+        return;
+      }
+
+      const data = n.data as Record<string, string> | undefined;
+      if (data?.action === 'open_community' && data?.postId) {
+        router.push(`/community?postId=${encodeURIComponent(data.postId)}`);
         return;
       }
 

@@ -19,6 +19,7 @@ import {
   X,
   Loader2,
   Globe,
+  Star,
 } from 'lucide-react';
 import {
   fetchFeed,
@@ -26,9 +27,12 @@ import {
   createPost,
   likePost,
   bookmarkPost,
+  favoritePost,
   type Post,
   type PostType,
 } from '@/services/posts';
+import { CommentPanel } from '@/components/community/organisms/CommentPanel';
+import type { Comment } from '@/services/posts';
 
 interface PostTypeConfig {
   label: string;
@@ -166,7 +170,7 @@ function formatTimeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)} ngày trước`;
 }
 
-function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: string) => void; onBookmark: (id: string) => void }) {
+function PostCard({ post, onLike, onBookmark, onComment, onFavorite }: { post: Post; onLike: (id: string) => void; onBookmark: (id: string) => void; onComment: (post: Post) => void; onFavorite: (id: string) => void }) {
   const cfg = POST_TYPE_CONFIG[post.type] ?? POST_TYPE_CONFIG['discussion'];
   const TypeIcon = cfg.Icon;
   const authorInitials = post.author?.displayName?.slice(0, 2).toUpperCase() ?? '??';
@@ -217,7 +221,10 @@ function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: strin
           <span>{post.likesCount}</span>
         </button>
 
-        <button className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary">
+        <button
+          onClick={() => onComment(post)}
+          className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary"
+        >
           <MessageSquare className="h-4 w-4" />
           <span>{post.commentsCount}</span>
         </button>
@@ -229,9 +236,17 @@ function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: strin
 
         <button
           onClick={() => onBookmark(post._id)}
-          className={`ml-auto flex items-center gap-1.5 text-sm transition ${post.isBookmarked ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
+          className={`flex items-center gap-1.5 text-sm transition ${post.isBookmarked ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
         >
           {post.isBookmarked ? <BookmarkCheck className="h-4 w-4 fill-current" /> : <Bookmark className="h-4 w-4" />}
+        </button>
+
+        <button
+          onClick={() => onFavorite(post._id)}
+          className={`ml-auto flex items-center gap-1.5 text-sm transition ${post.isFavorited ? 'text-yellow-500' : 'text-text-tertiary hover:text-yellow-500'}`}
+        >
+          <Star className={`h-4 w-4 ${post.isFavorited ? 'fill-current' : ''}`} />
+          <span>{post.favoritesCount ?? 0}</span>
         </button>
       </div>
     </article>
@@ -245,6 +260,7 @@ export default function CommunityContent() {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const loadPosts = useCallback(async (tab: string, cursor?: string) => {
     setLoading(true);
@@ -289,10 +305,28 @@ export default function CommunityContent() {
     } catch {/* ignore */}
   };
   const handlePostCreated = (post: Post) => { setPosts((prev) => [post, ...prev]); setShowCreateForm(false); };
+  const handleComment = (post: Post) => { setSelectedPost(post); };
+  const handleCommentAdded = (comment: Comment) => {
+    if (!selectedPost) return;
+    setPosts((prev) => prev.map((p) => p._id === selectedPost._id ? { ...p, commentsCount: p.commentsCount + 1 } : p));
+  };
+  const handleFavorite = async (postId: string) => {
+    try {
+      const { favorited, favoritesCount } = await favoritePost(postId);
+      setPosts((prev) => prev.map((p) => p._id === postId ? { ...p, isFavorited: favorited, favoritesCount } : p));
+    } catch {/* ignore */}
+  };
 
   return (
     <div className="flex h-full w-full overflow-hidden">
       {showCreateForm && <CreatePostForm onClose={() => setShowCreateForm(false)} onSuccess={handlePostCreated} />}
+      {selectedPost && (
+        <CommentPanel
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onCommentAdded={handleCommentAdded}
+        />
+      )}
 
       <div className="flex h-full w-full overflow-hidden">
         {/* Feed */}
@@ -366,7 +400,7 @@ export default function CommunityContent() {
             ) : (
               <div className="space-y-4">
                 {posts.map((post) => (
-                  <PostCard key={post._id} post={post} onLike={handleLike} onBookmark={handleBookmark} />
+                  <PostCard key={post._id} post={post} onLike={handleLike} onBookmark={handleBookmark} onComment={handleComment} onFavorite={handleFavorite} />
                 ))}
                 {nextCursor && (
                   <button onClick={() => loadPosts(activeTab, nextCursor)} className="zync-soft-button-secondary mt-2 w-full py-2.5 text-sm">

@@ -26,6 +26,8 @@ export interface Post {
   viewsCount: number;
   isLiked?: boolean;
   isBookmarked?: boolean;
+  isFavorited?: boolean;
+  favoritesCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -86,6 +88,11 @@ export async function likePost(postId: string): Promise<{ liked: boolean; likesC
 
 export async function bookmarkPost(postId: string): Promise<{ bookmarked: boolean }> {
   const { data } = await apiClient.post<{ success: boolean; data: { bookmarked: boolean } }>(`/api/posts/${postId}/bookmark`);
+  return data.data;
+}
+
+export async function favoritePost(postId: string): Promise<{ favorited: boolean; favoritesCount: number }> {
+  const { data } = await apiClient.post<{ success: boolean; data: { favorited: boolean; favoritesCount: number } }>(`/api/posts/${postId}/favorite`);
   return data.data;
 }
 

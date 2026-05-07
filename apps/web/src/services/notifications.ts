@@ -3,7 +3,7 @@ import { apiClient } from './api';
 export interface Notification {
   _id: string;
   userId: string;
-  type: 'new_message' | 'friend_request' | 'friend_accepted' | 'group_invite' | 'story_reaction' | 'story_reply';
+  type: 'new_message' | 'friend_request' | 'friend_accepted' | 'group_invite' | 'story_reaction' | 'story_reply' | 'post_like' | 'post_comment' | 'post_bookmark' | 'community_post';
   title: string;
   body: string;
   data?: Record<string, string>;

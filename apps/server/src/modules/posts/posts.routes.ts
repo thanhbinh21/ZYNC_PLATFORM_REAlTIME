@@ -9,6 +9,7 @@ import {
   deletePostHandler,
   toggleLikeHandler,
   toggleBookmarkHandler,
+  toggleFavoriteHandler,
   addCommentHandler,
   getCommentsHandler,
 } from './posts.controller';
@@ -40,6 +41,9 @@ postsRouter.post('/:postId/like', toggleLikeHandler);
 
 // POST /api/posts/:postId/bookmark – Bookmark toggle
 postsRouter.post('/:postId/bookmark', toggleBookmarkHandler);
+
+// POST /api/posts/:postId/favorite – Favorite toggle
+postsRouter.post('/:postId/favorite', toggleFavoriteHandler);
 
 // POST /api/posts/:postId/comments – Thêm comment
 postsRouter.post('/:postId/comments', addCommentHandler);

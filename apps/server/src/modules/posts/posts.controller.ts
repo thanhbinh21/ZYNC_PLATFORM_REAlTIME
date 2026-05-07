@@ -69,6 +69,14 @@ export async function toggleBookmarkHandler(req: Request, res: Response, next: N
   } catch (err) { next(err); }
 }
 
+export async function toggleFavoriteHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const result = await PostsService.toggleFavorite(req.params['postId'] as string, userId);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 export async function addCommentHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId } = req as AuthRequest;

@@ -17,6 +17,7 @@ export interface IPost extends Document {
   viewsCount: number;
   likedBy: string[];
   bookmarkedBy: string[];
+  favoritedBy: string[];
   status: PostStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +42,7 @@ const postSchema = new Schema<IPost>(
     viewsCount: { type: Number, default: 0 },
     likedBy: [{ type: String }],
     bookmarkedBy: [{ type: String }],
+    favoritedBy: [{ type: String }],
     status: {
       type: String,
       enum: ['published', 'draft', 'archived'],
