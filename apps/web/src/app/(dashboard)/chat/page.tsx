@@ -96,11 +96,7 @@ export default function ChatPage() {
   }, [searchParams, onSelectConversation, router]);
 
   if (loading) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <PageLoading />
-      </div>
-    );
+    return <PageLoading mode="panel" />;
   }
 
   return (

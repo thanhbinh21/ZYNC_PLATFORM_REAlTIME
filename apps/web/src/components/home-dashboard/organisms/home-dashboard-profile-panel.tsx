@@ -15,6 +15,7 @@ interface HomeDashboardProfilePanelProps {
   myStories?: Story[];
   feed?: StoryFeedGroup[];
   friends?: FriendUser[];
+  initialTab?: 'info' | 'stories';
   onProfileUpdated?: (user: MeUser) => void;
   onOpenCreateStory?: () => void;
   onViewStoryFeed?: (feedIndex: number) => void;
@@ -44,6 +45,7 @@ export function HomeDashboardProfilePanel({
   myStories = [],
   feed = [],
   friends = [],
+  initialTab,
   onProfileUpdated,
   onOpenCreateStory,
   onViewStoryFeed,
@@ -68,7 +70,13 @@ export function HomeDashboardProfilePanel({
     portfolioUrl: '',
   });
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'stories'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'stories'>(initialTab ?? 'info');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     if (!profile) return;

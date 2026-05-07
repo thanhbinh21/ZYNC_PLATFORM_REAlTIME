@@ -13,6 +13,8 @@ import {
   Briefcase,
   Compass,
   Globe,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import type { DashboardIconName } from '../home-dashboard.types';
 
@@ -37,6 +39,8 @@ const ICON_MAP: Record<DashboardIconName, React.ElementType> = {
   bell: Bell,
   bag: Briefcase,
   compass: Compass,
+  moon: Moon,
+  sun: Sun,
 };
 
 export function DashboardIcon({ name, className = 'h-4 w-4' }: DashboardIconProps) {

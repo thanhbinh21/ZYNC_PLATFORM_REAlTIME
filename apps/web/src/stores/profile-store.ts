@@ -7,6 +7,7 @@ type ProfileStore = {
   isLoading: boolean;
   isReady: boolean;
   load: () => Promise<void>;
+  setProfile: (profile: MeUser | null) => void;
 };
 
 let _profile: MeUser | null = null;
@@ -38,6 +39,12 @@ export const profileStore: ProfileStore = {
       _isLoading = false;
       notify();
     }
+  },
+  setProfile(profile) {
+    _profile = profile;
+    _isReady = true;
+    _isLoading = false;
+    notify();
   },
 };
 

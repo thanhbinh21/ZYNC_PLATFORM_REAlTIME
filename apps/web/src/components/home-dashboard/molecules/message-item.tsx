@@ -71,6 +71,7 @@ interface MessageItemProps {
   isSender: boolean;
   canRecall: boolean;
   senderAvatar?: string;
+  senderDisplayName?: string;
   messageStatus?: Record<string, MessageStatus | string>;
   reactionUserState?: {
     lastEmoji: string | null;
@@ -87,6 +88,14 @@ interface MessageItemProps {
   onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
   onReport?: (messageId: string) => void;
   onReact?: (messageId: string, reactionType: string) => void;
+  showSenderInfo?: boolean;
+  showDateSeparator?: boolean;
+  dateSeparatorText?: string;
+  isFirstInGroup?: boolean;
+  isConsecutive?: boolean;
+  seenByAvatarUrl?: string;
+  onImageLike?: (message: Message) => void;
+  onImageOptions?: (message: Message) => void;
 }
 
 function ReactionDetailsModal({
@@ -308,6 +317,7 @@ export function MessageItem({
   isSender,
   canRecall,
   senderAvatar,
+  senderDisplayName,
   messageStatus,
   reactionUserState,
   onDeleteForMe,
@@ -320,6 +330,14 @@ export function MessageItem({
   onFetchReactionDetails,
   onReport,
   onReact,
+  showSenderInfo = true,
+  showDateSeparator = false,
+  dateSeparatorText,
+  isFirstInGroup = true,
+  isConsecutive = false,
+  seenByAvatarUrl,
+  onImageLike,
+  onImageOptions,
 }: MessageItemProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -485,6 +503,7 @@ export function MessageItem({
     };
   }, []);
 
+  // Lifecycle notice messages
   if (isLifecycleNotice) {
     const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
       hour: '2-digit',
@@ -512,6 +531,13 @@ export function MessageItem({
       }`}
       onContextMenu={handleContextMenu}
     >
+      {/* Date Separator */}
+      {showDateSeparator && dateSeparatorText && (
+        <div className="chat-date-separator">
+          <span>{dateSeparatorText}</span>
+        </div>
+      )}
+
       <ReactionDetailsModal
         open={showReactionDetails}
         details={reactionDetails}
@@ -677,6 +703,7 @@ export function MessageItem({
             </div>
           </div>
         )}
+
         {/* Message Bubble */}
         <MessageBubble
           isOwn={isSender}
@@ -687,13 +714,19 @@ export function MessageItem({
           onJumpToMessage={onJumpToMessage}
           moderationWarning={Boolean((message as any).moderationWarning)}
           status={status}
-          readByPreview={message.readByPreview}
-          readByCount={message.readBy?.length}
-          onReadPreviewPress={canOpenReadStats ? handleOpenReadStats : undefined}
           timestamp={message.createdAt}
           senderAvatar={senderAvatar}
+          senderDisplayName={senderDisplayName}
+          showSenderInfo={showSenderInfo}
+          reactionSummary={summary}
+          userReaction={lastSelectedEmoji}
+          onReactionClick={(emoji) => handleReactionClick(emoji, 'bubble-click')}
+          isFirstInGroup={isFirstInGroup}
+          isConsecutive={isConsecutive}
+          seenByAvatarUrl={seenByAvatarUrl}
+          onImageLike={() => onImageLike?.(message)}
+          onImageOptions={() => onImageOptions?.(message)}
         />
-
 
         {isRecalled && (
           <p className="mt-1 text-xs italic text-text-tertiary">
@@ -701,23 +734,7 @@ export function MessageItem({
           </p>
         )}
 
-        {!isRecalled && hasSummary && (
-          <button
-            type="button"
-            onClick={handleOpenReactionDetails}
-            className="reaction-summary-button mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-opacity hover:opacity-80"
-            title="Xem chi tiet cam xuc"
-            disabled={!onFetchReactionDetails}
-          >
-            <span className="inline-flex items-center gap-1">
-              {summaryEntries.slice(0, 3).map(([emoji]) => (
-                <span key={`${message._id}-${emoji}`}>{emoji}</span>
-              ))}
-            </span>
-            <span>{summary?.totalCount || 0}</span>
-          </button>
-        )}
-
+        {/* Legacy reaction entries (non-summary format) - only show when no summary exists */}
         {!isRecalled && !hasSummary && legacyReactionEntries.length > 0 && (
           <div className={`mt-1 flex flex-wrap gap-1 ${isSender ? 'justify-end' : 'justify-start'}`}>
             {legacyReactionEntries.map(([emoji, count]) => (
@@ -733,7 +750,6 @@ export function MessageItem({
           </div>
         )}
       </div>
-
     </div>
   );
 }

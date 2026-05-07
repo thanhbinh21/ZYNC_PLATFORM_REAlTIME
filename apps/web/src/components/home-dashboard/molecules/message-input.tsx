@@ -16,7 +16,7 @@ function ImageIcon({ className }: { className: string }) {
 function SendIcon({ className }: { className: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      <path d="m4 19 17-7L4 5l1.3 5.1h7.1v3.8H5.3L4 19Z" />
+      <path d="M2 21L23 12 2 3 10 12 2 21Z" />
     </svg>
   );
 }
@@ -154,7 +154,6 @@ export function MessageInput({
       console.error('Finalize media message failed:', error);
     } finally {
       if (pending.previewUrl.startsWith('blob:')) {
-        // Delay revoke a bit to avoid flicker while bubble switches to remote URL.
         setTimeout(() => URL.revokeObjectURL(pending.previewUrl), 1200);
       }
 
@@ -230,31 +229,26 @@ export function MessageInput({
     setInput(value);
 
     if (value.length > 0) {
-      // Emit typing_start if interval isn't running (first keystroke or resuming after stop)
       if (!typingIntervalRef.current) {
         onStartTyping();
 
-        // Start throttle interval: re-emit every 2s to refresh Redis TTL
         typingIntervalRef.current = setInterval(() => {
           onStartTyping();
         }, 2000);
       }
 
-      // Reset stop debounce: clears any pending stop, sets new 3s timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
 
       typingTimeoutRef.current = setTimeout(() => {
         onStopTyping();
-        // Cleanup interval when typing stops
         if (typingIntervalRef.current) {
           clearInterval(typingIntervalRef.current);
           typingIntervalRef.current = null;
         }
       }, 3000);
     } else {
-      // User cleared all text: stop immediately
       onStopTyping();
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -327,7 +321,6 @@ export function MessageInput({
       resetTypingState();
       onCancelReply?.();
 
-      // Prevent double-click for 500ms
       setTimeout(() => setIsSending(false), 500);
     }
   };
@@ -339,7 +332,6 @@ export function MessageInput({
     }
   };
 
-  // Cache selected media only. Upload starts after user presses Send.
   const handleUploadFile = async (file: File) => {
     const messageType: MessageType = file.type.startsWith('image/')
       ? 'image'
@@ -370,7 +362,6 @@ export function MessageInput({
     setUploadProgress(0);
   };
 
-  // Handle paste event (Ctrl+V)
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -391,10 +382,8 @@ export function MessageInput({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Let user type a message first. Upload will start after Send.
     await handleUploadFile(file);
 
-    // Clear file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -429,26 +418,26 @@ export function MessageInput({
   };
 
   return (
-    <div className="border-t border-border/60 bg-bg-card/80 p-4 backdrop-blur-sm">
+    <div className="chat-input-container">
       {/* Reply Banner */}
       {replyingTo && (
-        <div className="mb-3 flex items-center justify-between rounded-xl border border-accent/20 bg-accent/5 px-4 py-2.5">
+        <div className="mb-2 mx-3 flex items-center justify-between rounded-lg border border-[#0084ff]/20 bg-[#0084ff]/5 px-4 py-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-accent/10">
-              <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinecap="round">
+            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#0084ff]/10">
+              <svg className="h-3 w-3 text-[#0084ff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 17 4 12 9 7"/>
                 <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Dang tra loi</p>
-              <p className="truncate text-[13px] text-text-secondary">{replyingTo.contentPreview || '[Tin nhan]'}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#0084ff]">Dang tra loi</p>
+              <p className="truncate text-[13px] text-[#65676b]">{replyingTo.contentPreview || '[Tin nhan]'}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onCancelReply}
-            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-text-tertiary hover:bg-border hover:text-text-primary transition-all"
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[#929292] hover:bg-[#f0f2f5] hover:text-[#050505] transition-all"
             title="Huy tra loi"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -459,62 +448,15 @@ export function MessageInput({
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-1 mb-3">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isLoading}
-          className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-bg-hover disabled:opacity-40 text-text-tertiary hover:text-accent"
-          title="Dinh kem tep"
-        >
-          <PaperclipIcon className="w-[18px] h-[18px]" />
-        </button>
-
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || isLoading}
-          className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-bg-hover disabled:opacity-40 text-text-tertiary hover:text-accent"
-          title="Gui hinh anh"
-        >
-          <ImageIcon className="w-[18px] h-[18px]" />
-        </button>
-
-        <button
-          onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
-          disabled={disabled || isLoading}
-          className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all disabled:opacity-40 text-text-tertiary hover:text-accent ${isEmojiPickerOpen ? 'bg-accent/10 text-accent' : 'hover:bg-bg-hover'}`}
-          title="Bieu tuong cam xuc"
-        >
-          <EmojiIcon className="w-[18px] h-[18px]" />
-        </button>
-
-        <button
-          ref={stickerButtonRef}
-          onClick={() => setShowStickerPicker(true)}
-          disabled={disabled || isLoading || isSending}
-          className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-bg-hover disabled:opacity-40 text-text-tertiary hover:text-accent"
-          title="Sticker"
-        >
-          <StickerIcon className="w-[18px] h-[18px]" />
-        </button>
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          className="hidden"
-          accept="image/*,video/*,.pdf,.doc,.docx"
-        />
-      </div>
-
+      {/* Emoji Picker */}
       {isEmojiPickerOpen && (
-        <div className="emoji-picker-container mb-3 flex flex-wrap gap-1.5 rounded-2xl border border-border bg-bg-card p-3 shadow-lg">
+        <div className="mb-2 mx-3 flex flex-wrap gap-1.5 rounded-2xl bg-[#ffffff] border border-[#e4e6eb] p-3 shadow-lg">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => handleSendEmoji(emoji)}
-              className="emoji-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-xl hover:bg-bg-hover hover:scale-110 transition-all active:scale-95"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-xl hover:bg-[#f0f2f5] hover:scale-110 transition-all active:scale-95"
             >
               {emoji}
             </button>
@@ -531,33 +473,77 @@ export function MessageInput({
         />
       )}
 
-      {/* Input Area */}
-      <div className="flex items-end gap-2.5">
-        <textarea
-          value={input}
-          onChange={(e) => handleInputChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder="Nhap tin nhan..."
-          disabled={disabled || isLoading}
-          rows={1}
-          className="chat-input-glow flex-1 rounded-2xl bg-bg-hover border border-border-light px-4 py-3 text-[15px] font-medium text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none disabled:opacity-50 transition-all"
-          style={{
-            minHeight: '46px',
-            maxHeight: '120px',
-          }}
-        />
+      {/* Input Bar */}
+      <div className="chat-input-bar">
+        {/* Action Icons */}
+        <div className="chat-input-actions">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || isLoading}
+            className="chat-input-action-btn"
+            title="Dinh kem tep"
+          >
+            <PaperclipIcon className="w-5 h-5" />
+          </button>
 
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || isLoading}
+            className="chat-input-action-btn"
+            title="Gui hinh anh"
+          >
+            <ImageIcon className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+            disabled={disabled || isLoading}
+            className={`chat-input-action-btn ${isEmojiPickerOpen ? 'bg-[#f0f2f5] text-[#0084ff]' : ''}`}
+            title="Bieu tuong cam xuc"
+          >
+            <EmojiIcon className="w-5 h-5" />
+          </button>
+
+          <button
+            ref={stickerButtonRef}
+            onClick={() => setShowStickerPicker(true)}
+            disabled={disabled || isLoading || isSending}
+            className="chat-input-action-btn"
+            title="Sticker"
+          >
+            <StickerIcon className="w-5 h-5" />
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+            accept="image/*,video/*,.pdf,.doc,.docx"
+          />
+        </div>
+
+        {/* Input Field */}
+        <div className="chat-input-field-wrapper">
+          <textarea
+            value={input}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder="Nhap tin nhan..."
+            disabled={disabled || isLoading}
+            rows={1}
+            className="chat-input-field"
+          />
+        </div>
+
+        {/* Send Button */}
         <button
           onClick={() => {
             void handleSend();
           }}
           disabled={isButtonDisabled}
-          className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl transition-all shadow-sm ${
-            isButtonDisabled
-              ? 'bg-bg-hover text-text-tertiary cursor-not-allowed'
-              : 'bg-gradient-to-br from-accent to-accent-hover text-white hover:shadow-md hover:scale-105 active:scale-95'
-          }`}
+          className="chat-send-button"
         >
           <SendIcon className="w-5 h-5" />
         </button>
@@ -565,22 +551,22 @@ export function MessageInput({
 
       {/* Media Preview */}
       {uploadedMedia && !queuedMediaSend && (
-        <div className="mt-3 relative inline-block">
+        <div className="mt-2 mx-3 relative inline-block">
           {uploadedMedia.type === 'image' ? (
             <img
               src={uploadedMedia.previewUrl}
               alt="Preview"
-              className={`max-w-[240px] rounded-2xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
+              className={`max-w-[200px] rounded-xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
             />
           ) : uploadedMedia.type === 'video' ? (
             <video
               src={uploadedMedia.previewUrl}
               controls={!uploading}
-              className={`max-w-[240px] rounded-2xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
+              className={`max-w-[200px] rounded-xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
             />
           ) : (
-            <div className={`inline-flex max-w-xs items-center gap-2 rounded-xl border border-border bg-bg-hover px-4 py-2.5 text-sm text-text-primary shadow-sm ${uploading ? 'opacity-50' : ''}`}>
-              <svg className="h-5 w-5 text-accent flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className={`inline-flex max-w-xs items-center gap-2 rounded-xl border border-[#e4e6eb] bg-[#f0f2f5] px-4 py-2.5 text-sm text-[#050505] shadow-sm ${uploading ? 'opacity-50' : ''}`}>
+              <svg className="h-5 w-5 text-[#0084ff] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
               </svg>
@@ -588,14 +574,12 @@ export function MessageInput({
             </div>
           )}
 
-          {/* Spinner overlay when uploading */}
           {uploading && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/20 backdrop-blur-[2px]">
-              <div className="h-10 w-10 rounded-full border-[3px] border-white/30 border-t-white animate-spin shadow-lg" />
+            <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 backdrop-blur-[2px]">
+              <div className="h-8 w-8 rounded-full border-[3px] border-white/30 border-t-white animate-spin shadow-lg" />
             </div>
           )}
 
-          {/* Remove button */}
           <button
             onClick={() => {
               if (queuedMediaSendRef.current) {
@@ -607,10 +591,10 @@ export function MessageInput({
               setUploadedMedia(null);
             }}
             disabled={Boolean(queuedMediaSend)}
-            className="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white shadow-md transition-all hover:bg-red-600 hover:scale-110 disabled:opacity-50"
+            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#65676b] text-white shadow-md transition-all hover:bg-[#050505] hover:scale-110 disabled:opacity-50"
             title="Xoa tep"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -619,8 +603,8 @@ export function MessageInput({
       )}
 
       {uploadedMedia && queuedMediaSend && uploading && (
-        <p className="mt-2 flex items-center gap-2 text-xs text-text-tertiary">
-          <svg className="h-3.5 w-3.5 animate-spin text-accent" viewBox="0 0 24 24" fill="none">
+        <p className="mt-2 mx-3 flex items-center gap-2 text-xs text-[#929292]">
+          <svg className="h-3.5 w-3.5 animate-spin text-[#0084ff]" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>

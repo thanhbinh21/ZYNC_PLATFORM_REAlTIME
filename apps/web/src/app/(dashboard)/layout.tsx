@@ -10,6 +10,12 @@ import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
 import type { DashboardAppearanceSettings } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
+import type { Notification } from '@/services/notifications';
+
+const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
+  theme: 'light',
+  messageFontSize: 'medium',
+};
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -31,14 +37,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const savedTheme = globalThis.localStorage?.getItem('zync.dashboard.theme');
     const savedFontSize = globalThis.localStorage?.getItem('zync.dashboard.messageFontSize');
 
-    const theme =
+    const theme: DashboardAppearanceSettings['theme'] =
       savedTheme === 'dark'
         ? 'dark'
         : savedTheme === 'light' || savedTheme === 'verdant'
           ? 'light'
           : DEFAULT_APPEARANCE_SETTINGS.theme;
 
-    const messageFontSize =
+    const messageFontSize: DashboardAppearanceSettings['messageFontSize'] =
       savedFontSize === 'small' || savedFontSize === 'medium' || savedFontSize === 'large'
         ? savedFontSize
         : 'medium';
@@ -80,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const handleToggleTheme = () => {
-    const newTheme = appearanceSettings.theme === 'dark' ? 'light' : 'dark';
+    const newTheme: DashboardAppearanceSettings['theme'] = appearanceSettings.theme === 'dark' ? 'light' : 'dark';
     const newSettings = { ...appearanceSettings, theme: newTheme };
     setAppearanceSettings(newSettings);
     globalThis.localStorage?.setItem('zync.dashboard.theme', newTheme);
@@ -105,12 +111,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (pathname.startsWith('/chat')) return 'chat';
     if (pathname.startsWith('/friends')) return 'friends';
     if (pathname.startsWith('/community')) return 'community';
-    if (pathname.startsWith('/explore')) return 'explore';
     if (pathname.startsWith('/settings')) return 'settings';
     return 'home';
   };
 
   const activeNavId = getActiveNavId();
+
+  const handleNotificationNavigate = (notification: Notification) => {
+    const action = notification.data?.action;
+    const conversationId = notification.conversationId ?? notification.data?.conversationId;
+    const storyId = notification.data?.storyId;
+
+    if (action === 'open_chat') {
+      router.push(conversationId ? `/chat?conversationId=${conversationId}` : '/chat');
+      return;
+    }
+
+    if (action === 'open_friend_requests') {
+      router.push('/friends#requests');
+      return;
+    }
+
+    if (action === 'open_story') {
+      router.push(storyId ? `/profile?tab=stories&storyId=${encodeURIComponent(storyId)}` : '/profile?tab=stories');
+      return;
+    }
+
+    if (notification.type === 'new_message' || notification.type === 'group_invite') {
+      router.push(conversationId ? `/chat?conversationId=${conversationId}` : '/chat');
+      return;
+    }
+
+    if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
+      router.push('/friends#requests');
+      return;
+    }
+
+    if (notification.type === 'story_reaction' || notification.type === 'story_reply') {
+      router.push('/profile?tab=stories');
+      return;
+    }
+
+    router.push('/home');
+  };
 
   // Update mock data user info from profile
   const headerData = {
@@ -127,12 +170,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <main className="zync-page-shell zync-dashboard-main flex h-[100dvh] flex-col overflow-hidden text-text-primary">
-      <Suspense fallback={<PageLoading />}>
+      <Suspense fallback={<PageLoading mode="panel" />}>
         <DashboardHeader
           data={headerData}
           activeNavId={activeNavId}
           theme={appearanceSettings.theme}
           onToggleTheme={handleToggleTheme}
+          notificationSlot={<NotificationHub onNavigate={handleNotificationNavigate} />}
           onNavSelect={(id) => {
             if (id === 'logout') onLogout();
           }}

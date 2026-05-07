@@ -51,6 +51,7 @@ claude/
 gemini/
 docs/todo
 output/
+.cursor/
 
 #folder 
 Agent Skill/

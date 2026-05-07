@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { FriendsScreenProps } from '../friends.types';
 import { Bell, Search, Users, UserPlus, Clock, CheckCircle2, X, UserX } from 'lucide-react';
 import { FriendItem } from '../molecules/friend-item';
@@ -25,6 +26,21 @@ export function FriendsScreen({
   onBlock,
   onUnblock,
 }: FriendsScreenProps) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const scrollToRequests = () => {
+      if (window.location.hash !== '#requests') return;
+      const section = document.getElementById('friend-requests');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    scrollToRequests();
+    window.addEventListener('hashchange', scrollToRequests);
+    return () => window.removeEventListener('hashchange', scrollToRequests);
+  }, [incomingRequests.length, outgoingRequests.length]);
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
@@ -54,7 +70,7 @@ export function FriendsScreen({
         <div className="mx-auto max-w-5xl space-y-5">
           {/* Pending Requests */}
           {incomingRequests.length > 0 || outgoingRequests.length > 0 ? (
-            <section className="zync-soft-card rounded-[1.8rem] p-5">
+            <section id="friend-requests" className="zync-soft-card rounded-[1.8rem] p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="font-ui-title text-lg text-text-primary">Lời mời kết bạn</h2>
                 {pendingTotal > 0 && (
@@ -110,7 +126,7 @@ export function FriendsScreen({
               )}
             </section>
           ) : (
-            <section className="zync-soft-card-muted rounded-[1.8rem] p-6 text-center">
+            <section id="friend-requests" className="zync-soft-card-muted rounded-[1.8rem] p-6 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-bg-hover">
                 <UserPlus className="h-5 w-5 text-text-tertiary" />
               </div>
