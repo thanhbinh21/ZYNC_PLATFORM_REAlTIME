@@ -68,6 +68,8 @@ export function DashboardHeader({
       router.push('/friends');
     } else if (id === 'community') {
       router.push('/community');
+    } else if (id === 'profile') {
+      router.push('/profile');
     } else if (id === 'settings') {
       router.push('/settings');
     }
@@ -167,6 +169,16 @@ export function DashboardHeader({
                     Tài khoản
                   </p>
                   <div className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectNav('profile')}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-text-primary transition hover:bg-[var(--bg-hover)]"
+                      role="menuitem"
+                    >
+                      <DashboardIcon name="profile" className="h-4 w-4" />
+                      <span className="font-ui-content">Hồ sơ</span>
+                    </button>
+                    <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
                     {data.sideFooterItems.map((item) => (
                       <button
                         key={item.id}

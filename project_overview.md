@@ -186,7 +186,9 @@ npm run dev:web
 - [x] Dựng giao diện `/home` theo mẫu dashboard `docs/designs/login.png` với mock data khi chưa có API <!-- done: 19/03/2026 -->
 - [x] Hoàn thiện luồng Secure Logout (xóa session, dọn dẹp state và chuyển hướng về đăng nhập) <!-- done: 12/04/2026 -->
 - [x] Cấu hình chính xác định tuyến từ Home Dashboard cho recent activities và dọn dẹp UI thừa <!-- done: 12/04/2026 -->
-- [x] Tối ưu header Dashboard Web: nhấn tab, bỏ Khám phá, đưa Cài đặt/Đăng xuất vào profile, chỉ giữ avatar <!-- done: 07/05/2026 -->
+- [x] Tối ưu header Dashboard Web: nhấn tab, bỏ Khám phá, đưa Cài đặt/Đăng xuất vào profile, bật thông báo, thêm Hồ sơ, chỉ giữ avatar <!-- done: 07/05/2026 -->
+- [x] Tạo route /profile trên Dashboard Web và điều hướng từ menu Hồ sơ <!-- done: 07/05/2026 -->
+- [x] Bổ sung routing thông báo và trang /settings cho Dashboard Web <!-- done: 07/05/2026 -->
 
 ### Phase 3 – Friends & Contacts (Module F5–F9)
 - [x] Gửi / chấp nhận / từ chối lời mời kết bạn <!-- done: 19/03/2026 -->
