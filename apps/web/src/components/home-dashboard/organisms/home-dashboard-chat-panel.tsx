@@ -779,16 +779,13 @@ function ChatPanel({
   }, [scrollToMessageElement, showJumpStatus]);
 
   return (
-    <article className="relative mx-auto flex h-full w-full max-w-[1440px] min-h-0 min-w-0 flex-col overflow-hidden rounded-[2rem] border border-border bg-bg-card shadow-sm">
+    <article className="relative mx-auto flex h-full w-full max-w-[1440px] min-h-0 min-w-0 flex-col overflow-hidden chat-page-bg">
       {/* Header */}
-      <header className="relative flex items-center justify-between border-b border-border bg-bg-card/80 px-5 py-3 backdrop-blur-sm">
-        {/* Gradient accent line */}
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent opacity-60" />
-
-        <div className="flex items-center gap-3.5">
+      <header className="chat-header">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             type="button"
-            className={`relative h-11 w-11 overflow-hidden rounded-full bg-gradient-to-br from-accent to-accent-hover shadow-sm ${
+            className={`relative h-11 w-11 overflow-hidden rounded-full bg-gradient-to-br from-accent to-accent-hover shadow-sm flex-shrink-0 ${
               isGroupConversation ? 'cursor-pointer hover:shadow-md hover:scale-105 transition-all' : 'cursor-default'
             }`}
             onClick={isGroupConversation ? onAvatarClick : undefined}
@@ -801,16 +798,12 @@ function ChatPanel({
                 {participantAvatar ? participantAvatar[0] : participantName[0]}
               </span>
             )}
-            {/* Online indicator */}
-            <span className={`absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-bg-card ${
-              isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-text-tertiary'
-            }`} />
           </button>
 
-          <div>
+          <div className="chat-header-info min-w-0">
             <button
               type="button"
-              className={`text-left text-base font-bold text-text-primary transition-colors ${
+              className={`text-left text-base font-bold text-[#050505] transition-colors block truncate max-w-full ${
                 isGroupConversation ? 'cursor-pointer hover:text-accent' : 'cursor-default'
               }`}
               onClick={isGroupConversation ? onNameClick : undefined}
@@ -818,42 +811,40 @@ function ChatPanel({
             >
               {participantName}
             </button>
-            <p className="flex items-center gap-1.5 text-[12px] text-text-tertiary">
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${
-                isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-text-tertiary'
-              }`} />
+            <div className="chat-header-status">
+              <span className={`online-dot ${isOnline ? '' : 'offline'}`} />
               {isOnline ? 'Dang hoat dong' : 'Ngoai tuyen'}
-            </p>
+            </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 text-text-secondary">
+        {/* Header Action Buttons */}
+        <div className="chat-header-actions flex-shrink-0">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-bg-hover transition-all hover:bg-border hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="chat-header-btn"
             title="Goi thoai"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
-            <PhoneIcon className="w-[18px] h-[18px]" />
+            <PhoneIcon className="w-5 h-5" />
           </button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-bg-hover transition-all hover:bg-border hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            className="chat-header-btn"
             title="Goi video"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
-            <VideoIcon className="w-[18px] h-[18px]" />
+            <VideoIcon className="w-5 h-5" />
           </button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-bg-hover transition-all hover:bg-border hover:text-accent"
+            className="chat-header-btn"
             title="Thong tin"
             onClick={onInfoClick}
           >
-            <InfoIcon className="w-[18px] h-[18px]" />
+            <InfoIcon className="w-5 h-5" />
           </button>
         </div>
       </header>
@@ -1145,7 +1136,7 @@ function ChatPanel({
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-5 py-4 chat-messages-scroll"
+        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-4 py-4 chat-messages-scroll"
       >
         {/* Load More Button */}
         {messages.length > 0 && hasMoreMessages && (
@@ -1250,42 +1241,32 @@ function ChatPanel({
       </div>
 
       {/* Moderation Bar */}
-      <div className="border-t border-border/60 bg-gradient-to-r from-bg-hover/50 to-bg-card/50 px-5 py-2">
-        <div className="mb-1.5 flex items-center justify-between text-[11px]">
-          <div className="flex items-center gap-1.5 text-text-tertiary">
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            <span>Muc do vi pham tieu chuan cong dong</span>
-          </div>
-          <span className={`font-semibold ${
-            userPenaltyScore >= 80 ? 'text-red-500' :
-            userPenaltyScore >= 50 ? 'text-orange-500' :
-            userPenaltyScore > 0 ? 'text-yellow-500' : 'text-text-tertiary'
-          }`}>
-            {userPenaltyScore}%
-          </span>
-        </div>
-        <div className="h-1 w-full overflow-hidden rounded-full bg-border/60">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              userPenaltyScore >= 80 ? 'bg-gradient-to-r from-red-500 to-red-400' :
-              userPenaltyScore >= 50 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :
-              userPenaltyScore > 0 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' : 'bg-gradient-to-r from-accent to-accent-hover'
-            }`}
-            style={{ width: `${Math.min(Math.max(userPenaltyScore, 0), 100)}%` }}
-          />
-        </div>
-        {userMutedUntil && new Date(userMutedUntil) > new Date() && (
-          <div className="mt-2 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-950/30 px-3 py-2 text-[11px] font-medium text-red-400">
-            <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <div className="chat-moderation-bar">
+        <svg className="w-3.5 h-3.5 text-[#929292] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span className="chat-moderation-text">Muc do vi pham tieu chuan cong dong</span>
+        <span className={`font-semibold text-[11px] ml-auto ${
+          userPenaltyScore >= 80 ? 'text-red-500' :
+          userPenaltyScore >= 50 ? 'text-orange-500' :
+          userPenaltyScore > 0 ? 'text-yellow-500' : 'text-[#929292]'
+        }`}>
+          {userPenaltyScore}%
+        </span>
+      </div>
+
+      {/* User Muted Warning */}
+      {userMutedUntil && new Date(userMutedUntil) > new Date() && (
+        <div className="bg-[#fef2f2] border-t border-[#fecaca] px-4 py-2">
+          <div className="flex items-center gap-2 text-xs text-red-600">
+            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
             Ban dang bi cam chat den {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Input Area */}
       <MessageInput
