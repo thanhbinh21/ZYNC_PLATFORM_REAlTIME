@@ -147,6 +147,7 @@ npm run dev:web
 - [x] Code lại landing route `/` theo mẫu UI mới (glassmorphism + hero + metrics + CTA + footer) <!-- done: 19/03/2026 -->
 - [x] Chuẩn hóa typography toàn hệ thống Web sang font Be Vietnam Pro <!-- done: 19/03/2026 -->
 - [x] Thêm hiệu ứng loading mở trang cho landing `/` và auth `/auth` (bao gồm luồng đăng nhập/đăng ký) <!-- done: 05/04/2026 -->
+- [x] Chuẩn hóa hiệu ứng loading chuyển trang bằng `PageLoading` dùng chung (Web) <!-- done: 07/05/2026 -->
 
 ### Phase 2 – Authentication & User Management (Module F1–F4)
 - [x] POST /api/auth/register – gửi OTP qua Twilio/Email <!-- done: 15/03/2026 -->

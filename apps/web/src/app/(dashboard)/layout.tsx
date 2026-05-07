@@ -170,7 +170,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <main className="zync-page-shell zync-dashboard-main flex h-[100dvh] flex-col overflow-hidden text-text-primary">
-      <Suspense fallback={<PageLoading />}>
+      <Suspense fallback={<PageLoading mode="panel" />}>
         <DashboardHeader
           data={headerData}
           activeNavId={activeNavId}
