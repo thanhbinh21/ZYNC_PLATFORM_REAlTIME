@@ -7,6 +7,8 @@ export type DashboardIconName =
   | 'group'
   | 'settings'
   | 'logout'
+  | 'moon'
+  | 'sun'
   | 'plus'
   | 'edit'
   | 'search'

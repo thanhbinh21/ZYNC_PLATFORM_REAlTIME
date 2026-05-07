@@ -105,7 +105,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (pathname.startsWith('/chat')) return 'chat';
     if (pathname.startsWith('/friends')) return 'friends';
     if (pathname.startsWith('/community')) return 'community';
-    if (pathname.startsWith('/explore')) return 'explore';
     if (pathname.startsWith('/settings')) return 'settings';
     return 'home';
   };
