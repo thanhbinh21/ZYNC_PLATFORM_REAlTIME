@@ -340,7 +340,10 @@ export function MessageItem({
   onImageOptions,
 }: MessageItemProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom'>('bottom');
   const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [reactionPlacement, setReactionPlacement] = useState<'top' | 'bottom'>('top');
+  const reactionRef = useRef<HTMLDivElement>(null);
   const [showReactionDetails, setShowReactionDetails] = useState(false);
   const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [reactionDetailsLoading, setReactionDetailsLoading] = useState(false);
@@ -503,6 +506,37 @@ export function MessageItem({
     };
   }, []);
 
+  useEffect(() => {
+    if (showMenu && menuRef.current) {
+      const rect = menuRef.current.parentElement?.getBoundingClientRect();
+      if (rect) {
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const menuHeight = 200; // Chiều cao ước tính hoặc tối đa của menu bạn
+
+        // Nếu khoảng trống bên dưới ít hơn chiều cao menu, thì đẩy lên trên
+        if (spaceBelow < menuHeight) {
+          setMenuPlacement('top');
+        } else {
+          setMenuPlacement('bottom');
+        }
+      }
+    }
+  }, [showMenu]);
+
+  useEffect(() => {
+    if (showReactionPicker && reactionRef.current) {
+      const parentRect = reactionRef.current.parentElement?.getBoundingClientRect();
+      if (parentRect) {
+        // Nếu khoảng cách từ đỉnh tin nhắn đến mép trên màn hình < 200px
+        if (parentRect.top < 200) {
+          setReactionPlacement('bottom');
+        } else {
+          setReactionPlacement('top');
+        }
+      }
+    }
+  }, [showReactionPicker]);
+
   // Lifecycle notice messages
   if (isLifecycleNotice) {
     const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
@@ -578,8 +612,12 @@ export function MessageItem({
 
               {showReactionPicker && (
                 <div
-                  className={`absolute z-[110] flex items-center gap-1 rounded-full border border-border-light bg-bg-card px-2 py-1 shadow-lg ${
-                    isSender ? 'right-0 bottom-full mb-2' : 'left-0 bottom-full mb-2'
+                  ref={reactionRef}
+                  className={`absolute z-[120] flex items-center gap-1 rounded-full border border-border-light bg-bg-card px-2 py-1 shadow-lg ${
+                    isSender ? 'right-0' : 'left-0'
+                  } ${
+                    // Tự động thay đổi giữa top-full và bottom-full
+                    reactionPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
                   }`}
                   onMouseEnter={showReactionPickerNow}
                   onMouseLeave={hideReactionPickerDelayed}
@@ -624,9 +662,12 @@ export function MessageItem({
               {showMenu && (
                 <div
                   ref={menuRef}
-                  className={`message-context-menu absolute top-full z-[120] mt-2 rounded-xl shadow-xl ${
+                  className={`message-context-menu absolute z-[120] rounded-xl shadow-xl ${
                     isSender ? 'right-0' : 'left-0'
-                  }`}
+                  } ${
+                      // Logic thay đổi vị trí dựa trên state
+                      menuPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                    }`}
                   style={{ minWidth: isSender ? '160px' : '220px' }}
                   onClick={(e) => e.stopPropagation()}
                 >
