@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator,
   RefreshControl,
   Dimensions,
   Image,
@@ -23,6 +22,7 @@ import { ChannelCard } from '../src/components/ChannelCard';
 import { DeveloperCard } from '../src/components/DeveloperCard';
 import { useExplore } from '../src/hooks/useExplore';
 import { fetchTrendingPosts, type Post } from '../src/services/posts';
+import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -141,7 +141,11 @@ export default function ExploreScreen() {
         {/* Loading state */}
         {(isLoadingChannels || isLoadingUsers) && !isRefreshing && (
           <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <View style={{ gap: 12, padding: 16, width: '100%' }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonCardPreset key={i} lines={2} showAvatar={false} />
+              ))}
+            </View>
           </View>
         )}
 

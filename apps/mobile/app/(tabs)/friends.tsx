@@ -1,13 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
   TextInput,
   StatusBar,
-  ActivityIndicator,
   RefreshControl,
   Alert
 } from 'react-native';
@@ -17,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
 import api from '../../src/services/api';
 import { useAuthStore } from '../../src/store/useAuthStore';
+import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
+import { EmptyState } from '../../src/ui/EmptyState';
 
 interface Friend {
   _id: string;
@@ -221,7 +222,11 @@ export default function FriendsScreen() {
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.accent} />
+            <View style={{ gap: 12, padding: 16, flex: 1 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonCardPreset key={i} lines={2} showAvatar />
+              ))}
+            </View>
           </View>
         ) : activeTab === 'friends' ? (
           /* Friends List */
@@ -247,11 +252,7 @@ export default function FriendsScreen() {
               </TouchableOpacity>
             )}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Users size={56} color={colors.textSubtle} />
-                <Text style={styles.emptyText}>Chưa có bạn bè</Text>
-                <Text style={styles.emptySubtext}>Tìm kiếm và gửi lời mời kết bạn</Text>
-              </View>
+              <EmptyState variant="no-friends" />
             }
             contentContainerStyle={filteredFriends.length === 0 ? { flex: 1 } : { paddingBottom: 100 }}
           />

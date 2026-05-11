@@ -18,6 +18,8 @@ import { fonts } from '../../src/theme/fonts';
 import { PostCard } from '../../src/components/PostCard';
 import { CreatePostSheet } from '../../src/components/CreatePostSheet';
 import { usePosts, type PostFilter } from '../../src/hooks/usePosts';
+import { SkeletonPostCardPreset } from '../../src/ui/ZyncSkeleton';
+import { EmptyState } from '../../src/ui/EmptyState';
 
 const FILTERS: { key: PostFilter; label: string }[] = [
   { key: 'latest', label: 'Moi nhat' },
@@ -142,19 +144,18 @@ export default function CommunityScreen() {
         }
         ListEmptyComponent={
           !isLoading ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Chua co bai viet nao</Text>
-              <Text style={styles.emptySubtitle}>
-                Hien chua co bai viet nao trong cong dong
-              </Text>
-            </View>
+            <EmptyState variant="no-posts" />
           ) : null
         }
       />
 
       {isLoading && !isRefreshing && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <View style={{ gap: 12, width: '100%', padding: 16 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonPostCardPreset key={i} />
+            ))}
+          </View>
         </View>
       )}
 

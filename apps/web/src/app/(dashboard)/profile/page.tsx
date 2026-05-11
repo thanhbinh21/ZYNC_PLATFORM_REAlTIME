@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { HomeDashboardProfilePanel } from '@/components/home-dashboard/organisms/home-dashboard-profile-panel';
@@ -7,11 +8,23 @@ import { StoryCreateModal } from '@/components/stories/molecules/StoryCreateModa
 import { StoryViewer } from '@/components/stories/organisms/StoryViewer';
 import { useStories } from '@/hooks/use-stories';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
+import { PageLoading } from '@/components/shared/page-loading';
+import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 import type { CreateStoryPayload } from '@/services/stories';
 import type { MeUser } from '@/services/users';
 import type { StoryReactionType } from '@/components/stories/stories.types';
 
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={<PageLoading variant="profile" mode="panel" />}>
+      <ZyncPageTransition>
+        <ProfilePageContent />
+      </ZyncPageTransition>
+    </Suspense>
+  );
+}
+
+function ProfilePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [profile, setProfile] = useState<MeUser | null>(profileStore.profile);

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StatusBar,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -36,6 +35,7 @@ import api from '../../src/services/api';
 import { useNotificationsContext } from '../../src/context/notifications-context';
 import { StoryBar } from '../../src/components/StoryBar';
 import { GlassPanel } from '../../src/ui/GlassPanel';
+import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 
 // ============================================================
 // HELPERS
@@ -595,10 +595,13 @@ export default function HomeScreen() {
             </View>
 
             {trendingLoading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color={theme.accent} />
-                <Text style={styles.loadingText}>Đang tải bài viết...</Text>
-              </View>
+              <GlassPanel style={styles.trendingPanel}>
+                <View style={{ gap: 12 }}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <SkeletonCardPreset key={i} lines={2} showAvatar={false} />
+                  ))}
+                </View>
+              </GlassPanel>
             ) : trendingPosts.length === 0 ? (
               <EmptyState
                 icon={<Zap size={32} color={theme.textSecondary} />}
@@ -640,10 +643,13 @@ export default function HomeScreen() {
             </View>
 
             {activitiesLoading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color={theme.accent} />
-                <Text style={styles.loadingText}>Đang tải hoạt động...</Text>
-              </View>
+              <GlassPanel style={styles.activityPanel}>
+                <View style={{ gap: 12 }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <SkeletonCardPreset key={i} lines={2} showAvatar />
+                  ))}
+                </View>
+              </GlassPanel>
             ) : activities.length === 0 ? (
               <EmptyState
                 icon={<Sparkles size={32} color={theme.textSecondary} />}

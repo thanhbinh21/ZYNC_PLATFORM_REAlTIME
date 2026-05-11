@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   Alert,
   TextInput,
 } from 'react-native';
@@ -17,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { lightTheme } from '../src/theme/colors';
 import api from '../src/services/api';
 import { useAuthStore } from '../src/store/useAuthStore';
+import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
 
 interface Member {
   _id: string;
@@ -232,7 +232,11 @@ export default function GroupInfoScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator size="large" color={lightTheme.accent} style={{ marginTop: 60 }} />
+        <View style={{ padding: 16, gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCardPreset key={i} lines={2} showAvatar={false} />
+          ))}
+        </View>
       ) : (
         <FlatList
           data={members}

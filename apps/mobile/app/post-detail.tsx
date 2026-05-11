@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator,
   Image,
   Dimensions,
   Linking,
@@ -18,6 +17,7 @@ import { CommentSheet } from '../src/components/CommentSheet';
 import { likePost, bookmarkPost } from '../src/services/posts';
 import { colors } from '../src/theme/colors';
 import { fonts } from '../src/theme/fonts';
+import { SkeletonPostCardPreset } from '../src/ui/ZyncSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -106,7 +106,7 @@ export default function PostDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <SkeletonPostCardPreset />
         </View>
       </SafeAreaView>
     );
@@ -272,10 +272,11 @@ export default function PostDetailScreen() {
             Binh luan ({post.commentsCount})
           </Text>
           {isLoadingComments ? (
-            <ActivityIndicator
-              color={colors.primary}
-              style={{ marginVertical: 16 }}
-            />
+            <View style={{ gap: 12, paddingVertical: 16 }}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCardPreset key={i} lines={1} showAvatar />
+              ))}
+            </View>
           ) : comments.length === 0 ? (
             <Text style={styles.noCommentsText}>
               Chua co binh luan nao. Hay la nguoi dau tien binh luan!

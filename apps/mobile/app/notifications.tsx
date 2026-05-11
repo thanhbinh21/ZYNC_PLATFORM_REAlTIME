@@ -17,6 +17,7 @@ import { getAppTheme } from '../src/theme/get-app-theme';
 import { useNotifications } from '../src/hooks/useNotifications';
 import { useAuthStore } from '../src/store/useAuthStore';
 import type { AppNotification } from '../src/services/notifications';
+import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -150,11 +151,11 @@ export default function NotificationsScreen() {
         onEndReachedThreshold={0.3}
         ListEmptyComponent={
           isLoading ? (
-            <ActivityIndicator
-              size="large"
-              color={theme.accent}
-              style={{ marginTop: 80 }}
-            />
+            <View style={{ gap: 12, padding: 16, flex: 1 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonCardPreset key={i} lines={2} showAvatar={false} />
+              ))}
+            </View>
           ) : (
             <View style={styles.emptyContainer}>
               <Ionicons name="notifications-off-outline" size={48} color={theme.textTertiary} />

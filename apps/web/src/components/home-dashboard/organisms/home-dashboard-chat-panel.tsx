@@ -2202,7 +2202,11 @@ export function HomeDashboardChatPanel({
       />
 
       <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-border bg-bg-card shadow-lg">
-        <div className="h-full w-[300px] shrink-0 border-r border-border bg-bg-card hidden md:block">
+        <div className={`h-full shrink-0 border-r border-border bg-bg-card ${
+          selectedConversationId 
+            ? 'hidden md:block md:w-[300px]' 
+            : 'block w-full md:w-[300px]'
+        }`}>
           <ConversationList
             conversations={visibleConversations}
             selectedId={selectedConversationId}
@@ -2212,7 +2216,11 @@ export function HomeDashboardChatPanel({
           />
         </div>
 
-        <div className="h-full min-h-0 min-w-0 flex-1 overflow-hidden flex flex-col">
+        <div className={`h-full min-h-0 min-w-0 flex-1 overflow-hidden flex-col ${
+          selectedConversationId 
+            ? 'flex' 
+            : 'hidden md:flex'
+        }`}>
           <ChatPanel
             {...chatPanelProps}
             isGroupConversation={isGroupConversation}

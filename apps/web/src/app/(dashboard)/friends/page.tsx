@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { FriendsScreen } from '@/components/friends/organisms/friends-screen';
 import { useFriendsDashboard } from '@/hooks/use-friends-dashboard';
 import { PageLoading } from '@/components/shared/page-loading';
+import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 
 function FriendsPageContent() {
   const dashboard = useFriendsDashboard();
@@ -38,8 +39,10 @@ function FriendsPageContent() {
 
 export default function FriendsPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
-      <FriendsPageContent />
+    <Suspense fallback={<PageLoading variant="friends" mode="panel" />}>
+      <ZyncPageTransition>
+        <FriendsPageContent />
+      </ZyncPageTransition>
     </Suspense>
   );
 }

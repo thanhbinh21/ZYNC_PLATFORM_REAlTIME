@@ -32,6 +32,7 @@ import {
   type PostType,
 } from '@/services/posts';
 import { CommentPanel } from '@/components/community/organisms/CommentPanel';
+import { EmptyState } from '@/components/shared/EmptyState';
 import type { Comment } from '@/services/posts';
 
 interface PostTypeConfig {
@@ -176,7 +177,7 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite }: { post: P
   const authorInitials = post.author?.displayName?.slice(0, 2).toUpperCase() ?? '??';
 
   return (
-    <article className="zync-soft-card rounded-[1.6rem] p-5 transition hover:shadow-md">
+    <article className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-semibold text-accent-strong">
           {post.author?.avatarUrl ? (
@@ -198,7 +199,7 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite }: { post: P
         </div>
       </div>
 
-      <h3 className="font-ui-title mt-3 cursor-pointer text-base leading-snug text-text-primary hover:text-accent">{post.title}</h3>
+      <h3 className="font-ui-title mt-4 cursor-pointer text-lg leading-snug text-text-primary transition-colors group-hover:text-accent">{post.title}</h3>
       <p className="font-ui-content mt-1.5 line-clamp-3 text-sm leading-relaxed text-text-secondary">{post.content}</p>
 
       {post.tags.length > 0 && (
@@ -381,21 +382,14 @@ export default function CommunityContent() {
                 ))}
               </div>
             ) : posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-border bg-bg-hover">
-                  <svg className="h-8 w-8 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    <line x1="9" y1="10" x2="15" y2="10"/>
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-ui-title text-base text-text-primary">Chưa có bài viết nào</p>
-                  <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy là người đầu tiên chia sẻ kiến thức!</p>
-                </div>
-                <button onClick={() => setShowCreateForm(true)} className="zync-soft-button mt-2 flex items-center gap-2 px-5 py-2.5 text-sm">
-                  <PenLine className="h-4 w-4" />
-                  Viết bài đầu tiên
-                </button>
+              <div className="flex flex-1 items-center justify-center">
+                <EmptyState
+                  variant="no-posts"
+                  action={{
+                    label: 'Viết bài đầu tiên',
+                    onClick: () => setShowCreateForm(true),
+                  }}
+                />
               </div>
             ) : (
               <div className="space-y-4">
@@ -421,13 +415,13 @@ export default function CommunityContent() {
             </h3>
           </div>
           {trendingPosts.length === 0 ? (
-            <div className="zync-soft-card-muted rounded-[1.4rem] p-4 text-center">
+            <div className="rounded-[1.4rem] border border-border bg-bg-card p-4 text-center">
               <p className="text-sm text-text-tertiary">Chưa có dữ liệu thịnh hành</p>
             </div>
           ) : (
             <div className="space-y-3">
               {trendingPosts.map((post, i) => (
-                <div key={post._id} className="zync-soft-card-muted rounded-[1.2rem] p-3">
+                <div key={post._id} className="group cursor-pointer rounded-[1.2rem] border border-transparent bg-bg-hover p-3 transition-all hover:border-accent/30 hover:bg-bg-active hover:shadow-sm">
                   <div className="flex items-start gap-2">
                     <span className="font-ui-title min-w-[1.2rem] text-lg text-accent-strong">{i + 1}</span>
                     <div className="min-w-0">

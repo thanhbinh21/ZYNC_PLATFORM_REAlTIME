@@ -1,32 +1,45 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { HomeDashboardSettingsPanel } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
+import { PageLoading } from '@/components/shared/page-loading';
+import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 import type { DashboardAppearanceSettings } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
 
-const DEFAULT_APPEARANCE: DashboardAppearanceSettings = {
-  theme: 'light',
-  messageFontSize: 'medium',
-};
-
-function loadAppearanceSettings(): DashboardAppearanceSettings {
-  if (typeof window === 'undefined') {
-    return DEFAULT_APPEARANCE;
-  }
-
-  const savedTheme = window.localStorage.getItem('zync.dashboard.theme');
-  const savedFontSize = window.localStorage.getItem('zync.dashboard.messageFontSize');
-
-  const theme = savedTheme === 'dark' ? 'dark' : 'light';
-  const messageFontSize =
-    savedFontSize === 'small' || savedFontSize === 'medium' || savedFontSize === 'large'
-      ? savedFontSize
-      : 'medium';
-
-  return { theme, messageFontSize };
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<PageLoading variant="settings" mode="panel" />}>
+      <ZyncPageTransition>
+        <SettingsPageContent />
+      </ZyncPageTransition>
+    </Suspense>
+  );
 }
 
-export default function SettingsPage() {
+function SettingsPageContent() {
+  const DEFAULT_APPEARANCE: DashboardAppearanceSettings = {
+    theme: 'light',
+    messageFontSize: 'medium',
+  };
+
+  function loadAppearanceSettings(): DashboardAppearanceSettings {
+    if (typeof window === 'undefined') {
+      return DEFAULT_APPEARANCE;
+    }
+
+    const savedTheme = window.localStorage.getItem('zync.dashboard.theme');
+    const savedFontSize = window.localStorage.getItem('zync.dashboard.messageFontSize');
+
+    const theme = savedTheme === 'dark' ? 'dark' : 'light';
+    const messageFontSize =
+      savedFontSize === 'small' || savedFontSize === 'medium' || savedFontSize === 'large'
+        ? savedFontSize
+        : 'medium';
+
+    return { theme, messageFontSize };
+  }
+
   const [appearance, setAppearance] = useState<DashboardAppearanceSettings>(DEFAULT_APPEARANCE);
 
   useEffect(() => {

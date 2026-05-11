@@ -7,6 +7,8 @@ import { useMessagePreview } from '@/hooks/use-message-preview';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
 import { MessagePreviewPopup } from '@/components/home-dashboard/organisms/MessagePreviewPopup';
 import { PageLoading } from '@/components/shared/page-loading';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -96,10 +98,19 @@ export default function ChatPage() {
   }, [searchParams, onSelectConversation, router]);
 
   if (loading) {
-    return <PageLoading mode="panel" />;
+    return <PageLoading variant="chat" mode="panel" />;
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <EmptyState variant="no-messages" />
+      </div>
+    );
   }
 
   return (
+    <ZyncPageTransition>
     <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1">
       <HomeDashboardChatPanel
         conversations={conversations}
@@ -181,5 +192,6 @@ export default function ChatPage() {
         }}
       />
     </div>
+    </ZyncPageTransition>
   );
 }
