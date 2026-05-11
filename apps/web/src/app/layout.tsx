@@ -26,8 +26,25 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const themeScript = `
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('zync.dashboard.theme');
+        var theme = savedTheme === 'dark' ? 'dark' : 'light';
+        document.documentElement.dataset['zyncTheme'] = theme;
+        
+        var savedFontSize = localStorage.getItem('zync.dashboard.messageFontSize');
+        var messageFontSize = savedFontSize === 'small' || savedFontSize === 'medium' || savedFontSize === 'large' ? savedFontSize : 'medium';
+        document.documentElement.dataset['zyncMessageSize'] = messageFontSize;
+      } catch (e) {}
+    })();
+  `;
+
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={`${beVietnamPro.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
         <Providers>{children}</Providers>
         <Toaster />

@@ -148,6 +148,7 @@ npm run dev:web
 - [x] Chuẩn hóa typography toàn hệ thống Web sang font Be Vietnam Pro <!-- done: 19/03/2026 -->
 - [x] Thêm hiệu ứng loading mở trang cho landing `/` và auth `/auth` (bao gồm luồng đăng nhập/đăng ký) <!-- done: 05/04/2026 -->
 - [x] Chuẩn hóa hiệu ứng loading chuyển trang bằng `PageLoading` dùng chung (Web) <!-- done: 07/05/2026 -->
+- [x] Sửa lỗi nháy trắng (white flash) khi tải trang ở Dark mode (Web) bằng inline script apply theme sớm <!-- done: 11/05/2026 -->
 
 ### Phase 2 – Authentication & User Management (Module F1–F4)
 - [x] POST /api/auth/register – gửi OTP qua Twilio/Email <!-- done: 15/03/2026 -->
@@ -528,7 +529,7 @@ npm run dev:web
 | D2.1 | Navigation Helper Hook (Web `use-navigation-flow.ts` + Mobile `useNavigationFlow.ts` + Backend GET `/api/conversations/direct`) | ✅ Hoàn thành |
 | D2.2 | Friends → Chat Quick Action (Web `friends-screen.tsx` + Mobile `friends.tsx` nút Nhắn tin) | ✅ Hoàn thành |
 | D2.3 | Community → Profile → Chat (Web `UserProfileModal` + Mobile `ProfileBottomSheet`) | ✅ Hoàn thành |
-| D2.4 | Explore → Friends/Chat Quick Actions (Web `explore-content.tsx` Developer Card CTA + Mobile DeveloperCard) | ✅ Hoàn thành |
+| D2.4 | Explore → Friends/Chat Quick Actions (Web `explore-content.tsx` Developer Card CTA + Mobile DeveloperCard) | ✅ Hoàn thành (Cải thiện UI/UX thẻ tác giả, tích hợp UserProfileModal) |
 | D2.5 | Onboarding → Personalized Explore (Web redirect `/onboarding` → `/explore?skills=...`) | ✅ Hoàn thành |
 | D2.6 | Chat ↔ Community Cross-reference (Web Chat Info Panel hiện bài viết từ người đang chat + Home Dashboard activity clickable) | ✅ Hoàn thành |
 
@@ -545,7 +546,7 @@ npm run dev:web
 ### Phase N3 – Explore & Discovery ✅ (Web only – Mobile ở Plan A)
 - [x] Sử dụng `getPublicChannels` và `discoverChannels` từ GroupsService cho API
 - [x] Dựng `ExploreContent` component với thanh tìm kiếm đa luồng (Channels, Users, Posts)
-- [x] User discovery cards với hiển thị kỹ năng (skills), bio, links (Github)
+- [x] User discovery cards với hiển thị kỹ năng (skills), bio, links (Github) và tích hợp `UserProfileModal` với nút Nhắn tin luôn sẵn sàng
 - [x] Cơ chế Join channel public trực tiếp từ màn hình Khám phá
 
 ### Plan A – Hoàn thiện Chức năng Web + Mobile (~42-52h) ✅ <!-- done: 05/05/2026 -->

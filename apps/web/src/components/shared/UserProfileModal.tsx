@@ -163,52 +163,55 @@ export function UserProfileModal({
             {/* Actions */}
             {!isMe && (
               <div className="mt-6 flex w-full flex-col gap-3">
-                {user.isFriend ? (
-                  <button
-                    type="button"
-                    onClick={handleSendMessage}
-                    className="zync-soft-button flex w-full items-center justify-center gap-2 py-3 text-sm"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    Nhắn tin
-                  </button>
-                ) : friendRequestLoading ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm"
-                    style={{
-                      backgroundColor: 'var(--surface-muted)',
-                      color: 'var(--text-tertiary)',
-                      cursor: 'not-allowed',
-                    }}
-                  >
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Đang gửi...
-                  </button>
-                ) : friendRequestSent ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm"
-                    style={{
-                      backgroundColor: 'var(--surface-muted)',
-                      color: 'var(--text-tertiary)',
-                      cursor: 'not-allowed',
-                    }}
-                  >
-                    <Check className="h-4 w-4" />
-                    Đã gửi lời mời
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSendFriendRequest}
-                    className="zync-soft-button-secondary flex w-full items-center justify-center gap-2 py-3 text-sm"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Kết bạn
-                  </button>
+                {/* Luôn hiển thị nút Nhắn tin */}
+                <button
+                  type="button"
+                  onClick={handleSendMessage}
+                  className="zync-soft-button flex w-full items-center justify-center gap-2 py-3 text-sm"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Nhắn tin
+                </button>
+
+                {!user.isFriend && (
+                  friendRequestLoading ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm"
+                      style={{
+                        backgroundColor: 'var(--surface-muted)',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'not-allowed',
+                      }}
+                    >
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang gửi...
+                    </button>
+                  ) : friendRequestSent ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm"
+                      style={{
+                        backgroundColor: 'var(--surface-muted)',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'not-allowed',
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                      Đã gửi lời mời
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendFriendRequest}
+                      className="zync-soft-button-secondary flex w-full items-center justify-center gap-2 py-3 text-sm"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Kết bạn
+                    </button>
+                  )
                 )}
 
                 {user.isFriend && (

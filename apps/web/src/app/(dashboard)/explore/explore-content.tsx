@@ -35,6 +35,8 @@ import {
 import { fetchTrendingPosts, type Post } from '@/services/posts';
 import type { GroupConversation } from '@/services/groups';
 import { useNavigationFlow } from '@/hooks/use-navigation-flow';
+import { UserProfileModal } from '@/components/shared/UserProfileModal';
+import { fetchFriends, fetchFriendRequests } from '@/services/friends';
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   frontend: Zap,
@@ -125,6 +127,7 @@ function UserCard({
   sentRequestIds,
   friendIds,
   currentUserId,
+  onOpenProfile,
 }: {
   user: DiscoverUser;
   onSendFriendRequest: (userId: string) => void;
@@ -132,6 +135,7 @@ function UserCard({
   sentRequestIds: Set<string>;
   friendIds: Set<string>;
   currentUserId?: string;
+  onOpenProfile?: (userId: string) => void;
 }) {
   const initials = user.displayName.slice(0, 2).toUpperCase();
   const isMe = user.id === currentUserId;
@@ -142,13 +146,16 @@ function UserCard({
   return (
     <div className="zync-soft-card rounded-[1.6rem] p-4 transition hover:shadow-md">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong">
+        <div 
+          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong cursor-pointer hover:opacity-80 transition"
+          onClick={() => onOpenProfile?.(user.id)}
+        >
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full rounded-full object-cover" />
           ) : initials}
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 cursor-pointer hover:opacity-80 transition" onClick={() => onOpenProfile?.(user.id)}>
           <p className="font-ui-title text-sm text-text-primary">{user.displayName}</p>
           {user.username && <p className="font-ui-content text-xs text-text-tertiary">@{user.username}</p>}
           {user.devRole && (
@@ -269,7 +276,16 @@ export default function ExploreContent() {
   const skillsFromUrl = searchParams.get('skills');
   const suggestedSkills = skillsFromUrl ? skillsFromUrl.split(',').filter(Boolean) : [];
 
-  const { navigateToChat, sendFriendRequest } = useNavigationFlow();
+  const { 
+    navigateToChat, 
+    sendFriendRequest, 
+    profileModalOpen, 
+    profileModalUserId, 
+    profileModalUser, 
+    profileModalLoading, 
+    openProfileModal, 
+    closeProfileModal 
+  } = useNavigationFlow();
 
   // Lay current user tu localStorage (duoc set boi auth flow)
   const currentUserId = (() => {
@@ -287,14 +303,18 @@ export default function ExploreContent() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [channelData, userData, postData] = await Promise.allSettled([
+      const [channelData, userData, postData, friendsData, requestsData] = await Promise.allSettled([
         fetchExploreChannels(),
         fetchDiscoverUsers(),
         fetchTrendingPosts(10),
+        fetchFriends(),
+        fetchFriendRequests(),
       ]);
       if (channelData.status === 'fulfilled') setChannels(channelData.value);
       if (userData.status === 'fulfilled') setUsers(userData.value);
       if (postData.status === 'fulfilled') setTrendingPosts(postData.value);
+      if (friendsData.status === 'fulfilled') setFriendIds(new Set(friendsData.value.friends.map((f) => f.id)));
+      if (requestsData.status === 'fulfilled') setSentRequestIds(new Set(requestsData.value.outgoing.map((r) => r.userId)));
     } finally {
       setLoading(false);
     }
@@ -473,6 +493,7 @@ export default function ExploreContent() {
                   sentRequestIds={sentRequestIds}
                   friendIds={friendIds}
                   currentUserId={currentUserId}
+                  onOpenProfile={openProfileModal}
                 />
               ))}
             </div>
@@ -516,6 +537,22 @@ export default function ExploreContent() {
           </div>
         </div>
       )}
+
+      <UserProfileModal
+        visible={profileModalOpen}
+        userId={profileModalUserId}
+        user={profileModalUser || undefined}
+        loading={profileModalLoading}
+        currentUserId={currentUserId}
+        onClose={closeProfileModal}
+        onSendMessage={async (id) => {
+          await navigateToChat(id);
+          closeProfileModal();
+        }}
+        onSendFriendRequest={async (id) => {
+          await handleSendFriendRequest(id);
+        }}
+      />
     </div>
   );
 }
