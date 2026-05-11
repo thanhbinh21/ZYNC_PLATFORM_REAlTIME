@@ -4,13 +4,10 @@ import { Suspense } from 'react';
 import { FriendsScreen } from '@/components/friends/organisms/friends-screen';
 import { useFriendsDashboard } from '@/hooks/use-friends-dashboard';
 import { PageLoading } from '@/components/shared/page-loading';
+import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 
 function FriendsPageContent() {
   const dashboard = useFriendsDashboard();
-  const { loadData } = dashboard;
-
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  dashboard.setSearchKeyword; // ensure all required props exist
 
   return (
     <FriendsScreen
@@ -22,14 +19,17 @@ function FriendsPageContent() {
       pendingTotal={dashboard.pendingTotal}
       nextCursor={dashboard.nextCursor}
       isLoading={dashboard.isLoading}
+      isLoadingMore={dashboard.isLoadingMore}
       infoMessage={dashboard.infoMessage}
       errorMessage={dashboard.errorMessage}
       onSearchKeywordChange={dashboard.setSearchKeyword}
       onSearch={dashboard.onSearch}
+      onClearSearch={dashboard.onClearSearch}
       onLoadMoreFriends={dashboard.loadMoreFriends}
       onSendRequest={dashboard.onSendRequest}
       onAcceptRequest={dashboard.onAcceptRequest}
       onRejectRequest={dashboard.onRejectRequest}
+      onCancelRequest={dashboard.onCancelRequest}
       onUnfriend={dashboard.onUnfriend}
       onBlock={dashboard.onBlock}
       onUnblock={dashboard.onUnblock}
@@ -39,8 +39,10 @@ function FriendsPageContent() {
 
 export default function FriendsPage() {
   return (
-    <Suspense fallback={<PageLoading />}>
-      <FriendsPageContent />
+    <Suspense fallback={<PageLoading variant="friends" mode="panel" />}>
+      <ZyncPageTransition className="flex h-full w-full min-h-0 min-w-0 flex-1 flex-col">
+        <FriendsPageContent />
+      </ZyncPageTransition>
     </Suspense>
   );
 }

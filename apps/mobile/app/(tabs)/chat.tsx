@@ -1,13 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
   TextInput,
   StatusBar,
-  ActivityIndicator,
   RefreshControl,
   Image,
   Alert,
@@ -26,6 +25,12 @@ import { socketService } from '../../src/services/socket';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { usePresence } from '../../src/hooks/usePresence';
 import { MessageSquare } from 'lucide-react-native';
+import {
+  SkeletonChatBubblePreset,
+  SkeletonAvatarPreset,
+  SkeletonCardPreset,
+} from '../../src/ui/ZyncSkeleton';
+import { EmptyState } from '../../src/ui/EmptyState';
 
 // ───────── Types ─────────
 interface ConversationMember {
@@ -553,8 +558,11 @@ export default function ChatScreen() {
         {/* Chat List */}
         {isLoading ? (
           <View style={s.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.accent} />
-            <Text style={s.loadingText}>Đang tải hội thoại...</Text>
+            <View style={{ gap: 12, padding: 16 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonCardPreset key={i} lines={2} showAvatar />
+              ))}
+            </View>
           </View>
         ) : (
           <FlatList<ChatListItem>
@@ -668,11 +676,9 @@ export default function ChatScreen() {
               );
             }}
             ListEmptyComponent={
-              <View style={s.emptyContainer}>
-                <Ionicons name="chatbubbles-outline" size={64} color={theme.textTertiary} />
-                <Text style={s.emptyTitle}>{isSearchMode ? 'Khong tim thay ket qua' : 'Chưa có cuộc trò chuyện'}</Text>
-                <Text style={s.emptySubtext}>{isSearchMode ? 'Thu tim voi tu khoa khac.' : 'Bắt đầu trò chuyện với bạn bè nhé!'}</Text>
-              </View>
+              <EmptyState
+                variant={isSearchMode ? 'no-results' : 'no-messages'}
+              />
             }
             contentContainerStyle={(isSearchMode ? searchTargets.length : sortedConversations.length) === 0 ? { flex: 1 } : { paddingBottom: 100 }}
           />
@@ -733,7 +739,7 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.glassPanel ?? colors.glassPanel,
+      backgroundColor: colors.glassPanel,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.glassBorder ?? colors.glassBorder,
@@ -766,7 +772,7 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       paddingVertical: 10,
       paddingHorizontal: 10,
       borderRadius: 16,
-      backgroundColor: theme.glassSoft ?? colors.glassSoft,
+      backgroundColor: colors.glassSoft,
       borderWidth: 1,
       borderColor: theme.glassBorderSoft ?? colors.glassBorderSoft,
     },
@@ -775,12 +781,12 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       width: 55,
       height: 55,
       borderRadius: 20,
-      backgroundColor: theme.glassPanelStrong ?? colors.glassPanelStrong,
+      backgroundColor: colors.glassPanelStrong,
       justifyContent: 'center',
       alignItems: 'center',
     },
     groupAvatar: {
-      backgroundColor: theme.glassSoft ?? colors.glassSoft,
+      backgroundColor: colors.glassSoft,
     },
     avatarText: {
       color: theme.textTertiary,
@@ -834,7 +840,7 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     pinBadge: {
       marginTop: 3,
       borderRadius: 8,
-      backgroundColor: theme.glassSoft,
+      backgroundColor: colors.glassSoft,
       paddingHorizontal: 5,
       paddingVertical: 2,
     },

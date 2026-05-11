@@ -9,8 +9,10 @@ import {
   deletePostHandler,
   toggleLikeHandler,
   toggleBookmarkHandler,
+  toggleFavoriteHandler,
   addCommentHandler,
   getCommentsHandler,
+  getPostsByAuthorHandler,
 } from './posts.controller';
 
 export const postsRouter = Router();
@@ -41,8 +43,14 @@ postsRouter.post('/:postId/like', toggleLikeHandler);
 // POST /api/posts/:postId/bookmark – Bookmark toggle
 postsRouter.post('/:postId/bookmark', toggleBookmarkHandler);
 
+// POST /api/posts/:postId/favorite – Favorite toggle
+postsRouter.post('/:postId/favorite', toggleFavoriteHandler);
+
 // POST /api/posts/:postId/comments – Thêm comment
 postsRouter.post('/:postId/comments', addCommentHandler);
 
 // GET /api/posts/:postId/comments – Danh sách comments
 postsRouter.get('/:postId/comments', getCommentsHandler);
+
+// GET /api/posts/author – Lấy bài viết theo tác giả (Chat Info Panel)
+postsRouter.get('/author', getPostsByAuthorHandler);

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import React, { Suspense } from 'react';
 import { DashboardStoryItemRow } from '@/components/home-dashboard/molecules/dashboard-story-item';
 import { DashboardStatCard } from '@/components/home-dashboard/molecules/dashboard-stat-card';
 import { DashboardActivityItemRow } from '@/components/home-dashboard/molecules/dashboard-activity-item';
@@ -9,9 +10,25 @@ import { DashboardNotificationItemRow } from '@/components/home-dashboard/molecu
 import { DashboardFriendActivityItemRow } from '@/components/home-dashboard/molecules/dashboard-friend-activity-item';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
-import { Bell, Users, ArrowRight, MessageSquare, UserPlus, FolderOpen } from 'lucide-react';
+import { PageLoading } from '@/components/shared/page-loading';
+import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
+import { 
+  Bell as LucideBell, 
+  Users as LucideUsers, 
+  ArrowRight as LucideArrowRight, 
+  MessageSquare as LucideMessageSquare, 
+  UserPlus as LucideUserPlus, 
+  FolderOpen as LucideFolderOpen 
+} from 'lucide-react';
 
-export default function HomePage() {
+const Bell = LucideBell as any;
+const Users = LucideUsers as any;
+const ArrowRight = LucideArrowRight as any;
+const MessageSquare = LucideMessageSquare as any;
+const UserPlus = LucideUserPlus as any;
+const FolderOpen = LucideFolderOpen as any;
+
+function HomePageContent(): React.JSX.Element {
   const router = useRouter();
   const { data, onSelectConversation } = useHomeDashboard();
   const mockData = DASHBOARD_HOME_MOCK_DATA;
@@ -88,7 +105,7 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
   };
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    <ZyncPageTransition className="flex h-full w-full flex-col overflow-hidden">
       <header className="border-b border-border-light px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -332,6 +349,14 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
           <div className="h-10 shrink-0" tabIndex={-1} />
         </div>
       </div>
-    </div>
+    </ZyncPageTransition>
+  );
+}
+
+export default function HomePage(): React.JSX.Element {
+  return (
+    <Suspense fallback={<PageLoading variant="home" mode="panel" />}>
+      <HomePageContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play } from 'lucide-react';
+import { Play, PenLine, Heart } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
@@ -11,6 +11,8 @@ import { MessageType } from '@zync/shared-types';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { ReactionDetailsResponse } from '@/services/chat';
 import { reportMessage, reactMessage } from '@/services/chat';
+import { fetchPostsByAuthor, type Post } from '@/services/posts';
+import { useRouter } from 'next/navigation';
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -83,6 +85,90 @@ function PinMiniIcon() {
     <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
       <path d="M15 3l6 6-2 2-3-3-3 3v4l-2 2v-6l-5 5-2-2 5-5H3l2-2h4l3-3-3-3 2-2 6 6z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+// ==================== AUTHOR POSTS SECTION ====================
+
+interface ConversationItem {
+  _id: string;
+  name?: string;
+  avatarUrl?: string;
+  type: 'direct' | 'group';
+  updatedAt?: string;
+  createdBy?: string;
+  adminIds?: string[];
+  memberApprovalEnabled?: boolean;
+  removedFromGroup?: boolean;
+  memberCount?: number;
+  members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
+  online?: boolean;
+  active?: boolean;
+}
+
+interface AuthorPostsSectionProps {
+  conversation?: ConversationItem;
+  currentUserId?: string;
+}
+
+function AuthorPostsSection({ conversation, currentUserId }: AuthorPostsSectionProps) {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  // Lay authorId tu conversation (nguoi khac trong direct conversation)
+  const otherParticipant = conversation?.members?.find((m) => m._id !== currentUserId);
+  const authorId = otherParticipant?._id;
+
+  useEffect(() => {
+    if (!authorId || conversation?.type === 'group') return;
+
+    setLoading(true);
+    fetchPostsByAuthor(authorId, 3)
+      .then(setPosts)
+      .catch(() => {/* ignore */})
+      .finally(() => setLoading(false));
+  }, [authorId, conversation?.type]);
+
+  if (conversation?.type === 'group' || !authorId) return null;
+
+  return (
+    <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
+      <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary flex items-center gap-1.5">
+        <PenLine className="h-3.5 w-3.5" />
+        Bai viet gan day
+      </p>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="h-12 animate-pulse rounded-lg bg-bg-hover" />
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <p className="text-xs text-text-tertiary">Chua co bai viet nao</p>
+      ) : (
+        <div className="space-y-2">
+          {posts.map((post) => (
+            <button
+              key={post._id}
+              type="button"
+              onClick={() => router.push(`/community?postId=${post._id}`)}
+              className="block w-full rounded-lg border border-border bg-bg-hover p-3 text-left transition hover:border-accent"
+            >
+              <p className="line-clamp-2 text-sm text-text-primary">{post.title}</p>
+              <p className="mt-1 flex items-center gap-2 text-xs text-text-tertiary">
+                <Heart className="h-3 w-3" />
+                {post.likesCount}
+                <span className="mx-1">-</span>
+                <PenLine className="h-3 w-3" />
+                {post.commentsCount}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2202,7 +2288,11 @@ export function HomeDashboardChatPanel({
       />
 
       <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-border bg-bg-card shadow-lg">
-        <div className="h-full w-[300px] shrink-0 border-r border-border bg-bg-card hidden md:block">
+        <div className={`h-full shrink-0 border-r border-border bg-bg-card ${
+          selectedConversationId 
+            ? 'hidden md:block md:w-[300px]' 
+            : 'block w-full md:w-[300px]'
+        }`}>
           <ConversationList
             conversations={visibleConversations}
             selectedId={selectedConversationId}
@@ -2212,7 +2302,11 @@ export function HomeDashboardChatPanel({
           />
         </div>
 
-        <div className="h-full min-h-0 min-w-0 flex-1 overflow-hidden flex flex-col">
+        <div className={`h-full min-h-0 min-w-0 flex-1 overflow-hidden flex-col ${
+          selectedConversationId 
+            ? 'flex' 
+            : 'hidden md:flex'
+        }`}>
           <ChatPanel
             {...chatPanelProps}
             isGroupConversation={isGroupConversation}
@@ -2367,6 +2461,9 @@ export function HomeDashboardChatPanel({
                       )}
                       <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                     </div>
+
+                    {/* Bai viet cua nguoi dang chat - hien thi 3 bai viet gan nhat */}
+                    <AuthorPostsSection conversation={selectedConversation} currentUserId={chatPanelProps.currentUserId} />
                   </>
                 )}
 

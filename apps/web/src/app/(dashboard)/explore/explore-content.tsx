@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Zap,
   Server,
@@ -12,14 +13,18 @@ import {
   FolderOpen,
   Users,
   UserCheck,
+  UserPlus,
+  MessageCircle,
+  Check,
+  Loader2,
   Search,
   TrendingUp,
   Tag,
-  Loader2,
   Heart,
   MessageSquare,
   Eye,
   Link2,
+  Sparkles,
 } from 'lucide-react';
 import {
   fetchExploreChannels,
@@ -29,6 +34,9 @@ import {
 } from '@/services/explore';
 import { fetchTrendingPosts, type Post } from '@/services/posts';
 import type { GroupConversation } from '@/services/groups';
+import { useNavigationFlow } from '@/hooks/use-navigation-flow';
+import { UserProfileModal } from '@/components/shared/UserProfileModal';
+import { fetchFriends, fetchFriendRequests } from '@/services/friends';
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   frontend: Zap,
@@ -112,19 +120,42 @@ function ChannelCard({
   );
 }
 
-function UserCard({ user }: { user: DiscoverUser }) {
+function UserCard({
+  user,
+  onSendFriendRequest,
+  friendRequestLoading,
+  sentRequestIds,
+  friendIds,
+  currentUserId,
+  onOpenProfile,
+}: {
+  user: DiscoverUser;
+  onSendFriendRequest: (userId: string) => void;
+  friendRequestLoading: boolean;
+  sentRequestIds: Set<string>;
+  friendIds: Set<string>;
+  currentUserId?: string;
+  onOpenProfile?: (userId: string) => void;
+}) {
   const initials = user.displayName.slice(0, 2).toUpperCase();
+  const isMe = user.id === currentUserId;
+  const isFriend = friendIds.has(user.id);
+  const isSent = sentRequestIds.has(user.id);
+  const isLoading = friendRequestLoading && isSent;
 
   return (
     <div className="zync-soft-card rounded-[1.6rem] p-4 transition hover:shadow-md">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong">
+        <div 
+          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong cursor-pointer hover:opacity-80 transition"
+          onClick={() => onOpenProfile?.(user.id)}
+        >
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full rounded-full object-cover" />
           ) : initials}
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 cursor-pointer hover:opacity-80 transition" onClick={() => onOpenProfile?.(user.id)}>
           <p className="font-ui-title text-sm text-text-primary">{user.displayName}</p>
           {user.username && <p className="font-ui-content text-xs text-text-tertiary">@{user.username}</p>}
           {user.devRole && (
@@ -155,10 +186,50 @@ function UserCard({ user }: { user: DiscoverUser }) {
         </div>
       )}
 
-      <p className="mt-2.5 flex items-center gap-1 text-xs text-text-tertiary">
-        <Users className="h-3 w-3" />
-        {user.friendCount} kết nối
-      </p>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="flex items-center gap-1 text-xs text-text-tertiary">
+          <Users className="h-3 w-3" />
+          {user.friendCount} kết nối
+        </p>
+
+        {!isMe && (
+          <div className="flex items-center gap-2">
+            {isFriend ? (
+              <button
+                type="button"
+                onClick={() => onSendFriendRequest(user.id)}
+                className="zync-soft-button flex items-center gap-1.5 px-3 py-1.5 text-xs"
+              >
+                <MessageCircle className="h-3 w-3" />
+                Nhắn tin
+              </button>
+            ) : isSent ? (
+              <button
+                type="button"
+                disabled
+                className="flex items-center gap-1.5 rounded-full border border-border bg-bg-hover px-3 py-1.5 text-xs text-text-tertiary"
+              >
+                <Check className="h-3 w-3" />
+                Đã gửi
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSendFriendRequest(user.id)}
+                disabled={isLoading}
+                className="zync-soft-button-secondary flex items-center gap-1.5 px-3 py-1.5 text-xs"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <UserPlus className="h-3 w-3" />
+                )}
+                Kết bạn
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -188,6 +259,7 @@ const SECTION_TABS = [
 const POPULAR_TAGS = ['react', 'nodejs', 'typescript', 'python', 'devops', 'ai-ml', 'docker', 'nextjs', 'rust', 'golang'];
 
 export default function ExploreContent() {
+  const searchParams = useSearchParams();
   const [channels, setChannels] = useState<GroupConversation[]>([]);
   const [users, setUsers] = useState<DiscoverUser[]>([]);
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
@@ -196,18 +268,53 @@ export default function ExploreContent() {
   const [search, setSearch] = useState('');
   const [activeSection, setActiveSection] = useState<'channels' | 'developers' | 'posts'>('channels');
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
+  const [sentRequestIds, setSentRequestIds] = useState<Set<string>>(new Set());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [friendRequestLoading, setFriendRequestLoading] = useState(false);
+
+  // Doc skills filter tu URL params (tu onboarding)
+  const skillsFromUrl = searchParams.get('skills');
+  const suggestedSkills = skillsFromUrl ? skillsFromUrl.split(',').filter(Boolean) : [];
+
+  const { 
+    navigateToChat, 
+    sendFriendRequest, 
+    profileModalOpen, 
+    profileModalUserId, 
+    profileModalUser, 
+    profileModalLoading, 
+    openProfileModal, 
+    closeProfileModal 
+  } = useNavigationFlow();
+
+  // Lay current user tu localStorage (duoc set boi auth flow)
+  const currentUserId = (() => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const stored = localStorage.getItem('zync_user');
+      if (stored) {
+        const user = JSON.parse(stored);
+        return user._id || user.id;
+      }
+    } catch {/* ignore */}
+    return undefined;
+  })();
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [channelData, userData, postData] = await Promise.allSettled([
+      const [channelData, userData, postData, friendsData, requestsData] = await Promise.allSettled([
         fetchExploreChannels(),
         fetchDiscoverUsers(),
         fetchTrendingPosts(10),
+        fetchFriends(),
+        fetchFriendRequests(),
       ]);
       if (channelData.status === 'fulfilled') setChannels(channelData.value);
       if (userData.status === 'fulfilled') setUsers(userData.value);
       if (postData.status === 'fulfilled') setTrendingPosts(postData.value);
+      if (friendsData.status === 'fulfilled') setFriendIds(new Set(friendsData.value.friends.map((f) => f.id)));
+      if (requestsData.status === 'fulfilled') setSentRequestIds(new Set(requestsData.value.outgoing.map((r) => r.userId)));
     } finally {
       setLoading(false);
     }
@@ -225,13 +332,38 @@ export default function ExploreContent() {
     }
   };
 
+  const handleSendFriendRequest = async (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+
+    // Neu da la ban thi navigate to chat
+    if (friendIds.has(userId)) {
+      await navigateToChat(userId);
+      return;
+    }
+
+    setFriendRequestLoading(true);
+    try {
+      await sendFriendRequest(userId);
+      setSentRequestIds((prev) => new Set([...prev, userId]));
+    } catch {/* ignore */} finally {
+      setFriendRequestLoading(false);
+    }
+  };
+
   const filteredChannels = channels.filter((c) =>
     !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()),
   );
-  const filteredUsers = users.filter((u) =>
-    !search || u.displayName.toLowerCase().includes(search.toLowerCase()) ||
-    (u.skills ?? []).some((s) => s.toLowerCase().includes(search.toLowerCase())),
-  );
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch = !search || u.displayName.toLowerCase().includes(search.toLowerCase()) ||
+      (u.skills ?? []).some((s) => s.toLowerCase().includes(search.toLowerCase()));
+    // Neu co skills tu onboarding thi loc theo skills
+    if (suggestedSkills.length > 0) {
+      const userSkillsLower = (u.skills ?? []).map((s) => s.toLowerCase());
+      return matchesSearch && suggestedSkills.some((skill) => userSkillsLower.includes(skill.toLowerCase()));
+    }
+    return matchesSearch;
+  });
   const filteredPosts = trendingPosts.filter((p) =>
     !search || p.title.toLowerCase().includes(search.toLowerCase()),
   );
@@ -240,6 +372,25 @@ export default function ExploreContent() {
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header + Search */}
       <div className="border-b border-border-light px-4 py-4 sm:px-6">
+        {/* Banner goi y skills tu onboarding */}
+        {suggestedSkills.length > 0 && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-[1.2rem] border border-accent/30 bg-accent/5 p-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <p className="font-ui-meta text-xs text-text-secondary">
+                Đề xuất developer cùng tech stack với bạn:
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {suggestedSkills.slice(0, 3).map((skill) => (
+                <span key={skill} className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs text-accent-strong">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Khám phá</p>
@@ -333,7 +484,18 @@ export default function ExploreContent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {filteredUsers.map((user) => <UserCard key={user.id} user={user} />)}
+              {filteredUsers.map((user) => (
+                <UserCard
+                  key={user.id}
+                  user={user}
+                  onSendFriendRequest={handleSendFriendRequest}
+                  friendRequestLoading={friendRequestLoading}
+                  sentRequestIds={sentRequestIds}
+                  friendIds={friendIds}
+                  currentUserId={currentUserId}
+                  onOpenProfile={openProfileModal}
+                />
+              ))}
             </div>
           )
         ) : (
@@ -375,6 +537,22 @@ export default function ExploreContent() {
           </div>
         </div>
       )}
+
+      <UserProfileModal
+        visible={profileModalOpen}
+        userId={profileModalUserId}
+        user={profileModalUser || undefined}
+        loading={profileModalLoading}
+        currentUserId={currentUserId}
+        onClose={closeProfileModal}
+        onSendMessage={async (id) => {
+          await navigateToChat(id);
+          closeProfileModal();
+        }}
+        onSendFriendRequest={async (id) => {
+          await handleSendFriendRequest(id);
+        }}
+      />
     </div>
   );
 }

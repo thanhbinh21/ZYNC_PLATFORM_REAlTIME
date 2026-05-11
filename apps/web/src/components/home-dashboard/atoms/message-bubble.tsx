@@ -169,8 +169,8 @@ export function MessageBubble({
               title="Di den tin nhan goc"
             >
               <div className="flex items-center gap-1.5 mb-0.5">
-                <ReplyIcon className="w-3 h-3 text-[#0084ff] flex-shrink-0" />
-                <span className="text-[10px] uppercase tracking-wide font-semibold text-[#0084ff]">
+                <ReplyIcon className="w-3 h-3 text-accent flex-shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide font-semibold text-accent">
                   Tra loi
                 </span>
               </div>

@@ -6,7 +6,11 @@ export type NotificationType =
   | 'friend_accepted'
   | 'group_invite'
   | 'story_reaction'
-  | 'story_reply';
+  | 'story_reply'
+  | 'post_like'
+  | 'post_comment'
+  | 'post_bookmark'
+  | 'community_post';
 
 export interface INotification extends Document {
   userId: string;
@@ -25,7 +29,18 @@ const notificationSchema = new Schema<INotification>(
     userId: { type: String, required: true },
     type: {
       type: String,
-      enum: ['new_message', 'friend_request', 'friend_accepted', 'group_invite', 'story_reaction', 'story_reply'],
+      enum: [
+        'new_message',
+        'friend_request',
+        'friend_accepted',
+        'group_invite',
+        'story_reaction',
+        'story_reply',
+        'post_like',
+        'post_comment',
+        'post_bookmark',
+        'community_post',
+      ],
       required: true,
     },
     title: { type: String, required: true },

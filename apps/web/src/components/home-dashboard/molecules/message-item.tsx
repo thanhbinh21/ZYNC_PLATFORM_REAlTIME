@@ -560,7 +560,9 @@ export function MessageItem({
   return (
     <div
       ref={messageRef}
-      className={`group relative z-0 mb-2 flex flex-row items-start hover:z-20 ${
+      className={`group relative mb-2 flex flex-row items-start hover:z-20 ${
+        showMenu || showReactionPicker ? 'z-30' : 'z-0'
+      } ${
         isSender ? 'justify-end' : 'justify-start'
       }`}
       onContextMenu={handleContextMenu}

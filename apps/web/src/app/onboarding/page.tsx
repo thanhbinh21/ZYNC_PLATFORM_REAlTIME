@@ -17,6 +17,9 @@ import {
   Zap,
   MessageSquare,
   PenLine,
+  Search,
+  Home,
+  Sparkles,
 } from 'lucide-react';
 import { apiClient } from '@/services/api';
 import { PageLoading } from '@/components/shared/page-loading';
@@ -80,6 +83,7 @@ function OnboardingPageContent() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
 
   const [devRole, setDevRole] = useState('developer');
   const [bio, setBio] = useState('');
@@ -113,7 +117,8 @@ function OnboardingPageContent() {
         linkedinUrl: linkedinUrl || undefined,
         onboardingCompleted: true,
       });
-      router.push('/home');
+      // Hien man hinh hoan thanh thay vi redirect thang
+      setShowCompletion(true);
     } catch (error) {
       console.error('Failed to save onboarding data', error);
       alert('Có lỗi xảy ra, vui lòng thử lại.');
@@ -122,9 +127,86 @@ function OnboardingPageContent() {
     }
   };
 
+  const handleGoToExplore = () => {
+    // Redirect den Explore voi skills filter
+    const skillsParam = skills.slice(0, 5).join(',');
+    if (skillsParam) {
+      router.push(`/explore?skills=${encodeURIComponent(skillsParam)}`);
+    } else {
+      router.push('/explore');
+    }
+  };
+
+  const handleGoHome = () => {
+    router.push('/home');
+  };
+
   return (
     <div className="zync-page-shell min-h-screen px-4 py-8 sm:py-10">
       <div className="zync-page-container">
+        {showCompletion ? (
+          /* Man hinh hoan thanh onboarding */
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="zync-soft-card zync-soft-card-elevated mb-8 rounded-[2rem] p-8 sm:p-12">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-accent-light mx-auto">
+                <Sparkles className="h-10 w-10 text-accent" />
+              </div>
+              <h1 className="font-ui-title mb-3 text-3xl text-text-primary">
+                Chúc mừng bạn!
+              </h1>
+              <p className="font-ui-content mx-auto max-w-md text-base leading-7 text-text-secondary">
+                Hồ sơ của bạn đã được lưu thành công. Giờ đây bạn có thể khám phá cộng đồng developer và kết nối với những người cùng chí hướng.
+              </p>
+              {skills.length > 0 && (
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {skills.slice(0, 5).map((skill) => (
+                    <span key={skill} className="rounded-full border border-accent bg-accent-light px-3 py-1 text-xs text-accent-strong">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <h2 className="font-ui-title mb-6 text-xl text-text-primary">
+              Bạn muốn làm gì tiếp theo?
+            </h2>
+
+            <div className="grid w-full max-w-lg gap-4 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={handleGoToExplore}
+                className="zync-soft-card zync-soft-card-elevated flex flex-col items-center gap-3 rounded-[1.8rem] p-6 text-center transition hover:shadow-lg"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-light">
+                  <Search className="h-7 w-7 text-accent" />
+                </div>
+                <div>
+                  <p className="font-ui-title text-base text-text-primary">Khám phá Developer</p>
+                  <p className="font-ui-meta mt-1 text-xs text-text-secondary">
+                    Tìm developer cùng tech stack với bạn
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGoHome}
+                className="zync-soft-card zync-soft-card-elevated flex flex-col items-center gap-3 rounded-[1.8rem] p-6 text-center transition hover:shadow-lg"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-hover">
+                  <Home className="h-7 w-7 text-text-secondary" />
+                </div>
+                <div>
+                  <p className="font-ui-title text-base text-text-primary">Về Trang chủ</p>
+                  <p className="font-ui-meta mt-1 text-xs text-text-secondary">
+                    Khám phá tính năng chat và cộng đồng
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           {/* Left panel */}
           <section className="zync-soft-card zync-soft-card-elevated rounded-[2rem] p-6 sm:p-8">
@@ -373,6 +455,7 @@ function OnboardingPageContent() {
             </div>
           </section>
         </div>
+        )}
       </div>
     </div>
   );

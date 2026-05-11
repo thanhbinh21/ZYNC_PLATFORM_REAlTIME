@@ -92,6 +92,17 @@ export class PostRepository extends BaseRepository<Document> {
       .findByIdAndUpdate(postId, { $inc: { viewsCount: 1 } }, { new: true })
       .lean() as unknown as Document | null;
   }
+
+  /**
+   * Lay bai viet theo tac gia (dung cho Chat Info Panel)
+   */
+  async findByAuthor(authorId: string, limit: number = 3): Promise<Document[]> {
+    return this.model
+      .find({ authorId, status: 'published' })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean() as unknown as Document[];
+  }
 }
 
 /**

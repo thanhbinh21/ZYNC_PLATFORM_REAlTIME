@@ -111,6 +111,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (pathname.startsWith('/chat')) return 'chat';
     if (pathname.startsWith('/friends')) return 'friends';
     if (pathname.startsWith('/community')) return 'community';
+    if (pathname.startsWith('/explore')) return 'explore';
     if (pathname.startsWith('/settings')) return 'settings';
     return 'home';
   };
@@ -184,9 +185,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Suspense>
 
       <div className="flex-1 overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4">
-        <section className="zync-soft-card zync-soft-card-elevated flex h-full flex-1 flex-col overflow-hidden rounded-[2rem]">
+        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
           {children}
-        </section>
+        </div>
       </div>
 
       {/* Export settings functions for child pages via window */}

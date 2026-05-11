@@ -210,7 +210,11 @@ export default function CreateGroupScreen() {
 
       {/* Danh sach ban be */}
       {isLoading ? (
-        <ActivityIndicator size="large" color={lightTheme.accent} style={{ marginTop: 40 }} />
+        <View style={{ padding: 16, gap: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCardPreset key={i} lines={2} showAvatar />
+          ))}
+        </View>
       ) : (
         <FlatList
           data={filtered}

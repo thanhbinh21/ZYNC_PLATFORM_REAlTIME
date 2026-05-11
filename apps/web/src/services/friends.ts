@@ -1,5 +1,14 @@
 import { apiClient } from './api';
 
+export interface FriendRequestItem {
+  requestId: string;
+  userId: string;
+  displayName: string;
+  username?: string;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
 export interface FriendUser {
   id: string;
   username?: string;
@@ -7,14 +16,7 @@ export interface FriendUser {
   email?: string;
   avatarUrl?: string;
   bio?: string;
-}
-
-export interface FriendRequestItem {
-  requestId: string;
-  userId: string;
-  displayName: string;
-  avatarUrl?: string;
-  createdAt: string;
+  status?: 'online' | 'offline' | 'away';
 }
 
 export async function fetchFriends(cursor?: string): Promise<{ friends: FriendUser[]; nextCursor: string | null }> {

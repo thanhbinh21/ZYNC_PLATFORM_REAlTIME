@@ -19,6 +19,7 @@ import {
   X,
   Loader2,
   Globe,
+  Star,
 } from 'lucide-react';
 import {
   fetchFeed,
@@ -26,9 +27,15 @@ import {
   createPost,
   likePost,
   bookmarkPost,
+  favoritePost,
   type Post,
   type PostType,
 } from '@/services/posts';
+import { CommentPanel } from '@/components/community/organisms/CommentPanel';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { UserProfileModal } from '@/components/shared/UserProfileModal';
+import { useNavigationFlow } from '@/hooks/use-navigation-flow';
+import type { Comment } from '@/services/posts';
 
 interface PostTypeConfig {
   label: string;
@@ -166,22 +173,38 @@ function formatTimeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)} ngày trước`;
 }
 
-function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: string) => void; onBookmark: (id: string) => void }) {
+function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorClick }: { post: Post; onLike: (id: string) => void; onBookmark: (id: string) => void; onComment: (post: Post) => void; onFavorite: (id: string) => void; onAuthorClick?: (authorId: string, author: Post['author']) => void }) {
   const cfg = POST_TYPE_CONFIG[post.type] ?? POST_TYPE_CONFIG['discussion'];
   const TypeIcon = cfg.Icon;
   const authorInitials = post.author?.displayName?.slice(0, 2).toUpperCase() ?? '??';
 
   return (
-    <article className="zync-soft-card rounded-[1.6rem] p-5 transition hover:shadow-md">
+    <article className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-semibold text-accent-strong">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAuthorClick?.(post.authorId, post.author);
+          }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-semibold text-accent-strong transition-opacity hover:opacity-80"
+        >
           {post.author?.avatarUrl ? (
             <img src={post.author.avatarUrl} alt={post.author.displayName} className="h-full w-full object-cover" />
           ) : authorInitials}
-        </div>
+        </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-ui-title text-sm text-text-primary">{post.author?.displayName ?? 'Ẩn danh'}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAuthorClick?.(post.authorId, post.author);
+              }}
+              className="font-ui-title text-sm text-text-primary transition-colors hover:text-accent"
+            >
+              {post.author?.displayName ?? 'Ẩn danh'}
+            </button>
             {post.author?.devRole && (
               <span className="rounded-full bg-bg-hover px-2 py-0.5 text-xs text-text-tertiary">{post.author.devRole}</span>
             )}
@@ -194,7 +217,7 @@ function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: strin
         </div>
       </div>
 
-      <h3 className="font-ui-title mt-3 cursor-pointer text-base leading-snug text-text-primary hover:text-accent">{post.title}</h3>
+      <h3 className="font-ui-title mt-4 cursor-pointer text-lg leading-snug text-text-primary transition-colors group-hover:text-accent">{post.title}</h3>
       <p className="font-ui-content mt-1.5 line-clamp-3 text-sm leading-relaxed text-text-secondary">{post.content}</p>
 
       {post.tags.length > 0 && (
@@ -217,7 +240,10 @@ function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: strin
           <span>{post.likesCount}</span>
         </button>
 
-        <button className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary">
+        <button
+          onClick={() => onComment(post)}
+          className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary"
+        >
           <MessageSquare className="h-4 w-4" />
           <span>{post.commentsCount}</span>
         </button>
@@ -229,9 +255,17 @@ function PostCard({ post, onLike, onBookmark }: { post: Post; onLike: (id: strin
 
         <button
           onClick={() => onBookmark(post._id)}
-          className={`ml-auto flex items-center gap-1.5 text-sm transition ${post.isBookmarked ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
+          className={`flex items-center gap-1.5 text-sm transition ${post.isBookmarked ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
         >
           {post.isBookmarked ? <BookmarkCheck className="h-4 w-4 fill-current" /> : <Bookmark className="h-4 w-4" />}
+        </button>
+
+        <button
+          onClick={() => onFavorite(post._id)}
+          className={`ml-auto flex items-center gap-1.5 text-sm transition ${post.isFavorited ? 'text-yellow-500' : 'text-text-tertiary hover:text-yellow-500'}`}
+        >
+          <Star className={`h-4 w-4 ${post.isFavorited ? 'fill-current' : ''}`} />
+          <span>{post.favoritesCount ?? 0}</span>
         </button>
       </div>
     </article>
@@ -245,6 +279,19 @@ export default function CommunityContent() {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
+  // Navigation flow for author profile
+  const {
+    navigateToChat,
+    sendFriendRequest,
+    profileModalUserId,
+    profileModalOpen,
+    profileModalUser,
+    profileModalLoading,
+    openProfileModal,
+    closeProfileModal,
+  } = useNavigationFlow();
 
   const loadPosts = useCallback(async (tab: string, cursor?: string) => {
     setLoading(true);
@@ -289,10 +336,31 @@ export default function CommunityContent() {
     } catch {/* ignore */}
   };
   const handlePostCreated = (post: Post) => { setPosts((prev) => [post, ...prev]); setShowCreateForm(false); };
+  const handleComment = (post: Post) => { setSelectedPost(post); };
+  const handleCommentAdded = (comment: Comment) => {
+    if (!selectedPost) return;
+    setPosts((prev) => prev.map((p) => p._id === selectedPost._id ? { ...p, commentsCount: p.commentsCount + 1 } : p));
+  };
+  const handleFavorite = async (postId: string) => {
+    try {
+      const { favorited, favoritesCount } = await favoritePost(postId);
+      setPosts((prev) => prev.map((p) => p._id === postId ? { ...p, isFavorited: favorited, favoritesCount } : p));
+    } catch {/* ignore */}
+  };
+  const handleAuthorClick = (authorId: string) => {
+    void openProfileModal(authorId);
+  };
 
   return (
     <div className="flex h-full w-full overflow-hidden">
       {showCreateForm && <CreatePostForm onClose={() => setShowCreateForm(false)} onSuccess={handlePostCreated} />}
+      {selectedPost && (
+        <CommentPanel
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onCommentAdded={handleCommentAdded}
+        />
+      )}
 
       <div className="flex h-full w-full overflow-hidden">
         {/* Feed */}
@@ -347,26 +415,19 @@ export default function CommunityContent() {
                 ))}
               </div>
             ) : posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-border bg-bg-hover">
-                  <svg className="h-8 w-8 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    <line x1="9" y1="10" x2="15" y2="10"/>
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-ui-title text-base text-text-primary">Chưa có bài viết nào</p>
-                  <p className="font-ui-content mt-1.5 text-sm text-text-secondary">Hãy là người đầu tiên chia sẻ kiến thức!</p>
-                </div>
-                <button onClick={() => setShowCreateForm(true)} className="zync-soft-button mt-2 flex items-center gap-2 px-5 py-2.5 text-sm">
-                  <PenLine className="h-4 w-4" />
-                  Viết bài đầu tiên
-                </button>
+              <div className="flex flex-1 items-center justify-center">
+                <EmptyState
+                  variant="no-posts"
+                  action={{
+                    label: 'Viết bài đầu tiên',
+                    onClick: () => setShowCreateForm(true),
+                  }}
+                />
               </div>
             ) : (
               <div className="space-y-4">
                 {posts.map((post) => (
-                  <PostCard key={post._id} post={post} onLike={handleLike} onBookmark={handleBookmark} />
+                  <PostCard key={post._id} post={post} onLike={handleLike} onBookmark={handleBookmark} onComment={handleComment} onFavorite={handleFavorite} onAuthorClick={handleAuthorClick} />
                 ))}
                 {nextCursor && (
                   <button onClick={() => loadPosts(activeTab, nextCursor)} className="zync-soft-button-secondary mt-2 w-full py-2.5 text-sm">
@@ -387,13 +448,13 @@ export default function CommunityContent() {
             </h3>
           </div>
           {trendingPosts.length === 0 ? (
-            <div className="zync-soft-card-muted rounded-[1.4rem] p-4 text-center">
+            <div className="rounded-[1.4rem] border border-border bg-bg-card p-4 text-center">
               <p className="text-sm text-text-tertiary">Chưa có dữ liệu thịnh hành</p>
             </div>
           ) : (
             <div className="space-y-3">
               {trendingPosts.map((post, i) => (
-                <div key={post._id} className="zync-soft-card-muted rounded-[1.2rem] p-3">
+                <div key={post._id} className="group cursor-pointer rounded-[1.2rem] border border-transparent bg-bg-hover p-3 transition-all hover:border-accent/30 hover:bg-bg-active hover:shadow-sm">
                   <div className="flex items-start gap-2">
                     <span className="font-ui-title min-w-[1.2rem] text-lg text-accent-strong">{i + 1}</span>
                     <div className="min-w-0">
@@ -424,6 +485,17 @@ export default function CommunityContent() {
           </div>
         </aside>
       </div>
+
+      {/* Author Profile Modal */}
+      <UserProfileModal
+        visible={profileModalOpen}
+        userId={profileModalUserId}
+        user={profileModalUser ?? undefined}
+        loading={profileModalLoading}
+        onClose={closeProfileModal}
+        onSendMessage={(userId) => { void navigateToChat(userId); }}
+        onSendFriendRequest={sendFriendRequest}
+      />
     </div>
   );
 }

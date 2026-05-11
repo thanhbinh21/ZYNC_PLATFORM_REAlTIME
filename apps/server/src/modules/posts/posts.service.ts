@@ -2,8 +2,16 @@ import { Types } from 'mongoose';
 import { PostModel, type PostType } from './post.model';
 import { CommentModel } from './comment.model';
 import { UserModel } from '../users/user.model';
+import { FriendshipModel } from '../friends/friendship.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
 import { PostRepository, CommentRepository, postRepository, commentRepository } from '../../shared/repositories/post.repository';
+import {
+  notifyPostLiked,
+  notifyPostCommented,
+  notifyPostBookmarked,
+  notifyFriendsOfNewPost,
+} from '../notifications/notifications.service';
+import { logger } from '../../shared/logger';
 
 export interface PostAuthor {
   _id: string;
@@ -29,6 +37,8 @@ export interface PostSummary {
   viewsCount: number;
   isLiked?: boolean;
   isBookmarked?: boolean;
+  isFavorited?: boolean;
+  favoritesCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,6 +99,21 @@ export class PostsService {
     });
 
     const author = await enrichWithAuthor(authorId);
+
+    // Thong bao den ban be khi co bai viet moi
+    void (async () => {
+      try {
+        const friendships = await FriendshipModel.find({
+          userId: authorId,
+          status: 'accepted',
+        }).select('friendId').lean();
+        const friendIds = friendships.map((f) => f.friendId);
+        await notifyFriendsOfNewPost(authorId, post._id.toString(), input.title, input.type ?? 'discussion', friendIds);
+      } catch (err) {
+        logger.error('Failed to notify friends of new post', err);
+      }
+    })();
+
     return formatPost(post.toObject(), authorId, author);
   }
 
@@ -210,6 +235,26 @@ export class PostsService {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
     const result = await PostsService.postRepo.toggleLike(postId, userId);
     if (!result) throw new NotFoundError('Post not found');
+
+    // Gui thong bao neu la like (khong phai unlike)
+    if (result.liked) {
+      void (async () => {
+        try {
+          const post = await PostModel.findById(postId).select('authorId title').lean();
+          if (post) {
+            await notifyPostLiked(
+              post.authorId as string,
+              userId,
+              postId,
+              post.title as string,
+            );
+          }
+        } catch (err) {
+          logger.error('Failed to notify post liked', err);
+        }
+      })();
+    }
+
     return result;
   }
 
@@ -218,7 +263,47 @@ export class PostsService {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
     const result = await PostsService.postRepo.toggleBookmark(postId, userId);
     if (!result) throw new NotFoundError('Post not found');
+
+    // Gui thong bao neu la bookmark moi (khong phai remove bookmark)
+    if (result.bookmarked) {
+      void (async () => {
+        try {
+          const post = await PostModel.findById(postId).select('authorId title').lean();
+          if (post) {
+            await notifyPostBookmarked(
+              post.authorId as string,
+              userId,
+              postId,
+              post.title as string,
+            );
+          }
+        } catch (err) {
+          logger.error('Failed to notify post bookmarked', err);
+        }
+      })();
+    }
+
     return result;
+  }
+
+  /** Favorite toggle */
+  static async toggleFavorite(postId: string, userId: string): Promise<{ favorited: boolean; favoritesCount: number }> {
+    if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
+    const post = await PostModel.findById(postId);
+    if (!post) throw new NotFoundError('Post not found');
+
+    const alreadyFavorited = (post.favoritedBy as string[]).includes(userId);
+    if (alreadyFavorited) {
+      post.favoritedBy = (post.favoritedBy as string[]).filter((id) => id !== userId);
+    } else {
+      (post.favoritedBy as string[]).push(userId);
+    }
+    await post.save();
+
+    return {
+      favorited: !alreadyFavorited,
+      favoritesCount: (post.favoritedBy as string[]).length,
+    };
   }
 
   /** Them comment */
@@ -246,6 +331,24 @@ export class PostsService {
       { $inc: { commentsCount: 1 } },
     );
 
+    // Gui thong bao cho tac gia bai viet
+    void (async () => {
+      try {
+        const post = await PostModel.findById(postId).select('authorId title').lean();
+        if (post) {
+          await notifyPostCommented(
+            post.authorId as string,
+            authorId,
+            postId,
+            post.title as string,
+            input.content,
+          );
+        }
+      } catch (err) {
+        logger.error('Failed to notify post commented', err);
+      }
+    })();
+
     const author = await enrichWithAuthor(authorId);
     return formatComment(comment as unknown as Record<string, unknown>, authorId, author);
   }
@@ -267,6 +370,19 @@ export class PostsService {
         ? { _id: user._id.toString(), displayName: user.displayName as string, avatarUrl: user.avatarUrl as string | undefined }
         : undefined;
       return formatComment(c, requesterId, author);
+    });
+  }
+
+  /** Lay bai viet cua mot tac gia (dung cho Chat Info Panel) */
+  static async getPostsByAuthor(authorId: string, requesterId: string, limit = 3): Promise<PostSummary[]> {
+    const posts = await PostsService.postRepo.findByAuthor(authorId, limit);
+
+    const author = await enrichWithAuthor(authorId);
+
+    return posts.map((p) => {
+      const raw = p as unknown as Record<string, unknown>;
+      const user = author ? new Map([[author._id, author]]).get(raw['authorId'] as string) : undefined;
+      return formatPost(p, requesterId, user ?? author);
     });
   }
 }
@@ -294,6 +410,8 @@ function formatPost(
     viewsCount: (p['viewsCount'] as number) ?? 0,
     isLiked: ((p['likedBy'] as string[]) ?? []).includes(requesterId),
     isBookmarked: ((p['bookmarkedBy'] as string[]) ?? []).includes(requesterId),
+    isFavorited: ((p['favoritedBy'] as string[]) ?? []).includes(requesterId),
+    favoritesCount: (p['favoritesCount'] as number) ?? ((p['favoritedBy'] as string[]) ?? []).length,
     createdAt: (p['createdAt'] instanceof Date ? p['createdAt'] : new Date(p['createdAt'] as string)).toISOString(),
     updatedAt: (p['updatedAt'] instanceof Date ? p['updatedAt'] : new Date(p['updatedAt'] as string)).toISOString(),
   };

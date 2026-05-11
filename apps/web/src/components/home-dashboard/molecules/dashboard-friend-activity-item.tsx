@@ -59,7 +59,7 @@ export function DashboardFriendActivityItemRow({ item, onClick }: DashboardFrien
 
   return (
     <article
-      className="group flex cursor-pointer items-center gap-3 rounded-[1.1rem] border border-transparent px-3 py-2.5 transition-all hover:border-border hover:bg-white/65 active:scale-[0.99]"
+      className="group flex cursor-pointer items-center gap-3 rounded-[1.1rem] border border-transparent px-3 py-2.5 transition-all hover:border-border hover:bg-bg-hover active:scale-[0.99]"
       onClick={() => onClick?.(item)}
     >
       {/* Avatar với badge trạng thái */}

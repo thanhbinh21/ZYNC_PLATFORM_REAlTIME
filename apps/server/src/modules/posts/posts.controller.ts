@@ -69,6 +69,14 @@ export async function toggleBookmarkHandler(req: Request, res: Response, next: N
   } catch (err) { next(err); }
 }
 
+export async function toggleFavoriteHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const result = await PostsService.toggleFavorite(req.params['postId'] as string, userId);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 export async function addCommentHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId } = req as AuthRequest;
@@ -82,5 +90,21 @@ export async function getCommentsHandler(req: Request, res: Response, next: Next
     const { userId } = req as AuthRequest;
     const comments = await PostsService.getComments(req.params['postId'] as string, userId);
     res.json({ success: true, data: comments });
+  } catch (err) { next(err); }
+}
+
+export async function getPostsByAuthorHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const authorId = req.query['authorId'] as string | undefined;
+    const limit = Number(req.query['limit'] ?? 3);
+
+    if (!authorId) {
+      res.status(400).json({ success: false, error: 'authorId is required' });
+      return;
+    }
+
+    const posts = await PostsService.getPostsByAuthor(authorId, userId, limit);
+    res.json({ success: true, data: posts });
   } catch (err) { next(err); }
 }

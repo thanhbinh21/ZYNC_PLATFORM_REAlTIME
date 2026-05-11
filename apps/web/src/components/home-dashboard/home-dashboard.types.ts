@@ -14,7 +14,8 @@ export type DashboardIconName =
   | 'search'
   | 'bell'
   | 'gear'
-  | 'bag';
+  | 'bag'
+  | 'compass';
 
 export interface DashboardUserSummary {
   displayName: string;

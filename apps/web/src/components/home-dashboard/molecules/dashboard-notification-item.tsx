@@ -58,7 +58,7 @@ export function DashboardNotificationItemRow({ item, onClick }: DashboardNotific
 
   return (
     <article
-      className={`group grid cursor-pointer grid-cols-[auto_1fr] items-start gap-3 rounded-[1.2rem] border border-transparent px-3 py-3.5 transition-all hover:border-border hover:bg-white/65 active:scale-[0.99] ${
+      className={`group grid cursor-pointer grid-cols-[auto_1fr] items-start gap-3 rounded-[1.2rem] border border-transparent px-3 py-3.5 transition-all hover:border-border hover:bg-bg-hover active:scale-[0.99] ${
         !item.isRead ? 'bg-accent-light/30' : ''
       }`}
       onClick={() => onClick?.(item)}

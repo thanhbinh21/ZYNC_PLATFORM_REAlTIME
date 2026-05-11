@@ -1,8 +1,8 @@
 # ZYNC Platform: Unified Implementation Roadmap
 
 **Ngày lập:** 02/05/2026
-**Cập nhật lần cuối:** 05/05/2026
-**Mục tiêu:** Hoàn thiện tính năng Web/Mobile + Tích hợp AI thông minh.
+**Cập nhật lần cuối:** 11/05/2026
+**Mục tiêu:** Hoàn thiện tính năng Web/Mobile + Chuẩn hóa UI/UX + Tích hợp AI thông minh.
 
 ---
 
@@ -18,6 +18,11 @@
 | Phase N3: Explore & Discovery | ✅ Hoàn thành | |
 | **Phase X: Backend Refactoring** | **✅ Hoàn thành** | **04/05/2026** |
 | **Plan A: Feature Parity Web + Mobile** | ✅ Hoàn thành | 05/05/2026 |
+| **Plan D1: Unified Loading & Shared UI** | ✅ Hoàn thành | 11/05/2026 |
+| **Plan D2: Business Flow Linking** | ⏳ Sắp tới | ~16.5h |
+| **Plan D3: Code Refactoring** | ⏳ Sắp tới | ~24h |
+| **Plan D4: Backend & CSS Cleanup** | ⏳ Sắp tới | ~10h |
+| **Plan D5: Mobile Sync & APK Build** | ⏳ Sắp tới | ~10h |
 | Plan B: AI Features | ⏳ Sắp tới | ~45-55h |
 | Plan C: Optimization + Hardening | ⏳ Sắp tới | ~35-45h |
 | Phase R7: Production Deploy | ⏳ Sắp tới | |

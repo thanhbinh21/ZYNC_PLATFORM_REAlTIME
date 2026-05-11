@@ -68,6 +68,8 @@ export function DashboardHeader({
       router.push('/friends');
     } else if (id === 'community') {
       router.push('/community');
+    } else if (id === 'explore') {
+      router.push('/explore');
     } else if (id === 'profile') {
       router.push('/profile');
     } else if (id === 'settings') {
@@ -84,6 +86,7 @@ export function DashboardHeader({
       case 'chat': return '/chat';
       case 'friends': return '/friends';
       case 'community': return '/community';
+      case 'explore': return '/explore';
       default: return '#';
     }
   };

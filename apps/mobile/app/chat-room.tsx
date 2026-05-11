@@ -36,6 +36,10 @@ import { useMessagePreview } from '../src/hooks/useMessagePreview';
 import { MessagePreviewOverlay } from '../src/components/MessagePreviewOverlay';
 import { StickerPicker } from '../src/components/StickerPicker';
 import { ForwardModal } from '../src/components/ForwardModal';
+import {
+  SkeletonChatBubblePreset,
+  SkeletonAvatarPreset,
+} from '../src/ui/ZyncSkeleton';
 
 interface MessageReadParticipant {
   userId: string;
@@ -2558,8 +2562,11 @@ export default function ChatRoomScreen() {
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Đang tải tin nhắn...</Text>
+              <View style={{ gap: 16, width: '100%', padding: 16 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <SkeletonChatBubblePreset key={i} senderIsSelf={i % 2 === 1} />
+                ))}
+              </View>
             </View>
           ) : (
             <FlatList

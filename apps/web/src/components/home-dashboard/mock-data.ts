@@ -16,6 +16,7 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
     { id: 'chat', label: 'Trò chuyện', icon: 'chat' },
     { id: 'friends', label: 'Bạn bè', icon: 'friends' },
     { id: 'community', label: 'Cộng đồng', icon: 'group' },
+    { id: 'explore', label: 'Khám phá', icon: 'compass' },
   ],
   sideFooterItems: [
     { id: 'settings', label: 'Cài đặt', icon: 'settings' },

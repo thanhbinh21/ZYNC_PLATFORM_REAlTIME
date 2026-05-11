@@ -32,7 +32,10 @@ export const getOrCreateDirectConversationHandler = async (req: Request, res: Re
       return;
     }
 
-    const targetUserId = (req.body as { targetUserId?: string })?.targetUserId;
+    // Support both POST (body) and GET (query param)
+    const targetUserId = (req.body as { targetUserId?: string })?.targetUserId
+      ?? (req.query as { userId?: string }).userId;
+
     if (!targetUserId || typeof targetUserId !== 'string') {
       throw new BadRequestError('targetUserId is required');
     }

@@ -3,6 +3,7 @@ import { NotificationPreferenceModel, type INotificationPreference } from './not
 import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
+import { UserModel } from '../users/user.model';
 
 // ─── Cursor helpers ───
 
@@ -249,4 +250,122 @@ export async function updatePreferences(
     { upsert: true, new: true },
   );
   return updated!;
+}
+
+// ─── C1.14 – Notify post author when someone likes their post ───
+
+export async function notifyPostLiked(
+  postAuthorId: string,
+  likerId: string,
+  postId: string,
+  postTitle: string,
+): Promise<void> {
+  if (postAuthorId === likerId) return;
+  try {
+    const liker = await UserModel.findById(likerId).select('displayName').lean();
+    const likerName = (liker?.displayName as string) ?? 'Một developer';
+    await produceNotificationEvent({
+      userId: postAuthorId,
+      type: 'post_like',
+      title: 'Bài viết được yêu thích',
+      body: `${likerName} đã thích bài viết của bạn: "${postTitle.slice(0, 60)}${postTitle.length > 60 ? '…' : ''}"`,
+      fromUserId: likerId,
+      data: { postId, action: 'open_community' },
+    });
+  } catch (err) {
+    logger.error('Failed to notify post liked', err);
+  }
+}
+
+// ─── C1.15 – Notify post author when someone comments on their post ───
+
+export async function notifyPostCommented(
+  postAuthorId: string,
+  commenterId: string,
+  postId: string,
+  postTitle: string,
+  commentPreview: string,
+): Promise<void> {
+  if (postAuthorId === commenterId) return;
+  try {
+    const commenter = await UserModel.findById(commenterId).select('displayName').lean();
+    const commenterName = (commenter?.displayName as string) ?? 'Một developer';
+    const preview = commentPreview.slice(0, 80);
+    await produceNotificationEvent({
+      userId: postAuthorId,
+      type: 'post_comment',
+      title: 'Bình luận mới',
+      body: `${commenterName} đã bình luận: "${preview}${commentPreview.length > 80 ? '…' : ''}"`,
+      fromUserId: commenterId,
+      data: { postId, action: 'open_community' },
+    });
+  } catch (err) {
+    logger.error('Failed to notify post commented', err);
+  }
+}
+
+// ─── C1.16 – Notify post author when someone bookmarks their post ───
+
+export async function notifyPostBookmarked(
+  postAuthorId: string,
+  bookmarkerId: string,
+  postId: string,
+  postTitle: string,
+): Promise<void> {
+  if (postAuthorId === bookmarkerId) return;
+  try {
+    const bookmarker = await UserModel.findById(bookmarkerId).select('displayName').lean();
+    const bookmarkerName = (bookmarker?.displayName as string) ?? 'Một developer';
+    await produceNotificationEvent({
+      userId: postAuthorId,
+      type: 'post_bookmark',
+      title: 'Bài viết được lưu',
+      body: `${bookmarkerName} đã lưu bài viết của bạn: "${postTitle.slice(0, 50)}${postTitle.length > 50 ? '…' : ''}"`,
+      fromUserId: bookmarkerId,
+      data: { postId, action: 'open_community' },
+    });
+  } catch (err) {
+    logger.error('Failed to notify post bookmarked', err);
+  }
+}
+
+// ─── C1.17 – Notify all friends when user creates a community post ───
+
+export async function notifyFriendsOfNewPost(
+  authorId: string,
+  postId: string,
+  postTitle: string,
+  postType: string,
+  friendIds: string[],
+): Promise<void> {
+  if (friendIds.length === 0) return;
+  try {
+    const author = await UserModel.findById(authorId).select('displayName avatarUrl').lean();
+    const authorName = (author?.displayName as string) ?? 'Một developer';
+
+    const postTypeLabels: Record<string, string> = {
+      discussion: 'Thảo luận',
+      question: 'Câu hỏi',
+      til: 'TIL',
+      showcase: 'Showcase',
+      tutorial: 'Hướng dẫn',
+      job: 'Tuyển dụng',
+    };
+    const typeLabel = postTypeLabels[postType] ?? 'Bài viết';
+
+    await Promise.allSettled(
+      friendIds.map((friendId) =>
+        produceNotificationEvent({
+          userId: friendId,
+          type: 'community_post',
+          title: `${typeLabel} mới từ bạn bè`,
+          body: `${authorName} vừa đăng: "${postTitle.slice(0, 60)}${postTitle.length > 60 ? '…' : ''}"`,
+          fromUserId: authorId,
+          data: { postId, action: 'open_community' },
+        }),
+      ),
+    );
+  } catch (err) {
+    logger.error('Failed to notify friends of new post', err);
+  }
 }

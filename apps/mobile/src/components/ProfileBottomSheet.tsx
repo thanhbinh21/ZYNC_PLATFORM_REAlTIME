@@ -47,6 +47,15 @@ export function ProfileBottomSheet({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [friendRequestSent, setFriendRequestSent] = useState(false);
+
+  // Reset state when sheet closes or user changes
+  useEffect(() => {
+    if (!visible) {
+      setFriendRequestSent(false);
+      setActionLoading(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !userId) return;
@@ -58,7 +67,10 @@ export function ProfileBottomSheet({
     try {
       setLoading(true);
       const res = await api.get(`/users/${userId}`);
-      setProfile(res.data?.data || res.data);
+      const userData = res.data?.data || res.data;
+      setProfile(userData);
+      // Reset friend request state when profile loads
+      setFriendRequestSent(false);
     } catch (err) {
       console.error('Load profile failed:', err);
     } finally {
@@ -71,7 +83,7 @@ export function ProfileBottomSheet({
     try {
       setActionLoading(true);
       await api.post('/friends/request', { toUserId: userId });
-      void loadProfile();
+      setFriendRequestSent(true);
     } catch (err) {
       console.error('Send friend request failed:', err);
     } finally {
@@ -140,29 +152,34 @@ export function ProfileBottomSheet({
               {/* Actions */}
               {!isMe && (
                 <View style={styles.actions}>
-                  <TouchableOpacity
-                    style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
-                    onPress={() => {
-                      onSendMessage?.(profile._id);
-                      onClose();
-                    }}
-                  >
-                    <MessageCircle size={18} color={theme.textOnAccent} />
-                    <Text style={[styles.primaryBtnText, { color: theme.textOnAccent }]}>Nhắn tin</Text>
-                  </TouchableOpacity>
-
-                  {!profile.isFriend && (
+                  {profile.isFriend ? (
                     <TouchableOpacity
-                      style={[styles.secondaryBtn, { backgroundColor: theme.accentLight }]}
+                      style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+                      onPress={() => {
+                        onSendMessage?.(profile._id);
+                        onClose();
+                      }}
+                    >
+                      <MessageCircle size={18} color={theme.textOnAccent} />
+                      <Text style={[styles.primaryBtnText, { color: theme.textOnAccent }]}>Nhắn tin</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.primaryBtn,
+                        { backgroundColor: friendRequestSent ? theme.bgSecondary : theme.accent },
+                      ]}
                       onPress={handleSendFriendRequest}
-                      disabled={actionLoading}
+                      disabled={actionLoading || friendRequestSent}
                     >
                       {actionLoading ? (
-                        <ActivityIndicator size="small" color={theme.accent} />
+                        <ActivityIndicator size="small" color={theme.textOnAccent} />
                       ) : (
                         <>
-                          <UserPlus size={18} color={theme.accent} />
-                          <Text style={[styles.secondaryBtnText, { color: theme.accent }]}>Kết bạn</Text>
+                          <UserPlus size={18} color={theme.textOnAccent} />
+                          <Text style={[styles.primaryBtnText, { color: theme.textOnAccent }]}>
+                            {friendRequestSent ? 'Đã gửi' : 'Kết bạn'}
+                          </Text>
                         </>
                       )}
                     </TouchableOpacity>
