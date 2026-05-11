@@ -1810,7 +1810,7 @@ body.story-viewer-open {
 .chat-message-content {
   display: flex;
   flex-direction: column;
-  max-width: 65%;
+  max-width: 100%;
   min-width: 60px;
 }
 

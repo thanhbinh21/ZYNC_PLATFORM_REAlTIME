@@ -159,7 +159,7 @@ export function MessageBubble({
         )}
 
         {/* Bubble Wrapper with Relative Positioning */}
-        <div className="chat-bubble-wrapper">
+        <div className="chat-bubble-wrapper w-full">
           {/* Reply Quote */}
           {replyTo?.messageRef && (
             <button
@@ -279,7 +279,7 @@ export function MessageBubble({
 
           {/* Text Bubble */}
           {content && (
-            <div className={`${bubbleClass} ${bubbleModifiers} ${hasReactions ? 'chat-bubble-with-reaction' : ''}`}>
+            <div className={`${bubbleClass} ${bubbleModifiers} ${hasReactions ? 'chat-bubble-with-reaction' : ''} break-words`}>
               <p className="chat-bubble-text">{content}</p>
             </div>
           )}
