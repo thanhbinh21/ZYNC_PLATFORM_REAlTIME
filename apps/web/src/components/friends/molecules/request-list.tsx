@@ -65,7 +65,7 @@ export function RequestList({
         <section>
           <div className="mb-3 flex items-center gap-2">
             <h3 className="font-ui-title text-sm text-[var(--text-secondary)]">Lời mời đã nhận</h3>
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)]/10 px-1.5 text-xs font-semibold text-[var(--accent)]">
+            <span className="zync-soft-badge flex h-5 min-w-5 items-center justify-center px-1.5 text-xs">
               {incomingRequests.length}
             </span>
           </div>
@@ -73,7 +73,7 @@ export function RequestList({
             {incomingRequests.map((request) => (
               <article
                 key={request.requestId}
-                className="flex items-center gap-4 rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition-all hover:border-[var(--accent)]/30"
+                className="zync-soft-card flex items-center gap-4 p-4 transition-all hover:border-[var(--accent)]/30"
               >
                 <FriendsAvatar name={request.displayName} avatarUrl={request.avatarUrl} size="md" />
 
@@ -123,7 +123,7 @@ export function RequestList({
         <section>
           <div className="mb-3 flex items-center gap-2">
             <h3 className="font-ui-title text-sm text-[var(--text-secondary)]">Lời mời đã gửi</h3>
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--bg-hover)] px-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+            <span className="zync-soft-badge flex h-5 min-w-5 items-center justify-center bg-[var(--bg-hover)] px-1.5 text-xs text-[var(--text-secondary)]">
               {outgoingRequests.length}
             </span>
           </div>
@@ -131,7 +131,7 @@ export function RequestList({
             {outgoingRequests.map((request) => (
               <article
                 key={request.requestId}
-                className="flex items-center gap-4 rounded-2xl border border-border bg-[var(--surface-muted)]/50 p-4 transition-all"
+                className="zync-soft-card-muted flex items-center gap-4 p-4 transition-all"
               >
                 <FriendsAvatar name={request.displayName} avatarUrl={request.avatarUrl} size="md" />
 

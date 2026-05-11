@@ -33,6 +33,8 @@ import {
 } from '@/services/posts';
 import { CommentPanel } from '@/components/community/organisms/CommentPanel';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { UserProfileModal } from '@/components/shared/UserProfileModal';
+import { useNavigationFlow } from '@/hooks/use-navigation-flow';
 import type { Comment } from '@/services/posts';
 
 interface PostTypeConfig {
@@ -171,7 +173,7 @@ function formatTimeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)} ngày trước`;
 }
 
-function PostCard({ post, onLike, onBookmark, onComment, onFavorite }: { post: Post; onLike: (id: string) => void; onBookmark: (id: string) => void; onComment: (post: Post) => void; onFavorite: (id: string) => void }) {
+function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorClick }: { post: Post; onLike: (id: string) => void; onBookmark: (id: string) => void; onComment: (post: Post) => void; onFavorite: (id: string) => void; onAuthorClick?: (authorId: string, author: Post['author']) => void }) {
   const cfg = POST_TYPE_CONFIG[post.type] ?? POST_TYPE_CONFIG['discussion'];
   const TypeIcon = cfg.Icon;
   const authorInitials = post.author?.displayName?.slice(0, 2).toUpperCase() ?? '??';
@@ -179,14 +181,30 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite }: { post: P
   return (
     <article className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-semibold text-accent-strong">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAuthorClick?.(post.authorId, post.author);
+          }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-semibold text-accent-strong transition-opacity hover:opacity-80"
+        >
           {post.author?.avatarUrl ? (
             <img src={post.author.avatarUrl} alt={post.author.displayName} className="h-full w-full object-cover" />
           ) : authorInitials}
-        </div>
+        </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-ui-title text-sm text-text-primary">{post.author?.displayName ?? 'Ẩn danh'}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAuthorClick?.(post.authorId, post.author);
+              }}
+              className="font-ui-title text-sm text-text-primary transition-colors hover:text-accent"
+            >
+              {post.author?.displayName ?? 'Ẩn danh'}
+            </button>
             {post.author?.devRole && (
               <span className="rounded-full bg-bg-hover px-2 py-0.5 text-xs text-text-tertiary">{post.author.devRole}</span>
             )}
@@ -263,6 +281,18 @@ export default function CommunityContent() {
   const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
+  // Navigation flow for author profile
+  const {
+    navigateToChat,
+    sendFriendRequest,
+    profileModalUserId,
+    profileModalOpen,
+    profileModalUser,
+    profileModalLoading,
+    openProfileModal,
+    closeProfileModal,
+  } = useNavigationFlow();
+
   const loadPosts = useCallback(async (tab: string, cursor?: string) => {
     setLoading(true);
     try {
@@ -316,6 +346,9 @@ export default function CommunityContent() {
       const { favorited, favoritesCount } = await favoritePost(postId);
       setPosts((prev) => prev.map((p) => p._id === postId ? { ...p, isFavorited: favorited, favoritesCount } : p));
     } catch {/* ignore */}
+  };
+  const handleAuthorClick = (authorId: string) => {
+    void openProfileModal(authorId);
   };
 
   return (
@@ -394,7 +427,7 @@ export default function CommunityContent() {
             ) : (
               <div className="space-y-4">
                 {posts.map((post) => (
-                  <PostCard key={post._id} post={post} onLike={handleLike} onBookmark={handleBookmark} onComment={handleComment} onFavorite={handleFavorite} />
+                  <PostCard key={post._id} post={post} onLike={handleLike} onBookmark={handleBookmark} onComment={handleComment} onFavorite={handleFavorite} onAuthorClick={handleAuthorClick} />
                 ))}
                 {nextCursor && (
                   <button onClick={() => loadPosts(activeTab, nextCursor)} className="zync-soft-button-secondary mt-2 w-full py-2.5 text-sm">
@@ -452,6 +485,17 @@ export default function CommunityContent() {
           </div>
         </aside>
       </div>
+
+      {/* Author Profile Modal */}
+      <UserProfileModal
+        visible={profileModalOpen}
+        userId={profileModalUserId}
+        user={profileModalUser ?? undefined}
+        loading={profileModalLoading}
+        onClose={closeProfileModal}
+        onSendMessage={(userId) => { void navigateToChat(userId); }}
+        onSendFriendRequest={sendFriendRequest}
+      />
     </div>
   );
 }

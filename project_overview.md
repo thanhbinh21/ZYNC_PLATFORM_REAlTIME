@@ -521,6 +521,17 @@ npm run dev:web
 - [x] Thay thế các emoji text bằng icon từ `lucide-react` toàn hệ thống (sidebar, community, explore, onboarding)
 - [x] Bổ sung Navigation cho "Cộng đồng" và "Khám phá" vào Dashboard sidebar
 
+### Plan D2 – Liên kết Luồng Nghiệp vụ Chính ✅ <!-- done: 11/05/2026 -->
+
+| Mục tiêu | Mô tả | Trạng thái |
+|---|---|---|
+| D2.1 | Navigation Helper Hook (Web `use-navigation-flow.ts` + Mobile `useNavigationFlow.ts` + Backend GET `/api/conversations/direct`) | ✅ Hoàn thành |
+| D2.2 | Friends → Chat Quick Action (Web `friends-screen.tsx` + Mobile `friends.tsx` nút Nhắn tin) | ✅ Hoàn thành |
+| D2.3 | Community → Profile → Chat (Web `UserProfileModal` + Mobile `ProfileBottomSheet`) | ✅ Hoàn thành |
+| D2.4 | Explore → Friends/Chat Quick Actions (Web `explore-content.tsx` Developer Card CTA + Mobile DeveloperCard) | ✅ Hoàn thành |
+| D2.5 | Onboarding → Personalized Explore (Web redirect `/onboarding` → `/explore?skills=...`) | ✅ Hoàn thành |
+| D2.6 | Chat ↔ Community Cross-reference (Web Chat Info Panel hiện bài viết từ người đang chat + Home Dashboard activity clickable) | ✅ Hoàn thành |
+
 ### Phase N1 – Community Posts ✅ (Web only – Mobile ở Plan A)
 - [x] Xây dựng `PostModel` và `CommentModel` hỗ trợ reply threads, tags, likes, bookmarks
 - [x] Phát triển `PostsService` hỗ trợ CRUD, feed pagination và trending posts

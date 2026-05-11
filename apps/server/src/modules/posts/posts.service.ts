@@ -372,6 +372,19 @@ export class PostsService {
       return formatComment(c, requesterId, author);
     });
   }
+
+  /** Lay bai viet cua mot tac gia (dung cho Chat Info Panel) */
+  static async getPostsByAuthor(authorId: string, requesterId: string, limit = 3): Promise<PostSummary[]> {
+    const posts = await PostsService.postRepo.findByAuthor(authorId, limit);
+
+    const author = await enrichWithAuthor(authorId);
+
+    return posts.map((p) => {
+      const raw = p as unknown as Record<string, unknown>;
+      const user = author ? new Map([[author._id, author]]).get(raw['authorId'] as string) : undefined;
+      return formatPost(p, requesterId, user ?? author);
+    });
+  }
 }
 
 function formatPost(

@@ -105,3 +105,8 @@ export async function addComment(postId: string, content: string, parentId?: str
   const { data } = await apiClient.post<{ success: boolean; data: Comment }>(`/api/posts/${postId}/comments`, { content, parentId });
   return data.data;
 }
+
+export async function fetchPostsByAuthor(authorId: string, limit = 3): Promise<Post[]> {
+  const { data } = await apiClient.get<{ success: boolean; data: Post[] }>(`/api/posts/author?authorId=${encodeURIComponent(authorId)}&limit=${limit}`);
+  return data.data;
+}

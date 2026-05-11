@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Bell, CheckCircle2, Users, X } from 'lucide-react';
 import { FriendsTabNavigation } from '../atoms/friends-tab-navigation';
 import { FriendCard } from '../molecules/friend-card';
 import { RequestList } from '../molecules/request-list';
 import { SearchPanel } from '../molecules/search-panel';
+import { UserProfileModal } from '@/components/shared/UserProfileModal';
+import { useNavigationFlow } from '@/hooks/use-navigation-flow';
 import type { FriendUser } from '@/services/friends';
+import { ZyncSkeleton } from '@/components/shared/ZyncSkeleton';
 
 interface FriendsScreenProps {
   friends: FriendUser[];
@@ -74,10 +77,22 @@ export function FriendsScreen({
   onBlock,
   onUnblock,
 }: FriendsScreenProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>('all');
   const [showToast, setShowToast] = useState(true);
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
+
+  // Navigation flow hook
+  const {
+    navigateToChat,
+    chatLoading,
+    profileModalUserId,
+    profileModalOpen,
+    profileModalUser,
+    profileModalLoading,
+    openProfileModal,
+    closeProfileModal,
+  } = useNavigationFlow();
 
   // Sync tab from URL on mount
   useEffect(() => {
@@ -103,58 +118,69 @@ export function FriendsScreen({
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
-    router.push(`/friends?${params.toString()}`, { scroll: false });
+    // Use window.location for URL update to avoid router import
+    window.history.pushState({}, '', `/friends?${params.toString()}`);
   };
 
-  // Handle message action - navigate to chat
+  // Handle message action - navigate to chat via navigation flow
   const handleMessage = (friendId: string) => {
-    router.push(`/chat?conversation=${friendId}`);
+    void navigateToChat(friendId);
+  };
+
+  // Handle friend request after send - refresh profile modal + track sent request
+  const handleSendRequestFromModal = async (userId: string) => {
+    await onSendRequest(userId);
+    setSentRequests((prev) => new Set([...prev, userId]));
+    // Refresh profile data after sending request
+    void openProfileModal(userId);
   };
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
-      {/* Header */}
-      <header className="border-b border-border-light bg-[var(--surface-card)]/80 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Top row: Title + Notifications */}
-          <div className="flex items-start justify-between lg:flex-1">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--accent)] to-emerald-400 shadow-md shadow-[var(--accent)]/20">
-                <Users className="h-5 w-5 text-white" />
+      {/* Header - Topbar pattern */}
+      <header className="zync-soft-topbar">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            {/* Top row: Title + Notifications */}
+            <div className="flex items-start justify-between lg:flex-1">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-emerald-400 shadow-md shadow-[var(--accent)]/20">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-ui-title text-xl text-[var(--text-primary)] sm:text-2xl">
+                    Bạn bè
+                  </h1>
+                  <p className="font-ui-meta text-xs text-[var(--text-tertiary)] sm:text-sm">
+                    {friends.length} kết nối
+                    {pendingTotal > 0 && ` · ${pendingTotal} lời mời chờ`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="font-ui-title text-xl text-[var(--text-primary)] sm:text-2xl">
-                  Bạn bè
-                </h1>
-                <p className="font-ui-meta text-xs text-[var(--text-tertiary)] sm:text-sm">
-                  {friends.length} kết nối
-                  {pendingTotal > 0 && ` · ${pendingTotal} lời mời chờ`}
-                </p>
-              </div>
+
+              {/* Notification Badge */}
+              {pendingTotal > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('requests')}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:shadow-md lg:hidden"
+                  aria-label={`${pendingTotal} lời mời kết bạn`}
+                >
+                  <Bell className="h-5 w-5 text-[var(--accent)]" />
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow-sm">
+                    {pendingTotal > 9 ? '9+' : pendingTotal}
+                  </span>
+                </button>
+              )}
             </div>
 
-            {/* Notification Badge */}
-            {pendingTotal > 0 && (
-              <button
-                type="button"
-                onClick={() => handleTabChange('requests')}
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:shadow-md lg:hidden"
-                aria-label={`${pendingTotal} lời mời kết bạn`}
-              >
-                <Bell className="h-5 w-5 text-[var(--accent)]" />
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow-sm">
-                  {pendingTotal > 9 ? '9+' : pendingTotal}
-                </span>
-              </button>
-            )}
+            {/* Tab Navigation */}
+            <FriendsTabNavigation
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              pendingCount={pendingTotal}
+            />
           </div>
-
-          {/* Tab Navigation */}
-          <FriendsTabNavigation
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            pendingCount={pendingTotal}
-          />
         </div>
       </header>
 
@@ -190,20 +216,8 @@ export function FriendsScreen({
                   {/* Friends Grid */}
                   {isLoading ? (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                        <div
-                          key={i}
-                          className="animate-pulse rounded-2xl border border-border bg-[var(--surface-muted)]/50 p-4"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="h-14 w-14 rounded-full bg-[var(--bg-hover)]" />
-                            <div className="flex-1 space-y-2">
-                              <div className="h-4 w-24 rounded bg-[var(--bg-hover)]" />
-                              <div className="h-3 w-16 rounded bg-[var(--bg-hover)]" />
-                            </div>
-                          </div>
-                          <div className="mt-4 h-9 w-full rounded-full bg-[var(--bg-hover)]" />
-                        </div>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        <ZyncSkeleton key={i} variant="card" className="h-44" />
                       ))}
                     </div>
                   ) : (
@@ -330,6 +344,18 @@ export function FriendsScreen({
           )}
         </div>
       </main>
+
+      {/* Profile Modal */}
+      <UserProfileModal
+        visible={profileModalOpen}
+        userId={profileModalUserId}
+        user={profileModalUser ?? undefined}
+        loading={profileModalLoading}
+        onClose={closeProfileModal}
+        onSendMessage={(userId) => { void navigateToChat(userId); }}
+        onSendFriendRequest={handleSendRequestFromModal}
+        friendRequestSent={profileModalUserId ? sentRequests.has(profileModalUserId) : false}
+      />
     </div>
   );
 }

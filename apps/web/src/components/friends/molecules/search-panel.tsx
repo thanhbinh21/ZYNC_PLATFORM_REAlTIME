@@ -101,7 +101,7 @@ export function SearchPanel({
           {searchResults.map((user) => (
             <article
               key={user.id}
-              className="flex items-center gap-4 rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition-all hover:border-[var(--accent)]/30"
+              className="zync-soft-card flex items-center gap-4 p-4 transition-all hover:border-[var(--accent)]/30"
             >
               <FriendsAvatar name={user.displayName} avatarUrl={user.avatarUrl} size="md" />
 
@@ -137,7 +137,7 @@ export function SearchPanel({
 
       {/* Empty State */}
       {showEmpty && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-[var(--surface-muted)]/50 py-12 text-center">
+        <div className="zync-soft-card-muted flex flex-col items-center gap-3 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-hover)]">
             <UserX className="h-6 w-6 text-[var(--text-tertiary)]" />
           </div>
@@ -154,7 +154,7 @@ export function SearchPanel({
 
       {/* Initial State */}
       {!hasSearched && !isLoading && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-[var(--surface-muted)]/30 py-12 text-center">
+        <div className="zync-soft-card flex flex-col items-center gap-3 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)]/10">
             <Search className="h-6 w-6 text-[var(--accent)]" />
           </div>

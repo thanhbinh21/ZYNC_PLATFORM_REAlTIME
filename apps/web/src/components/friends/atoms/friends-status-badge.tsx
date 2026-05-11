@@ -16,7 +16,7 @@ export function FriendsStatusBadge({ status, size = 'md' }: FriendsStatusBadgePr
   const statusConfig = {
     online: {
       bg: 'bg-emerald-500',
-      shadow: 'shadow-[0_0_8px_rgba(16,185,129,0.5)]',
+      shadow: 'shadow-[0_0_8px_rgba(34,197,94,0.5)]',
       label: 'Trực tuyến',
     },
     away: {

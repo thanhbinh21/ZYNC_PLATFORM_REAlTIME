@@ -18,6 +18,8 @@ import api from '../../src/services/api';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
+import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
+import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
 
 interface Friend {
   _id: string;
@@ -41,6 +43,18 @@ interface FriendRequest {
 export default function FriendsScreen() {
   const userInfo = useAuthStore((s) => s.userInfo);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const currentUserId = (userInfo as any)?._id || (userInfo as any)?.id || '';
+
+  const {
+    navigateToChat,
+    chatLoading,
+    profileSheetUserId,
+    profileSheetOpen,
+    profileSheetUser,
+    profileSheetLoading,
+    openProfileSheet,
+    closeProfileSheet,
+  } = useNavigationFlow();
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -237,20 +251,34 @@ export default function FriendsScreen() {
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />
             }
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.friendItem}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{item.displayName.charAt(0).toUpperCase()}</Text>
-                </View>
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{item.displayName}</Text>
-                  <Text style={styles.friendStatus}>{item.status || 'Offline'}</Text>
-                </View>
-                <TouchableOpacity style={styles.callBtn}>
-                  <MessageCircle size={18} color={colors.accent} />
+            renderItem={({ item }) => {
+              const friendId = (item._id || item.id) as string;
+              return (
+                <TouchableOpacity
+                  style={styles.friendItem}
+                  onPress={() => { if (friendId) void openProfileSheet(friendId); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{item.displayName.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{item.displayName}</Text>
+                    <Text style={styles.friendStatus}>{item.status || 'Offline'}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.callBtn, chatLoading && styles.callBtnDisabled]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (friendId) void navigateToChat(friendId);
+                    }}
+                    disabled={chatLoading}
+                  >
+                    <MessageCircle size={18} color={colors.accent} />
+                  </TouchableOpacity>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            )}
+              );
+            }}
             ListEmptyComponent={
               <EmptyState variant="no-friends" />
             }
@@ -302,6 +330,15 @@ export default function FriendsScreen() {
           />
         )}
       </View>
+
+      {/* Profile Bottom Sheet */}
+      <ProfileBottomSheet
+        visible={profileSheetOpen}
+        userId={profileSheetUserId}
+        currentUserId={currentUserId}
+        onClose={closeProfileSheet}
+        onSendMessage={(userId) => { void navigateToChat(userId); }}
+      />
     </SafeAreaView>
    </LinearGradient>
   );
@@ -444,6 +481,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.glassSoft,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  callBtnDisabled: {
+    opacity: 0.5,
   },
   addFriendBtn: {
     width: 38,

@@ -12,6 +12,7 @@ import {
   toggleFavoriteHandler,
   addCommentHandler,
   getCommentsHandler,
+  getPostsByAuthorHandler,
 } from './posts.controller';
 
 export const postsRouter = Router();
@@ -50,3 +51,6 @@ postsRouter.post('/:postId/comments', addCommentHandler);
 
 // GET /api/posts/:postId/comments – Danh sách comments
 postsRouter.get('/:postId/comments', getCommentsHandler);
+
+// GET /api/posts/author – Lấy bài viết theo tác giả (Chat Info Panel)
+postsRouter.get('/author', getPostsByAuthorHandler);

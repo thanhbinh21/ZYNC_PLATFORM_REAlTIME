@@ -20,6 +20,9 @@ import { CreatePostSheet } from '../../src/components/CreatePostSheet';
 import { usePosts, type PostFilter } from '../../src/hooks/usePosts';
 import { SkeletonPostCardPreset } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
+import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
+import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 const FILTERS: { key: PostFilter; label: string }[] = [
   { key: 'latest', label: 'Moi nhat' },
@@ -32,6 +35,7 @@ export default function CommunityScreen() {
   const router = useRouter();
   const mode = useAppPreferencesStore((s) => s.theme);
   const theme = getAppTheme(mode);
+  const currentUserId = useAuthStore((s) => s.userInfo?._id) ?? '';
 
   const {
     posts,
@@ -47,6 +51,16 @@ export default function CommunityScreen() {
     handleLikePost,
     handleBookmarkPost,
   } = usePosts({ initialFilter: 'latest' });
+
+  const {
+    navigateToChat,
+    profileSheetUserId,
+    profileSheetOpen,
+    profileSheetUser,
+    profileSheetLoading,
+    openProfileSheet,
+    closeProfileSheet,
+  } = useNavigationFlow();
 
   const [showCreate, setShowCreate] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,6 +87,13 @@ export default function CommunityScreen() {
       await handleCreatePost(payload);
     },
     [handleCreatePost]
+  );
+
+  const handleAuthorPress = useCallback(
+    (authorId: string) => {
+      void openProfileSheet(authorId);
+    },
+    [openProfileSheet]
   );
 
   return (
@@ -121,6 +142,7 @@ export default function CommunityScreen() {
             onPress={handlePostPress}
             onLike={handleLikePost}
             onBookmark={handleBookmarkPost}
+            onAuthorPress={handleAuthorPress}
           />
         )}
         contentContainerStyle={styles.listContent}
@@ -163,6 +185,14 @@ export default function CommunityScreen() {
         visible={showCreate}
         onClose={() => setShowCreate(false)}
         onSubmit={handleCreateSubmit}
+      />
+
+      <ProfileBottomSheet
+        visible={profileSheetOpen}
+        userId={profileSheetUserId}
+        currentUserId={currentUserId}
+        onClose={closeProfileSheet}
+        onSendMessage={(userId) => { void navigateToChat(userId); }}
       />
     </SafeAreaView>
   );

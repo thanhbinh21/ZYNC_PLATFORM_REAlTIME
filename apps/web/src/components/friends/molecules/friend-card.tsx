@@ -87,13 +87,13 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-[var(--surface-card-strong)] shadow-lg shadow-black/10">
+              <div className="zync-glass-panel-strong absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl p-1">
                 {onMessage && (
                   <button
                     type="button"
                     onClick={handleMessage}
                     disabled={isLoading}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
                   >
                     <MessageSquare className="h-4 w-4" />
                     Nhắn tin
@@ -103,7 +103,7 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
                   type="button"
                   onClick={handleUnfriend}
                   disabled={isLoading}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-amber-600"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-amber-600"
                 >
                   <UserMinus className="h-4 w-4" />
                   Hủy kết bạn
@@ -112,7 +112,7 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
                   type="button"
                   onClick={handleBlock}
                   disabled={isLoading}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-red-500 transition-colors hover:bg-[var(--danger-bg)]"
                 >
                   <UserX className="h-4 w-4" />
                   Chặn người dùng
