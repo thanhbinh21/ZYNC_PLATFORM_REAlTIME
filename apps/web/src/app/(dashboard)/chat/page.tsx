@@ -110,8 +110,7 @@ export default function ChatPage() {
   }
 
   return (
-    <ZyncPageTransition>
-    <div className="relative flex h-full w-full min-h-0 min-w-0 flex-1">
+    <ZyncPageTransition className="relative flex h-full w-full min-h-0 min-w-0 flex-1">
       <HomeDashboardChatPanel
         conversations={conversations}
         selectedConversationId={selectedConversationId}
@@ -191,7 +190,6 @@ export default function ChatPage() {
           onSelectConversation(conversationId);
         }}
       />
-    </div>
     </ZyncPageTransition>
   );
 }

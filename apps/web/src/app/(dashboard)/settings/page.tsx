@@ -10,7 +10,7 @@ import type { DashboardAppearanceSettings } from '@/components/home-dashboard/or
 export default function SettingsPage() {
   return (
     <Suspense fallback={<PageLoading variant="settings" mode="panel" />}>
-      <ZyncPageTransition>
+      <ZyncPageTransition className="flex h-full w-full min-h-0 min-w-0 flex-1 flex-col">
         <SettingsPageContent />
       </ZyncPageTransition>
     </Suspense>

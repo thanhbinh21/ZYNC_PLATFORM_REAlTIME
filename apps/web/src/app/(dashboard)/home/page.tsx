@@ -105,8 +105,7 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
   };
 
   return (
-    <ZyncPageTransition>
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    <ZyncPageTransition className="flex h-full w-full flex-col overflow-hidden">
       <header className="border-b border-border-light px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -350,7 +349,6 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
           <div className="h-10 shrink-0" tabIndex={-1} />
         </div>
       </div>
-    </div>
     </ZyncPageTransition>
   );
 }
