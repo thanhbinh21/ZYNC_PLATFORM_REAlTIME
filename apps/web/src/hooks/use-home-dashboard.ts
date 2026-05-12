@@ -1206,6 +1206,7 @@ export function useHomeDashboard() {
           avatarUrl: notif.data?.avatarUrl,
           conversationId: notif.conversationId,
           fromUserId: notif.fromUserId,
+          postId: notif.data?.postId,
         }));
 
         // Transform friend activities
@@ -3011,6 +3012,7 @@ export function useHomeDashboard() {
         avatarUrl: notif.data?.avatarUrl,
         conversationId: notif.conversationId,
         fromUserId: notif.fromUserId,
+        postId: notif.data?.postId,
       }));
 
       setData(prev => ({

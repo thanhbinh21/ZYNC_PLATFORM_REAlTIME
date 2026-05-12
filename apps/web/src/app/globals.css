@@ -282,6 +282,15 @@ html {
 	box-shadow: var(--shadow-sm);
 }
 
+/* Header notification dropdown — opaque enough to read over dashboard content */
+.zync-notification-panel {
+	border: 1px solid var(--border-light);
+	background: var(--surface-card-strong);
+	backdrop-filter: blur(18px) saturate(160%);
+	-webkit-backdrop-filter: blur(18px) saturate(160%);
+	box-shadow: var(--shadow-md);
+}
+
 .zync-soft-kicker {
 	display: inline-flex;
 	align-items: center;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { Bell, Check, CheckCheck, MessageCircle, Settings, UserCheck, Users, X } from 'lucide-react';
+import { Bell, Bookmark, Check, Heart, MessageCircle, Settings, UserCheck, Users, X } from 'lucide-react';
 import type { Notification } from '@/services/notifications';
 
 interface NotificationPanelProps {
@@ -23,6 +23,10 @@ const TYPE_ICONS: Record<Notification['type'], React.ElementType> = {
   group_invite: Users,
   story_reaction: Check,
   story_reply: MessageCircle,
+  post_like: Heart,
+  post_comment: MessageCircle,
+  post_bookmark: Bookmark,
+  community_post: MessageCircle,
 };
 
 function relativeTime(dateStr: string): string {
@@ -80,7 +84,7 @@ export function NotificationPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[1.6rem] zync-soft-glass"
+      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[1.6rem] zync-notification-panel"
       style={{ animation: 'panelSlide 0.2s ease-out' }}
       role="dialog"
       aria-label="Danh sách thông báo"

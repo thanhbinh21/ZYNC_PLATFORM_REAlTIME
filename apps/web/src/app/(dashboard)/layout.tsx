@@ -153,6 +153,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
+    if (
+      notification.type === 'community_post' ||
+      notification.data?.action === 'open_community'
+    ) {
+      const postId = notification.data?.postId;
+      router.push(postId ? `/community?post=${encodeURIComponent(postId)}` : '/community');
+      return;
+    }
+
+    if (
+      notification.type === 'post_like' ||
+      notification.type === 'post_comment' ||
+      notification.type === 'post_bookmark'
+    ) {
+      const postId = notification.data?.postId;
+      router.push(postId ? `/community?post=${encodeURIComponent(postId)}` : '/community');
+      return;
+    }
+
     router.push('/home');
   };
 

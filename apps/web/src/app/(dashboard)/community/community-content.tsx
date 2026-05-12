@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   MessageCircle,
   HelpCircle,
@@ -28,6 +29,7 @@ import {
   likePost,
   bookmarkPost,
   favoritePost,
+  fetchPostById,
   type Post,
   type PostType,
 } from '@/services/posts';
@@ -179,7 +181,10 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
   const authorInitials = post.author?.displayName?.slice(0, 2).toUpperCase() ?? '??';
 
   return (
-    <article className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40">
+    <article
+      id={`community-post-${post._id}`}
+      className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40"
+    >
       <div className="flex items-start gap-3">
         <button
           type="button"
@@ -273,6 +278,11 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
 }
 
 export default function CommunityContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const postIdFromQuery = searchParams.get('post') ?? searchParams.get('postId');
+  const deepLinkTargetRef = useRef<string | null>(null);
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<string>('feed');
@@ -321,6 +331,51 @@ export default function CommunityContent() {
   }, []);
 
   useEffect(() => { loadPosts('feed'); loadTrending(); }, [loadPosts, loadTrending]);
+
+  /** Open feed post from ?post= (e.g. thông báo bài viết cộng đồng) */
+  useEffect(() => {
+    if (!postIdFromQuery || loading) return;
+    if (deepLinkTargetRef.current === postIdFromQuery) return;
+
+    let cancelled = false;
+
+    const open = async () => {
+      try {
+        setActiveTab('feed');
+        const inFeed = posts.some((p) => p._id === postIdFromQuery);
+        let target: Post;
+        if (inFeed) {
+          target = posts.find((p) => p._id === postIdFromQuery)!;
+        } else {
+          target = await fetchPostById(postIdFromQuery);
+          if (cancelled) return;
+          setPosts((prev) => (prev.some((p) => p._id === target._id) ? prev : [target, ...prev]));
+        }
+        if (cancelled) return;
+        deepLinkTargetRef.current = postIdFromQuery;
+        setSelectedPost(target);
+        router.replace('/community', { scroll: false });
+        window.setTimeout(() => {
+          document.getElementById(`community-post-${target._id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+      } catch {
+        if (!cancelled) {
+          router.replace('/community', { scroll: false });
+        }
+      }
+    };
+
+    void open();
+    return () => {
+      cancelled = true;
+    };
+  }, [postIdFromQuery, loading, posts, router]);
+
+  useEffect(() => {
+    if (!postIdFromQuery) {
+      deepLinkTargetRef.current = null;
+    }
+  }, [postIdFromQuery]);
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setNextCursor(undefined); loadPosts(tab); };
   const handleLike = async (postId: string) => {

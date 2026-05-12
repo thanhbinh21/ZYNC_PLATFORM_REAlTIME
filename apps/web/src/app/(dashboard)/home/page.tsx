@@ -74,6 +74,16 @@ const handleNotificationClick = (item: typeof data.notifications[0]) => {
         router.push('/stories');
       }
       break;
+    case 'community_post':
+    case 'post_like':
+    case 'post_comment':
+    case 'post_bookmark':
+      if (item.postId) {
+        router.push(`/community?post=${encodeURIComponent(item.postId)}`);
+      } else {
+        router.push('/community');
+      }
+      break;
     default:
       router.push('/notifications');
   }
