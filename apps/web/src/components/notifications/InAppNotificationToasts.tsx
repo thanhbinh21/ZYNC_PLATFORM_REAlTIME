@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { getSocket } from '@/services/socket';
 import { getAccessToken } from '@/utils/auth-token';
@@ -42,6 +43,7 @@ function timeLabel(ts: number): string {
 export function InAppNotificationToasts() {
   const router = useRouter();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<ToastItem[]>([]);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const overflowCountRef = useRef<number>(0);
@@ -98,6 +100,10 @@ export function InAppNotificationToasts() {
   const openNotificationsFromSummary = useCallback(() => {
     router.push('/home?openNotifications=1');
   }, [router]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -212,10 +218,10 @@ export function InAppNotificationToasts() {
     });
   }, [dismiss, items, navigateFrom, openNotificationsFromSummary]);
 
-  if (items.length === 0) return null;
+  if (!mounted || items.length === 0) return null;
 
-  return (
-    <div className="pointer-events-none fixed left-0 right-0 top-4 z-[110] flex flex-col items-center gap-2 px-4">
+  return createPortal(
+    <div className="pointer-events-none fixed left-0 right-0 top-4 z-[9999] flex flex-col items-center gap-2 px-4">
       {rendered}
       <style jsx>{`
         @keyframes toastDrop {
@@ -223,7 +229,8 @@ export function InAppNotificationToasts() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

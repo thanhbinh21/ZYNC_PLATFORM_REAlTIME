@@ -3025,6 +3025,45 @@ export function useHomeDashboard() {
     }
   }, []);
 
+  // Đồng bộ khung "Thông báo" ở /home (và dữ liệu dashboard) khi server đẩy new_notification
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const socket = getSocket(token);
+    const onNewNotification = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        debounce = null;
+        void refreshNotifications();
+      }, 200);
+    };
+
+    socket.on('new_notification', onNewNotification);
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      socket.off('new_notification', onNewNotification);
+    };
+  }, [refreshNotifications]);
+
+  useEffect(() => {
+    const onCustomRefresh = () => {
+      void refreshNotifications();
+    };
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void refreshNotifications();
+      }
+    };
+    window.addEventListener('zync:focus-refresh-notifications', onCustomRefresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('zync:focus-refresh-notifications', onCustomRefresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshNotifications]);
+
   return {
     data,
     loading,

@@ -242,7 +242,7 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {data.notifications.slice(0, 5).map((item) => (
+                    {data.notifications.slice(0, 8).map((item) => (
                       <DashboardNotificationItemRow
                         key={item.id}
                         item={item}
