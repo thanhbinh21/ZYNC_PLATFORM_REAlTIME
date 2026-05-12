@@ -88,9 +88,10 @@ export default function ChatPage() {
     conversations,
   });
 
-  // Deep link support from in-app toast: /chat?conversationId=...
+  // Deep link: /chat?conversationId=... (alias: ?conversation= for legacy links)
   useEffect(() => {
-    const conversationId = searchParams.get('conversationId');
+    const conversationId =
+      searchParams.get('conversationId') ?? searchParams.get('conversation');
     if (!conversationId) return;
 
     onSelectConversation(conversationId);

@@ -97,10 +97,10 @@ export function NotificationPanel({
             </button>
           )}
           <button type="button" onClick={onOpenSettings} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Cài đặt thông báo">
-            <Settings className="h-4 w-4" />
+            <Settings className="h-4 w-4 shrink-0" aria-hidden />
           </button>
           <button type="button" onClick={onClose} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Đóng">
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 shrink-0" aria-hidden />
           </button>
         </div>
       </div>

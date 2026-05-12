@@ -448,6 +448,13 @@ html {
 	color: var(--text-primary);
 }
 
+/* Icon-only ghost buttons: shared soft-button rule sets padding that collapses small fixed squares */
+.zync-soft-button-ghost.h-8.w-8,
+.zync-soft-button-ghost.h-9.w-9,
+.zync-soft-button-ghost.h-10.w-10 {
+	padding: 0;
+}
+
 .zync-soft-button-danger {
 	border: 1px solid var(--danger-border);
 	background: var(--danger-bg);

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import type { DashboardHomeMockData } from '../home-dashboard/home-dashboard.types';
-import { DashboardIcon } from '../home-dashboard/atoms/dashboard-icon';
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import type { DashboardHomeMockData } from "../home-dashboard/home-dashboard.types";
+import { DashboardIcon } from "../home-dashboard/atoms/dashboard-icon";
 
 interface DashboardHeaderProps {
   data: DashboardHomeMockData;
@@ -40,40 +40,40 @@ export function DashboardHeader({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setIsProfileMenuOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isProfileMenuOpen]);
 
   const handleSelectNav = (id: string) => {
-    if (id === 'logout') {
+    if (id === "logout") {
       onNavSelect?.(id);
       setIsMobileMenuOpen(false);
       setIsProfileMenuOpen(false);
       return;
     }
-    if (id === 'home') {
-      router.push('/home');
-    } else if (id === 'chat') {
-      router.push('/chat');
-    } else if (id === 'friends') {
-      router.push('/friends');
-    } else if (id === 'community') {
-      router.push('/community');
-    } else if (id === 'explore') {
-      router.push('/explore');
-    } else if (id === 'profile') {
-      router.push('/profile');
-    } else if (id === 'settings') {
-      router.push('/settings');
+    if (id === "home") {
+      router.push("/home");
+    } else if (id === "chat") {
+      router.push("/chat");
+    } else if (id === "friends") {
+      router.push("/friends");
+    } else if (id === "community") {
+      router.push("/community");
+    } else if (id === "explore") {
+      router.push("/explore");
+    } else if (id === "profile") {
+      router.push("/profile");
+    } else if (id === "settings") {
+      router.push("/settings");
     }
     onNavSelect?.(id);
     setIsMobileMenuOpen(false);
@@ -82,12 +82,18 @@ export function DashboardHeader({
 
   const getNavHref = (id: string): string => {
     switch (id) {
-      case 'home': return '/home';
-      case 'chat': return '/chat';
-      case 'friends': return '/friends';
-      case 'community': return '/community';
-      case 'explore': return '/explore';
-      default: return '#';
+      case "home":
+        return "/home";
+      case "chat":
+        return "/chat";
+      case "friends":
+        return "/friends";
+      case "community":
+        return "/community";
+      case "explore":
+        return "/explore";
+      default:
+        return "#";
     }
   };
 
@@ -98,11 +104,22 @@ export function DashboardHeader({
           <div className="flex items-center gap-4 lg:gap-6">
             <div className="flex items-center gap-3">
               <span className="relative block h-10 w-10 overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-sm">
-                <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
+                <Image
+                  src="/logo.png"
+                  alt="Logo Zync"
+                  fill
+                  className="object-cover"
+                  sizes="40px"
+                  priority
+                />
               </span>
               <div className="hidden sm:block">
-                <p className="font-ui-brand text-xl leading-none text-text-primary">{data.brand}</p>
-                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">Cộng đồng nhà phát triển</p>
+                <p className="font-ui-brand text-xl leading-none text-text-primary">
+                  {data.brand}
+                </p>
+                <p className="font-ui-meta mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">
+                  Cộng đồng nhà phát triển
+                </p>
               </div>
             </div>
 
@@ -113,8 +130,8 @@ export function DashboardHeader({
                   href={getNavHref(item.id)}
                   className={`rounded-full px-4 py-2 text-[0.95rem] font-ui-brand transition ${
                     activeNavId === item.id
-                      ? 'bg-accent text-[var(--bg-primary)] shadow-sm font-ui-title'
-                      : 'border border-border bg-[var(--surface-glass)] text-text-primary hover:bg-[var(--surface-glass-strong)]'
+                      ? "bg-accent text-[var(--bg-primary)] shadow-sm font-ui-title"
+                      : "border border-border bg-[var(--surface-glass)] text-text-primary hover:bg-[var(--surface-glass-strong)]"
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -130,11 +147,14 @@ export function DashboardHeader({
             <button
               type="button"
               onClick={onToggleTheme}
-              className={`zync-soft-badge hidden items-center gap-2 text-xs sm:inline-flex ${theme === 'dark' ? 'zync-soft-badge-active' : ''}`}
+              className={`zync-soft-badge hidden items-center gap-2 text-xs sm:inline-flex ${theme === "dark" ? "zync-soft-badge-active" : ""}`}
               title="Chuyển đổi giao diện"
             >
-              <DashboardIcon name={theme === 'dark' ? 'sun' : 'moon'} className="h-4 w-4" />
-              {theme === 'dark' ? 'Sáng' : 'Tối'}
+              <DashboardIcon
+                name={theme === "dark" ? "sun" : "moon"}
+                className="h-4 w-4"
+              />
+              {theme === "dark" ? "Sáng" : "Tối"}
             </button>
 
             {notificationSlot ?? (
@@ -155,7 +175,13 @@ export function DashboardHeader({
               >
                 <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent-light text-xs font-semibold text-accent-strong">
                   {data.user.avatarUrl ? (
-                    <Image src={data.user.avatarUrl} alt={data.user.displayName} width={32} height={32} className="h-full w-full object-cover" />
+                    <Image
+                      src={data.user.avatarUrl}
+                      alt={data.user.displayName}
+                      width={32}
+                      height={32}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     data.user.initials
                   )}
@@ -174,23 +200,26 @@ export function DashboardHeader({
                   <div className="space-y-1">
                     <button
                       type="button"
-                      onClick={() => handleSelectNav('profile')}
+                      onClick={() => handleSelectNav("profile")}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-text-primary transition hover:bg-[var(--bg-hover)]"
                       role="menuitem"
                     >
                       <DashboardIcon name="profile" className="h-4 w-4" />
                       <span className="font-ui-content">Hồ sơ</span>
                     </button>
-                    <div className="my-1 h-px w-full bg-border" aria-hidden="true" />
+                    <div
+                      className="my-1 h-px w-full bg-border"
+                      aria-hidden="true"
+                    />
                     {data.sideFooterItems.map((item) => (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => handleSelectNav(item.id)}
                         className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${
-                          item.id === 'logout'
-                            ? 'text-[var(--danger-text)] hover:bg-[var(--danger-bg)]'
-                            : 'text-text-primary hover:bg-[var(--bg-hover)]'
+                          item.id === "logout"
+                            ? "text-[var(--danger-text)] hover:bg-[var(--danger-bg)]"
+                            : "text-text-primary hover:bg-[var(--bg-hover)]"
                         }`}
                         role="menuitem"
                       >
@@ -208,7 +237,14 @@ export function DashboardHeader({
               onClick={() => setIsMobileMenuOpen(true)}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary md:hidden"
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+              >
                 <path d="M4 7h16" />
                 <path d="M4 12h16" />
                 <path d="M4 17h16" />
@@ -219,14 +255,25 @@ export function DashboardHeader({
       </header>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
-          <aside className="absolute right-3 top-3 bottom-3 w-[min(82vw,320px)] rounded-[1.8rem] zync-soft-card zync-soft-card-elevated p-5" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 bg-black/40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          <aside
+            className="absolute right-3 top-3 bottom-3 w-[min(82vw,320px)] rounded-[1.8rem] zync-soft-card zync-soft-card-elevated p-5"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <span className="zync-soft-kicker">Điều hướng</span>
-                <p className="font-ui-title mt-3 text-lg text-text-primary">Menu workspace</p>
+                <p className="font-ui-title mt-3 text-lg text-text-primary">
+                  Menu workspace
+                </p>
               </div>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="zync-soft-button-ghost h-10 w-10 p-0 text-base">
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="zync-soft-button-ghost h-10 w-10 p-0 text-base"
+              >
                 <span className="font-ui-content text-xs">Đóng</span>
               </button>
             </div>
@@ -238,11 +285,14 @@ export function DashboardHeader({
                   onClick={() => handleSelectNav(item.id)}
                   className={`flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left text-sm font-ui-brand transition ${
                     activeNavId === item.id
-                      ? 'bg-accent text-[var(--bg-primary)] shadow-sm font-ui-title'
-                      : 'border border-border bg-[var(--surface-glass)] text-text-primary'
+                      ? "bg-accent text-[var(--bg-primary)] shadow-sm font-ui-title"
+                      : "border border-border bg-[var(--surface-glass)] text-text-primary"
                   }`}
                 >
-                  <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" />
+                  <DashboardIcon
+                    name={item.icon}
+                    className="h-[18px] w-[18px]"
+                  />
                   {item.label}
                 </button>
               ))}

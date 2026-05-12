@@ -30,7 +30,7 @@ const FolderOpen = LucideFolderOpen as any;
 
 function HomePageContent(): React.JSX.Element {
   const router = useRouter();
-  const { data, onSelectConversation } = useHomeDashboard();
+  const { data } = useHomeDashboard();
   const mockData = DASHBOARD_HOME_MOCK_DATA;
 
 /**
@@ -38,8 +38,7 @@ function HomePageContent(): React.JSX.Element {
  */
 const handleActivityClick = (item: typeof data.activities[0]) => {
   if (item.conversationId) {
-    // Đi đến chat và select conversation
-    router.push(`/chat?conversation=${item.conversationId}`);
+    router.push(`/chat?conversationId=${encodeURIComponent(item.conversationId)}`);
   }
 };
 
@@ -49,9 +48,10 @@ const handleActivityClick = (item: typeof data.activities[0]) => {
 const handleNotificationClick = (item: typeof data.notifications[0]) => {
   switch (item.type) {
     case 'new_message':
-      // Đi đến đúng conversation và highlight tin nhắn mới nhất
       if (item.conversationId) {
-        router.push(`/chat?conversation=${item.conversationId}&highlight=new`);
+        router.push(
+          `/chat?conversationId=${encodeURIComponent(item.conversationId)}&highlight=new`
+        );
       } else {
         router.push('/chat');
       }
