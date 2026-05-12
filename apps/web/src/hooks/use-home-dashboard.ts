@@ -1126,7 +1126,8 @@ export function useHomeDashboard() {
         }
         setFriendsForGroup(allFriends);
 
-        // Select first conversation (pinned first, then latest updated)
+        // Select first conversation (pinned first, then latest updated), unless a selection
+        // is already valid (e.g. /chat?conversationId=... applied before this fetch finished).
         if (convos.length > 0) {
           const pinnedSet = new Set(Array.isArray(prefs.pinnedConversations) ? prefs.pinnedConversations : []);
           const sorted = [...convos].sort((a, b) => {
@@ -1139,7 +1140,12 @@ export function useHomeDashboard() {
             const bTs = new Date(b.lastMessage?.sentAt || b.updatedAt || 0).getTime();
             return bTs - aTs;
           });
-          setSelectedConversationId(sorted[0]?._id || '');
+          setSelectedConversationId((prev) => {
+            if (prev && convos.some((c) => c._id === prev)) {
+              return prev;
+            }
+            return sorted[0]?._id || '';
+          });
         }
 
         let unreadMessagesCount = 0;

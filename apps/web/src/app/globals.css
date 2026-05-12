@@ -364,7 +364,10 @@ html {
 .zync-soft-input,
 .zync-soft-select {
 	height: 3rem;
-	padding: 0 0.95rem;
+	padding-top: 0;
+	padding-bottom: 0;
+	padding-left: 0.95rem;
+	padding-right: 0.95rem;
 }
 
 .zync-soft-textarea {
@@ -1643,6 +1646,22 @@ body.story-viewer-open {
 
 .animate-toast-slide-in {
 	animation: toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Centered toast: no translateX — use with flex centering on a full-screen layer */
+@keyframes toast-center-in {
+	0% {
+		opacity: 0;
+		transform: translateY(-10px) scale(0.98);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+.animate-toast-center-in {
+	animation: toast-center-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-toast-slide-out {

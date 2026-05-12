@@ -56,9 +56,10 @@ export function SearchPanel({
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder="Tìm bạn bè bằng tên hoặc @username..."
-            className={`zync-soft-input w-full pl-12 pr-12 ${
+            className={`zync-soft-input w-full ${
               isFocused ? 'ring-2 ring-[var(--accent)]/20' : ''
             }`}
+            style={{ paddingLeft: '3rem', paddingRight: '3rem' }}
             disabled={isLoading}
           />
           {searchKeyword && (
