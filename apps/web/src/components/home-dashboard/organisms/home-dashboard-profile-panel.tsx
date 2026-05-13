@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight } from 'lucide-react';
+import { KeyRound, Loader2, X } from 'lucide-react';
 import type { DashboardIconName } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
 import { updateMyProfile, fetchFriendsCount, type MeUser } from '@/services/users';
 import { uploadFile } from '@/services/upload';
 import type { FriendUser } from '@/services/friends';
-import type { Story, StoryFeedGroup } from '@/services/stories';
+import { changePassword } from '@/services/auth';
 
 interface HomeDashboardProfilePanelProps {
   profile: MeUser | null;
   loading: boolean;
   error: string | null;
   syncedPenaltyScore?: number;
-  myStories?: Story[];
-  feed?: StoryFeedGroup[];
+  myStories?: unknown[];
+  feed?: unknown[];
   friends?: FriendUser[];
-  initialTab?: 'info' | 'stories';
+  initialTab?: 'info';
   onProfileUpdated?: (user: MeUser) => void;
   onOpenCreateStory?: () => void;
   onViewStoryFeed?: (feedIndex: number) => void;
@@ -70,7 +70,16 @@ export function HomeDashboardProfilePanel({
     portfolioUrl: '',
   });
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'stories'>(initialTab ?? 'info');
+  const [activeTab, setActiveTab] = useState<'info'>(initialTab ?? 'info');
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
+  });
 
   useEffect(() => {
     if (initialTab) {
@@ -147,17 +156,45 @@ export function HomeDashboardProfilePanel({
   const joinedYear = profile.createdAt
     ? new Date(profile.createdAt).getFullYear()
     : null;
-  const normalizedPenalty = Math.max(0, Math.min(100, syncedPenaltyScore));
-  const trustScore = Math.max(0, Math.min(100, profile.trustScore ?? 100 - normalizedPenalty));
-  const violationCount = Math.max(
-    profile.globalViolationCount ?? 0,
-    normalizedPenalty > 0 ? Math.ceil(normalizedPenalty / 20) : 0,
-  );
-
   const personalInfoItems: Array<{ label: string; value: string; icon: DashboardIconName }> = [
     { label: 'Email', value: profile.email ?? '-', icon: 'message' },
     { label: 'Username', value: `@${username}`, icon: 'profile' },
   ];
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
+      setPasswordError('Vui lòng nhập đầy đủ thông tin.');
+      return;
+    }
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 8 ký tự.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      setPasswordError('Xác nhận mật khẩu mới không khớp.');
+      return;
+    }
+    setPasswordSubmitting(true);
+    try {
+      const response = await changePassword(passwordForm);
+      setPasswordSuccess(response.message || 'Đổi mật khẩu thành công');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+      setTimeout(() => setPasswordModalOpen(false), 700);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.toLowerCase().includes('mật khẩu hiện tại không đúng')) {
+        setPasswordError('Mật khẩu hiện tại không đúng.');
+      } else if (message.toLowerCase().includes('chưa thiết lập mật khẩu')) {
+        setPasswordError('Tài khoản chưa thiết lập mật khẩu.');
+      } else {
+        setPasswordError(message || 'Đổi mật khẩu thất bại');
+      }
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
 
   // ─── Save handler ─────────────────────────────────────────────────────────────
   const handleSaveProfile = async () => {
@@ -229,9 +266,8 @@ export function HomeDashboardProfilePanel({
     setAvatarFile(file);
   };
 
-  const tabs: Array<{ id: 'info' | 'stories'; label: string; count?: number }> = [
+  const tabs: Array<{ id: 'info'; label: string; count?: number }> = [
     { id: 'info', label: 'Thông tin' },
-    { id: 'stories', label: 'Stories', count: feed.length },
   ];
 
   return (
@@ -297,151 +333,162 @@ export function HomeDashboardProfilePanel({
         </div>
       </article>
 
-      {/* ── Edit form ───────────────────────────────────────────────────────────── */}
+      {/* ── Edit form modal ────────────────────────────────────────────────────── */}
       {isEditing && (
-        <section className="rounded-2xl border border-border bg-bg-card shadow-sm p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="font-ui-title text-lg text-[var(--text-primary)]">Cập nhật hồ sơ</h3>
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="font-ui-content text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              Đóng
-            </button>
-          </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !isSaving && !isUploadingAvatar) {
+              setIsEditing(false);
+            }
+          }}
+        >
+          <section className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-bg-card p-4 shadow-2xl sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="font-ui-title text-lg text-[var(--text-primary)]">Cập nhật hồ sơ</h3>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="font-ui-content text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Đóng
+              </button>
+            </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
-                @Username
-              </span>
-              <input
-                value={formValues.username}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, username: e.target.value }))
-                }
-                className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
-                placeholder="zync.user"
-              />
-            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+                  @Username
+                </span>
+                <input
+                  value={formValues.username}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, username: e.target.value }))
+                  }
+                  className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
+                  placeholder="zync.user"
+                />
+              </label>
 
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
-                Tên hiển thị
-              </span>
-              <input
-                value={formValues.displayName}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, displayName: e.target.value }))
-                }
-                className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
-                placeholder="Nhập tên hiển thị"
-              />
-            </label>
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+                  Tên hiển thị
+                </span>
+                <input
+                  value={formValues.displayName}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, displayName: e.target.value }))
+                  }
+                  className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
+                  placeholder="Nhập tên hiển thị"
+                />
+              </label>
 
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
-                Ảnh đại diện
-              </span>
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] p-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 overflow-hidden rounded-full bg-[var(--border)]">
-                    {avatarPreviewUrl || profile.avatarUrl ? (
-                      <img src={avatarPreviewUrl ?? profile.avatarUrl} alt="Avatar preview" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="font-ui-title flex h-full w-full items-center justify-center text-sm text-[var(--text-primary)]">{initials}</div>
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+                  Ảnh đại diện
+                </span>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] p-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="h-11 w-11 overflow-hidden rounded-full bg-[var(--border)]">
+                      {avatarPreviewUrl || profile.avatarUrl ? (
+                        <img src={avatarPreviewUrl ?? profile.avatarUrl} alt="Avatar preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="font-ui-title flex h-full w-full items-center justify-center text-sm text-[var(--text-primary)]">{initials}</div>
+                      )}
+                    </div>
+                    <label className="font-ui-title inline-flex h-9 cursor-pointer items-center rounded-full bg-[var(--accent)] px-4 text-sm text-[var(--bg-primary)] transition hover:brightness-110">
+                      Chọn ảnh
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    {avatarFile && (
+                      <span className="font-ui-content rounded-full border border-[var(--border)] bg-[var(--bg-hover)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                        Đã chọn ảnh mới
+                      </span>
                     )}
                   </div>
-                  <label className="font-ui-title inline-flex h-9 cursor-pointer items-center rounded-lg bg-[var(--accent)] px-3 text-sm text-[var(--bg-primary)] transition hover:brightness-110">
-                    Chọn ảnh
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                  {avatarFile && (
-                    <span className="font-ui-content truncate text-xs text-[var(--text-secondary)]">{avatarFile.name}</span>
+                  <p className="font-ui-content mt-2 text-xs text-[var(--text-secondary)]">Ảnh sẽ tự upload và cập nhật URL khi bạn bấm Lưu thay đổi.</p>
+                  {isUploadingAvatar && (
+                    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-hover)] p-2.5">
+                      <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                        <span>Đang tải ảnh đại diện</span>
+                        <span>{avatarUploadProgress}%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-hover)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent)] transition-all"
+                          style={{ width: `${avatarUploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
-                <p className="font-ui-content mt-2 text-xs text-[var(--text-secondary)]">Ảnh sẽ tự upload và cập nhật URL khi bạn bấm Lưu thay đổi.</p>
-                {isUploadingAvatar && (
-                  <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-hover)] p-2.5">
-                    <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                      <span>Đang tải ảnh đại diện</span>
-                      <span>{avatarUploadProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-hover)]">
-                      <div
-                        className="h-full rounded-full bg-[var(--accent)] transition-all"
-                        style={{ width: `${avatarUploadProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </label>
+              </label>
 
-            <label className="space-y-2 sm:col-span-2">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
-                Giới thiệu
-              </span>
-              <textarea
-                value={formValues.bio}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, bio: e.target.value }))
-                }
-                className="font-ui-content min-h-24 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
-                placeholder="Viết vài dòng giới thiệu"
-                maxLength={200}
-              />
-            </label>
+              <label className="space-y-2 sm:col-span-2">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+                  Giới thiệu
+                </span>
+                <textarea
+                  value={formValues.bio}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, bio: e.target.value }))
+                  }
+                  className="font-ui-content min-h-24 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)]"
+                  placeholder="Viết vài dòng giới thiệu"
+                  maxLength={200}
+                />
+              </label>
 
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Vai trò Developer</span>
-              <input value={formValues.devRole} onChange={(e) => setFormValues(p => ({ ...p, devRole: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="Ví dụ: Frontend Developer" />
-            </label>
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Kỹ năng (cách nhau bằng dấu phẩy)</span>
-              <input value={formValues.skills} onChange={(e) => setFormValues(p => ({ ...p, skills: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="react, nodejs, python" />
-            </label>
-            
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">GitHub URL</span>
-              <input value={formValues.githubUrl} onChange={(e) => setFormValues(p => ({ ...p, githubUrl: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="https://github.com/..." />
-            </label>
-            <label className="space-y-2 sm:col-span-1">
-              <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">LinkedIn URL</span>
-              <input value={formValues.linkedinUrl} onChange={(e) => setFormValues(p => ({ ...p, linkedinUrl: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="https://linkedin.com/in/..." />
-            </label>
-          </div>
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Vai trò Developer</span>
+                <input value={formValues.devRole} onChange={(e) => setFormValues(p => ({ ...p, devRole: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="Ví dụ: Frontend Developer" />
+              </label>
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Kỹ năng (cách nhau bằng dấu phẩy)</span>
+                <input value={formValues.skills} onChange={(e) => setFormValues(p => ({ ...p, skills: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="react, nodejs, python" />
+              </label>
+              
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">GitHub URL</span>
+                <input value={formValues.githubUrl} onChange={(e) => setFormValues(p => ({ ...p, githubUrl: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="https://github.com/..." />
+              </label>
+              <label className="space-y-2 sm:col-span-1">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">LinkedIn URL</span>
+                <input value={formValues.linkedinUrl} onChange={(e) => setFormValues(p => ({ ...p, linkedinUrl: e.target.value }))} className="font-ui-content h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 text-sm text-[var(--text-primary)] outline-none" placeholder="https://linkedin.com/in/..." />
+              </label>
+            </div>
 
-          {saveError && <p className="mt-3 text-sm text-[var(--danger-text)]">{saveError}</p>}
+            {saveError && <p className="mt-3 text-sm text-[var(--danger-text)]">{saveError}</p>}
 
-          <div className="mt-4 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="font-ui-title h-10 rounded-xl border border-[var(--border)] px-4 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            >
-              Hủy
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveProfile}
-              disabled={isSaving || isUploadingAvatar}
-              className="font-ui-title h-10 rounded-xl bg-[var(--accent)] px-4 text-[var(--bg-primary)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSaving || isUploadingAvatar ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
-          </div>
-        </section>
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="font-ui-title h-10 rounded-xl border border-[var(--border)] px-4 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                disabled={isSaving || isUploadingAvatar}
+                className="font-ui-title h-10 rounded-xl bg-[var(--accent)] px-4 text-[var(--bg-primary)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving || isUploadingAvatar ? 'Đang lưu...' : 'Lưu thay đổi'}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {/* ── Tab navigation ──────────────────────────────────────────────────────── */}
-      <div className="border border-border bg-bg-hover flex gap-1 rounded-2xl bg-[var(--bg-hover)]/58 p-1.5">
+      <div className="flex gap-1 rounded-2xl border border-border bg-bg-hover p-1.5">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -499,138 +546,28 @@ export function HomeDashboardProfilePanel({
               <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[var(--accent)]">
                 Bảo mật
               </h3>
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-hover)] px-3 py-2.5">
-                  <span className="font-ui-content text-sm text-[var(--text-primary)]">Xác thực hai bước</span>
-                  <span className="font-ui-meta text-xs uppercase tracking-[0.08em] text-[var(--accent)]">Đã bật</span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-hover)] px-3 py-2.5">
-                  <span className="font-ui-content text-sm text-[var(--text-primary)]">Thiết bị đăng nhập</span>
-                  <span className="font-ui-content text-sm text-[var(--text-secondary)]">1 thiết bị</span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-hover)] px-3 py-2.5">
-                  <span className="font-ui-content text-sm text-[var(--text-primary)]">Đổi mật khẩu gần nhất</span>
-                  <span className="font-ui-content text-sm text-[var(--text-secondary)]">30 ngày trước</span>
-                </div>
+              <div className="mt-3 space-y-3">
+                <p className="font-ui-content text-sm text-[var(--text-secondary)]">
+                  Quản lý mật khẩu tài khoản để tăng độ an toàn khi đăng nhập.
+                </p>
                 <button
                   type="button"
-                  className="font-ui-title mt-1 inline-flex w-full items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-hover)] px-3 py-2.5 text-sm text-[var(--text-primary)] transition hover:brightness-105"
+                  onClick={() => {
+                    setPasswordError(null);
+                    setPasswordSuccess(null);
+                    setPasswordModalOpen(true);
+                  }}
+                  className="font-ui-title inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3 py-2.5 text-sm text-[var(--bg-primary)] transition hover:brightness-110"
                 >
-                  Xem lịch sử bảo mật
+                  <KeyRound className="h-4 w-4" />
+                  Đổi mật khẩu
                 </button>
               </div>
-            </section>
-
-            {/* Reputation card */}
-            <section className="rounded-2xl border border-border bg-bg-card shadow-sm p-4">
-              <h3 className="font-ui-title text-sm uppercase tracking-[0.16em] text-[var(--accent)]">
-                Danh tiếng
-              </h3>
-
-              {/* Trust score bar */}
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1">
-                  <span>Điểm tin cậy</span>
-                  <span className="font-semibold text-[var(--accent)]">
-                    {trustScore}%
-                  </span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-[var(--bg-hover)] overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${trustScore}%`,
-                      background: trustScore >= 70
-                        ? 'linear-gradient(90deg, var(--accent), var(--accent))'
-                        : trustScore >= 40
-                        ? 'var(--warning-strong)'
-                        : 'var(--danger-text)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Violation count */}
-              <div className="mt-3 flex items-center justify-between rounded-2xl bg-[var(--bg-hover)] px-3 py-2">
-                <span className="font-ui-content text-sm text-[var(--text-secondary)]">Lần vi phạm toàn hệ thống</span>
-                <span className={`font-ui-title text-sm font-bold ${
-                  violationCount === 0
-                    ? 'text-[var(--accent)]'
-                    : violationCount < 3
-                    ? 'text-[var(--warning-strong)]'
-                    : 'text-[var(--danger-text)]'
-                }`}>
-                  {violationCount}
-                </span>
-              </div>
-
-              {/* Warning */}
-              {violationCount >= 3 && (
-                <div className="mt-3 rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2">
-                  <p className="font-ui-content flex items-center gap-1 text-xs text-[var(--danger-text)]">
-                    <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-                    <span>Tài khoản có nguy cơ bị hạn chế do nhiều lần vi phạm. Hãy tuân thủ cộng đồng.</span>
-                  </p>
-                </div>
-              )}
-                      {saveError && <p className="mt-3 text-sm text-[var(--danger-text)]">{saveError}</p>}
             </section>
           </div>
 
           {/* Right column */}
           <div className="space-y-4">
-
-            {/* My Stories (real) */}
-            <section className="rounded-2xl border border-border bg-bg-card shadow-sm p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="font-ui-title text-lg text-[var(--text-primary)]">Story của tôi</h3>
-                <span className="font-ui-content text-sm text-[var(--text-secondary)]">{myStories.length} story</span>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {/* Add story card */}
-                <div className="flex h-36 min-w-[84px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--bg-hover)]">
-                  <button
-                    type="button"
-                    onClick={() => onOpenCreateStory?.()}
-                    className="flex h-full w-full flex-col items-center justify-center gap-2"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--accent)]">
-                      <DashboardIcon name="plus" className="h-4 w-4 text-[var(--accent)]" />
-                    </div>
-                    <p className="font-ui-meta text-[0.6rem] uppercase tracking-[0.1em] text-[var(--accent)]">
-                      Thêm Story
-                    </p>
-                  </button>
-                </div>
-
-                {myStories.slice(0, 5).map((story) => (
-                  <div
-                    key={story._id}
-                    className="h-36 min-w-[84px] rounded-2xl border border-[var(--border)] bg-[var(--bg-hover)] overflow-hidden"
-                  >
-                    {story.mediaType === 'image' && story.mediaUrl ? (
-                      <img src={story.mediaUrl} alt="story" className="h-full w-full object-cover" />
-                    ) : story.mediaType === 'video' && story.mediaUrl ? (
-                      <div className="flex h-full items-center justify-center bg-[var(--bg-hover)]">
-                        <span className="font-ui-title text-lg text-[var(--accent)]">Video</span>
-                      </div>
-                    ) : (
-                      <div
-                        className="flex h-full items-center justify-center p-2"
-                        style={{ backgroundColor: story.backgroundColor || 'var(--bg-hover)' }}
-                      >
-                        <p className="font-ui-content text-xs text-white text-center line-clamp-3">
-                          {story.content || 'Story'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {myStories.length === 0 && (
-                  <p className="flex items-center px-4 font-ui-content text-sm text-[var(--text-secondary)]">Bạn chưa có story nào.</p>
-                )}
-              </div>
-            </section>
 
             {/* Bio + Real stats */}
             <section className="rounded-2xl border border-border bg-bg-card shadow-sm p-4">
@@ -642,7 +579,7 @@ export function HomeDashboardProfilePanel({
               <div className="mt-4 grid grid-cols-3 gap-3">
                 {[
                   { value: friendsCount ?? friends.length, label: 'Bạn bè' },
-                  { value: myStories.length, label: 'Story' },
+                  { value: profile.skills?.length ?? 0, label: 'Kỹ năng' },
                   { value: joinedYear ?? '-', label: 'Tham gia' },
                 ].map(({ value, label }) => (
                   <div key={label} className="rounded-2xl bg-[var(--bg-hover)] p-3 text-center">
@@ -683,48 +620,82 @@ export function HomeDashboardProfilePanel({
         </div>
       )}
 
-
-      {/* ── Tab: Stories Feed ───────────────────────────────────────────────────── */}
-      {activeTab === 'stories' && (
-        <section className="rounded-2xl border border-border bg-bg-card shadow-sm p-4">
-          <h3 className="font-ui-title mb-4 text-lg text-[var(--text-primary)]">
-            Story của bạn bè ({feed.length})
-          </h3>
-          {feed.length === 0 ? (
-            <p className="font-ui-content text-sm text-[var(--text-secondary)]">Bạn bè chưa đăng story nào.</p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {feed.map((group, idx) => (
-                <button
-                  key={group.userId}
-                  type="button"
-                  onClick={() => onViewStoryFeed?.(idx)}
-                  className="flex items-center gap-3 rounded-2xl bg-[var(--bg-hover)] p-3 text-left transition hover:bg-[var(--bg-hover)]"
-                >
-                  <div className="relative h-12 w-12 flex-shrink-0">
-                    <div className="h-full w-full overflow-hidden rounded-full ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-hover)]">
-                      {group.avatarUrl ? (
-                        <img src={group.avatarUrl} alt={group.displayName} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-[var(--text-secondary)] text-sm font-bold text-[var(--bg-hover)]">
-                          {getInitials(group.displayName)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-ui-title truncate text-sm text-[var(--text-primary)]">{group.displayName}</p>
-                    <p className="font-ui-content text-xs text-[var(--text-secondary)]">{group.stories.length} story</p>
-                  </div>
-                  <span className="font-ui-content inline-flex items-center gap-1 text-xs text-[var(--accent)]">
-                    Xem
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                  </span>
-                </button>
-              ))}
+      {passwordModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !passwordSubmitting) {
+              setPasswordModalOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-ui-title text-lg text-[var(--text-primary)]">Đổi mật khẩu</h3>
+              <button
+                type="button"
+                onClick={() => setPasswordModalOpen(false)}
+                disabled={passwordSubmitting}
+                className="rounded-full p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-          )}
-        </section>
+
+            <div className="space-y-3">
+              <label className="block space-y-1.5">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Mật khẩu cũ</span>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-border bg-bg-hover px-3 text-sm text-[var(--text-primary)] outline-none"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Mật khẩu mới</span>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-border bg-bg-hover px-3 text-sm text-[var(--text-primary)] outline-none"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="font-ui-meta text-[0.7rem] uppercase tracking-[0.1em] text-[var(--text-secondary)]">Xác nhận mật khẩu mới</span>
+                <input
+                  type="password"
+                  value={passwordForm.confirmNewPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmNewPassword: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-border bg-bg-hover px-3 text-sm text-[var(--text-primary)] outline-none"
+                />
+              </label>
+            </div>
+
+            {passwordError && <p className="mt-3 text-sm text-[var(--danger-text)]">{passwordError}</p>}
+            {passwordSuccess && <p className="mt-3 text-sm text-[var(--accent)]">{passwordSuccess}</p>}
+
+            <div className="mt-5 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setPasswordModalOpen(false)}
+                disabled={passwordSubmitting}
+                className="h-10 rounded-xl border border-border px-4 text-sm text-[var(--text-secondary)] hover:bg-bg-hover"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleChangePassword()}
+                disabled={passwordSubmitting}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-[var(--bg-primary)] hover:brightness-110 disabled:opacity-60"
+              >
+                {passwordSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

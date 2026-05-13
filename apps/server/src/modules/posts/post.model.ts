@@ -9,6 +9,8 @@ export interface IPost extends Document {
   content: string; // markdown
   codeSnippets: string[];
   mediaUrls: string[];
+  images: string[];
+  videoUrl?: string;
   tags: string[];
   type: PostType;
   channelId?: string;
@@ -30,6 +32,8 @@ const postSchema = new Schema<IPost>(
     content: { type: String, required: true, maxlength: 50000 },
     codeSnippets: [{ type: String }],
     mediaUrls: [{ type: String }],
+    images: [{ type: String }],
+    videoUrl: { type: String },
     tags: [{ type: String, lowercase: true, trim: true }],
     type: {
       type: String,

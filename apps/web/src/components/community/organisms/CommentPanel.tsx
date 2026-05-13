@@ -1,14 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  X,
-  Send,
-  Heart,
-  Code2,
-  Loader2,
-  CornerDownRight,
-} from 'lucide-react';
+import { X, Send, Heart, Loader2, CornerDownRight } from 'lucide-react';
 import { fetchComments, addComment, type Comment, type Post } from '@/services/posts';
 
 interface CommentPanelProps {
@@ -16,6 +9,15 @@ interface CommentPanelProps {
   onClose: () => void;
   onCommentAdded?: (comment: Comment) => void;
 }
+
+const POST_TYPE_LABEL: Record<Post['type'], string> = {
+  discussion: 'Thảo luận',
+  question: 'Câu hỏi',
+  til: 'TIL',
+  showcase: 'Showcase',
+  tutorial: 'Hướng dẫn',
+  job: 'Tuyển dụng',
+};
 
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -37,6 +39,7 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Nhom comments theo parentId (reply vs top-level)
   const topLevel = comments.filter((c) => !c.parentId);
@@ -67,6 +70,23 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments.length]);
+
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [content]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const handleReply = (comment: Comment) => {
     setReplyTo(comment);
@@ -99,10 +119,25 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
 
   const authorInitials = (comment: Comment) =>
     comment.author?.displayName?.slice(0, 2).toUpperCase() ?? '??';
+  const postTypeLabel = POST_TYPE_LABEL[post.type] ?? post.type;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end bg-black/30 backdrop-blur-sm sm:items-center sm:justify-center">
-      <div className="flex h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-border bg-[var(--bg-secondary)] shadow-2xl sm:h-[80vh] sm:rounded-[1.8rem]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3 backdrop-blur-[2px] sm:p-4"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Bình luận bài viết"
+        className="flex h-auto max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-[var(--bg-secondary)] shadow-2xl"
+        style={{ animation: 'modal-fade-in 0.2s ease-out' }}
+      >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <div>
@@ -121,9 +156,15 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
           </button>
         </div>
 
-        {/* Post preview */}
-        <div className="shrink-0 border-b border-border bg-[var(--bg-primary)] px-5 py-3">
-          <p className="font-ui-title line-clamp-2 text-sm text-text-primary">{post.title}</p>
+        {/* Question preview (highlighted stronger than answers) */}
+        <div className="shrink-0 border-b border-accent/30 bg-accent/10 px-5 py-3">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--bg-primary)]">
+              {postTypeLabel}
+            </span>
+          </div>
+          <p className="font-ui-title line-clamp-2 text-sm font-semibold text-text-primary">{post.title}</p>
+          <p className="mt-1 line-clamp-2 text-sm text-text-secondary">{post.content}</p>
         </div>
 
         {/* Comments list */}
@@ -153,8 +194,13 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
           ) : (
             <div className="space-y-4">
               {topLevel.map((comment) => (
-                <div key={comment._id} className="space-y-2">
-                  {/* Top-level comment */}
+                <div key={comment._id} className="space-y-2 rounded-xl border border-border/70 bg-bg-card p-3">
+                  {/* Top-level answer */}
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="rounded-full bg-bg-hover px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
+                      Phản hồi
+                    </span>
+                  </div>
                   <div className="flex gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-xs font-semibold text-accent-strong">
                       {comment.author?.avatarUrl ? (
@@ -194,11 +240,17 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
                     </div>
                   </div>
 
-                  {/* Replies */}
+                  {/* Nested replies */}
                   {repliesMap.has(comment._id) && (
-                    <div className="ml-10 space-y-2 border-l-2 border-border-light pl-4">
+                    <div className="ml-4 space-y-2 border-l-2 border-accent/30 pl-4">
                       {repliesMap.get(comment._id)!.map((reply) => (
-                        <div key={reply._id} className="flex gap-2">
+                        <div key={reply._id} className="rounded-xl border border-border bg-[var(--bg-primary)] p-2.5">
+                          <div className="mb-1 flex items-center gap-2">
+                            <span className="rounded-full bg-bg-hover px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary">
+                              Phản hồi
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
                           <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-hover text-[10px] font-semibold text-text-tertiary">
                             {reply.author?.avatarUrl ? (
                               <img src={reply.author.avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -234,6 +286,7 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
                             </div>
                           </div>
                         </div>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -259,7 +312,7 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
               </button>
             </div>
           )}
-          <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <form onSubmit={handleSubmit} className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <textarea
                 ref={inputRef}
@@ -267,11 +320,15 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Viết bình luận..."
                 rows={2}
-                className="zync-soft-textarea min-h-[44px] w-full resize-none py-2 text-sm"
+                className="zync-soft-textarea min-h-[44px] w-full resize-none rounded-xl py-2 text-sm focus:ring-2 focus:ring-accent/35"
+                disabled={submitting}
+                aria-label="Nhập bình luận"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    void handleSubmit(e);
+                    if (!submitting) {
+                      void handleSubmit(e);
+                    }
                   }
                 }}
               />
@@ -280,7 +337,8 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
               <button
                 type="submit"
                 disabled={submitting || !content.trim()}
-                className="zync-soft-button flex h-10 w-10 items-center justify-center p-0 text-sm"
+                aria-label={submitting ? 'Đang gửi bình luận' : 'Gửi bình luận'}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-[var(--bg-primary)] shadow-sm transition hover:scale-[1.03] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -295,6 +353,18 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
           </p>
         </div>
       </div>
+      <style>{`
+        @keyframes modal-fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

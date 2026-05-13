@@ -5,6 +5,7 @@ import {
   getFeedHandler,
   getTrendingHandler,
   getPostByIdHandler,
+  trackPostViewHandler,
   updatePostHandler,
   deletePostHandler,
   toggleLikeHandler,
@@ -28,8 +29,14 @@ postsRouter.get('/feed', getFeedHandler);
 // GET /api/posts/trending – Trending
 postsRouter.get('/trending', getTrendingHandler);
 
+// GET /api/posts/author – Lấy bài viết theo tác giả (Chat Info Panel)
+postsRouter.get('/author', getPostsByAuthorHandler);
+
 // GET /api/posts/:postId – Chi tiết bài viết
 postsRouter.get('/:postId', getPostByIdHandler);
+
+// POST /api/posts/:postId/view – Track view with cooldown
+postsRouter.post('/:postId/view', trackPostViewHandler);
 
 // PATCH /api/posts/:postId – Sửa bài viết
 postsRouter.patch('/:postId', updatePostHandler);
@@ -52,5 +59,3 @@ postsRouter.post('/:postId/comments', addCommentHandler);
 // GET /api/posts/:postId/comments – Danh sách comments
 postsRouter.get('/:postId/comments', getCommentsHandler);
 
-// GET /api/posts/author – Lấy bài viết theo tác giả (Chat Info Panel)
-postsRouter.get('/author', getPostsByAuthorHandler);

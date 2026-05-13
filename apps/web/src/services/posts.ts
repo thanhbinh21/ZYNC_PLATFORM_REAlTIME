@@ -18,6 +18,8 @@ export interface Post {
   content: string;
   codeSnippets: string[];
   mediaUrls: string[];
+  images: string[];
+  videoUrl?: string;
   tags: string[];
   type: PostType;
   channelId?: string;
@@ -51,6 +53,8 @@ export interface CreatePostPayload {
   type?: PostType;
   tags?: string[];
   codeSnippets?: string[];
+  images?: string[];
+  videoUrl?: string;
   channelId?: string;
 }
 
@@ -78,6 +82,11 @@ export async function fetchPostById(postId: string): Promise<Post> {
 
 export async function createPost(payload: CreatePostPayload): Promise<Post> {
   const { data } = await apiClient.post<{ success: boolean; data: Post }>('/api/posts', payload);
+  return data.data;
+}
+
+export async function trackPostView(postId: string): Promise<{ viewCount: number; counted: boolean }> {
+  const { data } = await apiClient.post<{ success: boolean; data: { viewCount: number; counted: boolean } }>(`/api/posts/${postId}/view`);
   return data.data;
 }
 

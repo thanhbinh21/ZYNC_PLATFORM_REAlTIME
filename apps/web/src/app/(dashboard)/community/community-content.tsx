@@ -21,6 +21,10 @@ import {
   Loader2,
   Globe,
   Star,
+  ImagePlus,
+  Video,
+  Trash2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   fetchFeed,
@@ -30,9 +34,11 @@ import {
   bookmarkPost,
   favoritePost,
   fetchPostById,
+  trackPostView,
   type Post,
   type PostType,
 } from '@/services/posts';
+import { uploadFile } from '@/services/upload';
 import { CommentPanel } from '@/components/community/organisms/CommentPanel';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { UserProfileModal } from '@/components/shared/UserProfileModal';
@@ -73,21 +79,83 @@ function CreatePostForm({ onClose, onSuccess }: CreatePostFormProps) {
   const [type, setType] = useState<PostType>('discussion');
   const [tags, setTags] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [images, setImages] = useState<File[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const MAX_IMAGES = 6;
+  const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+  const MAX_VIDEO_SIZE = 30 * 1024 * 1024;
+  const acceptedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const acceptedVideoTypes = ['video/mp4', 'video/webm'];
+
+  const addFiles = (files: FileList | null) => {
+    if (!files) return;
+    const fileList = Array.from(files);
+    const pickedImages = fileList.filter((f) => acceptedImageTypes.includes(f.type));
+    const pickedVideos = fileList.filter((f) => acceptedVideoTypes.includes(f.type));
+    const invalid = fileList.filter((f) => !acceptedImageTypes.includes(f.type) && !acceptedVideoTypes.includes(f.type));
+
+    if (invalid.length > 0) {
+      setError('Chỉ hỗ trợ ảnh jpg/jpeg/png/webp và video mp4/webm.');
+      return;
+    }
+
+    if (pickedImages.some((file) => file.size > MAX_IMAGE_SIZE)) {
+      setError('Mỗi ảnh tối đa 5MB.');
+      return;
+    }
+
+    if (pickedVideos.some((file) => file.size > MAX_VIDEO_SIZE)) {
+      setError('Video tối đa 30MB.');
+      return;
+    }
+
+    setImages((prev) => {
+      const next = [...prev, ...pickedImages];
+      if (next.length > MAX_IMAGES) {
+        setError(`Tối đa ${MAX_IMAGES} ảnh.`);
+        return prev;
+      }
+      return next;
+    });
+
+    if (pickedVideos[0]) {
+      setVideoFile(pickedVideos[0]);
+    }
+
+    setError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
     setSubmitting(true);
+    setError(null);
     try {
+      const imageUrls: string[] = [];
+      for (const image of images) {
+        const url = await uploadFile(image, 'community/images');
+        imageUrls.push(url);
+      }
+      let videoUrl: string | undefined;
+      if (videoFile) {
+        videoUrl = await uploadFile(videoFile, 'community/videos');
+      }
+
       const post = await createPost({
         title: title.trim(),
         content: content.trim(),
         type,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+        images: imageUrls,
+        videoUrl,
       });
       onSuccess(post);
-    } catch {
-      alert('Có lỗi xảy ra. Vui lòng thử lại.');
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error ? submitError.message : 'Có lỗi xảy ra. Vui lòng thử lại.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -152,6 +220,70 @@ function CreatePostForm({ onClose, onSuccess }: CreatePostFormProps) {
             <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="react, nodejs, typescript..." className="zync-soft-input" />
           </div>
 
+          <div>
+            <label className="font-ui-meta mb-2 block text-[0.72rem] uppercase tracking-[0.18em] text-text-tertiary">Media</label>
+            <div
+              className="rounded-2xl border border-dashed border-border bg-bg-hover/50 p-4 transition hover:border-accent/50"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                addFiles(event.dataTransfer.files);
+              }}
+            >
+              <input
+                id="community-media-upload"
+                type="file"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp,.mp4,.webm"
+                className="hidden"
+                onChange={(event) => addFiles(event.target.files)}
+              />
+              <label htmlFor="community-media-upload" className="flex cursor-pointer items-center justify-center gap-2 text-sm text-text-secondary">
+                <ImagePlus className="h-4 w-4" />
+                <span>Kéo thả hoặc chọn ảnh/video</span>
+                <Video className="h-4 w-4" />
+              </label>
+
+              {images.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {images.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="group relative overflow-hidden rounded-xl border border-border bg-bg-card">
+                      <img src={URL.createObjectURL(file)} alt={file.name} className="h-24 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
+                        className="absolute right-1 top-1 rounded-full bg-black/65 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {videoFile && (
+                <div className="mt-3 rounded-xl border border-border p-2">
+                  <video src={URL.createObjectURL(videoFile)} controls className="max-h-48 w-full rounded-lg" />
+                  <button
+                    type="button"
+                    onClick={() => setVideoFile(null)}
+                    className="mt-2 inline-flex items-center gap-1 text-xs text-text-tertiary hover:text-red-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Xóa video
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+              <AlertCircle className="h-4 w-4" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 border-t border-border pt-4">
             <button type="button" onClick={onClose} className="zync-soft-button-secondary px-5 py-2.5 text-sm">Hủy</button>
             <button type="submit" disabled={submitting || !title.trim() || !content.trim()} className="zync-soft-button flex items-center gap-2 px-6 py-2.5 text-sm">
@@ -184,6 +316,7 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
     <article
       id={`community-post-${post._id}`}
       className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40"
+      onClick={() => onComment(post)}
     >
       <div className="flex items-start gap-3">
         <button
@@ -225,6 +358,30 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
       <h3 className="font-ui-title mt-4 cursor-pointer text-lg leading-snug text-text-primary transition-colors group-hover:text-accent">{post.title}</h3>
       <p className="font-ui-content mt-1.5 line-clamp-3 text-sm leading-relaxed text-text-secondary">{post.content}</p>
 
+      {(post.images?.length > 0 || post.videoUrl) && (
+        <div className="mt-3 space-y-2">
+          {post.images?.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {post.images.slice(0, 3).map((imageUrl) => (
+                <img
+                  key={imageUrl}
+                  src={imageUrl}
+                  alt="Post media"
+                  className="h-24 w-full rounded-xl border border-border object-cover"
+                />
+              ))}
+            </div>
+          )}
+          {post.videoUrl && (
+            <video
+              src={post.videoUrl}
+              controls
+              className="max-h-64 w-full rounded-xl border border-border"
+            />
+          )}
+        </div>
+      )}
+
       {post.tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {post.tags.slice(0, 5).map((tag) => (
@@ -238,7 +395,8 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
 
       <div className="mt-4 flex items-center gap-4 border-t border-border-light pt-3">
         <button
-          onClick={() => onLike(post._id)}
+          onClick={(e) => { e.stopPropagation(); void onLike(post._id); }}
+          type="button"
           className={`flex items-center gap-1.5 text-sm transition ${post.isLiked ? 'text-rose-500' : 'text-text-tertiary hover:text-rose-500'}`}
         >
           <Heart className={`h-4 w-4 ${post.isLiked ? 'fill-current' : ''}`} />
@@ -246,27 +404,30 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
         </button>
 
         <button
-          onClick={() => onComment(post)}
+          onClick={(e) => { e.stopPropagation(); onComment(post); }}
+          type="button"
           className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary"
         >
           <MessageSquare className="h-4 w-4" />
           <span>{post.commentsCount}</span>
         </button>
 
-        <button className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary">
+        <button type="button" className="flex items-center gap-1.5 text-sm text-text-tertiary transition hover:text-text-primary">
           <Eye className="h-4 w-4" />
           <span>{post.viewsCount}</span>
         </button>
 
         <button
-          onClick={() => onBookmark(post._id)}
+          onClick={(e) => { e.stopPropagation(); void onBookmark(post._id); }}
+          type="button"
           className={`flex items-center gap-1.5 text-sm transition ${post.isBookmarked ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
         >
           {post.isBookmarked ? <BookmarkCheck className="h-4 w-4 fill-current" /> : <Bookmark className="h-4 w-4" />}
         </button>
 
         <button
-          onClick={() => onFavorite(post._id)}
+          onClick={(e) => { e.stopPropagation(); void onFavorite(post._id); }}
+          type="button"
           className={`ml-auto flex items-center gap-1.5 text-sm transition ${post.isFavorited ? 'text-yellow-500' : 'text-text-tertiary hover:text-yellow-500'}`}
         >
           <Star className={`h-4 w-4 ${post.isFavorited ? 'fill-current' : ''}`} />
@@ -290,6 +451,7 @@ export default function CommunityContent() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [trackingViewPostId, setTrackingViewPostId] = useState<string | null>(null);
 
   // Navigation flow for author profile
   const {
@@ -299,6 +461,7 @@ export default function CommunityContent() {
     profileModalOpen,
     profileModalUser,
     profileModalLoading,
+    currentUserId,
     openProfileModal,
     closeProfileModal,
   } = useNavigationFlow();
@@ -403,8 +566,49 @@ export default function CommunityContent() {
     } catch {/* ignore */}
   };
   const handleAuthorClick = (authorId: string) => {
+    if (currentUserId && authorId === currentUserId) {
+      router.push('/profile');
+      return;
+    }
     void openProfileModal(authorId);
   };
+
+  useEffect(() => {
+    if (!selectedPost) {
+      setTrackingViewPostId(null);
+    }
+  }, [selectedPost]);
+
+  useEffect(() => {
+    if (!selectedPost || trackingViewPostId === selectedPost._id) {
+      return;
+    }
+
+    setTrackingViewPostId(selectedPost._id);
+    setPosts((prev) => prev.map((post) => (
+      post._id === selectedPost._id ? { ...post, viewsCount: post.viewsCount + 1 } : post
+    )));
+
+    const execute = async () => {
+      try {
+        let result;
+        try {
+          result = await trackPostView(selectedPost._id);
+        } catch {
+          result = await trackPostView(selectedPost._id);
+        }
+        setPosts((prev) => prev.map((post) => (
+          post._id === selectedPost._id ? { ...post, viewsCount: result!.viewCount } : post
+        )));
+      } catch {
+        setPosts((prev) => prev.map((post) => (
+          post._id === selectedPost._id ? { ...post, viewsCount: Math.max(0, post.viewsCount - 1) } : post
+        )));
+        setTrackingViewPostId(null);
+      }
+    };
+    void execute();
+  }, [selectedPost, trackingViewPostId]);
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -545,6 +749,7 @@ export default function CommunityContent() {
       <UserProfileModal
         visible={profileModalOpen}
         userId={profileModalUserId}
+        currentUserId={currentUserId ?? undefined}
         user={profileModalUser ?? undefined}
         loading={profileModalLoading}
         onClose={closeProfileModal}
