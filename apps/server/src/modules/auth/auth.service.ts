@@ -359,6 +359,25 @@ export async function resetForgotPassword(email: string, otp: string, newPasswor
   await user.save();
 }
 
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await UserModel.findById(userId).select('+passwordHash');
+  if (!user?.passwordHash) {
+    throw new UnauthorizedError('Tài khoản chưa thiết lập mật khẩu');
+  }
+
+  const matched = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!matched) {
+    throw new UnauthorizedError('Mật khẩu hiện tại không đúng');
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  await user.save();
+}
+
 // ─── Google Login ────────────────────────────────────────────────────────────
 
 export async function loginWithGoogle(

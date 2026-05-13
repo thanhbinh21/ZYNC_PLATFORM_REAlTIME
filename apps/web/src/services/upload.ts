@@ -17,12 +17,23 @@ export async function uploadFile(
   folder = 'stories',
   options?: UploadFileOptions,
 ): Promise<string> {
-  const { data } = await apiClient.post<{ success: boolean; data: SignResponse }>(
-    '/api/upload/sign',
-    { folder },
+  const uploadType = file.type.startsWith('video/') ? 'video' : 'image';
+
+  const { data } = await apiClient.post<SignResponse | { success: boolean; data: SignResponse }>(
+    '/api/upload/generate-signature',
+    { type: uploadType },
   );
 
-  const { signature, timestamp, apiKey, cloudName, folder: signedFolder } = data.data;
+  const payload = 'success' in data ? data.data : data;
+  const signature = payload.signature;
+  const timestamp = payload.timestamp;
+  const apiKey = payload.apiKey;
+  const cloudName = payload.cloudName?.trim();
+  const signedFolder = payload.folder || folder;
+
+  if (!cloudName || !/^[a-z0-9-]+$/i.test(cloudName)) {
+    throw new Error('Cấu hình Cloudinary không hợp lệ (cloud_name).');
+  }
 
   const formData = new FormData();
   formData.append('file', file);
@@ -31,7 +42,7 @@ export async function uploadFile(
   formData.append('signature', signature);
   formData.append('folder', signedFolder);
 
-  const resourceType = file.type.startsWith('video/') ? 'video' : 'image';
+  const resourceType = uploadType;
   const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 
   const result = await new Promise<{ secure_url: string }>((resolve, reject) => {

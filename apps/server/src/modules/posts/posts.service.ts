@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { PostModel, type PostType } from './post.model';
 import { CommentModel } from './comment.model';
+import { PostViewModel } from './post-view.model';
 import { UserModel } from '../users/user.model';
 import { FriendshipModel } from '../friends/friendship.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
@@ -29,6 +30,8 @@ export interface PostSummary {
   content: string;
   codeSnippets: string[];
   mediaUrls: string[];
+  images: string[];
+  videoUrl?: string;
   tags: string[];
   type: PostType;
   channelId?: string;
@@ -74,6 +77,47 @@ export class PostsService {
   private static readonly postRepo: PostRepository = postRepository;
   private static readonly commentRepo: CommentRepository = commentRepository;
 
+  private static readonly VIEW_COOLDOWN_MS = Number(process.env['POST_VIEW_COOLDOWN_MS'] ?? 30 * 60 * 1000);
+  private static readonly MAX_IMAGES = Number(process.env['COMMUNITY_MAX_IMAGES'] ?? 6);
+
+  private static buildViewerKey(userId: string, input?: { ip?: string; userAgent?: string; deviceId?: string }): string {
+    if (userId) {
+      return `user:${userId}`;
+    }
+
+    const device = input?.deviceId?.trim();
+    if (device) {
+      return `device:${device}`;
+    }
+
+    const ip = input?.ip?.trim() || 'unknown';
+    const ua = input?.userAgent?.trim() || 'unknown';
+    return `guest:${ip}:${ua}`;
+  }
+
+  private static validateMedia(input: { images?: string[]; videoUrl?: string; mediaUrls?: string[] }): { images: string[]; videoUrl?: string; mediaUrls: string[] } {
+    const images = (input.images ?? []).filter(Boolean);
+    const videoUrl = input.videoUrl?.trim() || undefined;
+    const mediaUrls = (input.mediaUrls ?? []).filter(Boolean);
+
+    if (images.length > PostsService.MAX_IMAGES) {
+      throw new BadRequestError(`Maximum ${PostsService.MAX_IMAGES} images are allowed`);
+    }
+
+    if (videoUrl && !/^https?:\/\//i.test(videoUrl)) {
+      throw new BadRequestError('videoUrl must be a valid URL');
+    }
+
+    for (const url of images) {
+      if (!/^https?:\/\//i.test(url)) {
+        throw new BadRequestError('Each image URL must be a valid URL');
+      }
+    }
+
+    const normalizedMediaUrls = mediaUrls.length > 0 ? mediaUrls : [...images, ...(videoUrl ? [videoUrl] : [])];
+    return { images, videoUrl, mediaUrls: normalizedMediaUrls };
+  }
+
   /** Tao bai viet moi */
   static async createPost(
     authorId: string,
@@ -84,9 +128,13 @@ export class PostsService {
       tags?: string[];
       codeSnippets?: string[];
       mediaUrls?: string[];
+      images?: string[];
+      videoUrl?: string;
       channelId?: string;
     },
   ): Promise<PostSummary> {
+    const media = PostsService.validateMedia(input);
+
     const post = await PostModel.create({
       authorId,
       title: input.title.trim(),
@@ -94,7 +142,9 @@ export class PostsService {
       type: input.type ?? 'discussion',
       tags: (input.tags ?? []).map((t) => t.toLowerCase().trim()),
       codeSnippets: input.codeSnippets ?? [],
-      mediaUrls: input.mediaUrls ?? [],
+      mediaUrls: media.mediaUrls,
+      images: media.images,
+      videoUrl: media.videoUrl,
       channelId: input.channelId,
     });
 
@@ -185,11 +235,11 @@ export class PostsService {
     });
   }
 
-  /** Chi tiet bai viet + tang view count */
+  /** Chi tiet bai viet */
   static async getPostById(postId: string, requesterId: string): Promise<PostSummary> {
     if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
 
-    const post = await PostsService.postRepo.incrementViews(postId);
+    const post = await PostModel.findById(postId).lean();
 
     if (!post || (post as unknown as Record<string, unknown>)['status'] !== 'published') {
       throw new NotFoundError('Post not found');
@@ -198,6 +248,60 @@ export class PostsService {
     const authorId = (post as unknown as Record<string, unknown>)['authorId'] as string;
     const author = await enrichWithAuthor(authorId);
     return formatPost(post, requesterId, author);
+  }
+
+  /** Tang view theo cooldown (anti-refresh spam) */
+  static async trackPostView(
+    postId: string,
+    requesterId: string,
+    input?: { ip?: string; userAgent?: string; deviceId?: string },
+  ): Promise<{ viewCount: number; counted: boolean }> {
+    if (!Types.ObjectId.isValid(postId)) throw new BadRequestError('Invalid post id');
+
+    const post = await PostModel.findById(postId).select('_id status viewsCount').lean();
+    if (!post || (post.status as string) !== 'published') {
+      throw new NotFoundError('Post not found');
+    }
+
+    const viewerKey = PostsService.buildViewerKey(requesterId, input);
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - PostsService.VIEW_COOLDOWN_MS);
+
+    let shouldCount = false;
+    try {
+      const matched = await PostViewModel.findOneAndUpdate(
+        { postId, viewerKey, lastViewedAt: { $lte: cutoff } },
+        { $set: { lastViewedAt: now } },
+        { new: false },
+      ).lean();
+
+      if (matched) {
+        shouldCount = true;
+      } else {
+        await PostViewModel.create({ postId, viewerKey, lastViewedAt: now });
+        shouldCount = true;
+      }
+    } catch (error) {
+      const mongoError = error as { code?: number };
+      if (mongoError.code !== 11000) {
+        throw error;
+      }
+    }
+
+    if (!shouldCount) {
+      return { viewCount: Number(post.viewsCount ?? 0), counted: false };
+    }
+
+    const updated = await PostModel.findByIdAndUpdate(
+      postId,
+      { $inc: { viewsCount: 1 } },
+      { new: true, projection: { viewsCount: 1 } },
+    ).lean();
+
+    return {
+      viewCount: Number(updated?.viewsCount ?? post.viewsCount ?? 0),
+      counted: true,
+    };
   }
 
   /** Sửa bài viết (author only) */
@@ -402,6 +506,8 @@ function formatPost(
     content: p['content'] as string,
     codeSnippets: (p['codeSnippets'] as string[]) ?? [],
     mediaUrls: (p['mediaUrls'] as string[]) ?? [],
+    images: (p['images'] as string[]) ?? [],
+    videoUrl: p['videoUrl'] as string | undefined,
     tags: (p['tags'] as string[]) ?? [],
     type: p['type'] as PostType,
     channelId: p['channelId'] as string | undefined,

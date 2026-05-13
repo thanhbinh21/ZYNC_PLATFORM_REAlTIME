@@ -89,3 +89,12 @@ export async function loginWithGoogle(payload: {
 export async function logout(payload: { deviceToken?: string }): Promise<void> {
   await apiClient.post('/api/auth/logout', payload);
 }
+
+export async function changePassword(payload: {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}): Promise<{ success: boolean; message: string }> {
+  const { data } = await apiClient.post<{ success: boolean; message: string }>('/api/auth/change-password', payload);
+  return data;
+}

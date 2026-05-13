@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { authenticate } from '../../shared/middleware/auth.middleware';
 import { otpRateLimiter } from '../../shared/middleware/rate-limiter.middleware';
 import { validateBody } from '../../shared/middleware/validate.middleware';
 import {
@@ -10,6 +11,7 @@ import {
   GoogleLoginSchema,
   ForgotPasswordRequestOtpSchema,
   ForgotPasswordResetSchema,
+  ChangePasswordSchema,
 } from './auth.schema';
 import {
   registerHandler,
@@ -22,6 +24,7 @@ import {
   refreshHandler,
   currentTokenHandler,
   logoutHandler,
+  changePasswordHandler,
 } from './auth.controller';
 
 export const authRouter = Router();
@@ -73,3 +76,6 @@ authRouter.get('/current-token', currentTokenHandler);
 
 // POST /api/auth/logout – revoke token + clear cookie
 authRouter.post('/logout', validateBody(LogoutSchema), logoutHandler);
+
+// POST /api/auth/change-password – authenticated password change
+authRouter.post('/change-password', authenticate, validateBody(ChangePasswordSchema), changePasswordHandler);

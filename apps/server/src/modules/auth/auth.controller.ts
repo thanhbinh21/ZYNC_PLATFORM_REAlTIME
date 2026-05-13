@@ -6,6 +6,7 @@ import {
   verifyLoginWithPasswordAndOtp,
   requestForgotPasswordOtp,
   resetForgotPassword,
+  changePassword,
   loginWithGoogle,
   refreshAccessToken,
   logout,
@@ -329,6 +330,25 @@ export async function logoutHandler(
     });
 
     res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function changePasswordHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword: string;
+      newPassword: string;
+      confirmNewPassword: string;
+    };
+    await changePassword(userId, currentPassword, newPassword);
+    res.json({ success: true, message: 'Đổi mật khẩu thành công' });
   } catch (err) {
     next(err);
   }

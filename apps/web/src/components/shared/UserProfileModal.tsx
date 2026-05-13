@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   X,
   MessageCircle,
   UserPlus,
-  UserMinus,
   Loader2,
   Check,
 } from 'lucide-react';
@@ -19,7 +18,7 @@ interface UserProfileModalProps {
   loading?: boolean;
   onClose: () => void;
   onSendMessage?: (userId: string) => void;
-  onSendFriendRequest?: (userId: string) => Promise<void>;
+  onSendFriendRequest?: (userId: string) => Promise<boolean | void>;
 }
 
 function formatYear(dateStr?: string): string {
@@ -29,6 +28,18 @@ function formatYear(dateStr?: string): string {
   } catch {
     return '';
   }
+}
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  const selectors = [
+    'button:not([disabled])',
+    '[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ];
+  return Array.from(container.querySelectorAll<HTMLElement>(selectors.join(',')));
 }
 
 export function UserProfileModal({
@@ -43,6 +54,7 @@ export function UserProfileModal({
 }: UserProfileModalProps) {
   const [friendRequestLoading, setFriendRequestLoading] = useState(false);
   const [friendRequestSent, setFriendRequestSent] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Reset state when modal closes or user changes
   useEffect(() => {
@@ -51,6 +63,49 @@ export function UserProfileModal({
       setFriendRequestLoading(false);
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const card = cardRef.current;
+    if (card) {
+      const focusables = getFocusableElements(card);
+      focusables[0]?.focus();
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !cardRef.current) {
+        return;
+      }
+
+      const focusables = getFocusableElements(cardRef.current);
+      if (focusables.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first?.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [visible, onClose]);
 
   const handleSendMessage = useCallback(() => {
     if (userId && onSendMessage) {
@@ -62,8 +117,10 @@ export function UserProfileModal({
     if (!userId || !onSendFriendRequest) return;
     setFriendRequestLoading(true);
     try {
-      await onSendFriendRequest(userId);
-      setFriendRequestSent(true);
+      const ok = await onSendFriendRequest(userId);
+      if (ok !== false) {
+        setFriendRequestSent(true);
+      }
     } catch {
       // Error handled by parent
     } finally {
@@ -78,13 +135,17 @@ export function UserProfileModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="zync-soft-card zync-soft-card-elevated relative w-full max-w-sm rounded-[1.8rem] p-6 shadow-xl"
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Thông tin người dùng"
+        className="zync-soft-card zync-soft-card-elevated relative w-full max-w-md rounded-[1.8rem] border border-border/80 p-6 shadow-xl sm:p-7"
         style={{ animation: 'modal-pop-in 0.25s ease-out' }}
       >
         {/* Close button */}
@@ -99,8 +160,18 @@ export function UserProfileModal({
 
         {/* Loading state */}
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-accent" />
+          <div className="space-y-4 py-2">
+            <div className="mx-auto h-20 w-20 animate-pulse rounded-full bg-bg-hover" />
+            <div className="mx-auto h-5 w-40 animate-pulse rounded bg-bg-hover" />
+            <div className="mx-auto h-4 w-56 animate-pulse rounded bg-bg-hover" />
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              <div className="h-16 animate-pulse rounded-xl bg-bg-hover" />
+              <div className="h-16 animate-pulse rounded-xl bg-bg-hover" />
+              <div className="h-16 animate-pulse rounded-xl bg-bg-hover" />
+            </div>
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-accent" />
+            </div>
           </div>
         )}
 
@@ -127,6 +198,11 @@ export function UserProfileModal({
             <h2 className="font-ui-title text-xl text-text-primary">{user.displayName}</h2>
             {user.username && (
               <p className="font-ui-meta mt-0.5 text-sm text-text-tertiary">@{user.username}</p>
+            )}
+            {(user.emailMasked || user.email) && (
+              <p className="font-ui-content mt-1 text-xs text-text-tertiary">
+                {user.emailMasked ?? user.email}
+              </p>
             )}
             {user.bio && (
               <p className="font-ui-content mt-3 text-center text-sm leading-relaxed text-text-secondary">
@@ -215,13 +291,9 @@ export function UserProfileModal({
                 )}
 
                 {user.isFriend && (
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm text-text-tertiary transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500"
-                  >
-                    <UserMinus className="h-4 w-4" />
-                    Xóa bạn bè
-                  </button>
+                  <div className="w-full rounded-xl border border-border bg-bg-hover px-3 py-2 text-center text-xs text-text-tertiary">
+                    Đã là bạn bè
+                  </div>
                 )}
               </div>
             )}
@@ -234,6 +306,13 @@ export function UserProfileModal({
             <p className="font-ui-content text-sm text-text-tertiary">
               Không thể tải thông tin người dùng
             </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="zync-soft-button-secondary mt-4 px-4 py-2 text-sm"
+            >
+              Đóng
+            </button>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { UserModel, type IUser } from './user.model';
 import { DeviceTokenModel } from './device-token.model';
+import { FriendshipModel } from '../friends/friendship.model';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { getFriendsCount, getMutualFriendsCount } from '../friends/friends.service';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
@@ -42,6 +43,7 @@ export interface PublicUserProfile {
   emailMasked?: string;
   friendCount: number;
   mutualFriends: number;
+  isFriend?: boolean;
   createdAt?: string;
 }
 
@@ -62,6 +64,14 @@ export async function getUserById(
       : Promise.resolve(0),
   ]);
 
+  const isFriend = requesterId && requesterId !== userId
+    ? Boolean(await FriendshipModel.exists({
+        userId: requesterId,
+        friendId: userId,
+        status: 'accepted',
+      }))
+    : false;
+
   return {
     _id: user._id.toString(),
     username: user.username,
@@ -75,6 +85,7 @@ export async function getUserById(
     emailMasked: maskEmail(user.email),
     friendCount,
     mutualFriends,
+    isFriend,
     createdAt: (user as unknown as { createdAt?: Date }).createdAt?.toISOString(),
   };
 }
