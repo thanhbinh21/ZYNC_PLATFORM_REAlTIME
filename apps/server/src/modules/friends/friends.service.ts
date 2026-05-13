@@ -101,31 +101,38 @@ export async function sendFriendRequest(
     throw new ForbiddenError('Friend request is blocked');
   }
 
-  const existing = await FriendshipModel.findOne({
-    userId: requesterId,
-    friendId: toUserId,
-  });
+  // Check both directions for existing records
+  const [existing, reverse] = await Promise.all([
+    FriendshipModel.findOne({ userId: requesterId, friendId: toUserId }),
+    FriendshipModel.findOne({ userId: toUserId, friendId: requesterId }),
+  ]);
 
-  if (existing?.status === 'pending') {
-    throw new ConflictError('Friend request already sent');
-  }
-  if (existing?.status === 'accepted') {
+  // Only truly friends if BOTH directions are 'accepted'
+  if (existing?.status === 'accepted' && reverse?.status === 'accepted') {
     throw new ConflictError('Users are already friends');
   }
 
-  // Clean up stale rejected records (e.g. from previous reject/unfriend flows)
-  if (existing?.status === 'rejected') {
-    await FriendshipModel.deleteOne({ _id: existing._id });
+  // Active outgoing pending request
+  if (existing?.status === 'pending') {
+    throw new ConflictError('Friend request already sent');
   }
 
-  const reversePending = await FriendshipModel.findOne({
-    userId: toUserId,
-    friendId: requesterId,
-    status: 'pending',
-  });
-
-  if (reversePending) {
+  // Active incoming pending request
+  if (reverse?.status === 'pending') {
     throw new ConflictError('You already have an incoming request from this user');
+  }
+
+  // Clean up any stale/orphaned records (e.g. one-sided 'accepted' after
+  // incomplete unfriend, or data left from previous revoke failures)
+  const staleIds: string[] = [];
+  if (existing && existing.status !== 'blocked') {
+    staleIds.push(existing._id.toString());
+  }
+  if (reverse && reverse.status !== 'blocked') {
+    staleIds.push(reverse._id.toString());
+  }
+  if (staleIds.length > 0) {
+    await FriendshipModel.deleteMany({ _id: { $in: staleIds } });
   }
 
   const request = await FriendshipModel.create({
