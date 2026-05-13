@@ -125,17 +125,13 @@ export function disconnectSocket(): void {
 }
 
 export function joinConversation(conversationId: string): void {
-  if (!socket?.connected) {
-    return;
-  }
+  if (!socket) return;
 
   socket.emit('join_conversation', { conversationId });
 }
 
 export function leaveConversation(conversationId: string): void {
-  if (!socket?.connected) {
-    return;
-  }
+  if (!socket) return;
 
   socket.emit('leave_conversation', { conversationId });
 }
@@ -165,8 +161,8 @@ export function sendMessage(
     type?: string;
   },
 ): void {
-  if (!socket?.connected) {
-    throw new Error('Socket not connected');
+  if (!socket) {
+    throw new Error('Socket not initialized');
   }
 
   socket.emit('send_message', {
@@ -235,8 +231,8 @@ export function unlistenToMessages(): void {
  * @param messageIds Array of message IDs to mark as read
  */
 export function markAsRead(conversationId: string, messageIds: string[]): void {
-  if (!socket?.connected) {
-    throw new Error('Socket not connected');
+  if (!socket) {
+    throw new Error('Socket not initialized');
   }
 
   socket.emit('message_read', {
@@ -251,8 +247,8 @@ export function markAsRead(conversationId: string, messageIds: string[]): void {
  * @param messageIds Array of message IDs to mark as delivered
  */
 export function markAsDelivered(conversationId: string, messageIds: string[]): void {
-  if (!socket?.connected) {
-    throw new Error('Socket not connected');
+  if (!socket) {
+    throw new Error('Socket not initialized');
   }
 
   socket.emit('message_delivered', {
@@ -309,9 +305,7 @@ let typingTimeout: NodeJS.Timeout | null = null;
  * @param conversationId Conversation ID
  */
 export function startTyping(conversationId: string): void {
-  if (!socket?.connected) {
-    return;
-  }
+  if (!socket) return;
 
   socket.emit('typing_start', { conversationId });
 
@@ -326,9 +320,7 @@ export function startTyping(conversationId: string): void {
  * @param conversationId Conversation ID
  */
 export function stopTyping(conversationId: string): void {
-  if (!socket?.connected) {
-    return;
-  }
+  if (!socket) return;
 
   // Debounce: wait 3s before sending stop
   typingTimeout = setTimeout(() => {
@@ -343,9 +335,7 @@ export function stopTyping(conversationId: string): void {
  * @param conversationId Conversation ID
  */
 export function clearPendingTyping(conversationId: string): void {
-  if (!socket?.connected) {
-    return;
-  }
+  if (!socket) return;
 
   // Clear timeout if pending
   if (typingTimeout) {
@@ -475,9 +465,7 @@ export function emitCallReject(
   callToken: string,
   reason: 'rejected' | 'busy' = 'rejected',
 ): void {
-  if (!socket?.connected) {
-    throw new Error('Socket not connected');
-  }
+  if (!socket) throw new Error('Socket not initialized');
 
   socket.emit('call_reject', { sessionId, callToken, reason });
 }

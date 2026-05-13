@@ -252,7 +252,12 @@ export function useChat({
       setMessageStatus((prev) => {
         const next = { ...prev };
         const previousStatus = next[data.idempotencyKey] ?? "sent";
-        next[data.messageId] = previousStatus;
+        
+        const currentStatus = next[data.messageId];
+        if (currentStatus !== "delivered" && currentStatus !== "read") {
+          next[data.messageId] = previousStatus;
+        }
+        
         delete next[data.idempotencyKey];
         return next;
       });
@@ -909,16 +914,35 @@ export function useMessageHistory({
         const response = await getMessages(conversationId, currentCursor, 20);
         const { messages, nextCursor } = response;
 
-      if (messages && Array.isArray(messages)) {
-        const reversedMessages = messages.reverse();
-        setMessages((prev) => (currentCursor ? [...reversedMessages, ...prev] : reversedMessages));
-        setCursor(nextCursor);
-        setHasMore(Boolean(nextCursor));
-      } else {
-        setMessages([]);
-        setCursor(undefined);
-        setHasMore(false);
-      }
+        if (messages && Array.isArray(messages)) {
+          const reversedMessages = messages.reverse();
+          setMessages((prev) => {
+            if (currentCursor) {
+              return [...reversedMessages, ...prev];
+            }
+            // Merge with any real-time messages already present in prev
+            const merged = new Map<string, Message>();
+            reversedMessages.forEach((msg) => {
+              const key = String(msg.idempotencyKey || msg._id);
+              merged.set(key, msg);
+            });
+            prev.forEach((msg) => {
+              const key = String(msg.idempotencyKey || msg._id);
+              if (!merged.has(key)) {
+                merged.set(key, msg);
+              }
+            });
+            return Array.from(merged.values()).sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            );
+          });
+          setCursor(nextCursor);
+          setHasMore(Boolean(nextCursor));
+        } else {
+          setMessages([]);
+          setCursor(undefined);
+          setHasMore(false);
+        }
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to fetch messages";
