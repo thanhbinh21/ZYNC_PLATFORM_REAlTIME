@@ -407,7 +407,7 @@ export default function ExploreContent() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm kênh, người dùng, bài viết..."
+            placeholder="    Tìm kênh, người dùng, bài viết..."
             className="zync-soft-input w-full pl-9"
           />
         </div>

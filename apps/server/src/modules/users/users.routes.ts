@@ -5,6 +5,7 @@ import { UpdateProfileSchema, UpsertDeviceTokenSchema } from '../auth/auth.schem
 import {
   getMeHandler,
   getUserByIdHandler,
+  getPublicProfileHandler,
   searchUsersHandler,
   updateProfileHandler,
   upsertDeviceTokenHandler,
@@ -26,6 +27,9 @@ usersRouter.get('/search', searchUsersHandler);
 
 // GET /api/users/discover – nổi bật theo skills/tags
 usersRouter.get('/discover', discoverUsersHandler);
+
+// GET /api/users/:userId/public-profile – get safe public profile
+usersRouter.get('/:userId/public-profile', getPublicProfileHandler);
 
 // GET /api/users/:userId – get user profile (public)
 usersRouter.get('/:userId', getUserByIdHandler);

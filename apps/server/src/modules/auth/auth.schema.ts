@@ -73,6 +73,16 @@ export const ForgotPasswordResetSchema = z.object({
 });
 export type ForgotPasswordResetDto = z.infer<typeof ForgotPasswordResetSchema>;
 
+export const ChangePasswordSchema = z.object({
+  currentPassword: passwordSchema,
+  newPassword: passwordSchema,
+  confirmNewPassword: passwordSchema,
+}).refine((value) => value.newPassword === value.confirmNewPassword, {
+  message: 'Mật khẩu xác nhận không khớp',
+  path: ['confirmNewPassword'],
+});
+export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
+
 export const UpdateProfileSchema = z.object({
   username: usernameSchema.optional(),
   displayName: z.string().trim().min(1).max(50).optional(),

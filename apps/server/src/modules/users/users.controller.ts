@@ -42,7 +42,21 @@ export async function getUserByIdHandler(
   try {
     const { userId: requesterId } = req as AuthRequest;
     const user = await getUserById(req.params['userId'] as string, requesterId);
-    res.json({ success: true, user });
+    res.json({ success: true, data: user, user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getPublicProfileHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId: requesterId } = req as AuthRequest;
+    const user = await getUserById(req.params['userId'] as string, requesterId);
+    res.json({ success: true, data: user });
   } catch (err) {
     next(err);
   }

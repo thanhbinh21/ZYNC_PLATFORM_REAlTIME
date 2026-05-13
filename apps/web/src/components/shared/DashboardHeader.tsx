@@ -191,7 +191,7 @@ export function DashboardHeader({
               {isProfileMenuOpen && (
                 <div
                   ref={profileMenuRef}
-                  className="zync-glass-panel-strong absolute right-0 top-full mt-2 w-52 rounded-2xl p-2 shadow-lg"
+                  className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-border bg-bg-card p-2 shadow-lg"
                   role="menu"
                 >
                   <p className="px-3 pb-2 pt-1 font-ui-meta text-[0.65rem] uppercase tracking-[0.18em] text-text-tertiary">

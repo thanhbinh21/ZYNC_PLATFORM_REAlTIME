@@ -37,6 +37,29 @@ export async function getPostByIdHandler(req: Request, res: Response, next: Next
   } catch (err) { next(err); }
 }
 
+export async function trackPostViewHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const ipHeader = req.headers['x-forwarded-for'];
+    const forwarded = Array.isArray(ipHeader) ? ipHeader[0] : ipHeader;
+    const ip = forwarded?.split(',')[0]?.trim() || req.ip;
+    const userAgent = req.headers['user-agent'];
+    const deviceId = req.headers['x-device-id'];
+
+    const result = await PostsService.trackPostView(
+      req.params['postId'] as string,
+      userId,
+      {
+        ip,
+        userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
+        deviceId: Array.isArray(deviceId) ? deviceId[0] : deviceId,
+      },
+    );
+
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 export async function updatePostHandler(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { userId } = req as AuthRequest;

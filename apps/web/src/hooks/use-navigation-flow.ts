@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/services/api';
 import { sendFriendRequest as apiSendFriendRequest } from '@/services/friends';
@@ -11,6 +11,8 @@ export interface UserProfileSummary {
   username?: string;
   avatarUrl?: string;
   bio?: string;
+  email?: string;
+  emailMasked?: string;
   friendCount?: number;
   mutualFriends?: number;
   isFriend?: boolean;
@@ -39,6 +41,7 @@ interface UseNavigationFlowReturn {
   // Profile data
   profileModalUser: UserProfileSummary | null;
   profileModalLoading: boolean;
+  currentUserId: string | null;
 
   // Loading states
   chatLoading: boolean;
@@ -66,6 +69,21 @@ export function useNavigationFlow(): UseNavigationFlowReturn {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileModalUser, setProfileModalUser] = useState<UserProfileSummary | null>(null);
   const [profileModalLoading, setProfileModalLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const profileCacheRef = useRef<Map<string, UserProfileSummary>>(new Map());
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { data } = await apiClient.get<{ success: boolean; user?: { _id?: string } }>('/api/users/me');
+        if (data.success && data.user?._id) {
+          setCurrentUserId(data.user._id);
+        }
+      } catch {
+        // ignore auth fetch error
+      }
+    })();
+  }, []);
 
   /**
    * Di chuyển đến chat với người dùng cụ thể.
@@ -127,6 +145,13 @@ export function useNavigationFlow(): UseNavigationFlowReturn {
   const openProfileModal = useCallback(async (userId: string) => {
     setProfileModalUserId(userId);
     setProfileModalOpen(true);
+    const cached = profileCacheRef.current.get(userId);
+    if (cached) {
+      setProfileModalUser(cached);
+      setProfileModalLoading(false);
+      return;
+    }
+
     setProfileModalUser(null);
     setProfileModalLoading(true);
 
@@ -134,10 +159,13 @@ export function useNavigationFlow(): UseNavigationFlowReturn {
       const { data } = await apiClient.get<{
         success: boolean;
         data?: UserProfileSummary;
-      }>(`/api/users/${userId}`);
+        user?: UserProfileSummary;
+      }>(`/api/users/${userId}/public-profile`);
 
-      if (data.success && data.data) {
-        setProfileModalUser(data.data);
+      const profile = data.data ?? data.user;
+      if (data.success && profile) {
+        profileCacheRef.current.set(userId, profile);
+        setProfileModalUser(profile);
       }
     } catch (err) {
       console.error('[useNavigationFlow] openProfileModal fetch failed:', err);
@@ -176,6 +204,7 @@ export function useNavigationFlow(): UseNavigationFlowReturn {
     closeProfileModal,
     profileModalUser,
     profileModalLoading,
+    currentUserId,
     chatLoading,
     friendRequestLoading,
     navigateToExploreWithSkills,
