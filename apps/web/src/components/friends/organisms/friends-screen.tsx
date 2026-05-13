@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import { Bell, CheckCircle2, Users, X } from 'lucide-react';
 import { FriendsTabNavigation } from '../atoms/friends-tab-navigation';
@@ -310,40 +311,38 @@ export function FriendsScreen({
             </div>
           )}
 
-          {/* Feedback Messages */}
-          {infoMessage && showToast && (
-            <div className="animate-toast-slide-in flex items-center gap-3 rounded-2xl border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 shadow-sm">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)]" />
-              <p className="font-ui-content flex-1 text-sm text-[var(--success-text)]">
-                {infoMessage}
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowToast(false)}
-                className="shrink-0 text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
-                aria-label="Đóng thông báo"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {errorMessage && showToast && (
-            <div className="animate-toast-slide-in flex items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 shadow-sm">
-              <X className="h-5 w-5 shrink-0 text-red-400" />
-              <p className="font-ui-content flex-1 text-sm text-red-400">{errorMessage}</p>
-              <button
-                type="button"
-                onClick={() => setShowToast(false)}
-                className="shrink-0 text-red-400/70 transition-colors hover:text-red-400"
-                aria-label="Đóng thông báo"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
         </div>
       </main>
+
+      {/* Feedback Messages - rendered via portal to avoid transform containment */}
+      {infoMessage && showToast && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 shadow-lg">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+            <p className="font-ui-content flex-1 text-center text-sm text-[var(--success-text)] sm:text-left">
+              {infoMessage}
+            </p>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {errorMessage && showToast && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          role="alert"
+        >
+          <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 shadow-lg">
+            <X className="h-5 w-5 shrink-0 text-red-400" />
+            <p className="font-ui-content flex-1 text-center text-sm text-red-400 sm:text-left">{errorMessage}</p>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Profile Modal */}
       <UserProfileModal

@@ -62,7 +62,18 @@ export interface DashboardActivityItem {
 /**
  * Loại thông báo hiển thị trên dashboard
  */
-export type NotificationType = 'new_message' | 'friend_request' | 'friend_accepted' | 'group_invite' | 'story_reaction' | 'story_reply' | 'system';
+export type NotificationType =
+  | 'new_message'
+  | 'friend_request'
+  | 'friend_accepted'
+  | 'group_invite'
+  | 'story_reaction'
+  | 'story_reply'
+  | 'community_post'
+  | 'post_like'
+  | 'post_comment'
+  | 'post_bookmark'
+  | 'system';
 
 /**
  * Item thông báo hiển thị trên trang chủ
@@ -79,6 +90,8 @@ export interface DashboardNotificationItem {
   avatarUrl?: string;
   conversationId?: string;
   fromUserId?: string;
+  /** Bài cộng đồng (notification community_post / post_*) */
+  postId?: string;
 }
 
 /**

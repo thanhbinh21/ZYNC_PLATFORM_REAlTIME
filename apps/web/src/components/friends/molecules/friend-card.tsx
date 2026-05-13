@@ -1,8 +1,13 @@
+'use client';
+
 import type { FriendUser } from '@/services/friends';
 import { MessageSquare, MoreHorizontal, UserMinus, UserX } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FriendsAvatar } from '../atoms/friends-avatar';
 import { FriendsStatusBadge } from '../atoms/friends-status-badge';
+
+const MENU_WIDTH_PX = 192; // w-48
 
 interface FriendCardProps {
   friend: FriendUser;
@@ -14,19 +19,48 @@ interface FriendCardProps {
 
 export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }: FriendCardProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number } | null>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (!showMenu || !menuTriggerRef.current) {
+      setMenuRect(null);
+      return;
+    }
+    const update = () => {
+      const el = menuTriggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const left = Math.min(
+        Math.max(8, r.right - MENU_WIDTH_PX),
+        window.innerWidth - MENU_WIDTH_PX - 8
+      );
+      setMenuRect({ top: r.bottom + 4, left });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [showMenu]);
 
   useEffect(() => {
+    if (!showMenu) return;
+
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
+      const t = event.target as Node;
+      if (menuPanelRef.current?.contains(t)) return;
+      if (menuTriggerRef.current?.contains(t)) return;
+      setShowMenu(false);
     };
 
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const closeOnScroll = () => setShowMenu(false);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
   }, [showMenu]);
 
   const handleUnfriend = async () => {
@@ -45,13 +79,13 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
   };
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition-all duration-300 hover:border-[var(--accent)]/30 hover:shadow-[0_8px_30px_-12px_rgba(15,157,142,0.15)]">
+    <article className="group relative overflow-visible rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition-all duration-300 hover:border-[var(--accent)]/30 hover:shadow-[0_8px_30px_-12px_rgba(15,157,142,0.15)]">
       {/* Gradient accent bar */}
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent)]/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
       <div className="flex flex-col gap-4">
         {/* Header: Avatar + Info */}
-        <div className="flex items-start gap-3">
+        <div className="relative z-10 flex items-start gap-3">
           <div className="relative">
             <FriendsAvatar name={friend.displayName} avatarUrl={friend.avatarUrl} size="lg" />
             <div className="absolute -bottom-0.5 -right-0.5">
@@ -75,25 +109,34 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
             )}
           </div>
 
-          {/* Menu Button */}
-          <div className="relative" ref={menuRef}>
+          {/* Menu — panel via portal so it is not clipped by card / page overflow */}
+          <div className="relative shrink-0">
             <button
+              ref={menuTriggerRef}
               type="button"
               onClick={() => setShowMenu(!showMenu)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-tertiary)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="Tùy chọn"
+              aria-expanded={showMenu}
+              aria-haspopup="menu"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
 
-            {showMenu && (
-              <div className="zync-glass-panel-strong absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl p-1">
+            {showMenu && menuRect && typeof document !== 'undefined' && createPortal(
+              <div
+                ref={menuPanelRef}
+                className="zync-glass-panel-strong fixed z-[300] w-48 overflow-hidden rounded-xl bg-[var(--surface-card)]/95 p-1 shadow-2xl backdrop-blur-xl"
+                style={{ top: menuRect.top, left: menuRect.left }}
+                role="menu"
+              >
                 {onMessage && (
                   <button
                     type="button"
                     onClick={handleMessage}
                     disabled={isLoading}
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--accent)]"
+                    role="menuitem"
                   >
                     <MessageSquare className="h-4 w-4" />
                     Nhắn tin
@@ -104,6 +147,7 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
                   onClick={handleUnfriend}
                   disabled={isLoading}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-amber-600"
+                  role="menuitem"
                 >
                   <UserMinus className="h-4 w-4" />
                   Hủy kết bạn
@@ -113,11 +157,13 @@ export function FriendCard({ friend, onUnfriend, onBlock, isLoading, onMessage }
                   onClick={handleBlock}
                   disabled={isLoading}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-red-500 transition-colors hover:bg-[var(--danger-bg)]"
+                  role="menuitem"
                 >
                   <UserX className="h-4 w-4" />
                   Chặn người dùng
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>

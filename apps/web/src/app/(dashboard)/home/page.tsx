@@ -30,7 +30,7 @@ const FolderOpen = LucideFolderOpen as any;
 
 function HomePageContent(): React.JSX.Element {
   const router = useRouter();
-  const { data, onSelectConversation } = useHomeDashboard();
+  const { data } = useHomeDashboard();
   const mockData = DASHBOARD_HOME_MOCK_DATA;
 
 /**
@@ -38,8 +38,7 @@ function HomePageContent(): React.JSX.Element {
  */
 const handleActivityClick = (item: typeof data.activities[0]) => {
   if (item.conversationId) {
-    // Đi đến chat và select conversation
-    router.push(`/chat?conversation=${item.conversationId}`);
+    router.push(`/chat?conversationId=${encodeURIComponent(item.conversationId)}`);
   }
 };
 
@@ -49,9 +48,10 @@ const handleActivityClick = (item: typeof data.activities[0]) => {
 const handleNotificationClick = (item: typeof data.notifications[0]) => {
   switch (item.type) {
     case 'new_message':
-      // Đi đến đúng conversation và highlight tin nhắn mới nhất
       if (item.conversationId) {
-        router.push(`/chat?conversation=${item.conversationId}&highlight=new`);
+        router.push(
+          `/chat?conversationId=${encodeURIComponent(item.conversationId)}&highlight=new`
+        );
       } else {
         router.push('/chat');
       }
@@ -72,6 +72,16 @@ const handleNotificationClick = (item: typeof data.notifications[0]) => {
         router.push(`/stories?user=${item.fromUserId}`);
       } else {
         router.push('/stories');
+      }
+      break;
+    case 'community_post':
+    case 'post_like':
+    case 'post_comment':
+    case 'post_bookmark':
+      if (item.postId) {
+        router.push(`/community?post=${encodeURIComponent(item.postId)}`);
+      } else {
+        router.push('/community');
       }
       break;
     default:
@@ -232,7 +242,7 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {data.notifications.slice(0, 5).map((item) => (
+                    {data.notifications.slice(0, 8).map((item) => (
                       <DashboardNotificationItemRow
                         key={item.id}
                         item={item}

@@ -49,7 +49,7 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
     return (
       <div
         ref={panelRef}
-        className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] rounded-[1.6rem] p-4 zync-soft-glass"
+        className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[1.6rem] p-4 zync-notification-panel"
       >
         <div className="flex justify-center py-6">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-accent" />
@@ -61,7 +61,7 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] rounded-[1.6rem] zync-soft-glass"
+      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[1.6rem] zync-notification-panel"
       style={{ animation: 'settingsSlide 0.2s ease-out' }}
     >
       <div className="flex items-center justify-between border-b border-border-light px-4 py-3">

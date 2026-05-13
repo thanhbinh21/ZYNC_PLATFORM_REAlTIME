@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import type { DashboardNotificationItem } from '../home-dashboard.types';
-import { Bell, MessageSquare, UserPlus, Users, Heart, Reply } from 'lucide-react';
+import { Bell, Bookmark, MessageSquare, UserPlus, Users, Heart, Reply } from 'lucide-react';
 
 interface DashboardNotificationItemProps {
   item: DashboardNotificationItem;
@@ -26,6 +26,13 @@ function getNotificationIcon(type: DashboardNotificationItem['type']) {
       return Heart;
     case 'story_reply':
       return Reply;
+    case 'community_post':
+    case 'post_comment':
+      return MessageSquare;
+    case 'post_like':
+      return Heart;
+    case 'post_bookmark':
+      return Bookmark;
     default:
       return Bell;
   }
@@ -47,6 +54,13 @@ function getNotificationColor(type: DashboardNotificationItem['type']): string {
       return 'bg-[#ec4899]';
     case 'story_reply':
       return 'bg-[#3b82f6]';
+    case 'community_post':
+    case 'post_comment':
+      return 'bg-[#0f9d8e]';
+    case 'post_like':
+      return 'bg-[#ec4899]';
+    case 'post_bookmark':
+      return 'bg-[#f59e0b]';
     default:
       return 'bg-[#97a7b8]';
   }
