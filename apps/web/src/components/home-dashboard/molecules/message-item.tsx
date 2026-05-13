@@ -763,7 +763,7 @@ export function MessageItem({
           showSenderInfo={showSenderInfo}
           reactionSummary={summary}
           userReaction={lastSelectedEmoji}
-          onReactionClick={(emoji) => handleReactionClick(emoji, 'bubble-click')}
+          onReactionClick={() => handleOpenReactionDetails()}
           isFirstInGroup={isFirstInGroup}
           isConsecutive={isConsecutive}
           seenByAvatarUrl={seenByAvatarUrl}
@@ -783,7 +783,7 @@ export function MessageItem({
             {legacyReactionEntries.map(([emoji, count]) => (
               <button
                 key={`${message._id}-${emoji}`}
-                onClick={() => handleReactionClick(emoji, 'legacy-pill')}
+                onClick={handleOpenReactionDetails}
                 className="reaction-pill inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs transition-opacity hover:opacity-80"
               >
                 <span>{emoji}</span>

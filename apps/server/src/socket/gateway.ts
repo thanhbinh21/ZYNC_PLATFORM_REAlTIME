@@ -319,9 +319,6 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
-    // ✅ Reaction Events – delegated to ReactionController sub-module
-    registerReactionController(io, socket as AuthSocket);
-
     // ✅ Call & WebRTC Events – delegated to CallController sub-module
     registerCallController(io, socket as AuthSocket);
     socket.on('disconnect', async () => {
