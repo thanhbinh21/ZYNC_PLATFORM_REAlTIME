@@ -5,6 +5,7 @@ import { Play, PenLine, Heart } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
+import { ForwardMessageModal } from '../molecules/forward-message-modal';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
@@ -195,6 +196,11 @@ interface ChatPanelProps {
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
   onForwardMessage?: (message: Message) => void;
+  forwardModalOpen?: boolean;
+  forwardingMessage?: Message | null;
+  forwardLoading?: boolean;
+  onCloseForwardModal?: () => void;
+  onExecuteForward?: (toConversationId: string) => Promise<void> | void;
   onAvatarClick?: () => void;
   onNameClick?: () => void;
   inputDisabled?: boolean;
@@ -3202,6 +3208,26 @@ export function HomeDashboardChatPanel({
         onChangeQuery={setMemberSearchQuery}
         onToggleMember={toggleAddMemberSelection}
         onSubmit={handleConfirmAddMembers}
+      />
+
+      <ForwardMessageModal
+        open={Boolean(chatPanelProps.forwardModalOpen)}
+        message={chatPanelProps.forwardingMessage ?? null}
+        conversations={visibleConversations.map((conversation) => ({
+          _id: conversation.id,
+          name: conversation.name || 'Hội thoại',
+          avatarUrl: conversation.avatarUrl,
+          isGroup: conversation.isGroup,
+          memberCount: conversation.memberCount,
+        }))}
+        currentConversationId={selectedConversationId}
+        isLoading={Boolean(chatPanelProps.forwardLoading)}
+        onClose={() => {
+          chatPanelProps.onCloseForwardModal?.();
+        }}
+        onForward={(_message, toConversationId) => {
+          void chatPanelProps.onExecuteForward?.(toConversationId);
+        }}
       />
     </>
   );

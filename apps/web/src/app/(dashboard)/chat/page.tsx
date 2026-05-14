@@ -179,6 +179,11 @@ export default function ChatPage() {
           onToggleScreenShare: onToggleScreenShare,
           userPenaltyScore: userPenaltyScore,
           userMutedUntil: userMutedUntil,
+          forwardingMessage,
+          forwardModalOpen,
+          forwardLoading,
+          onCloseForwardModal,
+          onExecuteForward
         }}
       />
       <MessagePreviewPopup
