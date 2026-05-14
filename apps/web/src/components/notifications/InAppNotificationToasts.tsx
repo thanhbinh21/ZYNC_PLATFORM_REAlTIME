@@ -8,6 +8,7 @@ import { getAccessToken } from '@/utils/auth-token';
 import type { Notification } from '@/services/notifications';
 import { markAsRead } from '@/services/notifications';
 import { MessageCircle, UserPlus, UserCheck, Users, Heart, MessageSquare, Bell } from 'lucide-react';
+import { ACCOUNT_SETTINGS_EVENT, loadCachedAccountSettings, type AccountSettings } from '@/services/account-settings';
 
 type ToastItem = {
   id: string;
@@ -47,6 +48,7 @@ export function InAppNotificationToasts() {
   const [items, setItems] = useState<ToastItem[]>([]);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const overflowCountRef = useRef<number>(0);
+  const toastEnabledRef = useRef<boolean>(true);
 
   const dismiss = useCallback((id: string) => {
     setItems((prev) => prev.filter((t) => t.id !== id));
@@ -106,12 +108,37 @@ export function InAppNotificationToasts() {
   }, []);
 
   useEffect(() => {
+    toastEnabledRef.current = loadCachedAccountSettings().toastNotifications;
+
+    const handleSettingsUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<AccountSettings>).detail;
+      if (detail) {
+        toastEnabledRef.current = detail.toastNotifications;
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener(ACCOUNT_SETTINGS_EVENT, handleSettingsUpdate);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(ACCOUNT_SETTINGS_EVENT, handleSettingsUpdate);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const token = getAccessToken();
     if (!token) return;
 
     const socket = getSocket(token);
 
     const handler = (notification: Notification) => {
+      if (!toastEnabledRef.current) {
+        return;
+      }
+
       // Avoid duplicate UX when user is currently in Chat view
       if (pathname?.startsWith('/chat') && notification.type === 'new_message') {
         return;

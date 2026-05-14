@@ -9,8 +9,12 @@ import { PageLoading } from '@/components/shared/page-loading';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
-import type { DashboardAppearanceSettings } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
 import type { Notification } from '@/services/notifications';
+
+type DashboardAppearanceSettings = {
+  theme: 'dark' | 'light';
+  messageFontSize: 'small' | 'medium' | 'large';
+};
 
 const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
   theme: 'light',
@@ -91,19 +95,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setAppearanceSettings(newSettings);
     globalThis.localStorage?.setItem('zync.dashboard.theme', newTheme);
     globalThis.localStorage?.setItem('zync.dashboard.messageFontSize', newSettings.messageFontSize);
-  };
-
-  const handleApplyAppearance = (settings: DashboardAppearanceSettings) => {
-    setAppearanceSettings(settings);
-    globalThis.localStorage?.setItem('zync.dashboard.theme', settings.theme);
-    globalThis.localStorage?.setItem('zync.dashboard.messageFontSize', settings.messageFontSize);
-  };
-
-  const handleResetAppearance = () => {
-    const defaults = { theme: 'light' as const, messageFontSize: 'medium' as const };
-    setAppearanceSettings(defaults);
-    globalThis.localStorage?.setItem('zync.dashboard.theme', 'light');
-    globalThis.localStorage?.setItem('zync.dashboard.messageFontSize', 'medium');
   };
 
   // Determine active nav from pathname

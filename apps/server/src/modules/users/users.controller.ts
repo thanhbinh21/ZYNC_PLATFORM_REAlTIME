@@ -7,6 +7,8 @@ import {
   updateProfile,
   upsertDeviceToken,
   discoverUsers,
+  getAccountSettings,
+  updateAccountSettings,
 } from './users.service';
 import {
   getUserPresence,
@@ -15,6 +17,7 @@ import {
   formatLastSeen,
 } from './presence.service';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
+import type { UpdateAccountSettingsDto } from './users.schema';
 
 // ─── GET /api/users/me ────────────────────────────────────────────────────────
 
@@ -57,6 +60,38 @@ export async function getPublicProfileHandler(
     const { userId: requesterId } = req as AuthRequest;
     const user = await getUserById(req.params['userId'] as string, requesterId);
     res.json({ success: true, data: user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /api/users/me/settings ─────────────────────────────────────────────
+
+export async function getAccountSettingsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const settings = await getAccountSettings(userId);
+    res.json({ success: true, settings });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── PATCH /api/users/me/settings ───────────────────────────────────────────
+
+export async function updateAccountSettingsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const settings = await updateAccountSettings(userId, req.body as UpdateAccountSettingsDto);
+    res.json({ success: true, settings });
   } catch (err) {
     next(err);
   }
@@ -136,7 +171,8 @@ export async function getUserPresenceHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const presence = await getUserPresence(req.params['userId'] as string);
+    const { userId: requesterId } = req as AuthRequest;
+    const presence = await getUserPresence(req.params['userId'] as string, requesterId);
     res.json({
       success: true,
       online: presence.online,
@@ -163,7 +199,7 @@ export async function getBulkPresenceHandler(
       return;
     }
 
-    const presenceMap = await getBulkPresence(friendIds);
+    const presenceMap = await getBulkPresence(friendIds, userId);
     const result: Record<string, { online: boolean; lastSeen: string | null; lastSeenFormatted: string }> = {};
     for (const [uid, info] of presenceMap) {
       result[uid] = {

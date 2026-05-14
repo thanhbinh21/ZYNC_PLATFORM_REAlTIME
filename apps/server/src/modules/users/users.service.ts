@@ -4,7 +4,10 @@ import { DeviceTokenModel } from './device-token.model';
 import { FriendshipModel } from '../friends/friendship.model';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { getFriendsCount, getMutualFriendsCount } from '../friends/friends.service';
+import { getIO } from '../../socket/gateway';
+import { getFriendIds, getUserPresence } from './presence.service';
 import type { UpdateProfileDto, UpsertDeviceTokenDto } from '../auth/auth.schema';
+import type { UpdateAccountSettingsDto } from './users.schema';
 
 /** Lấy profile của bản thân (đầy đủ thông tin) */
 export async function getMe(userId: string): Promise<IUser> {
@@ -108,6 +111,7 @@ export async function searchUsers(
 
   const users = await UserModel.find({
     _id: { $ne: new Types.ObjectId(requesterId) },
+    allowSearchProfile: true,
     $or: [
       { username: regex },
       { email: regex },
@@ -218,6 +222,85 @@ export async function removeDeviceToken(
   deviceToken: string,
 ): Promise<void> {
   await DeviceTokenModel.findOneAndDelete({ userId, deviceToken });
+}
+
+export interface AccountSettings {
+  toastNotifications: boolean;
+  allowSearchProfile: boolean;
+  allowFriendRequest: boolean;
+  showOnlineStatus: boolean;
+}
+
+function extractAccountSettings(user: Pick<IUser, 'toastNotifications' | 'allowSearchProfile' | 'allowFriendRequest' | 'showOnlineStatus'>): AccountSettings {
+  return {
+    toastNotifications: user.toastNotifications ?? true,
+    allowSearchProfile: user.allowSearchProfile ?? true,
+    allowFriendRequest: user.allowFriendRequest ?? true,
+    showOnlineStatus: user.showOnlineStatus ?? true,
+  };
+}
+
+async function broadcastPresenceVisibility(userId: string, showOnlineStatus: boolean): Promise<void> {
+  const io = getIO();
+  if (!io) return;
+
+  const friendIds = await getFriendIds(userId);
+  if (friendIds.length === 0) return;
+
+  if (!showOnlineStatus) {
+    for (const friendId of friendIds) {
+      io.to(`user:${friendId}`).emit('presence_changed', {
+        userId,
+        status: 'offline',
+        lastSeen: null,
+        hidden: true,
+      });
+    }
+    return;
+  }
+
+  const presence = await getUserPresence(userId, userId);
+  for (const friendId of friendIds) {
+    io.to(`user:${friendId}`).emit('presence_changed', {
+      userId,
+      status: presence.online ? 'online' : 'offline',
+      lastSeen: presence.online ? null : presence.lastSeen,
+    });
+  }
+}
+
+export async function getAccountSettings(userId: string): Promise<AccountSettings> {
+  const user = await UserModel.findById(userId)
+    .select('toastNotifications allowSearchProfile allowFriendRequest showOnlineStatus')
+    .lean();
+  if (!user) throw new NotFoundError('User not found');
+  return extractAccountSettings(user as IUser);
+}
+
+export async function updateAccountSettings(
+  userId: string,
+  dto: UpdateAccountSettingsDto,
+): Promise<AccountSettings> {
+  if (Object.keys(dto).length === 0) {
+    throw new BadRequestError('No settings provided');
+  }
+
+  const before = await UserModel.findById(userId).select('showOnlineStatus').lean();
+  if (!before) throw new NotFoundError('User not found');
+
+  const updated = await UserModel.findByIdAndUpdate(
+    userId,
+    { $set: dto },
+    { new: true, runValidators: true },
+  ).select('toastNotifications allowSearchProfile allowFriendRequest showOnlineStatus');
+
+  if (!updated) throw new NotFoundError('User not found');
+
+  if (dto.showOnlineStatus !== undefined && dto.showOnlineStatus !== (before as IUser).showOnlineStatus) {
+    await broadcastPresenceVisibility(userId, dto.showOnlineStatus);
+  }
+
+  return extractAccountSettings(updated as IUser);
 }
 
 /** Khám phá developers nổi bật theo skills/tags */
