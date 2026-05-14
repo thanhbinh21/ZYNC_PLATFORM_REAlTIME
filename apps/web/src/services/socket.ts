@@ -1,4 +1,4 @@
-import { MessageType } from '@zync/shared-types';
+import { MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 
@@ -189,6 +189,7 @@ export function listenToMessages(
     messageId: string;
     conversationId?: string;
     senderId: string;
+    sender: SenderInMessage;
     content: string;
     type: string;
     mediaUrl?: string;

@@ -343,7 +343,6 @@ export function MessageBubble({
             <span className="chat-status-icon">
               {status === 'sent' && <SentIcon className="h-3.5 w-3.5" />}
               {status === 'delivered' && <DeliveredIcon className="h-3.5 w-3.5" />}
-              {status === 'read' && <ReadIcon className="h-3.5 w-3.5" />}
             </span>
           )}
 

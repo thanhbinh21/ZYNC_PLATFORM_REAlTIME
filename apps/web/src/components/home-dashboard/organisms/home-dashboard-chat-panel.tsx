@@ -1285,8 +1285,11 @@ function ChatPanel({
               </div>
             )}
 
-            {messagesForDisplay.map((message) => (
-              <div
+            {messagesForDisplay.map((message) => {
+              const avatarUrl = message.sender?.avatarUrl as string
+              const displayName = message.sender?.displayName as string
+
+              return (<div
                 key={message._id}
                 ref={(node) => {
                   messageRowRefs.current[message._id] = node;
@@ -1297,7 +1300,8 @@ function ChatPanel({
                   message={message}
                   isSender={String(message.senderId) === String(currentUserId)}
                   canRecall={canRecallMessage(message.createdAt)}
-                  senderAvatar={participantAvatar}
+                  senderAvatar={avatarUrl}
+                  senderDisplayName={displayName}
                   messageStatus={messageStatus}
                   onDeleteForMe={onDeleteMessageForMe}
                   onRecall={onRecallMessage}
@@ -1311,8 +1315,8 @@ function ChatPanel({
                   onReport={handleReportMessage}
                   onReact={handleReactMessage}
                 />
-              </div>
-            ))}
+              </div>)
+            })}
 
             {/* Typing Indicator */}
             {typingUsers.length > 0 && (

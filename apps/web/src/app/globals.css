@@ -1941,18 +1941,6 @@ body.story-viewer-open {
   min-width: 60px;
 }
 
-.chat-bubble-other::before {
-  content: '';
-  position: absolute;
-  left: -8px;
-  bottom: 4px;
-  width: 16px;
-  height: 16px;
-  background: #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.1);
-}
-
 [data-zync-theme='dark'] .chat-bubble-other {
   background: #3a3b3c;
   color: #e4e6eb;
@@ -1990,17 +1978,6 @@ body.story-viewer-open {
   color: #ffffff;
 }
 
-.chat-bubble-own::after {
-  content: '';
-  position: absolute;
-  right: -8px;
-  bottom: 4px;
-  width: 16px;
-  height: 16px;
-  background: #0084ff;
-  border-radius: 50%;
-  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.1);
-}
 
 [data-zync-theme='dark'] .chat-bubble-own {
   background: #0084ff;

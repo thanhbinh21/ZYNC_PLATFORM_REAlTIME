@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { Message, MessageStatus } from "@zync/shared-types";
+import type { Message, MessageStatus, SenderInMessage } from "@zync/shared-types";
 import {
   getSocket,
   isConnected,
@@ -166,6 +166,7 @@ export function useChat({
       messageId: string;
       conversationId?: string;
       senderId: string;
+      sender: SenderInMessage;
       content: string;
       type: string;
       mediaUrl?: string;
@@ -182,6 +183,7 @@ export function useChat({
         _id: data.messageId,
         conversationId: data.conversationId,
         senderId: data.senderId,
+        sender: data.sender,
         content: data.content,
         type: data.type as Message["type"],
         mediaUrl: data.mediaUrl,
