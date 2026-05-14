@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
-import { useImageViewer } from '@/context/image-viewer-context';
 import type { ReactionDetailsResponse } from '@/services/chat';
 
 function EllipsisVerticalIcon({ className }: { className: string }) {
@@ -123,20 +122,20 @@ function ReactionDetailsModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h4 className="reaction-modal-header text-base font-semibold">Chi tiet cam xuc</h4>
+          <h4 className="reaction-modal-header text-base font-semibold">Chi tiết cảm xúc</h4>
           <button
             type="button"
             onClick={onClose}
             className="reaction-modal-button rounded-lg px-3 py-1 text-sm hover:opacity-80 transition-opacity"
           >
-            Dong
+            Đóng
           </button>
         </div>
 
         {loading ? (
-          <p className="reaction-row-meta py-6 text-center text-sm">Dang tai...</p>
+          <p className="reaction-row-meta py-6 text-center text-sm">Đang tải...</p>
         ) : !details || visibleRows.length === 0 ? (
-          <p className="reaction-row-meta py-6 text-center text-sm">Chua co cam xuc cho tin nhan nay.</p>
+          <p className="reaction-row-meta py-6 text-center text-sm">Chưa có cảm xúc cho tin nhắn này.</p>
         ) : (
           <>
             <div className="mb-3 flex flex-wrap gap-2">
@@ -193,21 +192,21 @@ function StatusDetailsModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h4 className="reaction-modal-header text-base font-semibold">Thong ke da xem</h4>
+          <h4 className="reaction-modal-header text-base font-semibold">Thống kê đã xem</h4>
           <button
             type="button"
             onClick={onClose}
             className="reaction-modal-button rounded-lg px-3 py-1 text-sm hover:opacity-80 transition-opacity"
           >
-            Dong
+            Đóng
           </button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="status-modal-box rounded-xl border p-3">
-            <p className="status-modal-label mb-2 text-xs uppercase tracking-wide">Da xem ({readBy.length})</p>
+            <p className="status-modal-label mb-2 text-xs uppercase tracking-wide">Đã xem ({readBy.length})</p>
             {readBy.length === 0 ? (
-              <p className="status-modal-label text-sm">Chua co ai da xem.</p>
+              <p className="status-modal-label text-sm">Chưa có ai đã xem.</p>
             ) : (
               <div className="space-y-2">
                 {readBy.map((item) => (
@@ -240,9 +239,9 @@ function StatusDetailsModal({
           </div>
 
           <div className="status-modal-box rounded-xl border p-3">
-            <p className="status-modal-label mb-2 text-xs uppercase tracking-wide">Chua doc ({sentTo.length})</p>
+            <p className="status-modal-label mb-2 text-xs uppercase tracking-wide">Chưa đọc ({sentTo.length})</p>
             {sentTo.length === 0 ? (
-              <p className="status-modal-label text-sm">Tat ca da doc.</p>
+              <p className="status-modal-label text-sm">Tất cả đã đọc.</p>
             ) : (
               <div className="space-y-2">
                 {sentTo.map((item) => (
@@ -356,7 +355,6 @@ export function MessageItem({
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
   const isLifecycleNotice = isGroupLifecycleNotice(message);
   const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
-  const { openViewer } = useImageViewer();
 
   const summary = message.reactionSummary;
   const summaryEntries = Object.entries(summary?.emojiCounts || {}).sort((a, b) => b[1] - a[1]);
@@ -379,7 +377,7 @@ export function MessageItem({
     ? summaryEntries.slice(0, 5).map(([emoji]) => emoji)
     : DEFAULT_MENU_REACTIONS;
 
-  const isRecalled = message.type === 'system-recall' && message.content === '[Tin nhan da duoc thu hoi]';
+  const isRecalled = message.type === 'system-recall' && message.content === '[Tin nhắn đã được thu hồi]';
   const canOpenReadStats = isSender
     && status === 'read'
     && !isRecalled
@@ -605,7 +603,7 @@ export function MessageItem({
                 type="button"
                 onClick={handleTriggerClick}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-light bg-transparent text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
-                title="Tha cam xuc"
+                title="Thả cảm xúc"
               >
                 {lastSelectedEmoji ? (
                   <span className="text-sm leading-none">{lastSelectedEmoji}</span>
@@ -643,7 +641,7 @@ export function MessageItem({
                       onClick={handleRemoveMineReactions}
                       className="rounded-full px-2 py-0.5 text-xs text-red-500 transition-opacity hover:opacity-80"
                     >
-                      Xoa
+                      Xóa
                     </button>
                   )}
                 </div>
@@ -658,7 +656,7 @@ export function MessageItem({
                   setShowMenu((prev) => !prev);
                 }}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-light bg-transparent text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
-                title="Them tuy chon"
+                title="Thêm tùy chọn"
               >
                 <EllipsisVerticalIcon className="h-3.5 w-3.5" />
               </button>
@@ -695,7 +693,7 @@ export function MessageItem({
                         className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
                       >
                         <TrashIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Xoa cho toi</span>
+                        <span>Xóa chỗ tôi</span>
                       </button>
 
                       {canRecall && (
@@ -704,7 +702,7 @@ export function MessageItem({
                           className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
                         >
                           <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                          <span>Thu hoi</span>
+                          <span>Thu hồi</span>
                         </button>
                       )}
 
@@ -713,7 +711,7 @@ export function MessageItem({
                         className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
                       >
                         <ForwardIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Chuyen tiep</span>
+                        <span>Chuyển tiếp</span>
                       </button>
 
                       <button
@@ -721,7 +719,7 @@ export function MessageItem({
                         className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
                       >
                         <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Tra loi</span>
+                        <span>Trả lời</span>
                       </button>
                     </>
                   ) : (
@@ -731,7 +729,7 @@ export function MessageItem({
                         className="message-menu-button-report flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
                       >
                         <FlagIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Bao cao vi pham</span>
+                        <span>Báo cáo vi phạm</span>
                       </button>
 
                       <button
@@ -739,7 +737,7 @@ export function MessageItem({
                         className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
                       >
                         <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Tra loi</span>
+                        <span>Trả lời</span>
                       </button>
                     </>
                   )}
@@ -774,14 +772,11 @@ export function MessageItem({
           seenByAvatarUrl={seenByAvatarUrl}
           onImageLike={() => onImageLike?.(message)}
           onImageOptions={() => onImageOptions?.(message)}
-          onImageClick={(imageUrl) => {
-            openViewer({ imageUrl, senderAvatar, senderDisplayName, createdAt: message.createdAt });
-          }}
         />
 
         {isRecalled && (
           <p className="mt-1 text-xs italic text-text-tertiary">
-            {isSender ? 'Ban da thu hoi tin nhan nay' : 'Tin nhan da duoc thu hoi'}
+            {isSender ? 'Bạn đã thu hồi tin nhắn này' : 'Tin nhắn đã được thu hồi'}
           </p>
         )}
 

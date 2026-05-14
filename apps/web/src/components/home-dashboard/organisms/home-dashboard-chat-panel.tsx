@@ -3,7 +3,6 @@
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, PenLine, Heart } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
-import { MessageBubble } from '../atoms/message-bubble';
 import { MessageItem } from '../molecules/message-item';
 import { ForwardMessageModal } from '../molecules/forward-message-modal';
 import { TypingIndicator } from '../atoms/typing-indicator';
@@ -139,7 +138,7 @@ function AuthorPostsSection({ conversation, currentUserId }: AuthorPostsSectionP
     <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
       <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary flex items-center gap-1.5">
         <PenLine className="h-3.5 w-3.5" />
-        Bai viet gan day
+        Bài viết gần đây
       </p>
 
       {loading ? (
@@ -149,7 +148,7 @@ function AuthorPostsSection({ conversation, currentUserId }: AuthorPostsSectionP
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <p className="text-xs text-text-tertiary">Chua co bai viet nao</p>
+        <p className="text-xs text-text-tertiary">Chưa có bài viết nào</p>
       ) : (
         <div className="space-y-2">
           {posts.map((post) => (
@@ -870,9 +869,9 @@ function ChatPanel({
         }
       }
 
-      showJumpStatus('Tin nhan khong the truy cap.');
+      showJumpStatus('Tin nhắn không thể truy cập.');
     } catch {
-      showJumpStatus('Khong the tai them tin nhan de di den tin goc.');
+      showJumpStatus('Không thể tải thêm tin nhắn để đi đến tin gốc.');
     } finally {
       isJumpingRef.current = false;
     }
@@ -889,7 +888,7 @@ function ChatPanel({
               isGroupConversation ? 'cursor-pointer hover:shadow-md hover:scale-105 transition-all' : 'cursor-default'
             }`}
             onClick={isGroupConversation ? onAvatarClick : undefined}
-            title={isGroupConversation ? 'Doi anh nhom' : undefined}
+            title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
           >
             {participantAvatarUrl ? (
               <img src={participantAvatarUrl} alt={participantName} className="h-full w-full object-cover" />
@@ -913,7 +912,7 @@ function ChatPanel({
             </button>
             <div className="chat-header-status">
               <span className={`online-dot ${isOnline ? '' : 'offline'}`} />
-              {isOnline ? 'Dang hoat dong' : 'Ngoai tuyen'}
+              {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
             </div>
           </div>
         </div>
@@ -923,7 +922,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Goi thoai"
+            title="Gọi điện thoại"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
@@ -932,7 +931,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Goi video"
+            title="Gọi video"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
@@ -941,7 +940,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Thong tin"
+            title="Thông tin"
             onClick={onInfoClick}
           >
             <InfoIcon className="w-5 h-5" />
@@ -990,7 +989,7 @@ function ChatPanel({
               type="button"
               onClick={() => setReportStatus(null)}
               className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-text-tertiary hover:bg-white/10 transition-colors"
-              aria-label="Dong thong bao"
+              aria-label="Đóng thông báo"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1035,7 +1034,7 @@ function ChatPanel({
               type="button"
               onClick={() => setErrorToast(null)}
               className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-red-400 hover:bg-red-500/20 transition-colors"
-              aria-label="Dong thong bao"
+              aria-label="Đóng thông báo"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1252,10 +1251,10 @@ function ChatPanel({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                   </svg>
-                  Dang tai...
+                  Đang tải...
                 </span>
               ) : (
-                'Tin nhan cu hon'
+                'Tin nhắn cũ hơn'
               )}
             </button>
           </div>
@@ -1279,7 +1278,7 @@ function ChatPanel({
             <div className="space-y-1">
               <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
               <p className="text-sm text-text-tertiary max-w-[220px]">
-                Nhan tin ngay de bat dau tro chuyen voi <span className="font-medium text-accent">{participantName}</span>
+                Nhắn tin ngay để bắt đầu trò chuyện với <span className="font-medium text-accent">{participantName}</span>
               </p>
             </div>
 
@@ -1289,7 +1288,7 @@ function ChatPanel({
                 <line x1="22" y1="2" x2="11" y2="13"/>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
-              Nhan Enter de gui tin nhan
+              Nhấn Enter để gửi tin nhắn
             </div>
           </div>
         ) : (
@@ -1349,7 +1348,7 @@ function ChatPanel({
         <svg className="w-3.5 h-3.5 text-[#929292] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <span className="chat-moderation-text">Muc do vi pham tieu chuan cong dong</span>
+        <span className="chat-moderation-text">Mức độ vi phạm tiêu chuẩn cộng đồng</span>
         <span className={`font-semibold text-[11px] ml-auto ${
           userPenaltyScore >= 80 ? 'text-red-500' :
           userPenaltyScore >= 50 ? 'text-orange-500' :
@@ -1367,7 +1366,7 @@ function ChatPanel({
               <circle cx="12" cy="12" r="10"/>
               <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
-            Ban dang bi cam chat den {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+            Bạn đang bị cấm chat đến {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       )}
@@ -2704,7 +2703,7 @@ export function HomeDashboardChatPanel({
 
       {isInfoOpen && (
         <div className="fixed inset-0 z-40 bg-black/45 xl:hidden">
-          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-bg-card border-l border-border p-5">
+          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-bg-card border-border p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-text-primary">{isMembersViewOpen ? 'Thành viên' : isArchiveOpen ? 'Kho lưu trữ' : infoTitle}</h3>
               <button

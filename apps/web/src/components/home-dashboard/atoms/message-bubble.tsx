@@ -89,7 +89,6 @@ interface MessageBubbleProps {
   seenByAvatarUrl?: string;
   onImageLike?: () => void;
   onImageOptions?: () => void;
-  onImageClick?: (imageUrl: string) => void;
 }
 
 export function MessageBubble({
@@ -117,7 +116,6 @@ export function MessageBubble({
   seenByAvatarUrl,
   onImageLike,
   onImageOptions,
-  onImageClick,
 }: MessageBubbleProps) {
   const [imageHovered, setImageHovered] = useState(false);
   const { openViewer } = useMediaViewer();
@@ -179,18 +177,18 @@ export function MessageBubble({
               type="button"
               onClick={() => onJumpToMessage?.(replyTo.messageRef)}
               className="chat-reply-quote mb-2 w-full max-w-[240px] text-left block"
-              title="Di den tin nhan goc"
+              title="Đi đến tin nhắn gốc"
             >
               <div className="flex items-center gap-1.5 mb-0.5">
                 <ReplyIcon className="w-3 h-3 text-accent flex-shrink-0" />
                 <span className="text-[10px] uppercase tracking-wide font-semibold text-accent">
-                  Tra loi
+                  Trả lời
                 </span>
               </div>
               {replyTo.senderDisplayName && (
                 <p className="chat-reply-sender">{replyTo.senderDisplayName}</p>
               )}
-              <p className="chat-reply-preview">{replyTo.contentPreview || '[Tin nhan]'}</p>
+              <p className="chat-reply-preview">{replyTo.contentPreview || '[Tin nhắn]'}</p>
             </button>
           )}
 
@@ -223,7 +221,7 @@ export function MessageBubble({
                     type="button"
                     onClick={onImageLike}
                     className="chat-image-action"
-                    title="Tha cam xuc"
+                    title="Thả cảm xúc"
                   >
                     <LikeIcon className="w-4 h-4" />
                   </button>
@@ -233,7 +231,7 @@ export function MessageBubble({
                     type="button"
                     onClick={onImageOptions}
                     className="chat-image-action"
-                    title="Tuy chon"
+                    title="Tùy chọn"
                   >
                     <MoreIcon className="w-4 h-4" />
                   </button>
@@ -335,7 +333,7 @@ export function MessageBubble({
           <span className="chat-timestamp">{timeStr}</span>
 
           {moderationWarning && type !== 'system-recall' && (
-            <span className="inline-flex items-center gap-0.5 text-yellow-500" title="Tin nhan canh bao noi dung">
+            <span className="inline-flex items-center gap-0.5 text-yellow-500" title="Tin nhắn cảnh báo nội dung">
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" />
               </svg>
@@ -354,7 +352,7 @@ export function MessageBubble({
               type="button"
               onClick={onReadPreviewPress}
               className="inline-flex items-center gap-1 rounded-full border border-border-light bg-bg-hover px-1.5 py-0.5 hover:bg-border"
-              title="Xem chi tiet da xem"
+              title="Xem chi tiết đã xem"
             >
               <span className="inline-flex -space-x-2">
                 {previewReaders.map((reader) => {

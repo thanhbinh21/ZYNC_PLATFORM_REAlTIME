@@ -148,7 +148,7 @@ function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string
           : message.type === 'audio'
             ? 'Đã gửi âm thanh'
             : message.type === 'sticker'
-              ? 'Da gui sticker'
+              ? 'Đã gửi sticker'
               : 'Tin nhắn media';
 }
 
