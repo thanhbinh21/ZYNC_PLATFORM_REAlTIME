@@ -88,6 +88,7 @@ interface MessageBubbleProps {
   seenByAvatarUrl?: string;
   onImageLike?: () => void;
   onImageOptions?: () => void;
+  onImageClick?: (imageUrl: string) => void;
 }
 
 export function MessageBubble({
@@ -115,6 +116,7 @@ export function MessageBubble({
   seenByAvatarUrl,
   onImageLike,
   onImageOptions,
+  onImageClick,
 }: MessageBubbleProps) {
   const [imageHovered, setImageHovered] = useState(false);
   const isPendingLocalMedia = Boolean(mediaUrl?.startsWith('blob:'));
@@ -193,9 +195,10 @@ export function MessageBubble({
           {/* Image Message */}
           {mediaUrl && type === 'image' && (
             <div
-              className="chat-image-wrapper"
+              className="chat-image-wrapper cursor-pointer"
               onMouseEnter={() => setImageHovered(true)}
               onMouseLeave={() => setImageHovered(false)}
+              onClick={() => onImageClick?.(mediaUrl)}
             >
               {isPendingLocalMedia ? (
                 <img
@@ -298,9 +301,7 @@ export function MessageBubble({
             <button
               type="button"
               onClick={() => {
-                if (userReaction && onReactionClick) {
-                  onReactionClick();
-                }
+                onReactionClick();
               }}
               className={`chat-reaction-pill ${userReaction ? 'own-reaction' : ''} ${isOwn ? 'sent-reaction' : 'received-reaction'}`}
             >

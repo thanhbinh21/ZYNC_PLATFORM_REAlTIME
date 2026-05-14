@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
+import { useImageViewer } from '@/context/image-viewer-context';
 import type { ReactionDetailsResponse } from '@/services/chat';
 
 function EllipsisVerticalIcon({ className }: { className: string }) {
@@ -355,6 +356,7 @@ export function MessageItem({
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
   const isLifecycleNotice = isGroupLifecycleNotice(message);
   const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
+  const { openViewer } = useImageViewer();
 
   const summary = message.reactionSummary;
   const summaryEntries = Object.entries(summary?.emojiCounts || {}).sort((a, b) => b[1] - a[1]);
@@ -679,7 +681,7 @@ export function MessageItem({
                         key={emoji}
                         onClick={() => handleReactionClick(emoji, 'menu')}
                         className="reaction-menu-item p-0.5 transition-transform hover:scale-125"
-                        title={`React ${emoji}`}
+                        title={`React ${emoji}`} 
                       >
                         {emoji}
                       </button>
@@ -772,6 +774,9 @@ export function MessageItem({
           seenByAvatarUrl={seenByAvatarUrl}
           onImageLike={() => onImageLike?.(message)}
           onImageOptions={() => onImageOptions?.(message)}
+          onImageClick={(imageUrl) => {
+            openViewer({ imageUrl, senderAvatar, senderDisplayName, createdAt: message.createdAt });
+          }}
         />
 
         {isRecalled && (
@@ -796,6 +801,8 @@ export function MessageItem({
           </div>
         )}
       </div>
+
+      {/* ImageViewer is rendered by ImageViewerProvider at a higher level */}
     </div>
   );
 }
