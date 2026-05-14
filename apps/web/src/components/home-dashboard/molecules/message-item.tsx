@@ -757,6 +757,9 @@ export function MessageItem({
           onJumpToMessage={onJumpToMessage}
           moderationWarning={Boolean((message as any).moderationWarning)}
           status={status}
+          readByPreview={message.readByPreview}
+          readByCount={message.readBy?.length}
+          onReadPreviewPress={canOpenReadStats ? handleOpenReadStats : undefined}
           timestamp={message.createdAt}
           senderAvatar={senderAvatar}
           senderDisplayName={senderDisplayName}

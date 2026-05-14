@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
-import type { MessageStatus, MessageReplyTo } from '@zync/shared-types';
+import type { MessageStatus, MessageReplyTo, MessageReadParticipantWithTime } from '@zync/shared-types';
 import { GetFileIcon } from './file-type-icons';
 
 function ReplyIcon({ className }: { className: string }) {
@@ -72,13 +72,16 @@ interface MessageBubbleProps {
   onJumpToMessage?: (messageRef: string) => void;
   moderationWarning?: boolean;
   status?: MessageStatus;
+  readByPreview?: MessageReadParticipantWithTime[];
+  readByCount?: number;
+  onReadPreviewPress?: () => void;
   timestamp: string;
   senderAvatar?: string;
   senderDisplayName?: string;
   showSenderInfo?: boolean;
   reactionSummary?: ReactionSummary;
   userReaction?: string | null;
-  onReactionClick?: (emoji: string) => void;
+  onReactionClick: () => void;
   isFirstInGroup?: boolean;
   isConsecutive?: boolean;
   seenByAvatar?: string;
@@ -96,6 +99,9 @@ export function MessageBubble({
   onJumpToMessage,
   moderationWarning = false,
   status,
+  readByPreview = [],
+  readByCount = 0,
+  onReadPreviewPress,
   timestamp,
   senderAvatar,
   senderDisplayName,
@@ -124,6 +130,9 @@ export function MessageBubble({
     : (senderDisplayName || 'U').slice(0, 2).toUpperCase();
 
   const hasReactions = reactionSummary && reactionSummary.totalCount > 0;
+  const previewReaders = Array.isArray(readByPreview) ? readByPreview : [];
+  const visibleReadCount = readByCount > 0 ? readByCount : previewReaders.length;
+  const hasReadPreview = isOwn && type !== 'system-recall' && status === 'read' && previewReaders.length > 0;
 
   const bubbleClass = isOwn ? 'chat-bubble-own' : 'chat-bubble-other';
   const bubbleModifiers = isFirstInGroup ? 'bubble-first' : 'bubble-consecutive';
@@ -290,7 +299,7 @@ export function MessageBubble({
               type="button"
               onClick={() => {
                 if (userReaction && onReactionClick) {
-                  onReactionClick(userReaction);
+                  onReactionClick();
                 }
               }}
               className={`chat-reaction-pill ${userReaction ? 'own-reaction' : ''} ${isOwn ? 'sent-reaction' : 'received-reaction'}`}
@@ -336,6 +345,41 @@ export function MessageBubble({
               {status === 'delivered' && <DeliveredIcon className="h-3.5 w-3.5" />}
               {status === 'read' && <ReadIcon className="h-3.5 w-3.5" />}
             </span>
+          )}
+
+          {hasReadPreview && (
+            <button
+              type="button"
+              onClick={onReadPreviewPress}
+              className="inline-flex items-center gap-1 rounded-full border border-border-light bg-bg-hover px-1.5 py-0.5 hover:bg-border"
+              title="Xem chi tiet da xem"
+            >
+              <span className="inline-flex -space-x-2">
+                {previewReaders.map((reader) => {
+                  const hasAvatar = Boolean(reader.avatarUrl && /^(https?:\/\/|\/)/.test(reader.avatarUrl));
+                  return hasAvatar ? (
+                    <Image
+                      key={`read-${reader.userId}`}
+                      src={reader.avatarUrl!}
+                      alt={reader.displayName || 'reader'}
+                      width={16}
+                      height={16}
+                      className="h-4 w-4 rounded-full border border-white object-cover"
+                    />
+                  ) : (
+                    <span
+                      key={`read-${reader.userId}`}
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white bg-accent-light text-[9px] font-semibold text-accent"
+                    >
+                      {(reader.displayName || 'U').slice(0, 1).toUpperCase()}
+                    </span>
+                  );
+                })}
+              </span>
+              {visibleReadCount > previewReaders.length && (
+                <span className="text-[10px] text-text-tertiary">+{visibleReadCount - previewReaders.length}</span>
+              )}
+            </button>
           )}
         </div>
       </div>
