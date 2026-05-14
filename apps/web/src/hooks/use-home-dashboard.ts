@@ -127,6 +127,7 @@ interface ConversationSearchTarget {
   type: 'friend' | 'group';
   name: string;
   avatar?: string;
+  avatarUrl?: string;
   conversationId?: string;
 }
 
@@ -1738,6 +1739,9 @@ export function useHomeDashboard() {
         type: 'group',
         name: conversation.name || 'Nhóm',
         avatar: conversation.name?.substring(0, 2).toUpperCase() || 'GR',
+        avatarUrl: conversation.type === 'group'
+        ? conversation.avatarUrl
+        : conversation.users.find(u => u._id !== userId)?.avatarUrl,
         conversationId: conversation._id,
       });
     }
@@ -1753,6 +1757,7 @@ export function useHomeDashboard() {
         type: 'friend',
         name: friend.displayName,
         avatar: friend.displayName.substring(0, 2).toUpperCase(),
+        avatarUrl: friend.avatarUrl
       });
     }
 

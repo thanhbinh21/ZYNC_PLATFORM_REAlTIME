@@ -13,6 +13,7 @@ import type { ReactionDetailsResponse } from '@/services/chat';
 import { reportMessage, reactMessage } from '@/services/chat';
 import { fetchPostsByAuthor, type Post } from '@/services/posts';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -297,6 +298,7 @@ interface ConversationSearchTarget {
   type: 'friend' | 'group';
   name: string;
   avatar?: string;
+  avatarUrl?: string;
   conversationId?: string;
 }
 
@@ -335,7 +337,7 @@ function ConversationList({
   const normalizedQuery = query.trim().toLowerCase();
   const filteredConversations = normalizedQuery
     ? conversations.filter((item) => {
-      return item.name.toLowerCase().includes(normalizedQuery)
+      return (item.name as string).toLowerCase().includes(normalizedQuery)
         || item.preview.toLowerCase().includes(normalizedQuery);
     })
     : conversations;
@@ -383,8 +385,10 @@ function ConversationList({
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-bg-active active:scale-[0.99]"
                 >
-                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
-                    {(target.avatar || target.name).substring(0, 2).toUpperCase()}
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full overflow-hidden bg-accent text-sm font-semibold text-white">
+                    {target.avatarUrl?
+                      <Image src={target.avatarUrl} alt={target.avatar as string} width={48} height={48} className="h-full w-full object-cover" />:
+                      (target.avatar || target.name).substring(0, 2).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-ui-title text-sm text-text-primary">{target.name}</p>
@@ -432,9 +436,12 @@ function ConversationList({
             >
               <div className="flex items-center gap-3">
                 <div className="relative h-12 w-12 flex-shrink-0 rounded-2xl bg-accent text-white">
-                  <span className="flex h-full w-full items-center justify-center text-sm font-semibold">
-                    {item.avatar}
-                  </span>
+                    <span className="flex items-center justify-center overflow-hidden rounded-2xl h-full w-full text-sm font-semibold">
+                      {item.avatarUrl?
+                        <Image src={item.avatarUrl} alt={item.avatar} width={48} height={48} className="h-full w-full object-cover" />:
+                        item.avatar
+                      }
+                    </span>
                   {item.online && (
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-bg-card bg-emerald-400" />
                   )}
