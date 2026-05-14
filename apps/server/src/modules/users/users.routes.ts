@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../shared/middleware/auth.middleware';
 import { validateBody } from '../../shared/middleware/validate.middleware';
 import { UpdateProfileSchema, UpsertDeviceTokenSchema } from '../auth/auth.schema';
+import { UpdateAccountSettingsSchema } from './users.schema';
 import {
   getMeHandler,
   getUserByIdHandler,
@@ -12,6 +13,8 @@ import {
   discoverUsersHandler,
   getUserPresenceHandler,
   getBulkPresenceHandler,
+  getAccountSettingsHandler,
+  updateAccountSettingsHandler,
 } from './users.controller';
 
 export const usersRouter = Router();
@@ -21,6 +24,9 @@ usersRouter.use(authenticate);
 
 // GET /api/users/me – get own profile
 usersRouter.get('/me', getMeHandler);
+
+// GET /api/users/me/settings – get account settings
+usersRouter.get('/me/settings', getAccountSettingsHandler);
 
 // GET /api/users/search?query=...&limit=10 – search users for friend request
 usersRouter.get('/search', searchUsersHandler);
@@ -42,6 +48,9 @@ usersRouter.get('/:userId/presence', getUserPresenceHandler);
 
 // PATCH /api/users/me – update own profile
 usersRouter.patch('/me', validateBody(UpdateProfileSchema), updateProfileHandler);
+
+// PATCH /api/users/me/settings – update account settings
+usersRouter.patch('/me/settings', validateBody(UpdateAccountSettingsSchema), updateAccountSettingsHandler);
 
 // POST /api/users/me/device-token – register device token for push notifications
 usersRouter.post('/me/device-token', validateBody(UpsertDeviceTokenSchema), upsertDeviceTokenHandler);

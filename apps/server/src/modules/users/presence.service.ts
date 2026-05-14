@@ -1,6 +1,7 @@
 import { getRedis } from '../../infrastructure/redis';
 import { FriendshipModel } from '../friends/friendship.model';
 import { logger } from '../../shared/logger';
+import { UserModel } from './user.model';
 
 const PRESENCE_TTL_SECONDS = 60; // 60s TTL, heartbeat refreshes it
 
@@ -47,23 +48,35 @@ export async function refreshPresenceOnline(userId: string): Promise<void> {
 /**
  * Get presence for a single user.
  */
-export async function getUserPresence(userId: string): Promise<PresenceInfo> {
+export async function getUserPresence(userId: string, requesterId?: string): Promise<PresenceInfo> {
   const redis = getRedis();
   const [onlineKey, lastSeenRaw] = await Promise.all([
     redis.get(`presence:${userId}`),
     redis.get(`presence:lastSeen:${userId}`),
   ]);
 
-  return {
+  const presence: PresenceInfo = {
     online: onlineKey === 'online',
     lastSeen: lastSeenRaw ? new Date(Number(lastSeenRaw)).toISOString() : null,
   };
+
+  if (requesterId && requesterId !== userId) {
+    const user = await UserModel.findById(userId).select('showOnlineStatus').lean();
+    if (user && user.showOnlineStatus === false) {
+      return { online: false, lastSeen: null };
+    }
+  }
+
+  return presence;
 }
 
 /**
  * Get presence for multiple users efficiently using pipeline.
  */
-export async function getBulkPresence(userIds: string[]): Promise<Map<string, PresenceInfo>> {
+export async function getBulkPresence(
+  userIds: string[],
+  requesterId?: string,
+): Promise<Map<string, PresenceInfo>> {
   const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
   if (uniqueIds.length === 0) {
     return new Map();
@@ -78,9 +91,28 @@ export async function getBulkPresence(userIds: string[]): Promise<Map<string, Pr
   const results = await pipeline.exec();
 
   const presenceMap = new Map<string, PresenceInfo>();
+  let visibilityMap: Map<string, boolean> | null = null;
+
+  if (requesterId) {
+    const users = await UserModel.find({ _id: { $in: uniqueIds } })
+      .select('showOnlineStatus')
+      .lean();
+    visibilityMap = new Map<string, boolean>();
+    for (const user of users) {
+      visibilityMap.set(user._id.toString(), user.showOnlineStatus !== false);
+    }
+  }
+
   for (let i = 0; i < uniqueIds.length; i++) {
     const onlineValue = results?.[i * 2]?.[1] as string | null;
     const lastSeenValue = results?.[i * 2 + 1]?.[1] as string | null;
+    const targetId = uniqueIds[i]!;
+    const visible = !requesterId || requesterId === targetId || (visibilityMap?.get(targetId) ?? true);
+    if (!visible) {
+      presenceMap.set(targetId, { online: false, lastSeen: null });
+      continue;
+    }
+
     presenceMap.set(uniqueIds[i]!, {
       online: onlineValue === 'online',
       lastSeen: lastSeenValue ? new Date(Number(lastSeenValue)).toISOString() : null,

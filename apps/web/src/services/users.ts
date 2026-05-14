@@ -17,6 +17,12 @@ export interface MeUser {
   createdAt?: string;
   globalViolationCount?: number;
   trustScore?: number;
+  toastNotifications?: boolean;
+  allowSearchProfile?: boolean;
+  allowFriendRequest?: boolean;
+  showOnlineStatus?: boolean;
+  isOnline?: boolean;
+  lastSeenAt?: string | null;
 }
 
 export interface PublicUserProfile {

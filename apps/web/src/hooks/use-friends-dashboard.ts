@@ -274,8 +274,19 @@ export function useFriendsDashboard() {
 
     socket.on('new_notification', handleNewNotification);
 
+    const handlePresenceChanged = (payload: { userId: string; status: 'online' | 'offline'; hidden?: boolean }) => {
+      setFriends((prev) => prev.map((friend) => (
+        friend.id === payload.userId
+          ? { ...friend, status: payload.hidden ? undefined : payload.status }
+          : friend
+      )));
+    };
+
+    socket.on('presence_changed', handlePresenceChanged);
+
     return () => {
       socket.off('new_notification', handleNewNotification);
+      socket.off('presence_changed', handlePresenceChanged);
     };
   }, [loadData]);
 
