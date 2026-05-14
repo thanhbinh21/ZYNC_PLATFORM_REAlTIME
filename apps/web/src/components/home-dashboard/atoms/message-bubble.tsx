@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useState } from 'react';
 import type { MessageStatus, MessageReplyTo, MessageReadParticipantWithTime } from '@zync/shared-types';
+import { useMediaViewer } from '@/context/media-viewer-context';
 import { GetFileIcon } from './file-type-icons';
 
 function ReplyIcon({ className }: { className: string }) {
@@ -119,6 +120,7 @@ export function MessageBubble({
   onImageClick,
 }: MessageBubbleProps) {
   const [imageHovered, setImageHovered] = useState(false);
+  const { openViewer } = useMediaViewer();
   const isPendingLocalMedia = Boolean(mediaUrl?.startsWith('blob:'));
 
   const timeStr = new Date(timestamp).toLocaleTimeString('vi-VN', {
@@ -198,7 +200,7 @@ export function MessageBubble({
               className="chat-image-wrapper cursor-pointer"
               onMouseEnter={() => setImageHovered(true)}
               onMouseLeave={() => setImageHovered(false)}
-              onClick={() => onImageClick?.(mediaUrl)}
+              onClick={() => openViewer({ mediaUrl, type: 'image', senderAvatar, senderDisplayName, createdAt: timestamp })}
             >
               {isPendingLocalMedia ? (
                 <img
@@ -283,7 +285,7 @@ export function MessageBubble({
               className="inline-flex items-center gap-3 rounded-lg border border-[#e4e6eb] bg-[#f0f2f5] px-3 py-2.5 text-sm text-[#050505] shadow-sm transition-all hover:bg-[#e4e6eb]"
             >
               <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
-                <GetFileIcon extension={(type as string).split('/').pop() || ''} />
+                <GetFileIcon extension={(type as string).split('.').pop() || ''} />
               </div>
               <span className="truncate max-w-[200px]">{type.replace('file/', '')}</span>
             </a>

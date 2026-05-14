@@ -15,6 +15,7 @@ import { reportMessage, reactMessage } from '@/services/chat';
 import { fetchPostsByAuthor, type Post } from '@/services/posts';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useMediaViewer } from '@/context/media-viewer-context';
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -1870,6 +1871,7 @@ export function HomeDashboardChatPanel({
   onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
+  const { openViewer } = useMediaViewer();
   const conversationItems = conversations ?? [];
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -2434,11 +2436,16 @@ export function HomeDashboardChatPanel({
                       <div className="grid grid-cols-4 gap-2">
                         {mediaItems.length > 0 ? (
                           mediaItems.map((media) => (
-                            <a
+                            <button
                               key={media._id}
-                              href={media.mediaUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={() => openViewer({ 
+                                mediaUrl: media.mediaUrl ?? '', 
+                                type: (media.type as 'image' | 'video') || 'image', 
+                                senderAvatar: media.sender?.avatarUrl, 
+                                senderDisplayName: media.sender?.displayName, 
+                                createdAt: media.createdAt 
+                              })}
                               className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                             >
                               {media.type === 'image' ? (
@@ -2448,7 +2455,7 @@ export function HomeDashboardChatPanel({
                                   <Play className="h-3.5 w-3.5" aria-hidden />
                                 </div>
                               )}
-                            </a>
+                            </button>
                           ))
                         ) : (
                           <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2523,11 +2530,16 @@ export function HomeDashboardChatPanel({
                       <div className="grid grid-cols-4 gap-2">
                         {mediaItems.length > 0 ? (
                           mediaItems.map((media) => (
-                            <a
+                            <button
                               key={media._id}
-                              href={media.mediaUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={() => openViewer({ 
+                                mediaUrl: media.mediaUrl ?? '', 
+                                type: (media.type as 'image' | 'video') || 'image', 
+                                senderAvatar: media.sender?.avatarUrl, 
+                                senderDisplayName: media.sender?.displayName, 
+                                createdAt: media.createdAt 
+                              })}
                               className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                             >
                               {media.type === 'image' ? (
@@ -2537,7 +2549,7 @@ export function HomeDashboardChatPanel({
                                   <Play className="h-3.5 w-3.5" aria-hidden />
                                 </div>
                               )}
-                            </a>
+                            </button>
                           ))
                         ) : (
                           <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2596,7 +2608,16 @@ export function HomeDashboardChatPanel({
                       <div className="grid grid-cols-3 gap-3">
                         {allMediaItems.length === 0 && <p className="col-span-full text-sm text-text-tertiary">Chưa có ảnh/video nào.</p>}
                         {allMediaItems.map((media) => (
-                          <a key={media._id} href={media.mediaUrl} target="_blank" rel="noreferrer" className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
+                          <button key={media._id}
+                          type="button"
+                          onClick={() => openViewer({ 
+                            mediaUrl: media.mediaUrl ?? '', 
+                            type: (media.type as 'image' | 'video') || 'image', 
+                            senderAvatar: media.sender?.avatarUrl, 
+                            senderDisplayName: media.sender?.displayName, 
+                            createdAt: media.createdAt 
+                          })}
+                          className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
                             {media.type === 'image' ? (
                               <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                             ) : (
@@ -2605,7 +2626,7 @@ export function HomeDashboardChatPanel({
                                 <span>Video</span>
                               </div>
                             )}
-                          </a>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -2786,11 +2807,16 @@ export function HomeDashboardChatPanel({
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.length > 0 ? (
                       mediaItems.map((media) => (
-                        <a
+                        <button
                           key={media._id}
-                          href={media.mediaUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
+                          onClick={() => openViewer({ 
+                            mediaUrl: media.mediaUrl ?? '', 
+                            type: (media.type as 'image' | 'video') || 'image', 
+                            senderAvatar: media.sender?.avatarUrl, 
+                            senderDisplayName: media.sender?.displayName, 
+                            createdAt: media.createdAt 
+                          })}
                           className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                         >
                           {media.type === 'image' ? (
@@ -2800,7 +2826,7 @@ export function HomeDashboardChatPanel({
                               <Play className="h-3.5 w-3.5" aria-hidden />
                             </div>
                           )}
-                        </a>
+                        </button>
                       ))
                     ) : (
                       <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2872,11 +2898,16 @@ export function HomeDashboardChatPanel({
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.length > 0 ? (
                       mediaItems.map((media) => (
-                        <a
+                        <button
                           key={media._id}
-                          href={media.mediaUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
+                          onClick={() => openViewer({ 
+                            mediaUrl: media.mediaUrl ?? '', 
+                            type: (media.type as 'image' | 'video') || 'image', 
+                            senderAvatar: media.sender?.avatarUrl, 
+                            senderDisplayName: media.sender?.displayName, 
+                            createdAt: media.createdAt 
+                          })}
                           className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                         >
                           {media.type === 'image' ? (
@@ -2886,7 +2917,7 @@ export function HomeDashboardChatPanel({
                               <Play className="h-3.5 w-3.5" aria-hidden />
                             </div>
                           )}
-                        </a>
+                        </button>
                       ))
                     ) : (
                       <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2945,7 +2976,16 @@ export function HomeDashboardChatPanel({
                     <div className="grid grid-cols-3 gap-3">
                       {allMediaItems.length === 0 && <p className="col-span-full text-sm text-text-tertiary">Chưa có ảnh/video nào.</p>}
                       {allMediaItems.map((media) => (
-                        <a key={media._id} href={media.mediaUrl} target="_blank" rel="noreferrer" className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
+                        <button key={media._id} 
+                        type="button"
+                        onClick={() => openViewer({ 
+                          mediaUrl: media.mediaUrl ?? '', 
+                          type: (media.type as 'image' | 'video') || 'image', 
+                          senderAvatar: media.sender?.avatarUrl, 
+                          senderDisplayName: media.sender?.displayName, 
+                          createdAt: media.createdAt 
+                        })}
+                        className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
                           {media.type === 'image' ? (
                             <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                           ) : (
@@ -2954,7 +2994,7 @@ export function HomeDashboardChatPanel({
                               <span>Video</span>
                             </div>
                           )}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}

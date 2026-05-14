@@ -11,7 +11,7 @@ import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
 import type { DashboardAppearanceSettings } from '@/components/home-dashboard/organisms/home-dashboard-settings-panel';
 import type { Notification } from '@/services/notifications';
-import { ImageViewerProvider } from '@/context/image-viewer-context';
+import { MediaViewerProvider } from '@/context/media-viewer-context';
 
 const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
   theme: 'light',
@@ -190,7 +190,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <ImageViewerProvider>
+    <MediaViewerProvider>
       <main className="zync-page-shell zync-dashboard-main flex h-[100dvh] flex-col overflow-hidden text-text-primary">
         <Suspense fallback={<PageLoading mode="panel" />}>
           <DashboardHeader
@@ -230,6 +230,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}
         />
       </main>
-    </ImageViewerProvider>
+    </MediaViewerProvider>
   );
 }
