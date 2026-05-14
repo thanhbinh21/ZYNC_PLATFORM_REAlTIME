@@ -487,7 +487,7 @@ function ChatPanel({
   participantAvatar,
   participantAvatarUrl,
   isGroupConversation = false,
-  isOnline = true,
+  isOnline = false,
   messages = [],
   messageStatus = {},
   typingUsers = [],
