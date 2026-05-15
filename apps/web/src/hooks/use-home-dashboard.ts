@@ -2812,7 +2812,7 @@ export function useHomeDashboard() {
 
       try {
         // Use sendMessage from useChat hook
-        const result = await sendMessage(content, type, mediaUrl, options);
+        const result = await sendMessage(content, type, data.user.displayName, data.user.avatarUrl, mediaUrl, options);
         console.debug('[handleSendMessage] sent, idempotencyKey:', result);
         return result;
       } catch (error) {

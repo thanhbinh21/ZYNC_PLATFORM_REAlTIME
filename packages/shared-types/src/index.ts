@@ -79,7 +79,7 @@ export interface MessageReadParticipantWithTime extends MessageReadParticipant {
 export interface SenderInMessage {
   senderId: string;
   displayName: string;
-  avatarUrl: string;
+  avatarUrl?: string;
 }
 
 export interface Message {

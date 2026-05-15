@@ -78,6 +78,8 @@ interface UseChatReturn {
   sendMessage: (
     content: string,
     type: MessageType,
+    displayName: string,
+    avatarUrl?: string,
     mediaUrl?: string,
     options?: SendMessageOptions,
   ) => Promise<string | null>;
@@ -544,6 +546,8 @@ export function useChat({
     async (
       content: string,
       type: MessageType,
+      displayName: string,
+      avatarUrl?: string,
       mediaUrl?: string,
       options?: SendMessageOptions,
     ) => {
@@ -572,6 +576,11 @@ export function useChat({
           _id: idempotencyKey,
           conversationId,
           senderId: userId,
+          sender: {
+            senderId: userId,
+            displayName: displayName,
+            avatarUrl: avatarUrl
+          },
           content,
           type,
           mediaUrl,
