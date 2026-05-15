@@ -3,7 +3,17 @@
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, PenLine, Heart } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
-import { Menu, MenuProvider, MessageItem, ReactionPicker, ReactionPickerProvider } from '../molecules/message-item';
+import {
+  Menu,
+  MenuProvider,
+  MessageItem,
+  ReactionDetailsModal,
+  ReactionDetailsModalProvider,
+  ReactionPicker,
+  ReactionPickerProvider,
+  StatusDetailsModal,
+  StatusDetailsModalProvider,
+} from '../molecules/message-item';
 import { ForwardMessageModal } from '../molecules/forward-message-modal';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
@@ -1238,8 +1248,10 @@ function ChatPanel({
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-4 py-4 chat-messages-scroll"
       >
-        <ReactionPickerProvider>
-          <MenuProvider>
+        <ReactionDetailsModalProvider containerRef={messagesContainerRef}>
+          <StatusDetailsModalProvider containerRef={messagesContainerRef}>
+            <ReactionPickerProvider>
+              <MenuProvider>
             <div ref={menuLayerRef} className="relative">
             {/* Load More Button */}
             {messages.length > 0 && hasMoreMessages && (
@@ -1349,8 +1361,12 @@ function ChatPanel({
               <ReactionPicker containerRef={menuLayerRef} staticRef={messagesContainerRef} />
               <Menu containerRef={menuLayerRef} staticRef={messagesContainerRef} />
             </div>
-          </MenuProvider>
-        </ReactionPickerProvider>
+            <ReactionDetailsModal />
+            <StatusDetailsModal />
+              </MenuProvider>
+            </ReactionPickerProvider>
+          </StatusDetailsModalProvider>
+        </ReactionDetailsModalProvider>
       </div>
 
       {/* Moderation Bar */}

@@ -110,6 +110,33 @@ interface PickerContextType {
 
 const PickerContext = createContext<PickerContextType | undefined>(undefined);
 
+interface ReactionDetailsHandle {
+  message: Message;
+  fetchReactionDetails: (message: Message) => Promise<ReactionDetailsResponse>;
+}
+
+interface ReactionDetailsContextType {
+  openForReactionDetails: boolean;
+  activeReactionDetailsKey: string | null;
+  reactionDetailsHandle: ReactionDetailsHandle | null;
+  reactionDetails: ReactionDetailsResponse | null;
+  reactionDetailsLoading: boolean;
+  openReactionDetailsModal: (message: Message, fetchReactionDetails: (message: Message) => Promise<ReactionDetailsResponse>) => void;
+  closeReactionDetailsModal: () => void;
+}
+
+const ReactionDetailsContext = createContext<ReactionDetailsContextType | undefined>(undefined);
+
+interface StatusDetailsContextType {
+  openForStatusDetails: boolean;
+  activeStatusDetailsKey: string | null;
+  statusDetailsMessage: Message | null;
+  openStatusDetailsModal: (message: Message) => void;
+  closeStatusDetailsModal: () => void;
+}
+
+const StatusDetailsContext = createContext<StatusDetailsContextType | undefined>(undefined);
+
 interface MessageItemProps {
   message: Message;
   isSender: boolean;
@@ -142,7 +169,7 @@ interface MessageItemProps {
   onImageOptions?: (message: Message) => void;
 }
 
-function ReactionDetailsModal({
+function ReactionDetailsContent({
   open,
   details,
   loading,
@@ -160,7 +187,7 @@ function ReactionDetailsModal({
   const visibleRows = (details?.rows || []).filter((row) => row.totalCount > 0);
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
+    <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
       <div
         className="reaction-details-modal w-full max-w-xl rounded-2xl border p-4 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -213,7 +240,7 @@ function ReactionDetailsModal({
   );
 }
 
-function StatusDetailsModal({
+function StatusDetailsContent({
   open,
   message,
   onClose,
@@ -230,7 +257,7 @@ function StatusDetailsModal({
   const sentTo = Array.isArray(message.sentTo) ? message.sentTo : [];
 
   return (
-    <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
+    <div className="absolute inset-0 z-[92] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
       <div
         className="reaction-details-modal w-full max-w-lg rounded-2xl border p-4 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -317,6 +344,174 @@ function StatusDetailsModal({
   );
 }
 
+export function ReactionDetailsModalProvider({ children, containerRef }: { children: ReactNode; containerRef?: React.RefObject<HTMLElement | null> }) {
+  const [openForReactionDetails, setOpenForReactionDetails] = useState(false);
+  const [activeReactionDetailsKey, setActiveReactionDetailsKey] = useState<string | null>(null);
+  const [reactionDetailsHandle, setReactionDetailsHandle] = useState<ReactionDetailsHandle | null>(null);
+  const [reactionDetails, setReactionDetails] = useState<ReactionDetailsResponse | null>(null);
+  const [reactionDetailsLoading, setReactionDetailsLoading] = useState(false);
+
+  const closeReactionDetailsModal = useCallback(() => {
+    setOpenForReactionDetails(false);
+    setActiveReactionDetailsKey(null);
+    setReactionDetailsHandle(null);
+    setReactionDetails(null);
+    setReactionDetailsLoading(false);
+  }, []);
+
+  const openReactionDetailsModal = useCallback((message: Message, fetchReactionDetails: (message: Message) => Promise<ReactionDetailsResponse>) => {
+    const key = message._id || message.idempotencyKey || '';
+    setActiveReactionDetailsKey(key);
+    setReactionDetailsHandle({ message, fetchReactionDetails });
+    setOpenForReactionDetails(true);
+    setReactionDetailsLoading(true);
+    setReactionDetails(null);
+
+    void fetchReactionDetails(message)
+      .then((details) => {
+        setReactionDetails(details);
+      })
+      .finally(() => {
+        setReactionDetailsLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!openForReactionDetails) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const clickedInside = containerRef?.current?.contains(target);
+      if (!clickedInside) {
+        closeReactionDetailsModal();
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [openForReactionDetails, containerRef, closeReactionDetailsModal]);
+
+  return (
+    <ReactionDetailsContext.Provider
+      value={{
+        openForReactionDetails,
+        activeReactionDetailsKey,
+        reactionDetailsHandle,
+        reactionDetails,
+        reactionDetailsLoading,
+        openReactionDetailsModal,
+        closeReactionDetailsModal,
+      }}
+    >
+      {children}
+    </ReactionDetailsContext.Provider>
+  );
+}
+
+export const useReactionDetailsModal = () => {
+  const context = useContext(ReactionDetailsContext);
+  if (!context) {
+    throw new Error('useReactionDetailsModal phải nằm trong ReactionDetailsModalProvider');
+  }
+  return context;
+};
+
+export function ReactionDetailsModal() {
+  const {
+    openForReactionDetails,
+    reactionDetails,
+    reactionDetailsLoading,
+    closeReactionDetailsModal,
+  } = useReactionDetailsModal();
+
+  return (
+    <ReactionDetailsContent
+      open={openForReactionDetails}
+      details={reactionDetails}
+      loading={reactionDetailsLoading}
+      onClose={closeReactionDetailsModal}
+    />
+  );
+}
+
+export function StatusDetailsModalProvider({ children, containerRef }: { children: ReactNode; containerRef?: React.RefObject<HTMLElement | null> }) {
+  const [openForStatusDetails, setOpenForStatusDetails] = useState(false);
+  const [activeStatusDetailsKey, setActiveStatusDetailsKey] = useState<string | null>(null);
+  const [statusDetailsMessage, setStatusDetailsMessage] = useState<Message | null>(null);
+
+  const closeStatusDetailsModal = useCallback(() => {
+    setOpenForStatusDetails(false);
+    setActiveStatusDetailsKey(null);
+    setStatusDetailsMessage(null);
+  }, []);
+
+  const openStatusDetailsModal = useCallback((message: Message) => {
+    const key = message._id || message.idempotencyKey || '';
+    setActiveStatusDetailsKey(key);
+    setStatusDetailsMessage(message);
+    setOpenForStatusDetails(true);
+  }, []);
+
+  useEffect(() => {
+    if (!openForStatusDetails) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const clickedInside = containerRef?.current?.contains(target);
+      if (!clickedInside) {
+        closeStatusDetailsModal();
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [openForStatusDetails, containerRef, closeStatusDetailsModal]);
+
+  return (
+    <StatusDetailsContext.Provider
+      value={{
+        openForStatusDetails,
+        activeStatusDetailsKey,
+        statusDetailsMessage,
+        openStatusDetailsModal,
+        closeStatusDetailsModal,
+      }}
+    >
+      {children}
+    </StatusDetailsContext.Provider>
+  );
+}
+
+export const useStatusDetailsModal = () => {
+  const context = useContext(StatusDetailsContext);
+  if (!context) {
+    throw new Error('useStatusDetailsModal phải nằm trong StatusDetailsModalProvider');
+  }
+  return context;
+};
+
+export function StatusDetailsModal() {
+  const {
+    openForStatusDetails,
+    statusDetailsMessage,
+    closeStatusDetailsModal,
+  } = useStatusDetailsModal();
+
+  if (!statusDetailsMessage) {
+    return null;
+  }
+
+  return (
+    <StatusDetailsContent
+      open={openForStatusDetails}
+      message={statusDetailsMessage}
+      onClose={closeStatusDetailsModal}
+    />
+  );
+}
+
 function isGroupLifecycleNotice(message: Message): boolean {
   const normalized = message.content.trim().toLowerCase();
   if (!normalized) {
@@ -392,10 +587,8 @@ export function MessageItem({
     cancelCloseReactionPicker,
     closeReactionPicker,
   } = useReactionPicker();
-  const [showReactionDetails, setShowReactionDetails] = useState(false);
-  const [showStatusDetails, setShowStatusDetails] = useState(false);
-  const [reactionDetailsLoading, setReactionDetailsLoading] = useState(false);
-  const [reactionDetails, setReactionDetails] = useState<ReactionDetailsResponse | null>(null);
+  const { openReactionDetailsModal } = useReactionDetailsModal();
+  const { openStatusDetailsModal } = useStatusDetailsModal();
   const messageRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -474,15 +667,8 @@ export function MessageItem({
       return;
     }
 
-    setShowReactionDetails(true);
-    setReactionDetailsLoading(true);
-    try {
-      const details = await onFetchReactionDetails(message);
-      setReactionDetails(details);
-    } finally {
-      setReactionDetailsLoading(false);
-    }
-  }, [message, onFetchReactionDetails]);
+    openReactionDetailsModal(message, onFetchReactionDetails);
+  }, [message, onFetchReactionDetails, openReactionDetailsModal]);
 
   const handleRemoveMineReactions = useCallback(() => {
     onReactionRemoveAllMine?.(message);
@@ -557,8 +743,8 @@ export function MessageItem({
     if (!canOpenReadStats) {
       return;
     }
-    setShowStatusDetails(true);
-  }, [canOpenReadStats]);
+    openStatusDetailsModal(message);
+  }, [canOpenReadStats, message, openStatusDetailsModal]);
 
   // Lifecycle notice messages
   if (isLifecycleNotice) {
@@ -596,18 +782,6 @@ export function MessageItem({
           <span>{dateSeparatorText}</span>
         </div>
       )}
-
-      <ReactionDetailsModal
-        open={showReactionDetails}
-        details={reactionDetails}
-        loading={reactionDetailsLoading}
-        onClose={() => setShowReactionDetails(false)}
-      />
-      <StatusDetailsModal
-        open={showStatusDetails}
-        message={message}
-        onClose={() => setShowStatusDetails(false)}
-      />
 
       {/* ── Bubble column ── */}
       <div className="relative order-2 max-w-[75%] lg:max-w-[65%]">
