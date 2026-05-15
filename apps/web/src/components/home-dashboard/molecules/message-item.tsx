@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, createContext, ReactNode, useContext } from 'react';
 import type { Message, MessageStatus } from '@zync/shared-types';
 import { MessageBubble } from '../atoms/message-bubble';
 import type { ReactionDetailsResponse } from '@/services/chat';
@@ -65,6 +65,50 @@ function FlagIcon({ className }: { className: string }) {
 const QUICK_REACTIONS = ['👍', '❤️', '🤣', '😳', '😭', '😡'];
 const DEFAULT_MENU_REACTIONS = ['❤️', '👍', '😆', '😢', '😡'];
 const PICKER_HIDE_DELAY_MS = 700;
+
+interface MenuHandle {
+  isSender: boolean;
+  canRecall: boolean;
+  menuReactions: string[];
+  handleReactionClick: (emoji: string, source: string) => void;
+  handleDeleteForMeClick: () => void;
+  handleRecallClick: () => void;
+  handleForwardClick: () => void;
+  handleReplyClick: () => void;
+  handleReportClick: () => void;
+}
+
+interface MenuContextType {
+  anchorElementForMenu: HTMLElement | null;
+  openForMenu: boolean;
+  activeMenuKey: string | null;
+  handleForMenu: MenuHandle | null;
+  openMenu: (anchorElement: HTMLElement, key: string, handles: MenuHandle) => void;
+  toggleMenu: (anchorElement: HTMLElement, key: string, handles: MenuHandle) => void;
+  closeMenu: () => void;
+}
+
+const MenuContext = createContext<MenuContextType | undefined>(undefined);
+
+interface PickerHandle {
+  isSender: boolean;
+  canClearMine: boolean;
+  handleReactionClick: (emoji: string, source: string) => void;
+  handleRemoveMineReactions: () => void;
+}
+
+interface PickerContextType {
+  anchorElementForPicker: HTMLElement | null;
+  openForPicker: boolean;
+  activePickerKey: string | null;
+  handleForPicker: PickerHandle | null;
+  openReactionPicker: (anchorElement: HTMLElement, key: string, handles: PickerHandle) => void;
+  scheduleCloseReactionPicker: () => void;
+  cancelCloseReactionPicker: () => void;
+  closeReactionPicker: () => void;
+}
+
+const PickerContext = createContext<PickerContextType | undefined>(undefined);
 
 interface MessageItemProps {
   message: Message;
@@ -339,18 +383,21 @@ export function MessageItem({
   onImageLike,
   onImageOptions,
 }: MessageItemProps) {
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom'>('bottom');
-  const [showReactionPicker, setShowReactionPicker] = useState(false);
-  const [reactionPlacement, setReactionPlacement] = useState<'top' | 'bottom'>('top');
-  const reactionRef = useRef<HTMLDivElement>(null);
+  const { openForMenu, activeMenuKey, toggleMenu, closeMenu } = useMenu();
+  const {
+    openForPicker,
+    activePickerKey,
+    openReactionPicker,
+    scheduleCloseReactionPicker,
+    cancelCloseReactionPicker,
+    closeReactionPicker,
+  } = useReactionPicker();
   const [showReactionDetails, setShowReactionDetails] = useState(false);
   const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [reactionDetailsLoading, setReactionDetailsLoading] = useState(false);
   const [reactionDetails, setReactionDetails] = useState<ReactionDetailsResponse | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
-  const pickerHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
   const isLifecycleNotice = isGroupLifecycleNotice(message);
@@ -382,42 +429,28 @@ export function MessageItem({
     && status === 'read'
     && !isRecalled
     && (message.readByPreview?.length || 0) > 0;
-
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-      setShowMenu(false);
-    }
-    if (messageRef.current && !messageRef.current.contains(event.target as Node)) {
-      setShowReactionPicker(false);
-    }
-  }, []);
-
-  const handleContextMenu = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    if (!isRecalled) {
-      setShowMenu((prev) => !prev);
-    }
-  }, [isRecalled]);
+  const isMenuOpenForThisMessage = openForMenu && activeMenuKey === message._id;
+  const isPickerOpenForThisMessage = openForPicker && activePickerKey === message._id;
 
   const handleDeleteForMeClick = useCallback(() => {
     onDeleteForMe?.(message._id, message.idempotencyKey);
-    setShowMenu(false);
-  }, [message._id, message.idempotencyKey, onDeleteForMe]);
+    closeMenu();
+  }, [closeMenu, message._id, message.idempotencyKey, onDeleteForMe]);
 
   const handleRecallClick = useCallback(() => {
     onRecall?.(message._id, message.idempotencyKey);
-    setShowMenu(false);
-  }, [message._id, message.idempotencyKey, onRecall]);
+    closeMenu();
+  }, [closeMenu, message._id, message.idempotencyKey, onRecall]);
 
   const handleForwardClick = useCallback(() => {
     onForward?.(message);
-    setShowMenu(false);
-  }, [message, onForward]);
+    closeMenu();
+  }, [closeMenu, message, onForward]);
 
   const handleReplyClick = useCallback(() => {
     onReply?.(message);
-    setShowMenu(false);
-  }, [message, onReply]);
+    closeMenu();
+  }, [closeMenu, message, onReply]);
 
   const handleReactionClick = useCallback((emoji: string, source = 'menu') => {
     if (onReactionUpsert) {
@@ -425,9 +458,9 @@ export function MessageItem({
     } else {
       onReact?.(message._id, emoji);
     }
-    setShowReactionPicker(false);
-    setShowMenu(false);
-  }, [message, onReactionUpsert, onReact]);
+    closeReactionPicker();
+    closeMenu();
+  }, [closeMenu, closeReactionPicker, message, onReactionUpsert, onReact]);
 
   const handleTriggerClick = useCallback(() => {
     if (!lastSelectedEmoji) {
@@ -453,36 +486,72 @@ export function MessageItem({
 
   const handleRemoveMineReactions = useCallback(() => {
     onReactionRemoveAllMine?.(message);
-    if (pickerHideTimeoutRef.current) {
-      clearTimeout(pickerHideTimeoutRef.current);
-      pickerHideTimeoutRef.current = null;
-    }
-    setShowReactionPicker(false);
-  }, [message, onReactionRemoveAllMine]);
+    closeReactionPicker();
+  }, [closeReactionPicker, message, onReactionRemoveAllMine]);
 
-  const showReactionPickerNow = useCallback(() => {
-    if (pickerHideTimeoutRef.current) {
-      clearTimeout(pickerHideTimeoutRef.current);
-      pickerHideTimeoutRef.current = null;
+  const handleReactionHoverEnter = useCallback((anchorElement: HTMLElement | null) => {
+    if (!anchorElement) {
+      return;
     }
-    setShowReactionPicker(true);
-  }, []);
+    cancelCloseReactionPicker();
+    openReactionPicker(anchorElement, message._id, {
+      isSender,
+      canClearMine,
+      handleReactionClick,
+      handleRemoveMineReactions,
+    });
+  }, [
+    cancelCloseReactionPicker,
+    canClearMine,
+    handleReactionClick,
+    handleRemoveMineReactions,
+    isSender,
+    message._id,
+    openReactionPicker,
+  ]);
 
-  const hideReactionPickerDelayed = useCallback(() => {
-    if (pickerHideTimeoutRef.current) {
-      clearTimeout(pickerHideTimeoutRef.current);
-    }
-
-    pickerHideTimeoutRef.current = setTimeout(() => {
-      setShowReactionPicker(false);
-      pickerHideTimeoutRef.current = null;
-    }, PICKER_HIDE_DELAY_MS);
-  }, []);
+  const handleReactionHoverLeave = useCallback(() => {
+    scheduleCloseReactionPicker();
+  }, [scheduleCloseReactionPicker]);
 
   const handleReportClick = useCallback(() => {
     onReport?.(message.idempotencyKey || message._id);
-    setShowMenu(false);
-  }, [message.idempotencyKey, message._id, onReport]);
+    closeMenu();
+  }, [closeMenu, message.idempotencyKey, message._id, onReport]);
+
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isRecalled) {
+      const anchorElement = menuTriggerRef.current ?? messageRef.current;
+      if (anchorElement) {
+        toggleMenu(anchorElement, message._id, {
+          isSender,
+          canRecall,
+          menuReactions,
+          handleReactionClick,
+          handleDeleteForMeClick,
+          handleRecallClick,
+          handleForwardClick,
+          handleReplyClick,
+          handleReportClick,
+        });
+      }
+    }
+  }, [
+    canRecall,
+    handleDeleteForMeClick,
+    handleForwardClick,
+    handleReactionClick,
+    handleRecallClick,
+    handleReplyClick,
+    handleReportClick,
+    isRecalled,
+    isSender,
+    menuReactions,
+    message._id,
+    toggleMenu,
+  ]);
 
   const handleOpenReadStats = useCallback(() => {
     if (!canOpenReadStats) {
@@ -490,52 +559,6 @@ export function MessageItem({
     }
     setShowStatusDetails(true);
   }, [canOpenReadStats]);
-
-  useEffect(() => {
-    if (showMenu || showReactionPicker) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [showMenu, showReactionPicker, handleClickOutside]);
-
-  useEffect(() => {
-    return () => {
-      if (pickerHideTimeoutRef.current) {
-        clearTimeout(pickerHideTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (showMenu && menuRef.current) {
-      const rect = menuRef.current.parentElement?.getBoundingClientRect();
-      if (rect) {
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const menuHeight = 200; // Chiều cao ước tính hoặc tối đa của menu bạn
-
-        // Nếu khoảng trống bên dưới ít hơn chiều cao menu, thì đẩy lên trên
-        if (spaceBelow < menuHeight) {
-          setMenuPlacement('top');
-        } else {
-          setMenuPlacement('bottom');
-        }
-      }
-    }
-  }, [showMenu]);
-
-  useEffect(() => {
-    if (showReactionPicker && reactionRef.current) {
-      const parentRect = reactionRef.current.parentElement?.getBoundingClientRect();
-      if (parentRect) {
-        // Nếu khoảng cách từ đỉnh tin nhắn đến mép trên màn hình < 200px
-        if (parentRect.top < 200) {
-          setReactionPlacement('bottom');
-        } else {
-          setReactionPlacement('top');
-        }
-      }
-    }
-  }, [showReactionPicker]);
 
   // Lifecycle notice messages
   if (isLifecycleNotice) {
@@ -561,7 +584,7 @@ export function MessageItem({
     <div
       ref={messageRef}
       className={`group relative mb-2 flex flex-row items-start hover:z-20 ${
-        showMenu || showReactionPicker ? 'z-30' : 'z-0'
+        isMenuOpenForThisMessage || isPickerOpenForThisMessage ? 'z-30' : 'z-0'
       } ${
         isSender ? 'justify-end' : 'justify-start'
       }`}
@@ -596,8 +619,8 @@ export function MessageItem({
           >
             <div
               className="relative"
-              onMouseEnter={showReactionPickerNow}
-              onMouseLeave={hideReactionPickerDelayed}
+              onMouseEnter={(event) => handleReactionHoverEnter(event.currentTarget)}
+              onMouseLeave={handleReactionHoverLeave}
             >
               <button
                 type="button"
@@ -611,138 +634,36 @@ export function MessageItem({
                   <EmptyLikeIcon className="h-3.5 w-3.5" />
                 )}
               </button>
-
-              {showReactionPicker && (
-                <div
-                  ref={reactionRef}
-                  className={`absolute z-[120] flex items-center gap-1 rounded-full border border-border-light bg-bg-card px-2 py-1 shadow-lg ${
-                    isSender ? 'right-0' : 'left-0'
-                  } ${
-                    // Tự động thay đổi giữa top-full và bottom-full
-                    reactionPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-                  }`}
-                  onMouseEnter={showReactionPickerNow}
-                  onMouseLeave={hideReactionPickerDelayed}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {QUICK_REACTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => handleReactionClick(emoji, 'picker-select')}
-                      className="rounded-full px-1.5 py-0.5 text-base transition-opacity hover:opacity-80"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                  {canClearMine && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveMineReactions}
-                      className="rounded-full px-2 py-0.5 text-xs text-red-500 transition-opacity hover:opacity-80"
-                    >
-                      Xóa
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="relative">
               <button
+                ref={menuTriggerRef}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowMenu((prev) => !prev);
+                  const anchorElement = menuTriggerRef.current ?? messageRef.current;
+                  if (!anchorElement) {
+                    return;
+                  }
+
+                  toggleMenu(anchorElement, message._id, {
+                    isSender,
+                    canRecall,
+                    menuReactions,
+                    handleReactionClick,
+                    handleDeleteForMeClick,
+                    handleRecallClick,
+                    handleForwardClick,
+                    handleReplyClick,
+                    handleReportClick,
+                  });
                 }}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-light bg-transparent text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
                 title="Thêm tùy chọn"
               >
                 <EllipsisVerticalIcon className="h-3.5 w-3.5" />
               </button>
-
-              {showMenu && (
-                <div
-                  ref={menuRef}
-                  className={`message-context-menu absolute z-[120] rounded-xl shadow-xl ${
-                    isSender ? 'right-0' : 'left-0'
-                  } ${
-                      // Logic thay đổi vị trí dựa trên state
-                      menuPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-                    }`}
-                  style={{ minWidth: isSender ? '160px' : '220px' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center gap-1 border-b border-border-light px-3 py-2">
-                    {menuReactions.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => handleReactionClick(emoji, 'menu')}
-                        className="reaction-menu-item p-0.5 transition-transform hover:scale-125"
-                        title={`React ${emoji}`} 
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-
-                  {isSender ? (
-                    <>
-                      <button
-                        onClick={handleDeleteForMeClick}
-                        className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
-                      >
-                        <TrashIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Xóa chỗ tôi</span>
-                      </button>
-
-                      {canRecall && (
-                        <button
-                          onClick={handleRecallClick}
-                          className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
-                        >
-                          <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                          <span>Thu hồi</span>
-                        </button>
-                      )}
-
-                      <button
-                        onClick={handleForwardClick}
-                        className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
-                      >
-                        <ForwardIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Chuyển tiếp</span>
-                      </button>
-
-                      <button
-                        onClick={handleReplyClick}
-                        className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
-                      >
-                        <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Trả lời</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={handleReportClick}
-                        className="message-menu-button-report flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
-                      >
-                        <FlagIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Báo cáo vi phạm</span>
-                      </button>
-
-                      <button
-                        onClick={handleReplyClick}
-                        className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
-                      >
-                        <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
-                        <span>Trả lời</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -800,4 +721,426 @@ export function MessageItem({
       {/* ImageViewer is rendered by ImageViewerProvider at a higher level */}
     </div>
   );
+}
+export function MenuProvider({ children }: { children: ReactNode }) {
+  const [anchorElementForMenu, setAnchorElementForMenu] = useState<HTMLElement | null>(null);
+  const [activeMenuKey, setActiveMenuKey] = useState<string | null>(null);
+  const [openForMenu, setOpenForMenu] = useState<boolean>(false);
+  const [handleForMenu, setHandleForMenu] = useState<MenuHandle | null>(null);
+
+  const closeMenu = useCallback(() => {
+    setOpenForMenu(false);
+    setActiveMenuKey(null);
+    setAnchorElementForMenu(null);
+    setHandleForMenu(null);
+  }, []);
+
+  const openMenu = useCallback((anchorElement: HTMLElement, key: string, handles: MenuHandle) => {
+    setAnchorElementForMenu(anchorElement);
+    setActiveMenuKey(key);
+    setHandleForMenu(handles);
+    setOpenForMenu(true);
+  }, []);
+
+  const toggleMenu = useCallback((anchorElement: HTMLElement, key: string, handles: MenuHandle) => {
+    setOpenForMenu((previous) => {
+      const shouldClose = previous && activeMenuKey === key;
+      if (shouldClose) {
+        setActiveMenuKey(null);
+        setAnchorElementForMenu(null);
+        setHandleForMenu(null);
+        return false;
+      }
+
+      setAnchorElementForMenu(anchorElement);
+      setActiveMenuKey(key);
+      setHandleForMenu(handles);
+      return true;
+    });
+  }, [activeMenuKey]);
+
+  return (
+    <MenuContext.Provider
+      value={{
+        anchorElementForMenu,
+        openForMenu,
+        activeMenuKey,
+        handleForMenu,
+        openMenu,
+        toggleMenu,
+        closeMenu,
+      }}
+    >
+      {children}
+    </MenuContext.Provider>
+  );
+}
+
+export const useMenu = () => {
+  const context = useContext(MenuContext);
+  if (!context) {
+    throw new Error('useMenu phải nằm trong MenuProvider');
+  }
+  return context;
+};
+
+export function ReactionPickerProvider({ children }: { children: ReactNode }) {
+  const [anchorElementForPicker, setAnchorElementForPicker] = useState<HTMLElement | null>(null);
+  const [activePickerKey, setActivePickerKey] = useState<string | null>(null);
+  const [openForPicker, setOpenForPicker] = useState<boolean>(false);
+  const [handleForPicker, setHandleForPicker] = useState<PickerHandle | null>(null);
+  const pickerHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelCloseReactionPicker = useCallback(() => {
+    if (pickerHideTimeoutRef.current) {
+      clearTimeout(pickerHideTimeoutRef.current);
+      pickerHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const closeReactionPicker = useCallback(() => {
+    cancelCloseReactionPicker();
+    setOpenForPicker(false);
+    setActivePickerKey(null);
+    setAnchorElementForPicker(null);
+    setHandleForPicker(null);
+  }, [cancelCloseReactionPicker]);
+
+  const openReactionPicker = useCallback((anchorElement: HTMLElement, key: string, handles: PickerHandle) => {
+    cancelCloseReactionPicker();
+    setAnchorElementForPicker(anchorElement);
+    setActivePickerKey(key);
+    setHandleForPicker(handles);
+    setOpenForPicker(true);
+  }, [cancelCloseReactionPicker]);
+
+  const scheduleCloseReactionPicker = useCallback(() => {
+    cancelCloseReactionPicker();
+    pickerHideTimeoutRef.current = setTimeout(() => {
+      setOpenForPicker(false);
+      setActivePickerKey(null);
+      setAnchorElementForPicker(null);
+      setHandleForPicker(null);
+      pickerHideTimeoutRef.current = null;
+    }, PICKER_HIDE_DELAY_MS);
+  }, [cancelCloseReactionPicker]);
+
+  useEffect(() => {
+    return () => {
+      if (pickerHideTimeoutRef.current) {
+        clearTimeout(pickerHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <PickerContext.Provider
+      value={{
+        anchorElementForPicker,
+        openForPicker,
+        activePickerKey,
+        handleForPicker,
+        openReactionPicker,
+        scheduleCloseReactionPicker,
+        cancelCloseReactionPicker,
+        closeReactionPicker,
+      }}
+    >
+      {children}
+    </PickerContext.Provider>
+  );
+}
+
+export const useReactionPicker = () => {
+  const context = useContext(PickerContext);
+  if (!context) {
+    throw new Error('useReactionPicker phải nằm trong ReactionPickerProvider');
+  }
+  return context;
+};
+
+export function ReactionPicker({
+  containerRef,
+  staticRef,
+}: {
+  containerRef: React.RefObject<HTMLElement | null>;
+  staticRef: React.RefObject<HTMLElement | null>;
+}) {
+  const {
+    openForPicker,
+    handleForPicker,
+    anchorElementForPicker,
+    scheduleCloseReactionPicker,
+    cancelCloseReactionPicker,
+  } = useReactionPicker();
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [pickerPlacement, setPickerPlacement] = useState<'top' | 'bottom'>('top');
+
+  useEffect(() => {
+    if (!openForPicker || !anchorElementForPicker || !handleForPicker || !containerRef.current || !staticRef.current) {
+      setCoords(null);
+      return;
+    }
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const anchorRect = anchorElementForPicker.getBoundingClientRect();
+
+    const estimatedWidth = handleForPicker.canClearMine ? 288 : 248;
+    const estimatedHeight = 44;
+    const horizontalPadding = 8;
+    const verticalGap = 8;
+
+    const spaceAbove = anchorRect.top - staticRef.current.getBoundingClientRect().top;
+    const nextPlacement: 'top' | 'bottom' = spaceAbove >= (estimatedHeight + verticalGap) ? 'top' : 'bottom';
+
+    let left = handleForPicker.isSender
+      ? anchorRect.right - containerRect.left - estimatedWidth
+      : anchorRect.left - containerRect.left;
+
+    const maxLeft = Math.max(
+      horizontalPadding,
+      containerRect.width - estimatedWidth - horizontalPadding,
+    );
+    left = Math.min(Math.max(left, horizontalPadding), maxLeft);
+
+    const top = nextPlacement === 'top'
+      ? anchorRect.top - containerRect.top - estimatedHeight - verticalGap
+      : anchorRect.bottom - containerRect.top + verticalGap;
+
+    setPickerPlacement(nextPlacement);
+    setCoords({ top: Math.max(0, top), left });
+  }, [anchorElementForPicker, containerRef, handleForPicker, openForPicker]);
+
+  if (!handleForPicker || !coords || !openForPicker) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`absolute z-[120] flex items-center gap-1 rounded-full border border-border-light bg-bg-card px-2 py-1 shadow-lg ${
+        pickerPlacement === 'top' ? 'origin-bottom' : 'origin-top'
+      }`}
+      style={{ top: `${coords.top}px`, left: `${coords.left}px` }}
+      onMouseEnter={cancelCloseReactionPicker}
+      onMouseLeave={scheduleCloseReactionPicker}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {QUICK_REACTIONS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => handleForPicker.handleReactionClick(emoji, 'picker-select')}
+          className="rounded-full px-1.5 py-0.5 text-base transition-opacity hover:opacity-80"
+        >
+          {emoji}
+        </button>
+      ))}
+      {handleForPicker.canClearMine && (
+        <button
+          type="button"
+          onClick={handleForPicker.handleRemoveMineReactions}
+          className="rounded-full px-2 py-0.5 text-xs text-red-500 transition-opacity hover:opacity-80"
+        >
+          Xóa
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function Menu({
+  containerRef,
+  staticRef,
+}: {
+  containerRef: React.RefObject<HTMLElement | null>;
+  staticRef: React.RefObject<HTMLElement | null>;
+}) {
+  const { openForMenu, handleForMenu, anchorElementForMenu, closeMenu } = useMenu();
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom'>('bottom');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openForMenu || !anchorElementForMenu || !handleForMenu || !containerRef.current || !staticRef.current) {
+      setCoords(null);
+      return;
+    }
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const anchorRect = anchorElementForMenu.getBoundingClientRect();
+
+    const estimatedWidth = handleForMenu.isSender ? 170 : 220;
+    const estimatedHeight = handleForMenu.isSender
+      ? (handleForMenu.canRecall ? 220 : 182)
+      : 140;
+    const horizontalPadding = 8;
+    const verticalGap = 8;
+
+    const spaceBelow = staticRef.current.getBoundingClientRect().bottom - anchorRect.bottom;
+    const nextPlacement: 'top' | 'bottom' = spaceBelow < estimatedHeight ? 'top' : 'bottom';
+
+    let left = handleForMenu.isSender
+      ? anchorRect.right - containerRect.left - estimatedWidth
+      : anchorRect.left - containerRect.left;
+
+    const maxLeft = Math.max(
+      horizontalPadding,
+      containerRect.width - estimatedWidth - horizontalPadding,
+    );
+    left = Math.min(Math.max(left, horizontalPadding), maxLeft);
+
+    const top = nextPlacement === 'bottom'
+      ? anchorRect.bottom - containerRect.top + verticalGap
+      : anchorRect.top - containerRect.top - estimatedHeight - verticalGap;
+
+    setMenuPlacement(nextPlacement);
+    setCoords({ top: Math.max(0, top), left });
+  }, [anchorElementForMenu, containerRef, handleForMenu, openForMenu]);
+
+  useEffect(() => {
+    if (!openForMenu) {
+      return;
+    }
+
+    const handleResize = () => {
+      if (!anchorElementForMenu || !containerRef.current || !handleForMenu) {
+        return;
+      }
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const anchorRect = anchorElementForMenu.getBoundingClientRect();
+      const estimatedWidth = handleForMenu.isSender ? 170 : 220;
+      const horizontalPadding = 8;
+
+      let left = handleForMenu.isSender
+        ? anchorRect.right - containerRect.left - estimatedWidth
+        : anchorRect.left - containerRect.left;
+
+      const maxLeft = Math.max(
+        horizontalPadding,
+        containerRect.width - estimatedWidth - horizontalPadding,
+      );
+      left = Math.min(Math.max(left, horizontalPadding), maxLeft);
+
+      setCoords((prev) => (prev ? { ...prev, left } : prev));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [anchorElementForMenu, containerRef, handleForMenu, openForMenu]);
+
+  useEffect(() => {
+    if (!openForMenu) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const clickedMenu = menuRef.current?.contains(target);
+      const clickedAnchor = anchorElementForMenu?.contains(target);
+      if (!clickedMenu && !clickedAnchor) {
+        closeMenu();
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [anchorElementForMenu, closeMenu, openForMenu]);
+
+  if (!handleForMenu || !coords || !openForMenu) {
+    return null;
+  }
+
+  const {
+    isSender,
+    canRecall,
+    menuReactions,
+    handleReactionClick,
+    handleDeleteForMeClick,
+    handleRecallClick,
+    handleForwardClick,
+    handleReplyClick,
+    handleReportClick,
+  } = handleForMenu;
+
+  return (
+    <div
+      ref={menuRef}
+      className={`message-context-menu absolute z-[120] rounded-xl shadow-xl ${
+        menuPlacement === 'top' ? 'origin-bottom' : 'origin-top'
+      } ${
+        isSender ? 'text-right' : 'text-left'
+        }`}
+      style={{ top: `${coords.top}px`, left: `${coords.left}px`, minWidth: isSender ? '160px' : '220px' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-1 border-b border-border-light px-3 py-2">
+        {menuReactions.map((emoji) => (
+          <button
+            key={emoji}
+            onClick={() => handleReactionClick(emoji, 'menu')}
+            className="reaction-menu-item p-0.5 transition-transform hover:scale-125"
+            title={`React ${emoji}`} 
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+      {isSender ? (
+        <>
+          <button
+            onClick={handleDeleteForMeClick}
+            className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
+          >
+            <TrashIcon className="h-4 w-4 flex-shrink-0" />
+            <span>Xóa chỗ tôi</span>
+          </button>
+          {canRecall && (
+            <button
+              onClick={handleRecallClick}
+              className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
+            >
+              <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+              <span>Thu hồi</span>
+            </button>
+          )}
+          <button
+            onClick={handleForwardClick}
+            className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
+          >
+            <ForwardIcon className="h-4 w-4 flex-shrink-0" />
+            <span>Chuyển tiếp</span>
+          </button>
+          <button
+            onClick={handleReplyClick}
+            className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
+          >
+            <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+            <span>Trả lời</span>
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            onClick={handleReportClick}
+            className="message-menu-button-report flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
+          >
+            <FlagIcon className="h-4 w-4 flex-shrink-0" />
+            <span>Báo cáo vi phạm</span>
+          </button>
+          <button
+            onClick={handleReplyClick}
+            className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
+          >
+            <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
+            <span>Trả lời</span>
+          </button>
+        </>
+      )}
+    </div>
+  )
 }

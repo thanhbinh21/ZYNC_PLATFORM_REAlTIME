@@ -3,7 +3,7 @@
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, PenLine, Heart } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
-import { MessageItem } from '../molecules/message-item';
+import { Menu, MenuProvider, MessageItem, ReactionPicker, ReactionPickerProvider } from '../molecules/message-item';
 import { ForwardMessageModal } from '../molecules/forward-message-modal';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
@@ -542,6 +542,7 @@ function ChatPanel({
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const menuLayerRef = useRef<HTMLDivElement>(null);
   const messageRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const messagesRef = useRef<Message[]>(messages);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -1237,110 +1238,119 @@ function ChatPanel({
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-4 py-4 chat-messages-scroll"
       >
-        {/* Load More Button */}
-        {messages.length > 0 && hasMoreMessages && (
-          <div className="flex justify-center mb-6">
-            <button
-              onClick={onLoadMore}
-              disabled={isLoading}
-              className="zync-glass-subtle rounded-xl px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-accent transition-all hover:shadow-sm"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        <ReactionPickerProvider>
+          <MenuProvider>
+            <div ref={menuLayerRef} className="relative">
+            {/* Load More Button */}
+            {messages.length > 0 && hasMoreMessages && (
+              <div className="flex justify-center mb-6">
+                <button
+                  onClick={onLoadMore}
+                  disabled={isLoading}
+                  className="zync-glass-subtle rounded-xl px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-accent transition-all hover:shadow-sm"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Đang tải...
+                    </span>
+                  ) : (
+                    'Tin nhắn cũ hơn'
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {messages.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center py-16">
+                {/* Animated Icon */}
+                <div className="relative">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-bg-hover shadow-inner">
+                    <svg className="h-10 w-10 text-accent/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </div>
+                  {/* Decorative ring */}
+                  <div className="absolute -inset-3 rounded-full border border-dashed border-accent/20 animate-pulse" />
+                </div>
+
+                {/* Text */}
+                <div className="space-y-1">
+                  <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
+                  <p className="text-sm text-text-tertiary max-w-[220px]">
+                    Nhắn tin ngay để bắt đầu trò chuyện với <span className="font-medium text-accent">{participantName}</span>
+                  </p>
+                </div>
+
+                {/* Quick hint */}
+                <div className="flex items-center gap-2 rounded-full border border-border bg-bg-hover px-4 py-2 text-xs text-text-tertiary">
+                  <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                  Đang tải...
-                </span>
-              ) : (
-                'Tin nhắn cũ hơn'
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {messages.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center py-16">
-            {/* Animated Icon */}
-            <div className="relative">
-              <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-bg-hover shadow-inner">
-                <svg className="h-10 w-10 text-accent/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+                  Nhấn Enter để gửi tin nhắn
+                </div>
               </div>
-              {/* Decorative ring */}
-              <div className="absolute -inset-3 rounded-full border border-dashed border-accent/20 animate-pulse" />
-            </div>
+            ) : (
+              <>
+                {isRemovedFromGroup && !hasRemovedNoticeInMessages && (
+                  <div className="my-3 flex flex-col items-center gap-1.5">
+                  </div>
+                )}
 
-            {/* Text */}
-            <div className="space-y-1">
-              <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
-              <p className="text-sm text-text-tertiary max-w-[220px]">
-                Nhắn tin ngay để bắt đầu trò chuyện với <span className="font-medium text-accent">{participantName}</span>
-              </p>
-            </div>
+                {messagesForDisplay.map((message) => {
+                  const avatarUrl = message.sender?.avatarUrl as string
+                  const displayName = message.sender?.displayName as string
 
-            {/* Quick hint */}
-            <div className="flex items-center gap-2 rounded-full border border-border bg-bg-hover px-4 py-2 text-xs text-text-tertiary">
-              <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-              Nhấn Enter để gửi tin nhắn
-            </div>
-          </div>
-        ) : (
-          <>
-            {isRemovedFromGroup && !hasRemovedNoticeInMessages && (
-              <div className="my-3 flex flex-col items-center gap-1.5">
-              </div>
+                  return (<div
+                    key={message._id}
+                    ref={(node) => {
+                      messageRowRefs.current[message._id] = node;
+                    }}
+                    className={String(message.senderId) === String(currentUserId) ? 'message-bubble-own' : 'message-bubble-other'}
+                  >
+                    <MessageItem
+                      message={message}
+                      isSender={String(message.senderId) === String(currentUserId)}
+                      canRecall={canRecallMessage(message.createdAt)}
+                      senderAvatar={avatarUrl}
+                      senderDisplayName={displayName}
+                      messageStatus={messageStatus}
+                      onDeleteForMe={onDeleteMessageForMe}
+                      onRecall={onRecallMessage}
+                      onForward={onForwardMessage}
+                      onReply={handleReplyMessage}
+                      onJumpToMessage={handleJumpToMessage}
+                      reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
+                      onReactionUpsert={onReactionUpsert}
+                      onReactionRemoveAllMine={onReactionRemoveAllMine}
+                      onFetchReactionDetails={onFetchReactionDetails}
+                      onReport={handleReportMessage}
+                      onReact={handleReactMessage}
+                    />
+                  </div>)
+                })}
+
+                {/* Typing Indicator */}
+                {typingUsers.length > 0 && (
+                  <TypingIndicator
+                    userNames={typingUsers.map((u) => u.displayName)}
+                  />
+                )}
+
+                <div ref={messagesEndRef} />
+              </>
             )}
 
-            {messagesForDisplay.map((message) => {
-              const avatarUrl = message.sender?.avatarUrl as string
-              const displayName = message.sender?.displayName as string
-
-              return (<div
-                key={message._id}
-                ref={(node) => {
-                  messageRowRefs.current[message._id] = node;
-                }}
-                className={String(message.senderId) === String(currentUserId) ? 'message-bubble-own' : 'message-bubble-other'}
-              >
-                <MessageItem
-                  message={message}
-                  isSender={String(message.senderId) === String(currentUserId)}
-                  canRecall={canRecallMessage(message.createdAt)}
-                  senderAvatar={avatarUrl}
-                  senderDisplayName={displayName}
-                  messageStatus={messageStatus}
-                  onDeleteForMe={onDeleteMessageForMe}
-                  onRecall={onRecallMessage}
-                  onForward={onForwardMessage}
-                  onReply={handleReplyMessage}
-                  onJumpToMessage={handleJumpToMessage}
-                  reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
-                  onReactionUpsert={onReactionUpsert}
-                  onReactionRemoveAllMine={onReactionRemoveAllMine}
-                  onFetchReactionDetails={onFetchReactionDetails}
-                  onReport={handleReportMessage}
-                  onReact={handleReactMessage}
-                />
-              </div>)
-            })}
-
-            {/* Typing Indicator */}
-            {typingUsers.length > 0 && (
-              <TypingIndicator
-                userNames={typingUsers.map((u) => u.displayName)}
-              />
-            )}
-
-            <div ref={messagesEndRef} />
-          </>
-        )}
+              <ReactionPicker containerRef={menuLayerRef} staticRef={messagesContainerRef} />
+              <Menu containerRef={menuLayerRef} staticRef={messagesContainerRef} />
+            </div>
+          </MenuProvider>
+        </ReactionPickerProvider>
       </div>
 
       {/* Moderation Bar */}
