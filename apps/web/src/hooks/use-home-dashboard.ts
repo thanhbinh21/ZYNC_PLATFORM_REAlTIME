@@ -3101,7 +3101,10 @@ export function useHomeDashboard() {
 
       unsetMessages_Status()
 
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Comment để chuyển qua conversation khác trước khi server chưa kịp gửi socket về
+      // Nếu muốn có loading ở nút thì mới uncomment
+      // 700ms là có thể truy vấn được từ database, 500ms nữa là chờ một người trong conversation read
+      // await new Promise((resolve) => setTimeout(resolve, 1200))
 
       updatePreviewConversation({
         ...forwardingMessage,
