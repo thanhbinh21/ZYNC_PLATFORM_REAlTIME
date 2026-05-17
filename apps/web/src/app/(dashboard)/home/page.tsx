@@ -182,8 +182,8 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
                       <MessageSquare className="h-6 w-6 text-text-tertiary" />
                     </div>
                     <div>
-                      <p className="font-ui-title text-sm text-text-primary">Chưa có hoạt động nào</p>
-                      <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                      <p className="font-ui-title text-sm font-semibold text-text-primary">Chưa có hoạt động nào</p>
+                      <p className="font-ui-content mt-1.5 text-xs font-medium text-text-secondary max-w-[200px] mx-auto">
                         Bắt đầu trò chuyện để xem tin nhắn tại đây
                       </p>
                     </div>
@@ -234,11 +234,18 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
                       <Bell className="h-6 w-6 text-text-tertiary" />
                     </div>
                     <div>
-                      <p className="font-ui-title text-sm text-text-primary">Không có thông báo mới</p>
-                      <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                      <p className="font-ui-title text-sm font-semibold text-text-primary">Không có thông báo mới</p>
+                      <p className="font-ui-content mt-1.5 text-xs font-medium text-text-secondary max-w-[200px] mx-auto">
                         Bạn sẽ nhận thông báo khi có tin nhắn hoặc hoạt động mới
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/notifications')}
+                      className="zync-soft-button mt-2 px-4 py-2 text-sm"
+                    >
+                      Mở thông báo
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-1">
@@ -274,8 +281,8 @@ const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
                       <Users className="h-6 w-6 text-text-tertiary" />
                     </div>
                     <div>
-                      <p className="font-ui-title text-sm text-text-primary">Không có hoạt động bạn bè</p>
-                      <p className="font-ui-content mt-1 text-xs text-text-secondary">
+                      <p className="font-ui-title text-sm font-semibold text-text-primary">Không có hoạt động bạn bè</p>
+                      <p className="font-ui-content mt-1.5 text-xs font-medium text-text-secondary max-w-[200px] mx-auto">
                         Kết bạn để xem hoạt động của họ tại đây
                       </p>
                     </div>

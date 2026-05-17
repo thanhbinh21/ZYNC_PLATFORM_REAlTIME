@@ -79,6 +79,7 @@ import type {
   DashboardFriendActivityItem,
 } from '@/components/home-dashboard/home-dashboard.types';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
+import { callStore, subscribeToCallStore, type CallSessionState } from '@/stores/call-store';
 import type { MessageType } from '@zync/shared-types';
 
 interface DashboardUserPatch {
@@ -231,20 +232,6 @@ interface CallParticipantVideo {
   stream: MediaStream;
 }
 
-interface ActiveCallState {
-  sessionId: string;
-  conversationId?: string;
-  isGroupCall: boolean;
-  initiatedBy: string;
-  participantIds: string[];
-  joinedParticipantIds: string[];
-  participantDisplayNames: Record<string, string>;
-  direction: 'incoming' | 'outgoing';
-  status: CallUiStatus;
-  callToken: string;
-  reason?: string;
-}
-
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
@@ -260,15 +247,27 @@ export function useHomeDashboard() {
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [forwardLoading, setForwardLoading] = useState(false);
   const [reactionUserStateByMessage, setReactionUserStateByMessage] = useState<Record<string, MessageReactionUserState>>({});
-  const [activeCall, setActiveCall] = useState<ActiveCallState | null>(null);
+  const [activeCall, setActiveCallState] = useState<CallSessionState | null>(callStore.activeCall);
+
+  useEffect(() => {
+    return subscribeToCallStore((call) => {
+      setActiveCallState(call);
+    });
+  }, []);
+
+  const setActiveCall = useCallback((updater: CallSessionState | null | ((prev: CallSessionState | null) => CallSessionState | null)) => {
+    callStore.setActiveCall(updater);
+  }, []);
   const [callError, setCallError] = useState<string | null>(null);
+  const [callFriendError, setCallFriendError] = useState<string | null>(null);
+  const callFriendErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingReactionRequestsRef = useRef<Map<string, PendingReactionRequest>>(new Map());
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
-  const activeCallRef = useRef<ActiveCallState | null>(null);
+  const activeCallRef = useRef<CallSessionState | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -350,7 +349,7 @@ export function useHomeDashboard() {
     }
   }, []);
 
-  const syncRemoteParticipantsPreview = useCallback((nextCall?: ActiveCallState | null) => {
+  const syncRemoteParticipantsPreview = useCallback((nextCall?: CallSessionState | null) => {
     const callContext = nextCall ?? activeCallRef.current;
     const streams = Array.from(remoteStreamsRef.current.entries())
       .filter(([, stream]) => stream.getTracks().length > 0)
@@ -502,7 +501,7 @@ export function useHomeDashboard() {
     }
   }, []);
 
-  const ensurePeerConnection = useCallback((currentCall: ActiveCallState, peerUserId: string): RTCPeerConnection | null => {
+  const ensurePeerConnection = useCallback((currentCall: CallSessionState, peerUserId: string): RTCPeerConnection | null => {
     if (typeof RTCPeerConnection === 'undefined') {
       return null;
     }
@@ -563,11 +562,11 @@ export function useHomeDashboard() {
     return connection;
   }, [attachLocalTracksToPeer, closePeerConnection, flushPendingRemoteCandidates, getRtcConfiguration, syncRemoteParticipantsPreview]);
 
-  const latestCallWithFallback = useCallback((fallback: ActiveCallState): ActiveCallState => {
+  const latestCallWithFallback = useCallback((fallback: CallSessionState): CallSessionState => {
     return activeCallRef.current ?? fallback;
   }, []);
 
-  const shouldCreateOfferForPeer = useCallback((callState: ActiveCallState, peerUserId: string): boolean => {
+  const shouldCreateOfferForPeer = useCallback((callState: CallSessionState, peerUserId: string): boolean => {
     if (!callState.isGroupCall) {
       return callState.direction === 'outgoing';
     }
@@ -575,7 +574,7 @@ export function useHomeDashboard() {
     return userId.localeCompare(peerUserId) < 0;
   }, [userId]);
 
-  const createOfferForPeer = useCallback(async (callState: ActiveCallState, peerUserId: string) => {
+  const createOfferForPeer = useCallback(async (callState: CallSessionState, peerUserId: string) => {
     if (!callState.callToken || !callState.sessionId || !peerUserId || peerUserId === userId) {
       return;
     }
@@ -1091,9 +1090,10 @@ export function useHomeDashboard() {
     listenToReactionError(handleReactionError);
 
     return () => {
-      unlistenToReactionAck();
-      unlistenToReactionUpdated();
-      unlistenToReactionError();
+      // Truyen dung callback thay vi unlisten khong co param (se xoa tat ca).
+      unlistenToReactionAck(handleReactionAck);
+      unlistenToReactionUpdated(handleReactionUpdated);
+      unlistenToReactionError(handleReactionError);
     };
   }, [
     applyReactionSummaryToMessage,
@@ -2014,7 +2014,7 @@ export function useHomeDashboard() {
       setCallError(null);
       setActiveCall({
         sessionId: payload.sessionId,
-        conversationId: payload.conversationId ?? pendingOutgoing?.conversationId,
+        conversationId: payload.conversationId ?? pendingOutgoing?.conversationId ?? null,
         isGroupCall,
         initiatedBy: pendingOutgoing?.initiatedBy ?? userId,
         participantIds,
@@ -2040,7 +2040,7 @@ export function useHomeDashboard() {
       setCallError(null);
       setActiveCall({
         sessionId: payload.sessionId,
-        conversationId: payload.conversationId ?? peerInfo.conversationId,
+        conversationId: payload.conversationId ?? peerInfo.conversationId ?? null,
         isGroupCall,
         initiatedBy: payload.fromUserId,
         participantIds,
@@ -2104,8 +2104,11 @@ export function useHomeDashboard() {
       }
 
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
-        setCallError(null);
-        scheduleCallReset();
+        const latestCall = activeCallRef.current;
+        if (latestCall && latestCall.sessionId === payload.sessionId) {
+          setCallError(null);
+          scheduleCallReset();
+        }
       }
     };
 
@@ -2291,6 +2294,33 @@ export function useHomeDashboard() {
       if (!payload.message.toLowerCase().includes('call')) {
         return;
       }
+
+      // Chi hien toast cho cac loi nhu "not accepted friends" - khong co sessionId
+      // (co nghia la call bi tu choi truoc khi bat dau, can hien thi toast)
+      const friendErrorPhrases = [
+        'only accepted friends',
+        'not friends',
+        'friend',
+        'chỉ có thể gọi với',
+      ];
+      const isFriendError = friendErrorPhrases.some((phrase) =>
+        payload.message.toLowerCase().includes(phrase),
+      );
+
+      if (isFriendError) {
+        // Hien thi toast error 5s roi tu dong tat
+        if (callFriendErrorTimeoutRef.current) {
+          clearTimeout(callFriendErrorTimeoutRef.current);
+        }
+        setCallFriendError(payload.message);
+        callFriendErrorTimeoutRef.current = setTimeout(() => {
+          setCallFriendError(null);
+        }, 5000);
+        // Reset call UI vi khong co session
+        resetCallUi();
+        return;
+      }
+
       setCallError(payload.message);
     };
 
@@ -2305,15 +2335,15 @@ export function useHomeDashboard() {
     listenToErrors(handleSocketError);
 
     return () => {
-      unlistenToCallInvited();
-      unlistenToCallIncoming();
-      unlistenToCallStatus();
-      unlistenToCallParticipantJoined();
-      unlistenToCallParticipantLeft();
-      unlistenToWebRtcOffer();
-      unlistenToWebRtcAnswer();
-      unlistenToWebRtcIceCandidate();
-      unlistenToErrors();
+      unlistenToCallInvited(handleCallInvited as (...args: unknown[]) => void);
+      unlistenToCallIncoming(handleCallIncoming as (...args: unknown[]) => void);
+      unlistenToCallStatus(handleCallStatus as (...args: unknown[]) => void);
+      unlistenToCallParticipantJoined(handleCallParticipantJoined as (...args: unknown[]) => void);
+      unlistenToCallParticipantLeft(handleCallParticipantLeft as (...args: unknown[]) => void);
+      unlistenToWebRtcOffer(handleWebRtcOffer as (...args: unknown[]) => void);
+      unlistenToWebRtcAnswer(handleWebRtcAnswer as (...args: unknown[]) => void);
+      unlistenToWebRtcIceCandidate(handleWebRtcIceCandidate as (...args: unknown[]) => void);
+      unlistenToErrors(handleSocketError as (...args: unknown[]) => void);
     };
   }, [
     closePeerConnection,
@@ -3077,11 +3107,25 @@ export function useHomeDashboard() {
     ? (selectedConversationRaw?.name ?? 'Nhóm gọi')
     : activeCallParticipantNames[0];
 
-  // Cleanup typing timeout on unmount
+  // Cleanup typing timeout and active calls on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+      }
+
+      if (activeCallRef.current && !['ended', 'missed', 'rejected'].includes(activeCallRef.current.status)) {
+        const token = getAccessToken();
+        if (token) {
+          try {
+            const socket = getSocket(token);
+            socket.emit('call_end', {
+              sessionId: activeCallRef.current.sessionId,
+              callToken: activeCallRef.current.callToken,
+              reason: 'ended'
+            });
+          } catch {}
+        }
       }
 
       clearCallResetTimer();
@@ -3211,6 +3255,8 @@ export function useHomeDashboard() {
     callParticipantNames: activeCallParticipantNames,
     isGroupCallActive: activeCall?.isGroupCall ?? false,
     callError,
+    callFriendError,
+    onDismissCallFriendError: () => setCallFriendError(null),
     isMicMuted,
     isCameraEnabled,
     isScreenSharing,

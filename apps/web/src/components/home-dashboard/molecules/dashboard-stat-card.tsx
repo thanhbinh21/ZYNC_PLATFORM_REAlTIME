@@ -26,8 +26,8 @@ export function DashboardStatCard({ item }: DashboardStatCardProps) {
       </div>
 
       <div className="relative mt-4">
-        <p className="font-ui-title text-[2.4rem] leading-none tracking-tight text-text-primary">{item.value}</p>
-        <p className="font-ui-content mt-1.5 text-[0.875rem] text-text-secondary">{item.label}</p>
+        <p className="font-ui-title text-[2.4rem] font-bold leading-none tracking-tight text-text-primary">{item.value}</p>
+        <p className="font-ui-content mt-1.5 text-[0.875rem] font-medium text-text-secondary">{item.label}</p>
       </div>
     </article>
   );

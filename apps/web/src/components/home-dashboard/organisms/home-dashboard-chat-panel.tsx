@@ -228,6 +228,8 @@ interface ChatPanelProps {
   callParticipantNames?: string[];
   isGroupCallActive?: boolean;
   callError?: string | null;
+  callFriendError?: string | null;
+  onDismissCallFriendError?: () => void;
   isCallingAvailable?: boolean;
   isMicMuted?: boolean;
   isCameraEnabled?: boolean;
@@ -531,6 +533,8 @@ function ChatPanel({
   callParticipantNames = [],
   isGroupCallActive = false,
   callError = null,
+  callFriendError = null,
+  onDismissCallFriendError = () => {},
   isCallingAvailable = false,
   isMicMuted = false,
   isCameraEnabled = true,
@@ -1056,6 +1060,34 @@ function ChatPanel({
         </div>
       )}
 
+      {/* Call Friend Error Toast */}
+      {callFriendError && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate-toast-slide-in">
+          <div className="flex items-center gap-3 rounded-2xl border border-orange-500/30 bg-orange-950/90 px-5 py-3 shadow-xl backdrop-blur-md">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500/20">
+              <svg className="h-4 w-4 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.07 9.81 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.18 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 17z"/>
+              </svg>
+            </div>
+            <div className="flex flex-col">
+              <p className="text-sm font-medium text-orange-300">Không thể gọi video</p>
+              <p className="text-xs text-orange-400/80">Chỉ có thể gọi với bạn bè đã chấp nhận lời mời</p>
+            </div>
+            <button
+              type="button"
+              onClick={onDismissCallFriendError}
+              className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-orange-400 hover:bg-orange-500/20 transition-colors"
+              aria-label="Đóng thông báo"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {inputDisabled && (
         <div className="border-b border-border bg-bg-hover px-6 py-2 text-sm text-text-secondary">
           {inputDisabledReason ?? 'Bạn không thể nhắn tin trong hội thoại này.'}
@@ -1064,18 +1096,18 @@ function ChatPanel({
 
       {isCallVisible && (
         <div
-          className={`absolute inset-0 z-[40] flex px-3 py-3 sm:px-5 sm:py-4 ${
+          className={`absolute inset-0 z-[40] flex flex-col ${
             isTerminalCallState
-              ? 'items-start justify-center bg-transparent pointer-events-none'
-              : 'items-center justify-center bg-black/60 backdrop-blur-[2px]'
+              ? 'items-start justify-center bg-transparent pointer-events-none p-3 sm:p-5'
+              : 'bg-bg-card'
           }`}
         >
           <div
-            className={`pointer-events-auto w-full overflow-hidden rounded-2xl border border-border bg-bg-card text-text-primary shadow-2xl ${
-              isTerminalCallState ? 'max-w-xl' : 'max-w-3xl'
+            className={`pointer-events-auto flex w-full flex-col overflow-hidden ${
+              isTerminalCallState ? 'max-w-xl rounded-2xl border border-border shadow-2xl bg-bg-card' : 'flex-1 h-full'
             }`}
           >
-            <div className="border-b border-border px-5 py-4">
+            <div className="border-b border-border px-5 py-4 shrink-0 bg-bg-card">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-text-primary">
@@ -1137,7 +1169,7 @@ function ChatPanel({
                       <button
                         type="button"
                         onClick={onToggleMic}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent transition"
                       >
                         <MicIcon className="h-3.5 w-3.5" />
                         {isMicMuted ? 'Bật mic' : 'Tắt mic'}
@@ -1145,7 +1177,7 @@ function ChatPanel({
                       <button
                         type="button"
                         onClick={onToggleCamera}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent transition"
                       >
                         <CameraControlIcon className="h-3.5 w-3.5" />
                         {isCameraEnabled ? 'Tắt camera' : 'Bật camera'}
@@ -1155,7 +1187,7 @@ function ChatPanel({
                         onClick={() => {
                           void onToggleScreenShare();
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent transition"
                       >
                         <ScreenShareIcon className="h-3.5 w-3.5" />
                         {isScreenSharing ? 'Dừng chia sẻ' : 'Chia sẻ màn hình'}
@@ -1167,7 +1199,7 @@ function ChatPanel({
                     <button
                       type="button"
                       onClick={onEndCall}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-red-500/20"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition"
                     >
                       <EndCallIcon className="h-3.5 w-3.5" />
                       Kết thúc
@@ -1178,38 +1210,42 @@ function ChatPanel({
             </div>
 
             {shouldRenderCallMedia && (
-              <div className="grid gap-3 p-4 sm:grid-cols-[240px_minmax(0,1fr)]">
-                <div className="overflow-hidden rounded-xl border border-border bg-bg-card">
+              <div className={`flex flex-col md:flex-row gap-4 p-4 ${isTerminalCallState ? 'max-h-[52vh]' : 'flex-1 min-h-0 bg-bg-primary'}`}>
+                {/* Local Video */}
+                <div className="shrink-0 relative w-full md:w-[280px] h-[200px] md:h-auto overflow-hidden rounded-xl border border-border bg-black shadow-sm">
                   <video
                     ref={localVideoRef}
                     autoPlay
                     muted
                     playsInline
-                    className="h-44 w-full object-cover"
+                    className="h-full w-full object-cover absolute inset-0"
                   />
-                  <p className="border-t border-border px-2 py-1 text-[11px] text-text-tertiary">Camera của bạn</p>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 z-10 pointer-events-none">
+                    <p className="text-xs font-medium text-white drop-shadow-sm">Camera của bạn</p>
+                  </div>
                 </div>
 
+                {/* Remote Video Grid */}
                 {isGroupCallActive ? (
-                  <div className="grid max-h-[52vh] grid-cols-1 gap-2 overflow-auto rounded-xl border border-border bg-bg-card p-2 sm:grid-cols-2">
+                  <div className={`flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto content-start`}>
                     {remoteParticipantVideos.length === 0 && (
-                      <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-border text-xs text-text-primary sm:col-span-2">
+                      <div className="flex h-48 sm:h-full items-center justify-center rounded-xl border-2 border-dashed border-border bg-bg-card text-sm text-text-secondary sm:col-span-full shadow-sm">
                         Đang chờ thành viên khác tham gia...
                       </div>
                     )}
                     {remoteParticipantVideos.map((participant) => (
                       <div
                         key={participant.userId}
-                        className={`overflow-hidden rounded-lg border bg-bg-card ${
+                        className={`relative aspect-video overflow-hidden rounded-xl border bg-black shadow-sm ${
                           activeSpeakerUserId === participant.userId
-                            ? 'border-accent shadow-sm ring-1 ring-accent'
+                            ? 'border-accent ring-2 ring-accent'
                             : 'border-border'
                         }`}
                       >
                         <video
                           autoPlay
                           playsInline
-                          className="h-40 w-full object-cover"
+                          className="h-full w-full object-cover absolute inset-0"
                           ref={(node) => {
                             if (!node) {
                               return;
@@ -1219,21 +1255,28 @@ function ChatPanel({
                             }
                           }}
                         />
-                        <p className="border-t border-border px-2 py-1 text-[11px] text-text-tertiary">
-                          {participant.displayName}
-                          {activeSpeakerUserId === participant.userId ? ' - đang nói' : ''}
-                        </p>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 z-10 pointer-events-none">
+                          <p className="text-xs font-medium text-white drop-shadow-sm">
+                            {participant.displayName}
+                            {activeSpeakerUserId === participant.userId ? ' • Đang nói' : ''}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="relative overflow-hidden rounded-xl border border-border bg-bg-card">
+                  <div className="flex-1 min-h-[300px] md:min-h-0 relative overflow-hidden rounded-xl border border-border bg-black shadow-sm">
                     <video
                       ref={remoteVideoRef}
                       autoPlay
                       playsInline
-                      className="h-44 w-full object-cover sm:h-full"
+                      className="h-full w-full object-cover absolute inset-0"
                     />
+                    {callPeerName && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 z-10 pointer-events-none">
+                        <p className="text-sm font-medium text-white drop-shadow-sm">{callPeerName}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
