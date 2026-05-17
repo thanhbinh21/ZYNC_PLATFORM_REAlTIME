@@ -122,11 +122,17 @@ interface ConversationListItem {
   active?: boolean;
 }
 
+interface PresenceState {
+  online: boolean;
+  lastSeen: string | null;
+}
+
 interface ConversationSearchTarget {
   id: string;
   type: 'friend' | 'group';
   name: string;
   avatar?: string;
+  avatarUrl?: string;
   conversationId?: string;
 }
 
@@ -142,7 +148,7 @@ function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string
           : message.type === 'audio'
             ? 'Đã gửi âm thanh'
             : message.type === 'sticker'
-              ? 'Da gui sticker'
+              ? 'Đã gửi sticker'
               : 'Tin nhắn media';
 }
 
@@ -244,6 +250,7 @@ export function useHomeDashboard() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceState>>({});
   const [pinnedConversationIds, setPinnedConversationIds] = useState<string[]>([]);
   const [mutedUntilByConversation, setMutedUntilByConversation] = useState<Record<string, Date | null>>({});
   const [selectedConversationId, setSelectedConversationId] = useState<string>('');
@@ -300,6 +307,19 @@ export function useHomeDashboard() {
       conversationId: matchedConversation?._id,
     };
   }, [conversations]);
+
+  const getConversationPresence = useCallback((conversation: Conversation): PresenceState => {
+    if (conversation.type !== 'direct') {
+      return { online: false, lastSeen: null };
+    }
+
+    const peerId = conversation.users.find((member) => member._id !== userId)?._id;
+    if (!peerId) {
+      return { online: false, lastSeen: null };
+    }
+
+    return presenceByUserId[peerId] ?? { online: false, lastSeen: null };
+  }, [presenceByUserId, userId]);
 
   const resolveParticipantDisplayNames = useCallback((participantIds: string[]): Record<string, string> => {
     const names: Record<string, string> = {};
@@ -679,6 +699,7 @@ export function useHomeDashboard() {
     stopTyping,
     deleteMessageForMe,
     recallMessage,
+    unsetMessages_Status,
     isLoading: chatLoading,
     userPenaltyScore,
     userMutedUntil,
@@ -1287,6 +1308,80 @@ export function useHomeDashboard() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!userId || conversations.length === 0) {
+      return;
+    }
+
+    const directPeerIds = Array.from(new Set(
+      conversations
+        .filter((conversation) => conversation.type === 'direct')
+        .flatMap((conversation) => conversation.users
+          .map((member) => member._id)
+          .filter((memberId) => memberId !== userId)),
+    ));
+
+    if (directPeerIds.length === 0) {
+      setPresenceByUserId({});
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await apiClient.get('/api/users/presence/bulk');
+        const payload = (response.data?.presence ?? {}) as Record<string, { online?: boolean; lastSeen?: string | null }>;
+        const nextPresence: Record<string, PresenceState> = {};
+
+        for (const peerId of directPeerIds) {
+          const presence = payload[peerId];
+          nextPresence[peerId] = {
+            online: Boolean(presence?.online),
+            lastSeen: presence?.lastSeen ?? null,
+          };
+        }
+
+        if (!cancelled) {
+          setPresenceByUserId(nextPresence);
+        }
+      } catch {
+        if (!cancelled) {
+          setPresenceByUserId({});
+        }
+      }
+    })();
+
+    const token = getAccessToken();
+    if (!token) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const socket = getSocket(token);
+    const handlePresenceChanged = (payload: { userId: string; status: 'online' | 'offline'; lastSeen?: string | null }) => {
+      if (!directPeerIds.includes(payload.userId)) {
+        return;
+      }
+
+      setPresenceByUserId((prev) => ({
+        ...prev,
+        [payload.userId]: {
+          online: payload.status === 'online',
+          lastSeen: payload.lastSeen ?? prev[payload.userId]?.lastSeen ?? null,
+        },
+      }));
+    };
+
+    socket.on('presence_changed', handlePresenceChanged);
+
+    return () => {
+      cancelled = true;
+      socket.off('presence_changed', handlePresenceChanged);
+    };
+  }, [conversations, userId]);
+  
   // Update conversations list when receiving new messages
   useEffect(() => {
     if (messages.length === 0) return;
@@ -1488,10 +1583,10 @@ export function useHomeDashboard() {
       removedFromGroup: conv.removedFromGroup,
       memberCount: conv.users.length,
       members: conv.users,
-      online: true,
+      online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
     }));
-  }, [conversations, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
+  }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
 
   const createGroupConversation = useCallback(
     async (name: string, memberIds: string[]) => {
@@ -1738,6 +1833,9 @@ export function useHomeDashboard() {
         type: 'group',
         name: conversation.name || 'Nhóm',
         avatar: conversation.name?.substring(0, 2).toUpperCase() || 'GR',
+        avatarUrl: conversation.type === 'group'
+        ? conversation.avatarUrl
+        : conversation.users.find(u => u._id !== userId)?.avatarUrl,
         conversationId: conversation._id,
       });
     }
@@ -1753,6 +1851,7 @@ export function useHomeDashboard() {
         type: 'friend',
         name: friend.displayName,
         avatar: friend.displayName.substring(0, 2).toUpperCase(),
+        avatarUrl: friend.avatarUrl
       });
     }
 
@@ -2663,7 +2762,7 @@ export function useHomeDashboard() {
         participantName: conv.name || 'Nhóm',
         participantAvatar: conv.name?.substring(0, 2).toUpperCase() || 'GR',
         participantAvatarUrl: conv.avatarUrl,
-        isOnline: true,
+        isOnline: false,
         participantUserId: undefined,
       };
     }
@@ -2673,10 +2772,10 @@ export function useHomeDashboard() {
       participantName: otherUser?.displayName || 'Người dùng',
       participantAvatar: otherUser?.displayName?.substring(0, 2).toUpperCase(),
       participantAvatarUrl: otherUser?.avatarUrl,
-      isOnline: true,
+      isOnline: presenceByUserId[otherUser?._id ?? '']?.online ?? false,
       participantUserId: otherUser?._id,
     };
-  }, [conversations, selectedConversationId, userId]);
+  }, [conversations, presenceByUserId, selectedConversationId, userId]);
 
   const updateGroupConversation = useCallback(
     async (groupId: string, payload: { name?: string; avatarUrl?: string | null }) => {
@@ -2714,7 +2813,7 @@ export function useHomeDashboard() {
 
       try {
         // Use sendMessage from useChat hook
-        const result = await sendMessage(content, type, mediaUrl, options);
+        const result = await sendMessage(content, type, data.user.displayName, data.user.avatarUrl, mediaUrl, options);
         console.debug('[handleSendMessage] sent, idempotencyKey:', result);
         return result;
       } catch (error) {
@@ -2945,6 +3044,8 @@ export function useHomeDashboard() {
 
       // Emit forward message
       emitForwardMessage(forwardingMessage._id, toConversationId, idempotencyKey);
+
+      unsetMessages_Status()
 
       await new Promise((resolve) => setTimeout(resolve, 1000))
 

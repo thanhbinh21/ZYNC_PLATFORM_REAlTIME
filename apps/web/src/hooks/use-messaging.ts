@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { Message, MessageStatus } from "@zync/shared-types";
+import type { Message, MessageStatus, SenderInMessage } from "@zync/shared-types";
 import {
   getSocket,
   isConnected,
@@ -73,11 +73,14 @@ export interface SendMessageOptions {
 
 interface UseChatReturn {
   messages: Message[];
+  unsetMessages_Status: () => void
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
   sendMessage: (
     content: string,
     type: MessageType,
+    displayName: string,
+    avatarUrl?: string,
     mediaUrl?: string,
     options?: SendMessageOptions,
   ) => Promise<string | null>;
@@ -166,6 +169,7 @@ export function useChat({
       messageId: string;
       conversationId?: string;
       senderId: string;
+      sender: SenderInMessage;
       content: string;
       type: string;
       mediaUrl?: string;
@@ -182,6 +186,7 @@ export function useChat({
         _id: data.messageId,
         conversationId: data.conversationId,
         senderId: data.senderId,
+        sender: data.sender,
         content: data.content,
         type: data.type as Message["type"],
         mediaUrl: data.mediaUrl,
@@ -542,6 +547,8 @@ export function useChat({
     async (
       content: string,
       type: MessageType,
+      displayName: string,
+      avatarUrl?: string,
       mediaUrl?: string,
       options?: SendMessageOptions,
     ) => {
@@ -570,6 +577,11 @@ export function useChat({
           _id: idempotencyKey,
           conversationId,
           senderId: userId,
+          sender: {
+            senderId: userId,
+            displayName: displayName,
+            avatarUrl: avatarUrl
+          },
           content,
           type,
           mediaUrl,
@@ -855,6 +867,14 @@ export function useChat({
     [conversationId],
   );
 
+  const unsetMessages_Status = useCallback(
+    () => {
+      setMessages([])
+      setMessageStatus({})
+    },
+    []
+  )
+
   return {
     messages,
     typingUsers,
@@ -866,6 +886,7 @@ export function useChat({
     stopTyping: handleStopTyping,
     deleteMessageForMe: handleDeleteForMe,
     recallMessage: handleRecall,
+    unsetMessages_Status,
     isLoading,
     error,
     userPenaltyScore,

@@ -15,7 +15,7 @@ export function TypingIndicator({ userNames }: TypingIndicatorProps) {
           <div className="h-2 w-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0.15s' }} />
           <div className="h-2 w-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0.3s' }} />
         </div>
-        <span className="font-ui-content text-xs text-text-secondary">dang go...</span>
+        <span className="font-ui-content text-xs text-text-secondary">đang gõ...</span>
       </div>
     </div>
   );

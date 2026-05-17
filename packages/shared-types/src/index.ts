@@ -76,10 +76,17 @@ export interface MessageReadParticipantWithTime extends MessageReadParticipant {
   readAt: string;
 }
 
+export interface SenderInMessage {
+  senderId: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
   senderId: string;
+  sender?: SenderInMessage;
   content: string;
   type: MessageType;
   mediaUrl?: string;

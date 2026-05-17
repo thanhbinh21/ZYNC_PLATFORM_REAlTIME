@@ -3,8 +3,18 @@
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, PenLine, Heart } from 'lucide-react';
 import type { Message, MessageStatus } from '@zync/shared-types';
-import { MessageBubble } from '../atoms/message-bubble';
-import { MessageItem } from '../molecules/message-item';
+import {
+  Menu,
+  MenuProvider,
+  MessageItem,
+  ReactionDetailsModal,
+  ReactionDetailsModalProvider,
+  ReactionPicker,
+  ReactionPickerProvider,
+  StatusDetailsModal,
+  StatusDetailsModalProvider,
+} from '../molecules/message-item';
+import { ForwardMessageModal } from '../molecules/forward-message-modal';
 import { TypingIndicator } from '../atoms/typing-indicator';
 import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
@@ -13,6 +23,8 @@ import type { ReactionDetailsResponse } from '@/services/chat';
 import { reportMessage, reactMessage } from '@/services/chat';
 import { fetchPostsByAuthor, type Post } from '@/services/posts';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { useMediaViewer } from '@/context/media-viewer-context';
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -136,7 +148,7 @@ function AuthorPostsSection({ conversation, currentUserId }: AuthorPostsSectionP
     <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
       <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary flex items-center gap-1.5">
         <PenLine className="h-3.5 w-3.5" />
-        Bai viet gan day
+        Bài viết gần đây
       </p>
 
       {loading ? (
@@ -146,7 +158,7 @@ function AuthorPostsSection({ conversation, currentUserId }: AuthorPostsSectionP
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <p className="text-xs text-text-tertiary">Chua co bai viet nao</p>
+        <p className="text-xs text-text-tertiary">Chưa có bài viết nào</p>
       ) : (
         <div className="space-y-2">
           {posts.map((post) => (
@@ -194,6 +206,11 @@ interface ChatPanelProps {
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
   onForwardMessage?: (message: Message) => void;
+  forwardModalOpen?: boolean;
+  forwardingMessage?: Message | null;
+  forwardLoading?: boolean;
+  onCloseForwardModal?: () => void;
+  onExecuteForward?: (toConversationId: string) => Promise<void> | void;
   onAvatarClick?: () => void;
   onNameClick?: () => void;
   inputDisabled?: boolean;
@@ -297,6 +314,7 @@ interface ConversationSearchTarget {
   type: 'friend' | 'group';
   name: string;
   avatar?: string;
+  avatarUrl?: string;
   conversationId?: string;
 }
 
@@ -335,7 +353,7 @@ function ConversationList({
   const normalizedQuery = query.trim().toLowerCase();
   const filteredConversations = normalizedQuery
     ? conversations.filter((item) => {
-      return item.name.toLowerCase().includes(normalizedQuery)
+      return (item.name as string).toLowerCase().includes(normalizedQuery)
         || item.preview.toLowerCase().includes(normalizedQuery);
     })
     : conversations;
@@ -383,8 +401,10 @@ function ConversationList({
                   }}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-bg-active active:scale-[0.99]"
                 >
-                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">
-                    {(target.avatar || target.name).substring(0, 2).toUpperCase()}
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full overflow-hidden bg-accent text-sm font-semibold text-white">
+                    {target.avatarUrl?
+                      <Image src={target.avatarUrl} alt={target.avatar as string} width={48} height={48} className="h-full w-full object-cover" />:
+                      (target.avatar || target.name).substring(0, 2).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-ui-title text-sm text-text-primary">{target.name}</p>
@@ -432,9 +452,12 @@ function ConversationList({
             >
               <div className="flex items-center gap-3">
                 <div className="relative h-12 w-12 flex-shrink-0 rounded-2xl bg-accent text-white">
-                  <span className="flex h-full w-full items-center justify-center text-sm font-semibold">
-                    {item.avatar}
-                  </span>
+                    <span className="flex items-center justify-center overflow-hidden rounded-2xl h-full w-full text-sm font-semibold">
+                      {item.avatarUrl?
+                        <Image src={item.avatarUrl} alt={item.avatar} width={48} height={48} className="h-full w-full object-cover" />:
+                        item.avatar
+                      }
+                    </span>
                   {item.online && (
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-bg-card bg-emerald-400" />
                   )}
@@ -480,7 +503,7 @@ function ChatPanel({
   participantAvatar,
   participantAvatarUrl,
   isGroupConversation = false,
-  isOnline = true,
+  isOnline = false,
   messages = [],
   messageStatus = {},
   typingUsers = [],
@@ -529,6 +552,7 @@ function ChatPanel({
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const menuLayerRef = useRef<HTMLDivElement>(null);
   const messageRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const messagesRef = useRef<Message[]>(messages);
   const onLoadMoreRef = useRef(onLoadMore);
@@ -856,9 +880,9 @@ function ChatPanel({
         }
       }
 
-      showJumpStatus('Tin nhan khong the truy cap.');
+      showJumpStatus('Tin nhắn không thể truy cập.');
     } catch {
-      showJumpStatus('Khong the tai them tin nhan de di den tin goc.');
+      showJumpStatus('Không thể tải thêm tin nhắn để đi đến tin gốc.');
     } finally {
       isJumpingRef.current = false;
     }
@@ -875,7 +899,7 @@ function ChatPanel({
               isGroupConversation ? 'cursor-pointer hover:shadow-md hover:scale-105 transition-all' : 'cursor-default'
             }`}
             onClick={isGroupConversation ? onAvatarClick : undefined}
-            title={isGroupConversation ? 'Doi anh nhom' : undefined}
+            title={isGroupConversation ? 'Đổi ảnh nhóm' : undefined}
           >
             {participantAvatarUrl ? (
               <img src={participantAvatarUrl} alt={participantName} className="h-full w-full object-cover" />
@@ -899,7 +923,7 @@ function ChatPanel({
             </button>
             <div className="chat-header-status">
               <span className={`online-dot ${isOnline ? '' : 'offline'}`} />
-              {isOnline ? 'Dang hoat dong' : 'Ngoai tuyen'}
+              {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
             </div>
           </div>
         </div>
@@ -909,7 +933,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Goi thoai"
+            title="Gọi điện thoại"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
@@ -918,7 +942,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Goi video"
+            title="Gọi video"
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
@@ -927,7 +951,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Thong tin"
+            title="Thông tin"
             onClick={onInfoClick}
           >
             <InfoIcon className="w-5 h-5" />
@@ -976,7 +1000,7 @@ function ChatPanel({
               type="button"
               onClick={() => setReportStatus(null)}
               className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-text-tertiary hover:bg-white/10 transition-colors"
-              aria-label="Dong thong bao"
+              aria-label="Đóng thông báo"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1021,7 +1045,7 @@ function ChatPanel({
               type="button"
               onClick={() => setErrorToast(null)}
               className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-red-400 hover:bg-red-500/20 transition-colors"
-              aria-label="Dong thong bao"
+              aria-label="Đóng thông báo"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1224,106 +1248,125 @@ function ChatPanel({
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto px-4 py-4 chat-messages-scroll"
       >
-        {/* Load More Button */}
-        {messages.length > 0 && hasMoreMessages && (
-          <div className="flex justify-center mb-6">
-            <button
-              onClick={onLoadMore}
-              disabled={isLoading}
-              className="zync-glass-subtle rounded-xl px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-accent transition-all hover:shadow-sm"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        <ReactionDetailsModalProvider containerRef={messagesContainerRef}>
+          <StatusDetailsModalProvider containerRef={messagesContainerRef}>
+            <ReactionPickerProvider>
+              <MenuProvider>
+            <div ref={menuLayerRef} className="relative">
+            {/* Load More Button */}
+            {messages.length > 0 && hasMoreMessages && (
+              <div className="flex justify-center mb-6">
+                <button
+                  onClick={onLoadMore}
+                  disabled={isLoading}
+                  className="zync-glass-subtle rounded-xl px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-accent transition-all hover:shadow-sm"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Đang tải...
+                    </span>
+                  ) : (
+                    'Tin nhắn cũ hơn'
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {messages.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center py-16">
+                {/* Animated Icon */}
+                <div className="relative">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-bg-hover shadow-inner">
+                    <svg className="h-10 w-10 text-accent/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  </div>
+                  {/* Decorative ring */}
+                  <div className="absolute -inset-3 rounded-full border border-dashed border-accent/20 animate-pulse" />
+                </div>
+
+                {/* Text */}
+                <div className="space-y-1">
+                  <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
+                  <p className="text-sm text-text-tertiary max-w-[220px]">
+                    Nhắn tin ngay để bắt đầu trò chuyện với <span className="font-medium text-accent">{participantName}</span>
+                  </p>
+                </div>
+
+                {/* Quick hint */}
+                <div className="flex items-center gap-2 rounded-full border border-border bg-bg-hover px-4 py-2 text-xs text-text-tertiary">
+                  <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                  Dang tai...
-                </span>
-              ) : (
-                'Tin nhan cu hon'
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {messages.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center py-16">
-            {/* Animated Icon */}
-            <div className="relative">
-              <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-bg-hover shadow-inner">
-                <svg className="h-10 w-10 text-accent/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
+                  Nhấn Enter để gửi tin nhắn
+                </div>
               </div>
-              {/* Decorative ring */}
-              <div className="absolute -inset-3 rounded-full border border-dashed border-accent/20 animate-pulse" />
-            </div>
+            ) : (
+              <>
+                {isRemovedFromGroup && !hasRemovedNoticeInMessages && (
+                  <div className="my-3 flex flex-col items-center gap-1.5">
+                  </div>
+                )}
 
-            {/* Text */}
-            <div className="space-y-1">
-              <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
-              <p className="text-sm text-text-tertiary max-w-[220px]">
-                Nhan tin ngay de bat dau tro chuyen voi <span className="font-medium text-accent">{participantName}</span>
-              </p>
-            </div>
+                {messagesForDisplay.map((message) => {
+                  const avatarUrl = message.sender?.avatarUrl as string
+                  const displayName = message.sender?.displayName as string
 
-            {/* Quick hint */}
-            <div className="flex items-center gap-2 rounded-full border border-border bg-bg-hover px-4 py-2 text-xs text-text-tertiary">
-              <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-              Nhan Enter de gui tin nhan
-            </div>
-          </div>
-        ) : (
-          <>
-            {isRemovedFromGroup && !hasRemovedNoticeInMessages && (
-              <div className="my-3 flex flex-col items-center gap-1.5">
-              </div>
+                  return (<div
+                    key={message._id}
+                    ref={(node) => {
+                      messageRowRefs.current[message._id] = node;
+                    }}
+                    className={String(message.senderId) === String(currentUserId) ? 'message-bubble-own' : 'message-bubble-other'}
+                  >
+                    <MessageItem
+                      message={message}
+                      isSender={String(message.senderId) === String(currentUserId)}
+                      canRecall={canRecallMessage(message.createdAt)}
+                      senderAvatar={avatarUrl}
+                      senderDisplayName={displayName}
+                      messageStatus={messageStatus}
+                      onDeleteForMe={onDeleteMessageForMe}
+                      onRecall={onRecallMessage}
+                      onForward={onForwardMessage}
+                      onReply={handleReplyMessage}
+                      onJumpToMessage={handleJumpToMessage}
+                      reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
+                      onReactionUpsert={onReactionUpsert}
+                      onReactionRemoveAllMine={onReactionRemoveAllMine}
+                      onFetchReactionDetails={onFetchReactionDetails}
+                      onReport={handleReportMessage}
+                      onReact={handleReactMessage}
+                    />
+                  </div>)
+                })}
+
+                {/* Typing Indicator */}
+                {typingUsers.length > 0 && (
+                  <TypingIndicator
+                    userNames={typingUsers.map((u) => u.displayName)}
+                  />
+                )}
+
+                <div ref={messagesEndRef} />
+              </>
             )}
 
-            {messagesForDisplay.map((message) => (
-              <div
-                key={message._id}
-                ref={(node) => {
-                  messageRowRefs.current[message._id] = node;
-                }}
-                className={String(message.senderId) === String(currentUserId) ? 'message-bubble-own' : 'message-bubble-other'}
-              >
-                <MessageItem
-                  message={message}
-                  isSender={String(message.senderId) === String(currentUserId)}
-                  canRecall={canRecallMessage(message.createdAt)}
-                  senderAvatar={participantAvatar}
-                  messageStatus={messageStatus}
-                  onDeleteForMe={onDeleteMessageForMe}
-                  onRecall={onRecallMessage}
-                  onForward={onForwardMessage}
-                  onReply={handleReplyMessage}
-                  onJumpToMessage={handleJumpToMessage}
-                  reactionUserState={reactionUserStateByMessage[message._id] || message.reactionUserState}
-                  onReactionUpsert={onReactionUpsert}
-                  onReactionRemoveAllMine={onReactionRemoveAllMine}
-                  onFetchReactionDetails={onFetchReactionDetails}
-                  onReport={handleReportMessage}
-                  onReact={handleReactMessage}
-                />
-              </div>
-            ))}
-
-            {/* Typing Indicator */}
-            {typingUsers.length > 0 && (
-              <TypingIndicator
-                userNames={typingUsers.map((u) => u.displayName)}
-              />
-            )}
-
-            <div ref={messagesEndRef} />
-          </>
-        )}
+              <ReactionPicker containerRef={menuLayerRef} staticRef={messagesContainerRef} />
+              <Menu containerRef={menuLayerRef} staticRef={messagesContainerRef} />
+            </div>
+            <ReactionDetailsModal />
+            <StatusDetailsModal />
+              </MenuProvider>
+            </ReactionPickerProvider>
+          </StatusDetailsModalProvider>
+        </ReactionDetailsModalProvider>
       </div>
 
       {/* Moderation Bar */}
@@ -1331,7 +1374,7 @@ function ChatPanel({
         <svg className="w-3.5 h-3.5 text-[#929292] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <span className="chat-moderation-text">Muc do vi pham tieu chuan cong dong</span>
+        <span className="chat-moderation-text">Mức độ vi phạm tiêu chuẩn cộng đồng</span>
         <span className={`font-semibold text-[11px] ml-auto ${
           userPenaltyScore >= 80 ? 'text-red-500' :
           userPenaltyScore >= 50 ? 'text-orange-500' :
@@ -1349,7 +1392,7 @@ function ChatPanel({
               <circle cx="12" cy="12" r="10"/>
               <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
-            Ban dang bi cam chat den {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+            Bạn đang bị cấm chat đến {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       )}
@@ -1853,6 +1896,7 @@ export function HomeDashboardChatPanel({
   onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
+  const { openViewer } = useMediaViewer();
   const conversationItems = conversations ?? [];
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -2417,11 +2461,16 @@ export function HomeDashboardChatPanel({
                       <div className="grid grid-cols-4 gap-2">
                         {mediaItems.length > 0 ? (
                           mediaItems.map((media) => (
-                            <a
+                            <button
                               key={media._id}
-                              href={media.mediaUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={() => openViewer({ 
+                                mediaUrl: media.mediaUrl ?? '', 
+                                type: (media.type as 'image' | 'video') || 'image', 
+                                senderAvatar: media.sender?.avatarUrl, 
+                                senderDisplayName: media.sender?.displayName, 
+                                createdAt: media.createdAt 
+                              })}
                               className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                             >
                               {media.type === 'image' ? (
@@ -2431,7 +2480,7 @@ export function HomeDashboardChatPanel({
                                   <Play className="h-3.5 w-3.5" aria-hidden />
                                 </div>
                               )}
-                            </a>
+                            </button>
                           ))
                         ) : (
                           <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2506,11 +2555,16 @@ export function HomeDashboardChatPanel({
                       <div className="grid grid-cols-4 gap-2">
                         {mediaItems.length > 0 ? (
                           mediaItems.map((media) => (
-                            <a
+                            <button
                               key={media._id}
-                              href={media.mediaUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={() => openViewer({ 
+                                mediaUrl: media.mediaUrl ?? '', 
+                                type: (media.type as 'image' | 'video') || 'image', 
+                                senderAvatar: media.sender?.avatarUrl, 
+                                senderDisplayName: media.sender?.displayName, 
+                                createdAt: media.createdAt 
+                              })}
                               className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                             >
                               {media.type === 'image' ? (
@@ -2520,7 +2574,7 @@ export function HomeDashboardChatPanel({
                                   <Play className="h-3.5 w-3.5" aria-hidden />
                                 </div>
                               )}
-                            </a>
+                            </button>
                           ))
                         ) : (
                           <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2579,7 +2633,16 @@ export function HomeDashboardChatPanel({
                       <div className="grid grid-cols-3 gap-3">
                         {allMediaItems.length === 0 && <p className="col-span-full text-sm text-text-tertiary">Chưa có ảnh/video nào.</p>}
                         {allMediaItems.map((media) => (
-                          <a key={media._id} href={media.mediaUrl} target="_blank" rel="noreferrer" className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
+                          <button key={media._id}
+                          type="button"
+                          onClick={() => openViewer({ 
+                            mediaUrl: media.mediaUrl ?? '', 
+                            type: (media.type as 'image' | 'video') || 'image', 
+                            senderAvatar: media.sender?.avatarUrl, 
+                            senderDisplayName: media.sender?.displayName, 
+                            createdAt: media.createdAt 
+                          })}
+                          className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
                             {media.type === 'image' ? (
                               <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                             ) : (
@@ -2588,7 +2651,7 @@ export function HomeDashboardChatPanel({
                                 <span>Video</span>
                               </div>
                             )}
-                          </a>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -2666,7 +2729,7 @@ export function HomeDashboardChatPanel({
 
       {isInfoOpen && (
         <div className="fixed inset-0 z-40 bg-black/45 xl:hidden">
-          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-bg-card border-l border-border p-5">
+          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-bg-card border-border p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-text-primary">{isMembersViewOpen ? 'Thành viên' : isArchiveOpen ? 'Kho lưu trữ' : infoTitle}</h3>
               <button
@@ -2769,11 +2832,16 @@ export function HomeDashboardChatPanel({
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.length > 0 ? (
                       mediaItems.map((media) => (
-                        <a
+                        <button
                           key={media._id}
-                          href={media.mediaUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
+                          onClick={() => openViewer({ 
+                            mediaUrl: media.mediaUrl ?? '', 
+                            type: (media.type as 'image' | 'video') || 'image', 
+                            senderAvatar: media.sender?.avatarUrl, 
+                            senderDisplayName: media.sender?.displayName, 
+                            createdAt: media.createdAt 
+                          })}
                           className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                         >
                           {media.type === 'image' ? (
@@ -2783,7 +2851,7 @@ export function HomeDashboardChatPanel({
                               <Play className="h-3.5 w-3.5" aria-hidden />
                             </div>
                           )}
-                        </a>
+                        </button>
                       ))
                     ) : (
                       <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2855,11 +2923,16 @@ export function HomeDashboardChatPanel({
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.length > 0 ? (
                       mediaItems.map((media) => (
-                        <a
+                        <button
                           key={media._id}
-                          href={media.mediaUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                          type="button"
+                          onClick={() => openViewer({ 
+                            mediaUrl: media.mediaUrl ?? '', 
+                            type: (media.type as 'image' | 'video') || 'image', 
+                            senderAvatar: media.sender?.avatarUrl, 
+                            senderDisplayName: media.sender?.displayName, 
+                            createdAt: media.createdAt 
+                          })}
                           className="block h-12 overflow-hidden rounded-lg bg-bg-hover hover:opacity-80"
                         >
                           {media.type === 'image' ? (
@@ -2869,7 +2942,7 @@ export function HomeDashboardChatPanel({
                               <Play className="h-3.5 w-3.5" aria-hidden />
                             </div>
                           )}
-                        </a>
+                        </button>
                       ))
                     ) : (
                       <p className="col-span-4 text-xs text-text-tertiary">Chưa có ảnh/video nào</p>
@@ -2928,7 +3001,16 @@ export function HomeDashboardChatPanel({
                     <div className="grid grid-cols-3 gap-3">
                       {allMediaItems.length === 0 && <p className="col-span-full text-sm text-text-tertiary">Chưa có ảnh/video nào.</p>}
                       {allMediaItems.map((media) => (
-                        <a key={media._id} href={media.mediaUrl} target="_blank" rel="noreferrer" className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
+                        <button key={media._id} 
+                        type="button"
+                        onClick={() => openViewer({ 
+                          mediaUrl: media.mediaUrl ?? '', 
+                          type: (media.type as 'image' | 'video') || 'image', 
+                          senderAvatar: media.sender?.avatarUrl, 
+                          senderDisplayName: media.sender?.displayName, 
+                          createdAt: media.createdAt 
+                        })}
+                        className="block h-24 overflow-hidden rounded-lg bg-bg-hover">
                           {media.type === 'image' ? (
                             <img src={media.mediaUrl} alt="media" className="h-full w-full object-cover" />
                           ) : (
@@ -2937,7 +3019,7 @@ export function HomeDashboardChatPanel({
                               <span>Video</span>
                             </div>
                           )}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -3191,6 +3273,26 @@ export function HomeDashboardChatPanel({
         onChangeQuery={setMemberSearchQuery}
         onToggleMember={toggleAddMemberSelection}
         onSubmit={handleConfirmAddMembers}
+      />
+
+      <ForwardMessageModal
+        open={Boolean(chatPanelProps.forwardModalOpen)}
+        message={chatPanelProps.forwardingMessage ?? null}
+        conversations={visibleConversations.map((conversation) => ({
+          _id: conversation.id,
+          name: conversation.name || 'Hội thoại',
+          avatarUrl: conversation.avatarUrl,
+          isGroup: conversation.isGroup,
+          memberCount: conversation.memberCount,
+        }))}
+        currentConversationId={selectedConversationId}
+        isLoading={Boolean(chatPanelProps.forwardLoading)}
+        onClose={() => {
+          chatPanelProps.onCloseForwardModal?.();
+        }}
+        onForward={(_message, toConversationId) => {
+          void chatPanelProps.onExecuteForward?.(toConversationId);
+        }}
       />
     </>
   );

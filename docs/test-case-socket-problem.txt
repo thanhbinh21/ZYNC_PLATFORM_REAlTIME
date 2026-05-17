@@ -1,0 +1,113 @@
+TH1:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1:
+Nhắn tin bất kỳ vào
+Mở tài khoản thứ 2 lên rồi tự động vào conversation TK1 mới nhắn (không phải lỗi)
+TK1 không nhận được phản hồi tin nhắn đã được đọc
+
+TH2:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1:
+Chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ
+Nhắn tin bất kỳ vào
+Mở tài khoản thứ 2 lên rồi tự động vào conversation TK1 mới nhắn (không phải lỗi)
+TK1 đã nhận được phản hồi tin nhắn đã được đọc
+
+TH3:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên:
+TK1:
+Nhắn tin bất kỳ vào
+TK2:
+Không nhận được tin nhắn được gửi từ TK1
+TK1:
+Không nhận được phản hồi tin nhắn đã được đọc
+
+TH4:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên xong rồi chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ:
+TK1:
+Nhắn tin bất kỳ vào
+TK2:
+Nhận được tin nhắn được gửi từ TK1
+TK1:
+Nhận được phản hồi tin nhắn đã được đọc
+
+TH5:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên nhưng TK1 chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ:
+TK1:
+Nhắn tin bất kỳ vào
+TK2:
+Không nhận được tin nhắn được gửi từ TK1
+TK1:
+Nhận được phản hồi tin nhắn đã được đọc
+
+TH6:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên nhưng TK2 chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ:
+TK1:
+Nhắn tin bất kỳ vào
+TK2:
+Nhận được tin nhắn được gửi từ TK1
+TK1:
+Không nhận được phản hồi tin nhắn đã được đọc
+
+TH7:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1:
+react tin bất kỳ vào
+Mở tài khoản thứ 2 lên rồi tự động vào conversation TK1 mới nhắn (không phải lỗi)
+TK2 nhận được react
+TK1 thì bị mất react sau một khoảng thời gian. Phải chuyển sang conversation bất kỳ khác rồi chuyển về thì mới hiện lại react
+
+TH8:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1:
+Chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ
+react tin bất kỳ vào
+Mở tài khoản thứ 2 lên rồi tự động vào conversation TK1 mới nhắn (không phải lỗi)
+TK2 nhận được react. Phải chuyển sang conversation bất kỳ khác rồi chuyển về thì mới hiện lại react
+TK1 không bị mất react
+
+TH9:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên:
+TK1:
+react tin bất kỳ vào
+TK2:
+Không nhận được react được gửi từ TK1. Phải chuyển sang conversation bất kỳ khác rồi chuyển về thì mới hiện lại react
+TK1:
+TK1 thì bị mất react sau một khoảng thời gian. Phải chuyển sang conversation bất kỳ khác rồi chuyển về thì mới hiện lại react
+
+TH10:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên xong rồi chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ:
+TK1:
+react tin bất kỳ vào
+TK2:
+Nhận được react được gửi từ TK1
+TK1:
+TK1 không bị mất react
+
+TH11:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên nhưng TK1 chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ:
+TK1:
+react tin bất kỳ vào
+TK2:
+Không nhận được react được gửi từ TK1. Phải chuyển sang conversation bất kỳ khác rồi chuyển về thì mới hiện lại react
+TK1:
+TK1 không bị mất react
+
+TH12:
+Khi mới sang trang localhost:3001/chat: mặc định vào conversation đầu tiên (không phải lỗi)
+TK1 và TK2 cùng đi vào và vào cùng một conversation đầu tiên trang web hiện lên nhưng TK2 chuyển sang conversation nào khác bất kỳ rồi chuyển về lại conversation cũ:
+TK1:
+react tin bất kỳ vào
+TK2:
+Nhận được react được gửi từ TK1
+TK1:
+TK1 thì bị mất react sau một khoảng thời gian. Phải chuyển sang conversation bất kỳ khác rồi chuyển về thì mới hiện lại react
+
+*Note: lý do có vụ bị mất react gián tiếp là lúc trước có kêu ai thưc hiện react với ack time out để tự động xóa trong khoảng thời gian không có socket ack gửi về

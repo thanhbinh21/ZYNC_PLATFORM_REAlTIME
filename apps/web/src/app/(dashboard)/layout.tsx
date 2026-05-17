@@ -10,6 +10,7 @@ import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
 import type { Notification } from '@/services/notifications';
+import { MediaViewerProvider } from '@/context/media-viewer-context';
 
 type DashboardAppearanceSettings = {
   theme: 'dark' | 'light';
@@ -180,44 +181,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <main className="zync-page-shell zync-dashboard-main flex h-[100dvh] flex-col overflow-hidden text-text-primary">
-      <Suspense fallback={<PageLoading mode="panel" />}>
-        <DashboardHeader
-          data={headerData}
-          activeNavId={activeNavId}
-          theme={appearanceSettings.theme}
-          onToggleTheme={handleToggleTheme}
-          notificationSlot={<NotificationHub onNavigate={handleNotificationNavigate} />}
-          onNavSelect={(id) => {
-            if (id === 'logout') onLogout();
+    <MediaViewerProvider>
+      <main className="zync-page-shell zync-dashboard-main flex h-[100dvh] flex-col overflow-hidden text-text-primary">
+        <Suspense fallback={<PageLoading mode="panel" />}>
+          <DashboardHeader
+            data={headerData}
+            activeNavId={activeNavId}
+            theme={appearanceSettings.theme}
+            onToggleTheme={handleToggleTheme}
+            notificationSlot={<NotificationHub onNavigate={handleNotificationNavigate} />}
+            onNavSelect={(id) => {
+              if (id === 'logout') onLogout();
+            }}
+          />
+        </Suspense>
+
+        <div className="flex-1 overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4">
+          <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
+            {children}
+          </div>
+        </div>
+
+        {/* Export settings functions for child pages via window */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.__zyncDashboardSettings = {
+                getSettings: function() { return JSON.parse(localStorage.getItem('zync.dashboard.theme') ? '{"theme":"' + localStorage.getItem('zync.dashboard.theme') + '","messageFontSize":"' + (localStorage.getItem('zync.dashboard.messageFontSize') || 'medium') + '"}' : '{"theme":"light","messageFontSize":"medium"}'); },
+                applyAppearance: function(s) {
+                  document.documentElement.dataset['zyncTheme'] = s.theme;
+                  document.documentElement.dataset['zyncMessageSize'] = s.messageFontSize;
+                },
+                saveSettings: function(s) {
+                  localStorage.setItem('zync.dashboard.theme', s.theme);
+                  localStorage.setItem('zync.dashboard.messageFontSize', s.messageFontSize);
+                }
+              };
+            `,
           }}
         />
-      </Suspense>
-
-      <div className="flex-1 overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4">
-        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
-          {children}
-        </div>
-      </div>
-
-      {/* Export settings functions for child pages via window */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.__zyncDashboardSettings = {
-              getSettings: function() { return JSON.parse(localStorage.getItem('zync.dashboard.theme') ? '{"theme":"' + localStorage.getItem('zync.dashboard.theme') + '","messageFontSize":"' + (localStorage.getItem('zync.dashboard.messageFontSize') || 'medium') + '"}' : '{"theme":"light","messageFontSize":"medium"}'); },
-              applyAppearance: function(s) {
-                document.documentElement.dataset['zyncTheme'] = s.theme;
-                document.documentElement.dataset['zyncMessageSize'] = s.messageFontSize;
-              },
-              saveSettings: function(s) {
-                localStorage.setItem('zync.dashboard.theme', s.theme);
-                localStorage.setItem('zync.dashboard.messageFontSize', s.messageFontSize);
-              }
-            };
-          `,
-        }}
-      />
-    </main>
+      </main>
+    </MediaViewerProvider>
   );
 }
