@@ -16,9 +16,12 @@ function FriendsPageContent() {
       outgoingRequests={dashboard.outgoingRequests}
       searchKeyword={dashboard.searchKeyword}
       searchResults={dashboard.searchResults}
+      lastSubmittedSearchQuery={dashboard.lastSubmittedSearchQuery}
       pendingTotal={dashboard.pendingTotal}
       nextCursor={dashboard.nextCursor}
-      isLoading={dashboard.isLoading}
+      isFriendsLoading={dashboard.isFriendsLoading}
+      isSearchLoading={dashboard.isSearchLoading}
+      isMutating={dashboard.isMutating}
       isLoadingMore={dashboard.isLoadingMore}
       infoMessage={dashboard.infoMessage}
       errorMessage={dashboard.errorMessage}

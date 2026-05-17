@@ -160,23 +160,21 @@ export async function sendFriendRequest(
     throw new ForbiddenError('Friend request is blocked');
   }
 
-  const existing = await FriendshipModel.findOne({
-    userId: requesterId,
-    friendId: toUserId,
-  });
+  // Check both directions for existing records
+  const [existing, reverse] = await Promise.all([
+    FriendshipModel.findOne({ userId: requesterId, friendId: toUserId }),
+    FriendshipModel.findOne({ userId: toUserId, friendId: requesterId }),
+  ]);
 
-  if (existing?.status === 'pending') {
-    throw new ConflictError('Friend request already sent');
-  }
-  if (existing?.status === 'accepted') {
+  // Only truly friends if BOTH directions are 'accepted'
+  if (existing?.status === 'accepted' && reverse?.status === 'accepted') {
     throw new ConflictError('Users are already friends');
   }
 
-  const reversePending = await FriendshipModel.findOne({
-    userId: toUserId,
-    friendId: requesterId,
-    status: 'pending',
-  });
+  // Active outgoing pending request
+  if (existing?.status === 'pending') {
+    throw new ConflictError('Friend request already sent');
+  }
 
   if (reversePending) {
     await acceptFriendRequest(requesterId, reversePending._id.toString());
@@ -208,6 +206,19 @@ export async function sendFriendRequest(
       throw new NotFoundError('Friendship not found after syncing accepted state');
     }
     return accepted;
+  }
+
+  // Clean up any stale/orphaned records (e.g. one-sided 'accepted' after
+  // incomplete unfriend, or data left from previous revoke failures)
+  const staleIds: string[] = [];
+  if (existing && existing.status !== 'blocked') {
+    staleIds.push(existing._id.toString());
+  }
+  if (reverse && reverse.status !== 'blocked') {
+    staleIds.push(reverse._id.toString());
+  }
+  if (staleIds.length > 0) {
+    await FriendshipModel.deleteMany({ _id: { $in: staleIds } });
   }
 
   const request = await FriendshipModel.create({
@@ -288,22 +299,26 @@ export async function rejectFriendRequest(
   currentUserId: string,
   requestId: string,
 ): Promise<void> {
+  // Allow both the recipient (friendId) to reject AND the sender (userId) to revoke/cancel
   const deleted = await FriendshipModel.findOneAndDelete({
     _id: requestId,
-    friendId: currentUserId,
     status: 'pending',
+    $or: [
+      { friendId: currentUserId },
+      { userId: currentUserId },
+    ],
   });
 
   if (!deleted) {
     throw new NotFoundError('Friend request not found');
   }
 
-  await invalidateFriendsCache([currentUserId, deleted.userId]);
+  await invalidateFriendsCache([currentUserId, deleted.userId, deleted.friendId]);
 }
 
 export async function unfriend(currentUserId: string, friendId: string): Promise<void> {
+  // Delete ALL records between the two users (accepted, pending, etc.) to prevent stale data
   const result = await FriendshipModel.deleteMany({
-    status: 'accepted',
     $or: [
       { userId: currentUserId, friendId },
       { userId: friendId, friendId: currentUserId },
