@@ -699,6 +699,7 @@ export function useHomeDashboard() {
     stopTyping,
     deleteMessageForMe,
     recallMessage,
+    unsetMessages_Status,
     isLoading: chatLoading,
     userPenaltyScore,
     userMutedUntil,
@@ -3044,7 +3045,9 @@ export function useHomeDashboard() {
       // Emit forward message
       emitForwardMessage(forwardingMessage._id, toConversationId, idempotencyKey);
 
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      unsetMessages_Status()
+
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       updatePreviewConversation({
         ...forwardingMessage,

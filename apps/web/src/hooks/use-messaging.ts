@@ -73,6 +73,7 @@ export interface SendMessageOptions {
 
 interface UseChatReturn {
   messages: Message[];
+  unsetMessages_Status: () => void
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
   sendMessage: (
@@ -866,6 +867,14 @@ export function useChat({
     [conversationId],
   );
 
+  const unsetMessages_Status = useCallback(
+    () => {
+      setMessages([])
+      setMessageStatus({})
+    },
+    []
+  )
+
   return {
     messages,
     typingUsers,
@@ -877,6 +886,7 @@ export function useChat({
     stopTyping: handleStopTyping,
     deleteMessageForMe: handleDeleteForMe,
     recallMessage: handleRecall,
+    unsetMessages_Status,
     isLoading,
     error,
     userPenaltyScore,
