@@ -1,7 +1,7 @@
-import { Tabs } from 'expo-router';
+﻿import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Grid3X3, MessageCircle, UserRound, Users, Compass } from 'lucide-react-native';
+import { Grid3X3, MessageCircle, UserRound, Users, Globe2 } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../../src/theme/get-app-theme';
 
@@ -11,6 +11,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="home"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.accent,
@@ -32,18 +33,18 @@ export default function TabLayout() {
           left: 0,
           right: 0,
           shadowColor: '#000',
-          shadowOpacity: 0.25,
+          shadowOpacity: 0.08,
           shadowRadius: 20,
           shadowOffset: { width: 0, height: 10 },
           elevation: 0,
         },
         tabBarBackground: () => (
-          <BlurView intensity={88} tint={mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+          <BlurView intensity={88} tint="light" style={StyleSheet.absoluteFill} />
         ),
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
           title: 'Trang chủ',
           tabBarIcon: ({ color }) => <Grid3X3 size={22} color={color} />,
@@ -60,7 +61,7 @@ export default function TabLayout() {
         name="community"
         options={{
           title: 'Cộng đồng',
-          tabBarIcon: ({ color }) => <Compass size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Globe2 size={22} color={color} />,
         }}
       />
       <Tabs.Screen

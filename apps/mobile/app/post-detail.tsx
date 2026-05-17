@@ -5,11 +5,11 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Image,
   Dimensions,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Heart, MessageCircle, Bookmark, Share } from 'lucide-react-native';
 import { usePostDetail } from '../src/hooks/usePosts';
@@ -17,7 +17,7 @@ import { CommentSheet } from '../src/components/CommentSheet';
 import { likePost, bookmarkPost } from '../src/services/posts';
 import { colors } from '../src/theme/colors';
 import { fonts } from '../src/theme/fonts';
-import { SkeletonPostCardPreset } from '../src/ui/ZyncSkeleton';
+import { SkeletonCardPreset, SkeletonPostCardPreset } from '../src/ui/ZyncSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -102,6 +102,10 @@ export default function PostDetailScreen() {
     // Placeholder share — open URL if post has share link
   }, []);
 
+  const handleSubmitComment = useCallback(async (content: string): Promise<void> => {
+    await handleAddComment(content);
+  }, [handleAddComment]);
+
   if (isLoadingPost) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -117,7 +121,7 @@ export default function PostDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorState}>
           <Text style={styles.errorText}>
-            {error || 'Khong tim thay bai viet'}
+            {error || 'Không tìm thấy bài viết'}
           </Text>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backLinkText}>Quay lai</Text>
@@ -343,7 +347,7 @@ export default function PostDetailScreen() {
         comments={comments}
         isLoading={isLoadingComments}
         onClose={() => setShowCommentSheet(false)}
-        onSubmit={handleAddComment}
+        onSubmit={handleSubmitComment}
       />
     </SafeAreaView>
   );

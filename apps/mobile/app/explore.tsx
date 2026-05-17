@@ -6,13 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   RefreshControl,
   Dimensions,
   Image,
   FlatList,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Search, TrendingUp, Users, Hash } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../src/theme/get-app-theme';
@@ -23,13 +24,16 @@ import { DeveloperCard } from '../src/components/DeveloperCard';
 import { useExplore } from '../src/hooks/useExplore';
 import { fetchTrendingPosts, type Post } from '../src/services/posts';
 import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
+import { useNavigationFlow } from '../src/hooks/useNavigationFlow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export default function ExploreScreen() {
+export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) {
   const router = useRouter();
+  const params = useLocalSearchParams<{ skills?: string }>();
   const mode = useAppPreferencesStore((s) => s.theme);
   const theme = getAppTheme(mode);
+  const { navigateToChat, sendFriendRequest } = useNavigationFlow();
 
   const {
     channels,
@@ -43,7 +47,9 @@ export default function ExploreScreen() {
     handleJoinChannel,
   } = useExplore();
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(
+    typeof params.skills === 'string' ? params.skills.split(',').filter(Boolean).join(' ') : ''
+  );
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [isLoadingTrending, setIsLoadingTrending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -109,11 +115,13 @@ export default function ExploreScreen() {
     !isLoadingChannels && !isLoadingUsers && channels.length === 0 && users.length === 0;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Kham pha</Text>
-      </View>
+      {showHeader && (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Khám phá</Text>
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -131,7 +139,7 @@ export default function ExploreScreen() {
           <Search size={18} color={colors.textSubtle} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Tim kenh, nguoi dung..."
+            placeholder="Tìm kênh, người dùng..."
             placeholderTextColor={colors.textSubtle}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -152,9 +160,9 @@ export default function ExploreScreen() {
         {/* Empty state */}
         {hasContent && !searchQuery && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Chua co noi dung nao</Text>
+              <Text style={styles.emptyTitle}>Chưa có nội dung nào</Text>
             <Text style={styles.emptySubtitle}>
-              Danh sach kenh va nguoi dung se xuat hien o day
+              Danh sách kênh và người dùng sẽ xuất hiện ở đây
             </Text>
           </View>
         )}
@@ -164,7 +172,7 @@ export default function ExploreScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Hash size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Kenh pho bien</Text>
+              <Text style={styles.sectionTitle}>Kênh phổ biến</Text>
             </View>
             {filteredChannels.map((channel) => (
               <ChannelCard
@@ -182,7 +190,7 @@ export default function ExploreScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <TrendingUp size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Bai viet noi bat</Text>
+              <Text style={styles.sectionTitle}>Bài viết nổi bật</Text>
             </View>
             <ScrollView
               horizontal
@@ -224,10 +232,10 @@ export default function ExploreScreen() {
                   </Text>
                   <View style={styles.trendingStats}>
                     <Text style={styles.trendingStat}>
-                      {post.likesCount} thich
+                      {post.likesCount} thích
                     </Text>
                     <Text style={styles.trendingStat}>
-                      {post.commentsCount} binh luan
+                      {post.commentsCount} bình luận
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -241,17 +249,22 @@ export default function ExploreScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Users size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Developer noi bat</Text>
+              <Text style={styles.sectionTitle}>Developer nổi bật</Text>
             </View>
             {filteredUsers.map((user) => (
               <DeveloperCard
                 key={user.id}
                 user={user}
                 onMessage={(userId) => {
-                  // Navigate to chat with user
+                  void navigateToChat(userId);
                 }}
                 onAddFriend={(userId) => {
-                  // Send friend request
+                  void sendFriendRequest(userId).then((ok) => {
+                    Alert.alert(
+                      ok ? 'Thông báo' : 'Lỗi',
+                      ok ? 'Đã gửi lời mời kết bạn.' : 'Không thể gửi lời mời kết bạn lúc này.'
+                    );
+                  });
                 }}
               />
             ))}
@@ -263,15 +276,23 @@ export default function ExploreScreen() {
           filteredChannels.length === 0 &&
           filteredUsers.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Khong tim thay ket qua</Text>
+              <Text style={styles.emptyTitle}>Không tìm thấy kết quả</Text>
               <Text style={styles.emptySubtitle}>
-                Thuử tu kho tim kiem khac
+                Thử từ khóa tìm kiếm khác
               </Text>
             </View>
           )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+    </View>
+  );
+}
+
+export default function ExploreScreen() {
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <ExploreContent />
     </SafeAreaView>
   );
 }

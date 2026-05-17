@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
-import { Animated, StyleSheet, Text, View, SafeAreaView } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
 import { getAppTheme } from '../theme/get-app-theme';
 

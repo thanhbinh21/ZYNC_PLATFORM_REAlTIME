@@ -2,10 +2,15 @@
   "expo": {
     "name": "Zync Mobile",
     "slug": "zync-mobile",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#eaf1f8"
+    },
     "plugins": [
       "expo-head",
       "expo-video",
-      "expo-dev-client",
       [
         "@config-plugins/react-native-webrtc",
         {
@@ -16,6 +21,10 @@
     ],
     "android": {
       "package": "com.binhdev_zync.zyncmobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#eaf1f8"
+      },
       "permissions": [
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA",

@@ -1,35 +1,35 @@
 import { socketService } from './socket';
 
 export const callService = {
-  startCall: (targetUserId: string, conversationId?: string) => {
-    socketService.getSocket()?.emit('call_invite', { targetUserId, conversationId });
+  startCall: (targetUserId: string, conversationId?: string, callType: 'audio' | 'video' = 'video') => {
+    socketService.emitCallInvite(targetUserId, conversationId, callType);
   },
 
-  startGroupCall: (conversationId: string) => {
-    socketService.getSocket()?.emit('call_group_invite', { conversationId });
+  startGroupCall: (conversationId: string, callType: 'audio' | 'video' = 'video') => {
+    socketService.emitCallGroupInvite(conversationId, callType);
   },
 
   acceptCall: (sessionId: string, callToken: string) => {
-    socketService.getSocket()?.emit('call_accept', { sessionId, callToken });
+    socketService.emitCallAccept(sessionId, callToken);
   },
 
   rejectCall: (sessionId: string, callToken: string, reason: 'rejected' | 'busy' = 'rejected') => {
-    socketService.getSocket()?.emit('call_reject', { sessionId, callToken, reason });
+    socketService.emitCallReject(sessionId, callToken, reason);
   },
 
   endCall: (sessionId: string, callToken: string, reason: string = 'ended') => {
-    socketService.getSocket()?.emit('call_end', { sessionId, callToken, reason });
+    socketService.emitCallEnd(sessionId, callToken, reason);
   },
 
   sendWebRtcOffer: (sessionId: string, toUserId: string, callToken: string, sdp: unknown) => {
-    socketService.getSocket()?.emit('webrtc_offer', { sessionId, toUserId, callToken, sdp });
+    socketService.emitWebRtcOffer(sessionId, toUserId, callToken, sdp);
   },
 
   sendWebRtcAnswer: (sessionId: string, toUserId: string, callToken: string, sdp: unknown) => {
-    socketService.getSocket()?.emit('webrtc_answer', { sessionId, toUserId, callToken, sdp });
+    socketService.emitWebRtcAnswer(sessionId, toUserId, callToken, sdp);
   },
 
   sendIceCandidate: (sessionId: string, toUserId: string, callToken: string, candidate: unknown) => {
-    socketService.getSocket()?.emit('webrtc_ice_candidate', { sessionId, toUserId, callToken, candidate });
+    socketService.emitWebRtcIceCandidate(sessionId, toUserId, callToken, candidate);
   },
 };

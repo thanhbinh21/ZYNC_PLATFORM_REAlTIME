@@ -11,6 +11,8 @@ export function configureNotificationHandler(): void {
       // Tra ve true de cho phep hien thi notification khi app dang o foreground
       return {
         shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
       };
@@ -59,7 +61,12 @@ export async function getPushToken(): Promise<string | null> {
 
     return tokenData.data;
   } catch (e) {
-    console.warn('Khong the lay push token:', e);
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes('Default FirebaseApp is not initialized')) {
+      console.info('Bỏ qua push token: APK Android chưa cấu hình FCM.');
+      return null;
+    }
+    console.warn('Không thể lấy push token:', e);
     return null;
   }
 }
@@ -72,7 +79,7 @@ export async function registerPushToken(token: string, platform: string): Promis
       platform,
     });
   } catch (e) {
-    console.warn('Khong the dang ky push token:', e);
+    console.warn('Không thể đăng ký push token:', e);
   }
 }
 

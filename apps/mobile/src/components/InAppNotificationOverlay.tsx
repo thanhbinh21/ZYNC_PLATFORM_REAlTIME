@@ -85,7 +85,7 @@ function ToastCard({
         },
       ]}
     >
-      <Pressable onPress={onPress} style={styles.content} android_ripple={{ color: 'rgba(48,215,171,0.12)' }}>
+      <Pressable onPress={onPress} style={styles.content} android_ripple={{ color: 'rgba(15,157,142,0.12)' }}>
         <View style={styles.iconBox}>
           <Text style={styles.icon}>{item.icon ?? '🔔'}</Text>
         </View>
@@ -101,7 +101,7 @@ function ToastCard({
           </Text>
         </View>
         <Pressable onPress={dismissAnimated} hitSlop={10} style={styles.closeBtn}>
-          <Ionicons name="close" size={16} color="#7cb3a1" />
+          <Ionicons name="close" size={16} color={colors.textTertiary} />
         </Pressable>
       </Pressable>
     </Animated.View>
@@ -147,15 +147,15 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: 'rgba(10, 59, 47, 0.96)',
+    backgroundColor: colors.glassPanelStrong,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(26, 92, 74, 0.6)',
+    borderColor: colors.glassBorder,
     overflow: 'hidden',
     marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.14,
     shadowRadius: 14,
     elevation: 10,
   },
@@ -170,11 +170,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 14,
-    backgroundColor: colors.glassSoft,
+    backgroundColor: colors.glassUltra,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(26, 92, 74, 0.55)',
+    borderColor: colors.glassBorderSoft,
   },
   icon: {
     fontSize: 16,
@@ -193,17 +193,17 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: '#e4fff5',
+    color: colors.text,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   time: {
-    color: '#6db39e',
+    color: colors.textTertiary,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_400Regular',
   },
   body: {
-    color: '#a8d8c7',
+    color: colors.textMuted,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_400Regular',
     lineHeight: 17,
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: 'rgba(13, 58, 47, 0.8)',
+    backgroundColor: colors.surfaceHover,
     alignItems: 'center',
     justifyContent: 'center',
   },

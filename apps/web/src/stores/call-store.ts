@@ -13,6 +13,7 @@ export interface CallSessionState {
   status: 'ringing' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected' | 'outgoing' | 'incoming';
   reason?: string;
   callToken: string;
+  callType?: 'audio' | 'video';
   timeoutAt?: string | null;
 }
 

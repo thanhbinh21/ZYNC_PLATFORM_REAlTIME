@@ -5,10 +5,10 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
@@ -23,13 +23,16 @@ import { EmptyState } from '../../src/ui/EmptyState';
 import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
 import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
 import { useAuthStore } from '../../src/store/useAuthStore';
+import { ExploreContent } from '../explore';
 
 const FILTERS: { key: PostFilter; label: string }[] = [
-  { key: 'latest', label: 'Moi nhat' },
-  { key: 'trending', label: 'Thu hut' },
-  { key: 'question', label: 'Hoi dap' },
+  { key: 'latest', label: 'Mới nhất' },
+  { key: 'trending', label: 'Thu hút' },
+  { key: 'question', label: 'Hỏi đáp' },
   { key: 'til', label: 'TIL' },
 ];
+
+type CommunityTab = 'posts' | 'discover';
 
 export default function CommunityScreen() {
   const router = useRouter();
@@ -64,6 +67,7 @@ export default function CommunityScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<CommunityTab>('posts');
 
   useEffect(() => {
     loadPosts();
@@ -97,17 +101,43 @@ export default function CommunityScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cong dong</Text>
+        <Text style={styles.headerTitle}>Cộng đồng</Text>
+        {activeTab === 'posts' && (
+          <TouchableOpacity
+            onPress={() => setShowCreate(true)}
+            style={styles.createButton}
+          >
+            <Pencil size={18} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.mainTabRow}>
         <TouchableOpacity
-          onPress={() => setShowCreate(true)}
-          style={styles.createButton}
+          onPress={() => setActiveTab('posts')}
+          style={[styles.mainTab, activeTab === 'posts' && styles.mainTabActive]}
         >
-          <Pencil size={18} color={colors.primary} />
+          <Text style={[styles.mainTabText, activeTab === 'posts' && styles.mainTabTextActive]}>
+            Bài viết
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setActiveTab('discover')}
+          style={[styles.mainTab, activeTab === 'discover' && styles.mainTabActive]}
+        >
+          <Text style={[styles.mainTabText, activeTab === 'discover' && styles.mainTabTextActive]}>
+            Khám phá
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {activeTab === 'discover' ? (
+        <ExploreContent showHeader={false} />
+      ) : (
+      <>
 
       {/* Filter tabs */}
       <View style={styles.filterRow}>
@@ -156,6 +186,10 @@ export default function CommunityScreen() {
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews
         ListFooterComponent={
           isLoadingMore ? (
             <ActivityIndicator
@@ -194,6 +228,8 @@ export default function CommunityScreen() {
         onClose={closeProfileSheet}
         onSendMessage={(userId) => { void navigateToChat(userId); }}
       />
+      </>
+      )}
     </SafeAreaView>
   );
 }
@@ -224,6 +260,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  mainTabRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: colors.glassSoft,
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
+  },
+  mainTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    paddingVertical: 9,
+  },
+  mainTabActive: {
+    backgroundColor: colors.primary,
+  },
+  mainTabText: {
+    color: colors.textMuted,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+  },
+  mainTabTextActive: {
+    color: colors.textOnAccent,
+    fontFamily: fonts.bold,
+  },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -248,7 +313,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   filterTextActive: {
-    color: colors.text,
+    color: colors.textOnAccent,
     fontFamily: fonts.bold,
   },
   listContent: {

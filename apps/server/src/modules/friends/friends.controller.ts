@@ -138,7 +138,12 @@ export async function listFriendRequestsHandler(
   try {
     const { userId } = req as AuthRequest;
     const data = await listFriendRequests(userId);
-    res.json({ success: true, ...data });
+    res.json({
+      success: true,
+      ...data,
+      received: data.incoming,
+      sent: data.outgoing,
+    });
   } catch (err) {
     next(err);
   }

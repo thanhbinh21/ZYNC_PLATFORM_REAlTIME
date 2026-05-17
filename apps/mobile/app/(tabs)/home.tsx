@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,8 +18,7 @@ import {
   Users,
   MessageCircle,
   Mail,
-  Compass,
-  AddCircle,
+  CirclePlus,
   Globe,
   ChevronRight,
   Sparkles,
@@ -33,7 +33,6 @@ import { getAppTheme } from '../../src/theme/get-app-theme';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api from '../../src/services/api';
 import { useNotificationsContext } from '../../src/context/notifications-context';
-import { StoryBar } from '../../src/components/StoryBar';
 import { GlassPanel } from '../../src/ui/GlassPanel';
 import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 
@@ -262,8 +261,6 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const displayName = userInfo?.displayName || userInfo?.username || 'User';
-  const currentUserId = userInfo?._id || userInfo?.id || '';
-
   // ============================================================
   // DATA LOADING
   // ============================================================
@@ -383,18 +380,6 @@ export default function HomeScreen() {
     });
   }, [openNotificationSheet]);
 
-  const handleCreateStory = useCallback(() => {
-    router.push('/create-story');
-  }, [router]);
-
-  const handleViewStory = useCallback((feedIndex: number) => {
-    router.push({ pathname: '/create-story', params: { feedIndex: String(feedIndex) } });
-  }, [router]);
-
-  const handleViewMyStory = useCallback(() => {
-    router.push('/create-story');
-  }, [router]);
-
   const handleTrendingPostPress = useCallback((post: TrendingPost) => {
     router.push({ pathname: '/post-detail', params: { postId: post._id } });
   }, [router]);
@@ -429,7 +414,7 @@ export default function HomeScreen() {
       style={styles.safeArea}
     >
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
         {/* ============================================================ */}
         {/* HEADER */}
@@ -470,20 +455,6 @@ export default function HomeScreen() {
             />
           }
         >
-          {/* ============================================================ */}
-          {/* STORIES BAR */}
-          {/* ============================================================ */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Khoảnh khắc</Text>
-            <StoryBar
-              currentUserId={currentUserId}
-              currentUserName={displayName}
-              onCreateStory={handleCreateStory}
-              onViewStory={handleViewStory}
-              onViewMyStory={handleViewMyStory}
-            />
-          </View>
-
           {/* ============================================================ */}
           {/* STATS GRID */}
           {/* ============================================================ */}
@@ -562,13 +533,13 @@ export default function HomeScreen() {
               />
               <QuickAction
                 label="Khám phá"
-                icon={<Compass size={22} color={theme.warning} />}
+                icon={<Globe size={22} color={theme.warning} />}
                 color={theme.warning}
-                onPress={() => router.push('/explore')}
+                onPress={() => router.push('/(tabs)/community')}
               />
               <QuickAction
                 label="Tạo nhóm"
-                icon={<AddCircle size={22} color={theme.pink} />}
+                icon={<CirclePlus size={22} color={theme.pink} />}
                 color={theme.pink}
                 onPress={() => router.push('/create-group')}
               />
@@ -586,7 +557,7 @@ export default function HomeScreen() {
               </View>
               <TouchableOpacity
                 style={styles.seeAllBtn}
-                onPress={() => router.push('/explore')}
+                onPress={() => router.push('/(tabs)/community')}
                 activeOpacity={0.7}
               >
                 <Text style={styles.seeAllText}>Xem thêm</Text>

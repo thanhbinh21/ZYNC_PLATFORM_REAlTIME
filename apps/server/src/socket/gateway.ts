@@ -73,10 +73,12 @@ interface AuthSocket extends Socket {
 interface CallInvitePayload {
   targetUserId: string;
   conversationId?: string;
+  callType: 'audio' | 'video';
 }
 
 interface CallGroupInvitePayload {
   conversationId: string;
+  callType: 'audio' | 'video';
 }
 
 interface CallSessionPayload {
@@ -327,8 +329,6 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
-    // ✅ Call & WebRTC Events – delegated to CallController sub-module
-    registerCallController(io, socket as AuthSocket);
     socket.on('disconnect', async () => {
       logger.debug(`Socket disconnected: ${userId}`);
       await setPresenceOffline(userId);
@@ -390,6 +390,7 @@ function parseCallInvitePayload(payload: unknown): CallInvitePayload {
   const data = payload as Record<string, unknown>;
   const targetUserId = data['targetUserId'];
   const conversationId = data['conversationId'];
+  const callType = data['callType'];
 
   if (typeof targetUserId !== 'string' || targetUserId.length === 0) {
     throw new BadRequestError('targetUserId is required');
@@ -398,10 +399,14 @@ function parseCallInvitePayload(payload: unknown): CallInvitePayload {
   if (conversationId !== undefined && (typeof conversationId !== 'string' || conversationId.length === 0)) {
     throw new BadRequestError('conversationId must be a non-empty string');
   }
+  if (callType !== undefined && callType !== 'audio' && callType !== 'video') {
+    throw new BadRequestError('callType must be audio or video');
+  }
 
   return {
     targetUserId,
     conversationId: typeof conversationId === 'string' ? conversationId : undefined,
+    callType: callType === 'audio' ? 'audio' : 'video',
   };
 }
 
@@ -412,12 +417,17 @@ function parseCallGroupInvitePayload(payload: unknown): CallGroupInvitePayload {
 
   const data = payload as Record<string, unknown>;
   const conversationId = data['conversationId'];
+  const callType = data['callType'];
   if (typeof conversationId !== 'string' || conversationId.length === 0) {
     throw new BadRequestError('conversationId is required');
+  }
+  if (callType !== undefined && callType !== 'audio' && callType !== 'video') {
+    throw new BadRequestError('callType must be audio or video');
   }
 
   return {
     conversationId,
+    callType: callType === 'audio' ? 'audio' : 'video',
   };
 }
 
@@ -542,7 +552,7 @@ async function handleCallInvite(
   const session = await CallsService.createOneToOneSession(userId, {
     targetUserId: input.targetUserId,
     conversationId: input.conversationId,
-    callType: 'video',
+    callType: input.callType,
   });
   const [callerToken, calleeToken] = await Promise.all([
     CallsService.issueSessionTokenForUser(session.sessionId, userId),
@@ -608,7 +618,7 @@ async function handleCallGroupInvite(
 
   const session = await CallsService.createGroupSession(userId, {
     conversationId: input.conversationId,
-    callType: 'video',
+    callType: input.callType,
   });
 
   const tokenEntries = await Promise.all(

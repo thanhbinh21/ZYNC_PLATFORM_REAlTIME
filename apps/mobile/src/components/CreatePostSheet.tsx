@@ -100,7 +100,7 @@ export function CreatePostSheet({
       });
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Khong the tao bai viet');
+      setError(err instanceof Error ? err.message : 'Không thể tạo bài viết');
     } finally {
       setIsSubmitting(false);
     }

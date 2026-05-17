@@ -265,7 +265,9 @@ export async function refreshHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined;
+    const bodyRefreshToken = (req.body as { refreshToken?: unknown } | undefined)?.refreshToken;
+    const refreshToken = (req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined)
+      ?? (typeof bodyRefreshToken === 'string' ? bodyRefreshToken : undefined);
     if (!refreshToken) {
       res.status(401).json({ success: false, error: 'Refresh token not found' });
       return;

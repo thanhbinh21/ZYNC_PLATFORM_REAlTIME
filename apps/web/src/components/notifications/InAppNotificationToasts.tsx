@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getSocket } from '@/services/socket';
 import { getAccessToken } from '@/utils/auth-token';
 import type { Notification } from '@/services/notifications';
@@ -14,11 +14,28 @@ type ToastItem = {
   id: string;
   notification: Notification;
   createdAt: number;
+  actions?: Array<{
+    label: string;
+    variant?: 'primary' | 'danger' | 'secondary';
+    onClick: () => void;
+  }>;
 };
 
 const MAX_TOASTS = 2;
 const AUTO_DISMISS_MS = 5500;
 const SUMMARY_ID = 'toast-summary';
+export const WEB_IN_APP_TOAST_EVENT = 'zync:web-in-app-toast';
+
+export type WebInAppToastDetail = {
+  id?: string;
+  type?: Notification['type'];
+  title: string;
+  body: string;
+  durationMs?: number;
+  dismiss?: boolean;
+  onPress?: () => void;
+  actions?: ToastItem['actions'];
+};
 
 function IconForType({ type, isSummary }: { type?: Notification['type'], isSummary?: boolean }) {
   if (isSummary) return <Bell className="h-5 w-5 text-accent" />;
@@ -43,7 +60,6 @@ function timeLabel(ts: number): string {
 
 export function InAppNotificationToasts() {
   const router = useRouter();
-  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<ToastItem[]>([]);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -139,11 +155,6 @@ export function InAppNotificationToasts() {
         return;
       }
 
-      // Avoid duplicate UX when user is currently in Chat view
-      if (pathname?.startsWith('/chat') && notification.type === 'new_message') {
-        return;
-      }
-
       const now = Date.now();
       const id = `toast-${notification._id}-${now}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -180,7 +191,38 @@ export function InAppNotificationToasts() {
     return () => {
       socket.off('new_notification', handler);
     };
-  }, [pathname, scheduleDismiss]);
+  }, [scheduleDismiss]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<WebInAppToastDetail>).detail;
+      if (!detail?.id) return;
+      if (detail.dismiss) {
+        dismiss(detail.id);
+        return;
+      }
+      if (!detail.title) return;
+
+      const now = Date.now();
+      const id = detail.id;
+      const notification: Notification = {
+        _id: id,
+        userId: '',
+        type: detail.type ?? 'community_post',
+        title: detail.title,
+        body: detail.body,
+        read: true,
+        createdAt: new Date(now).toISOString(),
+      };
+
+      setItems((prev) => [{ id, notification, createdAt: now, actions: detail.actions }, ...prev.filter((t) => t.id !== id)].slice(0, MAX_TOASTS));
+      const t = setTimeout(() => dismiss(id), detail.durationMs ?? AUTO_DISMISS_MS);
+      timersRef.current.set(id, t);
+    };
+
+    window.addEventListener(WEB_IN_APP_TOAST_EVENT, handler);
+    return () => window.removeEventListener(WEB_IN_APP_TOAST_EVENT, handler);
+  }, [dismiss]);
 
   useEffect(() => {
     return () => {
@@ -208,6 +250,7 @@ export function InAppNotificationToasts() {
                 openNotificationsFromSummary();
                 return;
               }
+              if (t.actions?.length) return;
               void navigateFrom(t.notification);
               dismiss(t.id);
             }}
@@ -225,6 +268,31 @@ export function InAppNotificationToasts() {
               <p className={`font-ui-content mt-1 ${isSummary ? 'line-clamp-1' : 'line-clamp-2'} text-xs text-[#a8d8c7]`}>
                 {t.notification.body}
               </p>
+              {t.actions && t.actions.length > 0 && (
+                <div className="mt-3 flex gap-2">
+                  {t.actions.map((action) => (
+                    <span
+                      key={action.label}
+                      role="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        action.onClick();
+                        dismiss(t.id);
+                      }}
+                      className={`inline-flex flex-1 items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold text-white ${
+                        action.variant === 'danger'
+                          ? 'bg-red-500 hover:bg-red-600'
+                          : action.variant === 'secondary'
+                            ? 'bg-[#194437] hover:bg-[#215443]'
+                            : 'bg-emerald-600 hover:bg-emerald-700'
+                      }`}
+                    >
+                      {action.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <span
@@ -248,11 +316,11 @@ export function InAppNotificationToasts() {
   if (!mounted || items.length === 0) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed left-0 right-0 top-4 z-[9999] flex flex-col items-center gap-2 px-4">
+    <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-[9999] flex flex-col-reverse items-center gap-2 px-4">
       {rendered}
       <style jsx>{`
         @keyframes toastDrop {
-          from { opacity: 0; transform: translateY(-10px); }
+          from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>

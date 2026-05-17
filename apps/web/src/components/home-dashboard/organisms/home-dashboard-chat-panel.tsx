@@ -102,11 +102,11 @@ function PinMiniIcon() {
 
 // ==================== AUTHOR POSTS SECTION ====================
 
-interface ConversationItem {
-  _id: string;
+interface AuthorConversationItem {
   name?: string;
   avatarUrl?: string;
-  type: 'direct' | 'group';
+  type?: 'direct' | 'group';
+  isGroup?: boolean;
   updatedAt?: string;
   createdBy?: string;
   adminIds?: string[];
@@ -119,7 +119,7 @@ interface ConversationItem {
 }
 
 interface AuthorPostsSectionProps {
-  conversation?: ConversationItem;
+  conversation?: AuthorConversationItem;
   currentUserId?: string;
 }
 
@@ -127,22 +127,23 @@ function AuthorPostsSection({ conversation, currentUserId }: AuthorPostsSectionP
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const isGroupConversation = conversation?.type === 'group' || conversation?.isGroup === true;
 
   // Lay authorId tu conversation (nguoi khac trong direct conversation)
   const otherParticipant = conversation?.members?.find((m) => m._id !== currentUserId);
   const authorId = otherParticipant?._id;
 
   useEffect(() => {
-    if (!authorId || conversation?.type === 'group') return;
+    if (!authorId || isGroupConversation) return;
 
     setLoading(true);
     fetchPostsByAuthor(authorId, 3)
       .then(setPosts)
       .catch(() => {/* ignore */})
       .finally(() => setLoading(false));
-  }, [authorId, conversation?.type]);
+  }, [authorId, isGroupConversation]);
 
-  if (conversation?.type === 'group' || !authorId) return null;
+  if (isGroupConversation || !authorId) return null;
 
   return (
     <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
@@ -241,6 +242,7 @@ interface ChatPanelProps {
     displayName: string;
     stream: MediaStream;
   }>;
+  onStartAudioCall?: () => void;
   onStartVideoCall?: () => void;
   onAcceptIncomingCall?: () => void;
   onRejectIncomingCall?: () => void;
@@ -542,6 +544,7 @@ function ChatPanel({
   localVideoRef,
   remoteVideoRef,
   remoteParticipantVideos = [],
+  onStartAudioCall = () => {},
   onStartVideoCall = () => {},
   onAcceptIncomingCall = () => {},
   onRejectIncomingCall = () => {},
@@ -759,6 +762,18 @@ function ChatPanel({
   const activeSpeakerName = activeSpeakerUserId
     ? remoteParticipantVideos.find((participant) => participant.userId === activeSpeakerUserId)?.displayName
     : null;
+  const callMediaLayout = isScreenSharing
+    ? 'flex flex-col gap-3 p-4'
+    : 'flex flex-col md:flex-row gap-4 p-4';
+  const localCallTileClass = isScreenSharing
+    ? 'relative h-[min(58vh,560px)] w-full overflow-hidden rounded-xl border border-border bg-black shadow-sm'
+    : 'shrink-0 relative w-full md:w-[280px] h-[200px] md:h-auto overflow-hidden rounded-xl border border-border bg-black shadow-sm';
+  const remoteCallGridClass = isScreenSharing
+    ? 'grid max-h-44 grid-flow-col auto-cols-[180px] gap-3 overflow-x-auto pb-1'
+    : 'flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto content-start';
+  const remoteCallTileClass = isScreenSharing
+    ? 'relative h-32 w-[180px] overflow-hidden rounded-xl border bg-black shadow-sm'
+    : 'relative aspect-video overflow-hidden rounded-xl border bg-black shadow-sm';
   // Report message
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const handleReportMessage = useCallback(async (messageId: string) => {
@@ -939,7 +954,7 @@ function ChatPanel({
             className="chat-header-btn"
             title="Gọi điện thoại"
             disabled={!isCallingAvailable}
-            onClick={onStartVideoCall}
+            onClick={onStartAudioCall}
           >
             <PhoneIcon className="w-5 h-5" />
           </button>
@@ -1210,9 +1225,9 @@ function ChatPanel({
             </div>
 
             {shouldRenderCallMedia && (
-              <div className={`flex flex-col md:flex-row gap-4 p-4 ${isTerminalCallState ? 'max-h-[52vh]' : 'flex-1 min-h-0 bg-bg-primary'}`}>
+              <div className={`${callMediaLayout} ${isTerminalCallState ? 'max-h-[52vh]' : 'flex-1 min-h-0 bg-bg-primary'}`}>
                 {/* Local Video */}
-                <div className="shrink-0 relative w-full md:w-[280px] h-[200px] md:h-auto overflow-hidden rounded-xl border border-border bg-black shadow-sm">
+                <div className={localCallTileClass}>
                   <video
                     ref={localVideoRef}
                     autoPlay
@@ -1227,7 +1242,7 @@ function ChatPanel({
 
                 {/* Remote Video Grid */}
                 {isGroupCallActive ? (
-                  <div className={`flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto content-start`}>
+                  <div className={remoteCallGridClass}>
                     {remoteParticipantVideos.length === 0 && (
                       <div className="flex h-48 sm:h-full items-center justify-center rounded-xl border-2 border-dashed border-border bg-bg-card text-sm text-text-secondary sm:col-span-full shadow-sm">
                         Đang chờ thành viên khác tham gia...
@@ -1236,7 +1251,7 @@ function ChatPanel({
                     {remoteParticipantVideos.map((participant) => (
                       <div
                         key={participant.userId}
-                        className={`relative aspect-video overflow-hidden rounded-xl border bg-black shadow-sm ${
+                        className={`${remoteCallTileClass} ${
                           activeSpeakerUserId === participant.userId
                             ? 'border-accent ring-2 ring-accent'
                             : 'border-border'
@@ -1265,7 +1280,7 @@ function ChatPanel({
                     ))}
                   </div>
                 ) : (
-                  <div className="flex-1 min-h-[300px] md:min-h-0 relative overflow-hidden rounded-xl border border-border bg-black shadow-sm">
+                  <div className={isScreenSharing ? `${remoteCallTileClass} border-border` : 'flex-1 min-h-[300px] md:min-h-0 relative overflow-hidden rounded-xl border border-border bg-black shadow-sm'}>
                     <video
                       ref={remoteVideoRef}
                       autoPlay

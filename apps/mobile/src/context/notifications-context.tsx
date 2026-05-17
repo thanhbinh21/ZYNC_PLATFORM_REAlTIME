@@ -5,7 +5,7 @@ import type { NotificationAnchorRect } from '../services/notifications';
 import { useAuthStore } from '../store/useAuthStore';
 import { socketService } from '../services/socket';
 import { InAppNotificationOverlay, type InAppToastItem } from '../components/InAppNotificationOverlay';
-import { useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import type { AppNotification } from '../services/notifications';
 
 export type { NotificationAnchorRect };
@@ -27,8 +27,6 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const overflowCountRef = useRef<number>(0);
   const SUMMARY_TOAST_ID = 'toast-summary';
   const router = useRouter();
-  const pathname = usePathname();
-  const params = useGlobalSearchParams();
   const lastToastAtRef = useRef<number>(0);
 
   const openNotificationSheet = useCallback(
@@ -90,28 +88,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [dismissToast, navigateFromNotification, notificationsApi],
   );
 
-  // Listen socket events globally to show in-app toast (when not already viewing same chat)
+  // Listen socket events globally to show in-app toast on every screen.
   useEffect(() => {
     if (!isAuthenticated) return;
 
     let off: (() => void) | undefined;
     let cancelled = false;
 
-    const shouldSuppress = (n: AppNotification) => {
-      if (!n.conversationId) return false;
-      if (pathname !== '/chat-room') return false;
-      const currentConversationId =
-        typeof params.conversationId === 'string' ? params.conversationId : undefined;
-      return currentConversationId === n.conversationId;
-    };
-
     const attach = () => {
       const sock = socketService.getSocket();
       if (!sock || cancelled) return;
       const handler = (notification: AppNotification) => {
-        if (sheetVisible) return;
-        if (shouldSuppress(notification)) return;
-
         const now = Date.now();
         // Lightweight dedupe to avoid toast spam bursts
         if (now - lastToastAtRef.current < 250) return;
@@ -180,7 +167,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       cancelled = true;
       off?.();
     };
-  }, [isAuthenticated, pathname, params.conversationId, sheetVisible]);
+  }, [isAuthenticated]);
 
   const value = useMemo(
     () => ({
