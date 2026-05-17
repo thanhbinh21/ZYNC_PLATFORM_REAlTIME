@@ -439,9 +439,66 @@ async function handleForwardMessage(io: Server, socket: AuthSocket, payload: unk
   const { originalMessageId, toConversationId, idempotencyKey } = payload as { originalMessageId?: string; toConversationId?: string; idempotencyKey?: string };
   if (!originalMessageId || !toConversationId || !idempotencyKey) { socket.emit('error', { message: 'Missing required fields' }); return; }
 
+  // ─── Membership + Penalty Check (using aggregate + profile) ───
+  const memberProfile = await MessagesService.getConversationMemberPenaltyProfile(toConversationId as string, userId);
+
+  if (!memberProfile) {
+    socket.emit('error', { message: 'Not allowed to send message in this conversation' });
+    return;
+  }
+
+  // Prepare minimal PenaltyMemberState for refresh (same shape as penalty-policy expects)
+  const penaltyState: { penaltyScore?: number; mutedUntil?: Date | undefined; penaltyWindowStartedAt?: Date | undefined } = {
+    penaltyScore: memberProfile.penaltyScore,
+    mutedUntil: memberProfile.mutedUntil ? new Date(memberProfile.mutedUntil) : undefined,
+    penaltyWindowStartedAt: memberProfile.penaltyWindowStartedAt ? new Date(memberProfile.penaltyWindowStartedAt) : undefined,
+  };
+
+  const windowChanged = refreshPenaltyWindow(penaltyState as any);
+  if (windowChanged) {
+    // Persist changes back to ConversationMember document
+    const update: Record<string, any> = { $set: { penaltyScore: penaltyState.penaltyScore ?? 0 } };
+    const unset: Record<string, ''> = {};
+    if (penaltyState.mutedUntil) update.$set.mutedUntil = penaltyState.mutedUntil;
+    else unset.mutedUntil = '';
+    if (penaltyState.penaltyWindowStartedAt) update.$set.penaltyWindowStartedAt = penaltyState.penaltyWindowStartedAt;
+    else unset.penaltyWindowStartedAt = '';
+    if (Object.keys(unset).length > 0) update.$unset = unset;
+
+    try {
+      await ConversationMemberModel.updateOne({ conversationId: toConversationId as string, userId }, update as any);
+    } catch (err) {
+      logger.warn('[ChatController] Failed to persist penalty window changes', err);
+    }
+  }
+
+  if (penaltyState.mutedUntil && penaltyState.mutedUntil > new Date()) {
+    socket.emit('error', {
+      message: `Bạn đang bị tạm khóa gửi tin đến ${penaltyState.mutedUntil.toLocaleTimeString('vi-VN')}`,
+    });
+    socket.emit('user_penalty_updated', {
+      conversationId: toConversationId as string,
+      penaltyScore: penaltyState.penaltyScore ?? 0,
+      mutedUntil: penaltyState.mutedUntil,
+    });
+    return;
+  }
+
   MessagesService.forwardMessage(originalMessageId, toConversationId, userId, idempotencyKey)
     .then((newMessage) => {
-      io.to(`conv:${toConversationId}`).emit('receive_message', { messageId: newMessage._id, conversationId: toConversationId, senderId: userId, content: newMessage.content, type: newMessage.type, mediaUrl: newMessage.mediaUrl, status: 'sent', createdAt: newMessage.createdAt, idempotencyKey: newMessage.idempotencyKey });
+      io.to(`conv:${toConversationId}`).emit('receive_message', 
+        { 
+          messageId: newMessage._id, 
+          conversationId: toConversationId, 
+          senderId: userId,
+          sender: { senderId: userId, displayName: memberProfile.displayName ?? undefined, avatarUrl: memberProfile.avatarUrl ?? undefined },
+          content: newMessage.content, 
+          type: newMessage.type, 
+          mediaUrl: newMessage.mediaUrl, 
+          status: 'sent', 
+          createdAt: newMessage.createdAt, 
+          idempotencyKey: newMessage.idempotencyKey 
+        });
       socket.emit('message_forwarded', { messageId: newMessage._id, idempotencyKey, toConversationId });
     })
     .catch((err) => {
