@@ -34,6 +34,12 @@ export interface IUser extends Document {
   passwordHash?: string;
   globalViolationCount: number;
   trustScore: number;
+  toastNotifications: boolean;
+  allowSearchProfile: boolean;
+  allowFriendRequest: boolean;
+  showOnlineStatus: boolean;
+  isOnline: boolean;
+  lastSeenAt?: Date | null;
 }
 
 const userSchema = new Schema<IUser>(
@@ -66,6 +72,12 @@ const userSchema = new Schema<IUser>(
     passwordHash: { type: String, select: false },
     globalViolationCount: { type: Number, default: 0 },
     trustScore: { type: Number, default: 100 }, // 0 to 100
+    toastNotifications: { type: Boolean, default: true },
+    allowSearchProfile: { type: Boolean, default: true },
+    allowFriendRequest: { type: Boolean, default: true },
+    showOnlineStatus: { type: Boolean, default: true },
+    isOnline: { type: Boolean, default: false },
+    lastSeenAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

@@ -430,15 +430,15 @@ export function MessageInput({
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Dang tra loi</p>
-              <p className="truncate text-[13px] text-[#65676b]">{replyingTo.contentPreview || '[Tin nhan]'}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Đang trả lời</p>
+              <p className="truncate text-[13px] text-[#65676b]">{replyingTo.contentPreview || '[Tin nhắn]'}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onCancelReply}
             className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[#929292] hover:bg-[#f0f2f5] hover:text-[#050505] transition-all"
-            title="Huy tra loi"
+            title="Hủy trả lời"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
@@ -481,7 +481,7 @@ export function MessageInput({
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || isLoading}
             className="chat-input-action-btn"
-            title="Dinh kem tep"
+            title="Đính kèm tệp"
           >
             <PaperclipIcon className="w-5 h-5" />
           </button>
@@ -490,7 +490,7 @@ export function MessageInput({
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || isLoading}
             className="chat-input-action-btn"
-            title="Gui hinh anh"
+            title="Gửi hình ảnh"
           >
             <ImageIcon className="w-5 h-5" />
           </button>
@@ -499,7 +499,7 @@ export function MessageInput({
             onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
             disabled={disabled || isLoading}
             className={`chat-input-action-btn ${isEmojiPickerOpen ? 'bg-[#f0f2f5] text-accent' : ''}`}
-            title="Bieu tuong cam xuc"
+            title="Biểu tượng cảm xúc"
           >
             <EmojiIcon className="w-5 h-5" />
           </button>
@@ -530,7 +530,7 @@ export function MessageInput({
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="Nhap tin nhan..."
+            placeholder="Nhập tin nhắn..."
             disabled={disabled || isLoading}
             rows={1}
             className="chat-input-field"
@@ -592,7 +592,7 @@ export function MessageInput({
             }}
             disabled={Boolean(queuedMediaSend)}
             className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#65676b] text-white shadow-md transition-all hover:bg-[#050505] hover:scale-110 disabled:opacity-50"
-            title="Xoa tep"
+            title="Xóa tệp"
           >
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
@@ -608,7 +608,7 @@ export function MessageInput({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>
-          Dang tai media...
+          Đang tải media...
         </p>
       )}
     </div>

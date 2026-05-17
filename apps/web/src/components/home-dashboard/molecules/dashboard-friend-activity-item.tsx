@@ -88,21 +88,21 @@ export function DashboardFriendActivityItemRow({ item, onClick }: DashboardFrien
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="font-ui-title truncate text-xs text-text-primary">{item.userName}</p>
+          <p className="font-ui-title truncate text-xs font-semibold text-text-primary">{item.userName}</p>
           {item.action === 'online' && (
             <span className="flex h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-emerald-400" />
           )}
         </div>
-        <p className="font-ui-content mt-0.5 truncate text-[11px] text-text-secondary">
+        <p className="font-ui-content mt-0.5 truncate text-[11px] font-medium text-text-secondary">
           {actionLabel}
           {item.target && (
-            <span className="ml-1 text-text-tertiary">{item.target}</span>
+            <span className="ml-1 font-normal text-text-secondary">{item.target}</span>
           )}
         </p>
       </div>
 
       {/* Time */}
-      <span className="font-ui-meta flex-shrink-0 text-[10px] text-text-tertiary">
+      <span className="font-ui-meta flex-shrink-0 text-[10px] font-medium text-text-secondary">
         {item.timeLabel}
       </span>
     </article>

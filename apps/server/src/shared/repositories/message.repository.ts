@@ -1,7 +1,18 @@
 import { type IMessage, MessageModel } from '../../modules/messages/message.model';
+import { ConversationMemberModel } from '../../modules/conversations/conversation-member.model';
+import { UserModel } from '../../modules/users/user.model';
 import { BaseRepository } from '../../shared/repositories/base.repository';
 import type { FilterQuery } from 'mongoose';
 import type { Document } from 'mongoose';
+
+export interface IConversationMemberPenaltyProfile {
+  senderId: string;
+  penaltyScore: number;
+  mutedUntil?: Date | null;
+  penaltyWindowStartedAt?: Date | null;
+  displayName?: string;
+  avatarUrl?: string;
+}
 
 /**
  * MessageRepository - Tầng truy xuất dữ liệu cho Message
@@ -10,6 +21,78 @@ import type { Document } from 'mongoose';
 export class MessageRepository extends BaseRepository<IMessage & Document> {
   constructor() {
     super(MessageModel as any);
+  }
+
+  /**
+   * Lấy penalty state của một thành viên trong conversation kèm profile user.
+   * Trả về senderId = userId để đồng bộ với realtime payload.
+   */
+  async findConversationMemberPenaltyProfile(
+    conversationId: string,
+    userId: string,
+  ): Promise<IConversationMemberPenaltyProfile | null> {
+    const results = await ConversationMemberModel.aggregate<IConversationMemberPenaltyProfile>([
+      {
+        $match: {
+          conversationId,
+          userId,
+        },
+      },
+      {
+        $lookup: {
+          from: UserModel.collection.name,
+          let: { memberUserId: '$userId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: [
+                    '$_id',
+                    {
+                      $convert: {
+                        input: '$$memberUserId',
+                        to: 'objectId',
+                        onError: null,
+                        onNull: null,
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                displayName: 1,
+                avatarUrl: 1,
+              },
+            },
+            { $limit: 1 },
+          ],
+          as: 'user',
+        },
+      },
+      {
+        $unwind: {
+          path: '$user',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          senderId: '$userId',
+          penaltyScore: 1,
+          mutedUntil: 1,
+          penaltyWindowStartedAt: 1,
+          displayName: '$user.displayName',
+          avatarUrl: '$user.avatarUrl',
+        },
+      },
+      { $limit: 1 },
+    ]);
+
+    return results[0] ?? null;
   }
 
   /**

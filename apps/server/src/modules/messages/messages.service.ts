@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { MessageReactionsService } from './message-reaction.service';
 import { UserModel } from '../users/user.model';
 import { MessageRepository } from '../../shared/repositories/message.repository';
+import type { IConversationMemberPenaltyProfile } from '../../shared/repositories/message.repository';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -57,6 +58,16 @@ export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
   /** Repository singleton – all DB queries go through here */
   private static readonly repo = new MessageRepository();
+
+  /**
+   * Fetch conversation member penalty profile (penalty fields + user profile)
+   */
+  static async getConversationMemberPenaltyProfile(
+    conversationId: string,
+    userId: string,
+  ): Promise<IConversationMemberPenaltyProfile | null> {
+    return this.repo.findConversationMemberPenaltyProfile(conversationId, userId);
+  }
 
   private static getLastMessagePreview(
     content: string,
@@ -535,9 +546,21 @@ export class MessagesService {
           }))
           : readBy.slice(0, 3);
 
+        const sender = memberIds
+          .filter((memberId) => memberId === senderId)
+          .map((memberId) => {
+            const participant = participantByUserId.get(memberId);
+            return {
+              senderId: memberId,
+              displayName: participant?.displayName || 'Nguoi dung',
+              avatarUrl: participant?.avatarUrl,
+            };
+          })[0];
+
         return {
           ...msg,
           status,
+          sender,
           readBy,
           sentTo,
           readByPreview,

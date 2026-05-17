@@ -10,14 +10,17 @@ import { FriendshipModel, type IFriendship } from './friendship.model';
 import { UserModel } from '../users/user.model';
 import { produceNotificationEvent } from '../notifications/notifications.service';
 import { logger } from '../../shared/logger';
+import { getBulkPresence } from '../users/presence.service';
 
 const FRIENDS_CACHE_TTL_SECONDS = 10 * 60;
 
 interface FriendListItem {
   id: string;
   displayName: string;
+  username?: string;
   avatarUrl?: string;
   bio?: string;
+  status?: 'online' | 'offline';
 }
 
 export interface FriendRequestItem {
@@ -89,6 +92,14 @@ export async function sendFriendRequest(
   }
 
   await ensureUserExists(toUserId);
+
+  const targetUser = await UserModel.findById(toUserId).select('allowFriendRequest').lean();
+  if (!targetUser) {
+    throw new NotFoundError('User not found');
+  }
+  if (targetUser.allowFriendRequest === false) {
+    throw new ForbiddenError('User does not accept friend requests');
+  }
 
   const blockRelation = await FriendshipModel.findOne({
     $or: [
@@ -319,17 +330,21 @@ export async function listFriends(
 
   const friendIds = pageItems.map((item) => item.friendId);
   const users = await UserModel.find({ _id: { $in: friendIds } })
-    .select('displayName avatarUrl bio')
+    .select('displayName username avatarUrl bio showOnlineStatus')
     .lean();
 
-  const userMap = new Map<string, { displayName: string; avatarUrl?: string; bio?: string }>();
+  const userMap = new Map<string, { displayName: string; username?: string; avatarUrl?: string; bio?: string; showOnlineStatus?: boolean }>();
   for (const user of users) {
     userMap.set(user._id.toString(), {
       displayName: user.displayName as string,
+      username: user.username as string | undefined,
       avatarUrl: user.avatarUrl as string | undefined,
       bio: user.bio as string | undefined,
+      showOnlineStatus: user.showOnlineStatus as boolean | undefined,
     });
   }
+
+  const presenceMap = await getBulkPresence(friendIds, currentUserId);
 
   const friends: FriendListItem[] = [];
   for (const item of pageItems) {
@@ -338,11 +353,16 @@ export async function listFriends(
       continue;
     }
 
+    const presence = presenceMap.get(item.friendId);
+    const canShowStatus = detail.showOnlineStatus !== false;
+
     friends.push({
       id: item.friendId,
       displayName: detail.displayName,
+      username: detail.username,
       avatarUrl: detail.avatarUrl,
       bio: detail.bio,
+      status: canShowStatus ? (presence?.online ? 'online' : 'offline') : undefined,
     });
   }
 

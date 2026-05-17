@@ -1,9 +1,10 @@
-import { MessageType } from '@zync/shared-types';
+import { MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 
 let socket: Socket | null = null;
 let currentToken: string | null = null;
+const listenerRegistry = new Map<string, unknown>();
 
 const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
 
@@ -70,6 +71,7 @@ export function getSocket(token?: string): Socket {
 
   // Token changed (re-login) – disconnect old socket first
   if (socket && currentToken !== resolvedToken) {
+    listenerRegistry.clear();
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
@@ -78,7 +80,7 @@ export function getSocket(token?: string): Socket {
   currentToken = resolvedToken;
 
   socket = io(resolveWebSocketUrl(), {
-    auth: { token },
+    auth: { token: resolvedToken },
     transports: ['websocket', 'polling'],
     autoConnect: true,
     reconnection: true,
@@ -121,6 +123,7 @@ export function disconnectSocket(): void {
     socket.disconnect();
     socket = null;
     currentToken = null;
+    listenerRegistry.clear();
   }
 }
 
@@ -189,6 +192,7 @@ export function listenToMessages(
     messageId: string;
     conversationId?: string;
     senderId: string;
+    sender: SenderInMessage;
     content: string;
     type: string;
     mediaUrl?: string;
@@ -210,17 +214,29 @@ export function listenToMessages(
     return;
   }
 
-  socket.off('receive_message'); // prevent duplicate listeners
-  socket.on('receive_message', callback);
+  const event = 'receive_message';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
 /**
  * Stop listening to messages
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToMessages(): void {
-  if (socket) {
-    socket.off('receive_message');
+export function unlistenToMessages(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'receive_message';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 // ─── Message Status Events ───
@@ -283,17 +299,29 @@ export function listenToStatusUpdates(
     return;
   }
 
-  socket.off('status_update'); // prevent duplicate listeners
-  socket.on('status_update', (data) => callback(data));
+  const event = 'status_update';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, (data) => callback(data));
 }
 
 /**
  * Stop listening to status updates
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToStatusUpdates(): void {
-  if (socket) {
-    socket.off('status_update');
+export function unlistenToStatusUpdates(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'status_update';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 // ─── Typing Indicator Events ───
@@ -363,17 +391,29 @@ export function listenToTypingIndicators(
     return;
   }
 
-  socket.off('typing_indicator'); // prevent duplicate listeners
-  socket.on('typing_indicator', callback);
+  const event = 'typing_indicator';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
 /**
  * Stop listening to typing indicators
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToTypingIndicators(): void {
-  if (socket) {
-    socket.off('typing_indicator');
+export function unlistenToTypingIndicators(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'typing_indicator';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export interface CallInvitedPayload {
@@ -537,14 +577,25 @@ export function listenToCallInvited(callback: (data: CallInvitedPayload) => void
     return;
   }
 
-  socket.off('call_invited');
-  socket.on('call_invited', callback);
+  const event = 'call_invited';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToCallInvited(): void {
-  if (socket) {
-    socket.off('call_invited');
+export function unlistenToCallInvited(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'call_invited';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToCallIncoming(callback: (data: CallIncomingPayload) => void): void {
@@ -552,14 +603,25 @@ export function listenToCallIncoming(callback: (data: CallIncomingPayload) => vo
     return;
   }
 
-  socket.off('call_incoming');
-  socket.on('call_incoming', callback);
+  const event = 'call_incoming';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToCallIncoming(): void {
-  if (socket) {
-    socket.off('call_incoming');
+export function unlistenToCallIncoming(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'call_incoming';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToCallStatus(callback: (data: CallStatusPayload) => void): void {
@@ -567,14 +629,25 @@ export function listenToCallStatus(callback: (data: CallStatusPayload) => void):
     return;
   }
 
-  socket.off('call_status');
-  socket.on('call_status', callback);
+  const event = 'call_status';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToCallStatus(): void {
-  if (socket) {
-    socket.off('call_status');
+export function unlistenToCallStatus(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'call_status';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToCallParticipantJoined(callback: (data: CallParticipantPayload) => void): void {
@@ -582,14 +655,25 @@ export function listenToCallParticipantJoined(callback: (data: CallParticipantPa
     return;
   }
 
-  socket.off('call_participant_joined');
-  socket.on('call_participant_joined', callback);
+  const event = 'call_participant_joined';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToCallParticipantJoined(): void {
-  if (socket) {
-    socket.off('call_participant_joined');
+export function unlistenToCallParticipantJoined(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'call_participant_joined';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToCallParticipantLeft(callback: (data: CallParticipantPayload) => void): void {
@@ -597,14 +681,25 @@ export function listenToCallParticipantLeft(callback: (data: CallParticipantPayl
     return;
   }
 
-  socket.off('call_participant_left');
-  socket.on('call_participant_left', callback);
+  const event = 'call_participant_left';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToCallParticipantLeft(): void {
-  if (socket) {
-    socket.off('call_participant_left');
+export function unlistenToCallParticipantLeft(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'call_participant_left';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToWebRtcOffer(callback: (data: WebRtcOfferPayload) => void): void {
@@ -612,14 +707,25 @@ export function listenToWebRtcOffer(callback: (data: WebRtcOfferPayload) => void
     return;
   }
 
-  socket.off('webrtc_offer');
-  socket.on('webrtc_offer', callback);
+  const event = 'webrtc_offer';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToWebRtcOffer(): void {
-  if (socket) {
-    socket.off('webrtc_offer');
+export function unlistenToWebRtcOffer(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'webrtc_offer';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToWebRtcAnswer(callback: (data: WebRtcAnswerPayload) => void): void {
@@ -627,14 +733,25 @@ export function listenToWebRtcAnswer(callback: (data: WebRtcAnswerPayload) => vo
     return;
   }
 
-  socket.off('webrtc_answer');
-  socket.on('webrtc_answer', callback);
+  const event = 'webrtc_answer';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToWebRtcAnswer(): void {
-  if (socket) {
-    socket.off('webrtc_answer');
+export function unlistenToWebRtcAnswer(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'webrtc_answer';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToWebRtcIceCandidate(callback: (data: WebRtcIceCandidatePayload) => void): void {
@@ -642,31 +759,74 @@ export function listenToWebRtcIceCandidate(callback: (data: WebRtcIceCandidatePa
     return;
   }
 
-  socket.off('webrtc_ice_candidate');
-  socket.on('webrtc_ice_candidate', callback);
+  const event = 'webrtc_ice_candidate';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToWebRtcIceCandidate(): void {
-  if (socket) {
-    socket.off('webrtc_ice_candidate');
+export function unlistenToWebRtcIceCandidate(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'webrtc_ice_candidate';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
-export const listenToContentBlocked = (callback: (data: any) => void) => {
-  if (socket) socket.on('content_blocked', callback);
-};
+export function listenToContentBlocked(callback: (data: any) => void): void {
+  if (!socket) return;
 
-export const unlistenToContentBlocked = () => {
-  if (socket) socket.off('content_blocked');
-};
+  const event = 'content_blocked';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
+}
 
-export const listenToContentWarning = (callback: (data: any) => void) => {
-  if (socket) socket.on('content_warning', callback);
-};
+export function unlistenToContentBlocked(cb?: unknown): void {
+  if (!socket) return;
 
-export const unlistenToContentWarning = () => {
-  if (socket) socket.off('content_warning');
-};
+  const event = 'content_blocked';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
+}
+
+export function listenToContentWarning(callback: (data: any) => void): void {
+  if (!socket) return;
+
+  const event = 'content_warning';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
+}
+
+export function unlistenToContentWarning(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'content_warning';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
+}
 
 // ─── Delete & Recall Events ───
 
@@ -740,34 +900,29 @@ export function listenToMessageDeletion(
     return;
   }
 
-  socket.on('message_deleted_for_me', callback);
+  const event = 'message_deleted_for_me';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
 /**
  * Stop listening to message deletion events
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToMessageDeletion(
-  callback: (data: {
-    messageId: string;
-    conversationId: string;
-    deletedAt: string;
-    effectiveLastMessage?: {
-      content: string;
-      senderId: string;
-      sentAt: string;
-    } | null;
-    unreadCount?: number;
-    lastVisibleMessage?: {
-      content: string;
-      senderId: string;
-      senderDisplayName?: string;
-      sentAt: string;
-    } | null;
-  }) => void,
-): void {
-  if (socket) {
-    socket.off('message_deleted_for_me', callback);
+export function unlistenToMessageDeletion(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'message_deleted_for_me';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 /**
@@ -793,47 +948,79 @@ export function listenToMessageRecall(
     return;
   }
 
-  socket.on('message_recalled', callback);
+  const event = 'message_recalled';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
 /**
  * Stop listening to message recall events
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToMessageRecall(
-  callback: (data: {
-    messageId: string;
-    idempotencyKey: string;
-    conversationId: string;
-    recalledBy: string;
-    recalledAt: string;
-    conversationLastMessage?: {
-      content: string;
-      senderId: string;
-      sentAt: string;
-    } | null;
-  }) => void,
-): void {
-  if (socket) {
-    socket.off('message_recalled', callback);
+export function unlistenToMessageRecall(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'message_recalled';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 // ─── Reactions & Moderation ───
 
 export function listenToMessageReacted(callback: (data: any) => void): void {
-  if (socket) socket.on('message_reacted', callback);
+  if (!socket) return;
+
+  const event = 'message_reacted';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToMessageReacted(): void {
-  if (socket) socket.off('message_reacted');
+export function unlistenToMessageReacted(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'message_reacted';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
 }
 
 export function listenToUserPenaltyUpdated(callback: (data: any) => void): void {
-  if (socket) socket.on('user_penalty_updated', callback);
+  if (!socket) return;
+
+  const event = 'user_penalty_updated';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToUserPenaltyUpdated(): void {
-  if (socket) socket.off('user_penalty_updated');
+export function unlistenToUserPenaltyUpdated(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'user_penalty_updated';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
 }
 
 // ─── Forward Message ───
@@ -876,16 +1063,29 @@ export function listenToMessageForwarded(
     return;
   }
 
-  socket.on('message_forwarded', callback);
+  const event = 'message_forwarded';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
 /**
  * Stop listening to message forwarded events
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToMessageForwarded(): void {
-  if (socket) {
-    socket.off('message_forwarded');
+export function unlistenToMessageForwarded(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'message_forwarded';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 // ─── Message Reactions ───
@@ -976,14 +1176,25 @@ export function listenToReactionUpdated(
     return;
   }
 
-  socket.off('reaction_updated');
-  socket.on('reaction_updated', callback);
+  const event = 'reaction_updated';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToReactionUpdated(): void {
-  if (socket) {
-    socket.off('reaction_updated');
+export function unlistenToReactionUpdated(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'reaction_updated';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToReactionAck(
@@ -993,14 +1204,25 @@ export function listenToReactionAck(
     return;
   }
 
-  socket.off('reaction_ack');
-  socket.on('reaction_ack', callback);
+  const event = 'reaction_ack';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToReactionAck(): void {
-  if (socket) {
-    socket.off('reaction_ack');
+export function unlistenToReactionAck(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'reaction_ack';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 export function listenToReactionError(
@@ -1017,14 +1239,25 @@ export function listenToReactionError(
     return;
   }
 
-  socket.off('reaction_error');
-  socket.on('reaction_error', callback);
+  const event = 'reaction_error';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
-export function unlistenToReactionError(): void {
-  if (socket) {
-    socket.off('reaction_error');
+export function unlistenToReactionError(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'reaction_error';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 // ─── Quick Reply (cross-conversation send without joining room) ───
@@ -1058,17 +1291,29 @@ export function listenToErrors(callback: (error: { message: string }) => void): 
     return;
   }
 
-  socket.off('error'); // prevent duplicate listeners
-  socket.on('error', callback);
+  const event = 'error';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
 }
 
 /**
  * Stop listening to errors
+ * @param cb Optional specific callback to remove. If not provided, removes the last registered callback.
  */
-export function unlistenToErrors(): void {
-  if (socket) {
-    socket.off('error');
+export function unlistenToErrors(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'error';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
   }
+  listenerRegistry.delete(event);
 }
 
 // ─── Socket Service Object (for bundled injection) ───

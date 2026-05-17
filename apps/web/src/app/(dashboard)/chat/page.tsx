@@ -64,6 +64,8 @@ export default function ChatPage() {
     callParticipantNames,
     isGroupCallActive,
     callError,
+    callFriendError,
+    onDismissCallFriendError,
     isMicMuted,
     isCameraEnabled,
     isScreenSharing,
@@ -162,6 +164,8 @@ export default function ChatPage() {
           callParticipantNames: callParticipantNames,
           isGroupCallActive: isGroupCallActive,
           callError: callError,
+          callFriendError: callFriendError,
+          onDismissCallFriendError: onDismissCallFriendError,
           isMicMuted: isMicMuted,
           isCameraEnabled: isCameraEnabled,
           isScreenSharing: isScreenSharing,
@@ -179,6 +183,11 @@ export default function ChatPage() {
           onToggleScreenShare: onToggleScreenShare,
           userPenaltyScore: userPenaltyScore,
           userMutedUntil: userMutedUntil,
+          forwardingMessage,
+          forwardModalOpen,
+          forwardLoading,
+          onCloseForwardModal,
+          onExecuteForward
         }}
       />
       <MessagePreviewPopup

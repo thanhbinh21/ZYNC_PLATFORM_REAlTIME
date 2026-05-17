@@ -192,7 +192,15 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     // Đánh dấu user đang online trong Redis và broadcast cho bạn bè
     void (async () => {
       await setPresenceOnline(userId);
-      await broadcastPresenceChanged(io, userId, true);
+      const updated = await UserModel.findByIdAndUpdate(
+        userId,
+        { $set: { isOnline: true } },
+        { new: true },
+      ).select('showOnlineStatus');
+
+      if (updated?.showOnlineStatus !== false) {
+        await broadcastPresenceChanged(io, userId, true);
+      }
     })();
 
     // Heartbeat: client gui `heartbeat` moi 30s de giu online
@@ -319,19 +327,21 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     });
 
-    // ✅ Reaction Events – delegated to ReactionController sub-module
-    registerReactionController(io, socket as AuthSocket);
-
     // ✅ Call & WebRTC Events – delegated to CallController sub-module
     registerCallController(io, socket as AuthSocket);
     socket.on('disconnect', async () => {
       logger.debug(`Socket disconnected: ${userId}`);
       await setPresenceOffline(userId);
-      await broadcastPresenceChanged(io, userId, false);
-    });
+      const updated = await UserModel.findByIdAndUpdate(
+        userId,
+        { $set: { isOnline: false, lastSeenAt: new Date() } },
+        { new: true },
+      ).select('showOnlineStatus');
 
-    // Thông báo bạn bè user vừa online
-    io.emit('user_online', { userId, online: true });
+      if (updated?.showOnlineStatus !== false) {
+        await broadcastPresenceChanged(io, userId, false);
+      }
+    });
   });
 
   return io;
