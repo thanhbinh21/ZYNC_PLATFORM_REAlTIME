@@ -51,8 +51,15 @@ const ONE_MONTH = ONE_DAY * 30;
 const ACCOUNT_AGE_MIN = ONE_MONTH;
 const ACCOUNT_AGE_MAX = ONE_DAY * 3;
 
-const DEFAULT_PASSWORD = 'ZyncDev2026!';
+const DEFAULT_PASSWORD = '12345678';
 const PASSWORD_HASH = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
+
+// Giữ seed gọn để dễ test UI/dev local.
+const MAIN_USER_SEED_LIMIT = 12;
+const EXTRA_USER_SEED_LIMIT = 0;
+const MAIN_FRIENDSHIP_LIMIT = 8;
+const DIRECT_CONVERSATION_LIMIT = 6;
+const GROUP_CONVERSATION_LIMIT = 3;
 
 // ─── Utility Functions ──────────────────────────────────────────────────────────
 
@@ -440,7 +447,7 @@ interface SeedUser {
 
 const SEED_USER_DEFINITIONS = [
   {
-    email: 'thanhbinhdev@gmail.com',
+    email: 'binhdeviuh@gmail.com',
     username: 'binhdev',
     displayName: 'Nguyễn Thanh Bình',
     bio: 'Fullstack Developer | TypeScript & React | HCM City | Building Zync',
@@ -462,7 +469,7 @@ const SEED_USER_DEFINITIONS = [
     avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1776614290/zync/images/69e2647d1680fe1676223bff/q2hgnnbvyn3xaodsgutu.jpg',
   },
   {
-    email: 'linhtran.dev@gmail.com',
+    email: 'linhtran@gmail.com',
     username: 'linhdev',
     displayName: 'Trần Thị Linh',
     bio: 'Frontend Developer | React & Vue | HCM City | UI/UX Enthusiast',
@@ -473,7 +480,7 @@ const SEED_USER_DEFINITIONS = [
     avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1776618723/zync/images/69e2647d1680fe1676223c00/jhehlpuz4mkpolyidqpq.jpg',
   },
   {
-    email: 'quangminh.coder@gmail.com',
+    email: 'quangminh@gmail.com',
     username: 'quangminh',
     displayName: 'Bùi Quang Minh',
     bio: 'Mobile Developer | React Native & Flutter | HCM City',
@@ -672,7 +679,7 @@ const SEED_USER_DEFINITIONS = [
   },
 ];
 
-// Bổ sung thêm 15 user ngẫu nhiên để đạt ~35 user
+// Template user phụ; mặc định không seed để giữ dataset gọn
 const EXTRA_USER_TEMPLATES: Array<{
   prefix: string; name: string; role: string;
   bio_template: string;
@@ -735,7 +742,7 @@ async function seedUsers(): Promise<SeedUser[]> {
   const createdUsers: SeedUser[] = [];
 
   // Seed main users
-  for (const def of SEED_USER_DEFINITIONS) {
+  for (const def of SEED_USER_DEFINITIONS.slice(0, MAIN_USER_SEED_LIMIT)) {
     const accountAge = randInt(ACCOUNT_AGE_MIN, ACCOUNT_AGE_MAX);
     const isOnline = Math.random() < 0.2; // 20% online
     const lastSeenOffset = isOnline ? 0 : randInt(0, ONE_DAY * 3);
@@ -781,7 +788,7 @@ async function seedUsers(): Promise<SeedUser[]> {
   }
 
   // Seed extra users
-  for (const tmpl of EXTRA_USER_TEMPLATES) {
+  for (const tmpl of EXTRA_USER_TEMPLATES.slice(0, EXTRA_USER_SEED_LIMIT)) {
     const accountAge = randInt(ONE_DAY * 5, ACCOUNT_AGE_MAX);
     const email = `${tmpl.prefix}@zync.dev`;
     const bio = tmpl.bio_template
@@ -834,34 +841,31 @@ async function seedUsers(): Promise<SeedUser[]> {
 async function seedFriendships(users: SeedUser[]): Promise<void> {
   logger.info('Seeding friendships...');
 
-  const friendships: Array<{ userId: string; friendId: string; status: 'pending' | 'accepted' | 'blocked' }> = [];
+  const friendships: Array<{ userId: string; friendId: string; status: 'pending' | 'accepted' }> = [];
 
   // Friendship graph: main user (binhdev) has friends
   const mainUser = users.find((u) => u.username === 'binhdev')!;
   const otherUsers = users.filter((u) => u.username !== 'binhdev');
 
-  for (const friend of otherUsers.slice(0, 20)) {
+  for (const friend of otherUsers.slice(0, MAIN_FRIENDSHIP_LIMIT)) {
     const rand = Math.random();
-    if (rand < 0.55) {
+    if (rand < 0.65) {
       // Accepted friendship (both sides)
       friendships.push({ userId: mainUser._id, friendId: friend._id, status: 'accepted' });
       friendships.push({ userId: friend._id, friendId: mainUser._id, status: 'accepted' });
-    } else if (rand < 0.75) {
-      // Pending request
-      friendships.push({ userId: mainUser._id, friendId: friend._id, status: 'pending' });
     } else if (rand < 0.85) {
-      // Incoming request
-      friendships.push({ userId: friend._id, friendId: mainUser._id, status: 'pending' });
+      // Outgoing pending request
+      friendships.push({ userId: mainUser._id, friendId: friend._id, status: 'pending' });
     } else {
-      // Blocked
-      friendships.push({ userId: mainUser._id, friendId: friend._id, status: 'blocked' });
+      // Incoming pending request
+      friendships.push({ userId: friend._id, friendId: mainUser._id, status: 'pending' });
     }
   }
 
   // Add friend connections between other users
   for (let i = 0; i < otherUsers.length - 1; i++) {
-    for (let j = i + 1; j < Math.min(i + 5, otherUsers.length); j++) {
-      if (Math.random() < 0.4) {
+    for (let j = i + 1; j < Math.min(i + 3, otherUsers.length); j++) {
+      if (Math.random() < 0.25) {
         friendships.push({ userId: otherUsers[i]._id, friendId: otherUsers[j]._id, status: 'accepted' });
         friendships.push({ userId: otherUsers[j]._id, friendId: otherUsers[i]._id, status: 'accepted' });
       }
@@ -881,10 +885,10 @@ async function seedConversations(users: SeedUser[]): Promise<void> {
   // ─── Direct Conversations ───────────────────────────────────────────────────
   const conversationIds: string[] = [];
 
-  for (const friend of friends.slice(0, 12)) {
+  for (const friend of friends.slice(0, DIRECT_CONVERSATION_LIMIT)) {
     const convType = pickOne(['tech', 'casual', 'urgent'] as const);
     const messagePool = DIRECT_MESSAGES_POOL[convType];
-    const msgCount = randInt(3, Math.min(messagePool.length, 12));
+    const msgCount = randInt(3, Math.min(messagePool.length, 6));
 
     // Chọn ngẫu nhiên n tin nhắn và phân bổ thời gian
     const selectedMessages = pickRandom(messagePool, msgCount);
@@ -955,12 +959,12 @@ async function seedConversations(users: SeedUser[]): Promise<void> {
     { name: 'Show & Tell Friday', category: 'general' as const, memberCount: 7 },
   ];
 
-  for (const groupDef of groupDefs) {
+  for (const groupDef of groupDefs.slice(0, GROUP_CONVERSATION_LIMIT)) {
     const members = [mainUser, ...pickRandom(friends, groupDef.memberCount - 1)];
     const memberIds = members.map((m) => m._id);
 
     const startTime = NOW - ONE_DAY * randInt(5, 25);
-    const msgCount = randInt(8, 20);
+    const msgCount = randInt(4, 8);
     const timestamps = randomTimestampsBetween(startTime, NOW, msgCount);
 
     const selectedMsgs = pickRandom(GROUP_MESSAGES_POOL, msgCount);
@@ -1030,7 +1034,7 @@ async function seedConversations(users: SeedUser[]): Promise<void> {
 
   // ─── Sticker Messages ───────────────────────────────────────────────────────
   // Add a few sticker messages in some conversations
-  const stickerConversations = conversationIds.slice(0, 5);
+  const stickerConversations = conversationIds.slice(0, 2);
   for (const convId of stickerConversations) {
     const conv = await ConversationModel.findById(convId).lean();
     if (!conv) continue;
@@ -1039,7 +1043,7 @@ async function seedConversations(users: SeedUser[]): Promise<void> {
     if (memberDocs.length < 2) continue;
 
     const [member1, member2] = memberDocs;
-    const stickerCount = randInt(1, 4);
+    const stickerCount = randInt(1, 2);
     const stickerTimestamps = randomTimestampsBetween(NOW - ONE_DAY * 5, NOW, stickerCount);
 
     const stickers = [
@@ -1071,15 +1075,15 @@ async function seedPosts(users: SeedUser[]): Promise<void> {
   logger.info('Seeding posts...');
 
   const activeUsers = users.filter((u) => u.onboardingCompleted);
-  const postCount = randInt(18, 25);
+  const postCount = randInt(8, 12);
 
   for (let i = 0; i < postCount; i++) {
     const author = pickOne(activeUsers);
     const title = pickOne(POST_TITLES_POOL);
     const content = pickOne(POST_CONTENTS_POOL);
     const createdAt = new Date(randomTimestamp(1.2));
-    const likedBy = pickRandom(activeUsers.filter((u) => u._id !== author._id), randInt(2, 10));
-    const bookmarkedBy = pickRandom(activeUsers.filter((u) => u._id !== author._id), randInt(1, 5));
+    const likedBy = pickRandom(activeUsers.filter((u) => u._id !== author._id), randInt(1, 5));
+    const bookmarkedBy = pickRandom(activeUsers.filter((u) => u._id !== author._id), randInt(0, 3));
 
     const post = await PostModel.create({
       authorId: author._id,
@@ -1089,7 +1093,7 @@ async function seedPosts(users: SeedUser[]): Promise<void> {
       type: pickOne(['discussion', 'question', 'til', 'showcase', 'tutorial'] as const),
       likesCount: likedBy.length,
       commentsCount: 0,
-      viewsCount: randInt(10, 200),
+      viewsCount: randInt(5, 80),
       likedBy: likedBy.map((u) => u._id),
       bookmarkedBy: bookmarkedBy.map((u) => u._id),
       favoritedBy: [],
@@ -1099,13 +1103,13 @@ async function seedPosts(users: SeedUser[]): Promise<void> {
     });
 
     // Comments for this post
-    const commentCount = randInt(2, 8);
+    const commentCount = randInt(1, 4);
     const commentTimestamps = randomTimestampsBetween(createdAt.getTime(), NOW, commentCount);
 
     const insertedComments = await CommentModel.insertMany(
       Array.from({ length: commentCount }, (_, idx) => {
         const commenter = pickOne(activeUsers.filter((u) => u._id !== author._id));
-        const commentLikers = pickRandom(activeUsers.filter((u) => u._id !== commenter._id), randInt(0, 4));
+        const commentLikers = pickRandom(activeUsers.filter((u) => u._id !== commenter._id), randInt(0, 2));
         return {
           postId: post._id.toString(),
           authorId: commenter._id,
@@ -1125,7 +1129,7 @@ async function seedPosts(users: SeedUser[]): Promise<void> {
     await post.save();
 
     // Post views
-    const views = pickRandom(users.filter((u) => u._id !== author._id), randInt(5, 20));
+    const views = pickRandom(users.filter((u) => u._id !== author._id), randInt(3, 8));
     await PostViewModel.insertMany(
       views.map((viewer) => ({
         postId: post._id.toString(),
@@ -1156,7 +1160,7 @@ async function seedNotifications(users: SeedUser[]): Promise<void> {
   }> = [];
 
   // Friend request notifications
-  for (const friend of friends.slice(0, 5)) {
+  for (const friend of friends.slice(0, 3)) {
     notifications.push({
       userId: mainUser._id,
       type: 'friend_request',
@@ -1169,7 +1173,7 @@ async function seedNotifications(users: SeedUser[]): Promise<void> {
   }
 
   // Message notifications (unread)
-  const convs = await ConversationModel.find({ type: 'direct' }).limit(3).lean();
+  const convs = await ConversationModel.find({ type: 'direct' }).limit(2).lean();
   for (const conv of convs) {
     const senderId = conv.lastMessage?.senderId;
     if (!senderId || senderId === mainUser._id) continue;
@@ -1189,7 +1193,7 @@ async function seedNotifications(users: SeedUser[]): Promise<void> {
   }
 
   // Post activity notifications
-  const posts = await PostModel.find({ authorId: mainUser._id }).limit(5).lean();
+  const posts = await PostModel.find({ authorId: mainUser._id }).limit(3).lean();
   for (const post of posts) {
     const liker = pickOne(friends);
     notifications.push({
@@ -1204,7 +1208,7 @@ async function seedNotifications(users: SeedUser[]): Promise<void> {
   }
 
   // Community post notifications
-  for (const friend of friends.slice(5, 8)) {
+  for (const friend of friends.slice(3, 5)) {
     notifications.push({
       userId: mainUser._id,
       type: 'community_post',
@@ -1252,9 +1256,10 @@ async function seedCalls(users: SeedUser[]): Promise<void> {
     createdAt: Date;
   }> = [];
 
-  const callTimestamps = randomTimestampsBetween(NOW - ONE_WEEK, NOW, 8);
+  const callCount = 4;
+  const callTimestamps = randomTimestampsBetween(NOW - ONE_WEEK, NOW, callCount);
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < callCount; i++) {
     const friend = pickOne(friends);
     const status = pickOne(['connected', 'connected', 'missed', 'rejected', 'ended'] as const);
     const createdAt = new Date(callTimestamps[i]);
@@ -1329,10 +1334,10 @@ async function seedCalls(users: SeedUser[]): Promise<void> {
 async function seedModerationLogs(users: SeedUser[]): Promise<void> {
   logger.info('Seeding moderation logs...');
 
-  const activeUsers = users.slice(0, 5);
-  const sampleMessages = await MessageModel.find({ type: 'text' }).limit(20).lean();
+  const activeUsers = users.slice(0, 3);
+  const sampleMessages = await MessageModel.find({ type: 'text' }).limit(10).lean();
 
-  const logs = sampleMessages.slice(0, 5).map((msg) => ({
+  const logs = sampleMessages.slice(0, 3).map((msg) => ({
     messageId: msg._id.toString(),
     conversationId: msg.conversationId,
     senderId: msg.senderId.toString(),
@@ -1447,11 +1452,13 @@ async function seed(): Promise<void> {
     logger.info('Tài khoản đăng nhập (email / password):');
     logger.info(`  Password chung: ${DEFAULT_PASSWORD}`);
     logger.info('');
-    const mainUsers = users.slice(0, 10);
+    const mainUsers = users.slice(0, Math.min(10, users.length));
     for (const user of mainUsers) {
       logger.info(`  - ${user.displayName} (@${user.username}) | ${user.email}`);
     }
-    logger.info(`  ... và ${users.length - 10} user khác`);
+    if (users.length > mainUsers.length) {
+      logger.info(`  ... và ${users.length - mainUsers.length} user khác`);
+    }
     logger.info('');
     logger.info('Thống kê dữ liệu:');
 

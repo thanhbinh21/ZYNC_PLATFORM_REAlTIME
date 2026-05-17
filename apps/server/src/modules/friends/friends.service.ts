@@ -83,6 +83,54 @@ async function ensureUserExists(userId: string): Promise<void> {
   }
 }
 
+export async function ensureAcceptedFriendship(
+  userId: string,
+  friendId: string,
+  forbiddenMessage = 'Only accepted friends can start this action',
+): Promise<void> {
+  if (userId === friendId) {
+    throw new BadRequestError('Cannot use yourself as friend');
+  }
+
+  const [forward, reverse] = await Promise.all([
+    FriendshipModel.findOne({ userId, friendId }),
+    FriendshipModel.findOne({ userId: friendId, friendId: userId }),
+  ]);
+
+  if (forward?.status === 'blocked' || reverse?.status === 'blocked') {
+    throw new ForbiddenError('Friendship is blocked');
+  }
+
+  if (forward?.status === 'accepted' && reverse?.status === 'accepted') {
+    return;
+  }
+
+  const hasAcceptedEdge = forward?.status === 'accepted' || reverse?.status === 'accepted';
+  if (!hasAcceptedEdge) {
+    throw new ForbiddenError(forbiddenMessage);
+  }
+
+  const updates: Array<Promise<unknown>> = [];
+  if (forward?.status !== 'accepted') {
+    updates.push(FriendshipModel.findOneAndUpdate(
+      { userId, friendId },
+      { status: 'accepted' },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    ));
+  }
+
+  if (reverse?.status !== 'accepted') {
+    updates.push(FriendshipModel.findOneAndUpdate(
+      { userId: friendId, friendId: userId },
+      { status: 'accepted' },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    ));
+  }
+
+  await Promise.all(updates);
+  await invalidateFriendsCache([userId, friendId]);
+}
+
 export async function sendFriendRequest(
   requesterId: string,
   toUserId: string,
@@ -131,7 +179,35 @@ export async function sendFriendRequest(
   });
 
   if (reversePending) {
-    throw new ConflictError('You already have an incoming request from this user');
+    await acceptFriendRequest(requesterId, reversePending._id.toString());
+    const accepted = await FriendshipModel.findOne({
+      userId: requesterId,
+      friendId: toUserId,
+      status: 'accepted',
+    });
+    if (!accepted) {
+      throw new NotFoundError('Friendship not found after accepting request');
+    }
+    return accepted;
+  }
+
+  const reverseAccepted = await FriendshipModel.findOne({
+    userId: toUserId,
+    friendId: requesterId,
+    status: 'accepted',
+  });
+
+  if (reverseAccepted) {
+    const accepted = await FriendshipModel.findOneAndUpdate(
+      { userId: requesterId, friendId: toUserId },
+      { status: 'accepted' },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    await invalidateFriendsCache([requesterId, toUserId]);
+    if (!accepted) {
+      throw new NotFoundError('Friendship not found after syncing accepted state');
+    }
+    return accepted;
   }
 
   const request = await FriendshipModel.create({

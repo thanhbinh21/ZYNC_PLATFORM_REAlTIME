@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAppPreferencesStore } from '../../store/useAppPreferencesStore';
-import { getAppTheme } from '../../theme/get-app-theme';
+import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
+import { getAppTheme } from '../theme/get-app-theme';
 
 /* ============================================================
  * Types
@@ -89,10 +89,10 @@ function handleNavigate(router: ReturnType<typeof useRouter>, variant: EmptyStat
       router.push('/explore');
       break;
     case 'no-messages':
-      router.push('/chat');
+      router.push('/(tabs)/chat');
       break;
     case 'no-posts':
-      router.push('/community');
+      router.push('/(tabs)/community');
       break;
     default:
       break;

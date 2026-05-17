@@ -1,9 +1,9 @@
 import { ConversationMemberModel } from './conversation-member.model';
 import { ConversationModel } from './conversation.model';
 import { UserModel } from '../users/user.model';
-import { FriendshipModel } from '../friends/friendship.model';
+import { ensureAcceptedFriendship } from '../friends/friends.service';
 import { MessageModel } from '../messages/message.model';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
+import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 
 interface EnrichedConversation {
@@ -204,14 +204,7 @@ export class ConversationsService {
         throw new NotFoundError('Target user not found');
       }
 
-      const friendship = await FriendshipModel.exists({
-        userId,
-        friendId: targetUserId,
-        status: 'accepted',
-      });
-      if (!friendship) {
-        throw new ForbiddenError('Only friends can open direct conversation');
-      }
+      await ensureAcceptedFriendship(userId, targetUserId, 'Only friends can open direct conversation');
 
       const existingMembers = await ConversationMemberModel.find({ userId: { $in: [userId, targetUserId] } })
         .select('conversationId userId')

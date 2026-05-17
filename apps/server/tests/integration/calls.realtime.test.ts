@@ -16,9 +16,62 @@ jest.mock('@socket.io/redis-adapter', () => {
   };
 });
 
+const redisStore = new Map<string, string>();
+function createRedisPipelineMock() {
+  const results: Array<Promise<[null, unknown]>> = [];
+
+  const pipeline = {
+    get: jest.fn((key: string) => {
+      results.push(Promise.resolve([null, redisStore.get(key) ?? null]));
+      return pipeline;
+    }),
+    set: jest.fn((key: string, value: string) => {
+      redisStore.set(key, value);
+      results.push(Promise.resolve([null, 'OK']));
+      return pipeline;
+    }),
+    setex: jest.fn((key: string, _ttl: number, value: string) => {
+      redisStore.set(key, value);
+      results.push(Promise.resolve([null, 'OK']));
+      return pipeline;
+    }),
+    setnx: jest.fn((key: string, value: string) => {
+      const inserted = redisStore.has(key) ? 0 : 1;
+      if (inserted) redisStore.set(key, value);
+      results.push(Promise.resolve([null, inserted]));
+      return pipeline;
+    }),
+    del: jest.fn((key: string) => {
+      const deleted = redisStore.delete(key) ? 1 : 0;
+      results.push(Promise.resolve([null, deleted]));
+      return pipeline;
+    }),
+    exec: jest.fn(() => Promise.all(results)),
+  };
+
+  return pipeline;
+}
+
 const redisMockClient = {
   hset: jest.fn(() => Promise.resolve(1)),
   hdel: jest.fn(() => Promise.resolve(1)),
+  get: jest.fn((key: string) => Promise.resolve(redisStore.get(key) ?? null)),
+  set: jest.fn((key: string, value: string) => {
+    redisStore.set(key, value);
+    return Promise.resolve('OK');
+  }),
+  setex: jest.fn((key: string, _ttl: number, value: string) => {
+    redisStore.set(key, value);
+    return Promise.resolve('OK');
+  }),
+  del: jest.fn((...keys: string[]) => {
+    let deleted = 0;
+    for (const key of keys) {
+      if (redisStore.delete(key)) deleted += 1;
+    }
+    return Promise.resolve(deleted);
+  }),
+  pipeline: jest.fn(() => createRedisPipelineMock()),
   duplicate: jest.fn(() => redisMockClient),
 };
 
@@ -234,6 +287,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  redisStore.clear();
   jest.clearAllMocks();
   await Promise.all([
     CallEventModel.deleteMany({}),

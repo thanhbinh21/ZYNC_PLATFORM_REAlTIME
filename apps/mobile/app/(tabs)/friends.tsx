@@ -157,7 +157,7 @@ export default function FriendsScreen() {
       style={styles.safeArea}
     >
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

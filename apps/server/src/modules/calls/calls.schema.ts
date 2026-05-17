@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const CreateCallSessionSchema = z.object({
   targetUserId: z.string().min(1, 'targetUserId is required'),
   conversationId: z.string().min(1).optional(),
-  callType: z.literal('video').default('video'),
+  callType: z.enum(['audio', 'video']).default('video'),
 });
 
 export const RejectCallSessionSchema = z.object({

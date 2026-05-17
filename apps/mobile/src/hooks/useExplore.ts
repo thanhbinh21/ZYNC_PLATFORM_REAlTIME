@@ -33,7 +33,7 @@ export function useExplore() {
       setChannels(combined);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Khong the tai danh sach kenh'
+        err instanceof Error ? err.message : 'Không thể tải danh sách kênh'
       );
     } finally {
       setIsLoadingChannels(false);
@@ -48,7 +48,7 @@ export function useExplore() {
       setUsers(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Khong the tai danh sach nguoi dung'
+        err instanceof Error ? err.message : 'Không thể tải danh sách người dùng'
       );
     } finally {
       setIsLoadingUsers(false);
@@ -69,7 +69,7 @@ export function useExplore() {
         );
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Khong the tham gia kenh'
+          err instanceof Error ? err.message : 'Không thể tham gia kênh'
         );
       } finally {
         setIsJoining(null);

@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/errors';
-import { FriendshipModel } from '../friends/friendship.model';
+import { ensureAcceptedFriendship } from '../friends/friends.service';
 import { UserModel } from '../users/user.model';
 import { ConversationModel } from '../conversations/conversation.model';
 import { ConversationMemberModel } from '../conversations/conversation-member.model';
@@ -25,12 +25,12 @@ const ACTIVE_SESSION_STATUSES: CallSessionStatus[] = ['ringing', 'connecting', '
 interface CreateOneToOneCallInput {
   targetUserId: string;
   conversationId?: string;
-  callType: 'video';
+  callType: 'audio' | 'video';
 }
 
 interface CreateGroupCallInput {
   conversationId: string;
-  callType: 'video';
+  callType: 'audio' | 'video';
 }
 
 interface CallParticipantView {
@@ -45,7 +45,7 @@ interface CallSessionDetail {
   sessionId: string;
   conversationId: string | null;
   mode: 'p2p' | 'sfu';
-  callType: 'video';
+  callType: 'audio' | 'video';
   status: CallSessionStatus;
   initiatedBy: string;
   participantIds: string[];
@@ -141,17 +141,6 @@ async function ensureUserExists(userId: string): Promise<void> {
   const exists = await UserModel.exists({ _id: userId });
   if (!exists) {
     throw new NotFoundError('User not found');
-  }
-}
-
-async function ensureAcceptedFriendship(callerId: string, calleeId: string): Promise<void> {
-  const [forward, reverse] = await Promise.all([
-    FriendshipModel.exists({ userId: callerId, friendId: calleeId, status: 'accepted' }),
-    FriendshipModel.exists({ userId: calleeId, friendId: callerId, status: 'accepted' }),
-  ]);
-
-  if (!forward || !reverse) {
-    throw new ForbiddenError('Only accepted friends can start a 1-1 call');
   }
 }
 
@@ -359,7 +348,11 @@ export class CallsService {
       ensureUserExists(callerUserId),
       ensureUserExists(calleeUserId),
     ]);
-    await ensureAcceptedFriendship(callerUserId, calleeUserId);
+    await ensureAcceptedFriendship(
+      callerUserId,
+      calleeUserId,
+      'Only accepted friends can start a 1-1 call',
+    );
 
     await this.cleanupExpiredRingingSessionsForPair(callerUserId, calleeUserId);
 

@@ -231,7 +231,9 @@ export interface AccountSettings {
   showOnlineStatus: boolean;
 }
 
-function extractAccountSettings(user: Pick<IUser, 'toastNotifications' | 'allowSearchProfile' | 'allowFriendRequest' | 'showOnlineStatus'>): AccountSettings {
+type AccountSettingsFields = Pick<IUser, 'toastNotifications' | 'allowSearchProfile' | 'allowFriendRequest' | 'showOnlineStatus'>;
+
+function extractAccountSettings(user: AccountSettingsFields): AccountSettings {
   return {
     toastNotifications: user.toastNotifications ?? true,
     allowSearchProfile: user.allowSearchProfile ?? true,
@@ -274,7 +276,7 @@ export async function getAccountSettings(userId: string): Promise<AccountSetting
     .select('toastNotifications allowSearchProfile allowFriendRequest showOnlineStatus')
     .lean();
   if (!user) throw new NotFoundError('User not found');
-  return extractAccountSettings(user as IUser);
+  return extractAccountSettings(user as unknown as AccountSettingsFields);
 }
 
 export async function updateAccountSettings(
@@ -296,11 +298,11 @@ export async function updateAccountSettings(
 
   if (!updated) throw new NotFoundError('User not found');
 
-  if (dto.showOnlineStatus !== undefined && dto.showOnlineStatus !== (before as IUser).showOnlineStatus) {
+  if (dto.showOnlineStatus !== undefined && dto.showOnlineStatus !== (before as unknown as AccountSettingsFields).showOnlineStatus) {
     await broadcastPresenceVisibility(userId, dto.showOnlineStatus);
   }
 
-  return extractAccountSettings(updated as IUser);
+  return extractAccountSettings(updated);
 }
 
 /** Khám phá developers nổi bật theo skills/tags */

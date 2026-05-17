@@ -225,6 +225,7 @@ interface PendingReactionRequest {
 }
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
+type CallMediaType = 'audio' | 'video';
 
 interface CallParticipantVideo {
   userId: string;
@@ -282,6 +283,7 @@ export function useHomeDashboard() {
     initiatedBy: string;
     participantIds: string[];
     participantDisplayNames: Record<string, string>;
+    callType?: CallMediaType;
   } | null>(null);
 
   const notifyCallBlockingIssue = useCallback((message: string) => {
@@ -2023,6 +2025,7 @@ export function useHomeDashboard() {
         direction: 'outgoing',
         status: 'outgoing',
         callToken: payload.callToken,
+        callType: payload.callType ?? pendingOutgoing?.callType ?? 'video',
       });
     };
 
@@ -2049,6 +2052,7 @@ export function useHomeDashboard() {
         direction: 'incoming',
         status: 'incoming',
         callToken: payload.callToken,
+        callType: payload.callType ?? 'video',
       });
 
       if (payload.conversationId) {
@@ -2157,7 +2161,7 @@ export function useHomeDashboard() {
       }
 
       try {
-        await ensureLocalMedia(isCameraEnabled);
+            await ensureLocalMedia(latestCall.callType === 'audio' ? false : isCameraEnabled);
         for (const peerUserId of peersToOffer) {
           await createOfferForPeer(latestCall, peerUserId);
         }
@@ -2361,7 +2365,7 @@ export function useHomeDashboard() {
     userId,
   ]);
 
-  const handleStartVideoCall = useCallback(async () => {
+  const handleStartCall = useCallback(async (callType: CallMediaType = 'video') => {
     if (!selectedConversationId || !userId) {
       return;
     }
@@ -2382,7 +2386,7 @@ export function useHomeDashboard() {
     stopRemoteMedia();
     setCallError(null);
     setIsMicMuted(false);
-    setIsCameraEnabled(true);
+    setIsCameraEnabled(callType === 'video');
 
     const participantIds = Array.from(new Set(selectedConversation.users.map((member) => member._id)));
     if (!participantIds.includes(userId)) {
@@ -2399,12 +2403,12 @@ export function useHomeDashboard() {
       }
 
       emitInvite = () => {
-        emitCallInvite(peer._id, selectedConversation._id);
+        emitCallInvite(peer._id, selectedConversation._id, callType);
       };
       isGroupCall = false;
     } else {
       emitInvite = () => {
-        emitCallGroupInvite(selectedConversation._id);
+        emitCallGroupInvite(selectedConversation._id, callType);
       };
       isGroupCall = true;
     }
@@ -2417,6 +2421,7 @@ export function useHomeDashboard() {
       initiatedBy: userId,
       participantIds,
       participantDisplayNames,
+      callType,
     };
 
     setActiveCall({
@@ -2430,10 +2435,11 @@ export function useHomeDashboard() {
       direction: 'outgoing',
       status: 'outgoing',
       callToken: '',
+      callType,
     });
 
     try {
-      await ensureLocalMedia(true);
+      await ensureLocalMedia(callType === 'video');
       emitInvite();
     } catch (error: unknown) {
       const message = resolveCallMediaErrorMessage(
@@ -2462,6 +2468,9 @@ export function useHomeDashboard() {
     userId,
   ]);
 
+  const handleStartVideoCall = useCallback(() => handleStartCall('video'), [handleStartCall]);
+  const handleStartAudioCall = useCallback(() => handleStartCall('audio'), [handleStartCall]);
+
   const handleAcceptIncomingCall = useCallback(async () => {
     const current = activeCallRef.current;
     if (!current || current.direction !== 'incoming') {
@@ -2479,7 +2488,7 @@ export function useHomeDashboard() {
 
     try {
       try {
-        await ensureLocalMedia(isCameraEnabled);
+        await ensureLocalMedia(current.callType === 'audio' ? false : isCameraEnabled);
       } catch {
         await ensureLocalMedia(false);
         setCallError('Không truy cập được camera, tiếp tục cuộc gọi với audio.');
@@ -2558,6 +2567,21 @@ export function useHomeDashboard() {
     setCallError(null);
     scheduleCallReset(1200);
   }, [scheduleCallReset]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!activeCall || activeCall.direction !== 'incoming' || activeCall.status !== 'incoming') {
+      return;
+    }
+
+    const autoAcceptSessionId = window.sessionStorage.getItem('zync.autoAcceptCallSessionId');
+    if (autoAcceptSessionId !== activeCall.sessionId) {
+      return;
+    }
+
+    window.sessionStorage.removeItem('zync.autoAcceptCallSessionId');
+    void handleAcceptIncomingCall();
+  }, [activeCall, handleAcceptIncomingCall]);
 
   const handleEndCall = useCallback(() => {
     const current = activeCallRef.current;
@@ -3250,7 +3274,11 @@ export function useHomeDashboard() {
     onReactionRemoveAllMine: handleReactionRemoveAllMine,
     onFetchReactionDetails: handleFetchReactionDetails,
     reactionUserStateByMessage,
-    callStatus: activeCall?.status ?? 'idle',
+    callStatus: (
+      activeCall?.status === 'ringing'
+        ? (activeCall.direction === 'incoming' ? 'incoming' : 'outgoing')
+        : activeCall?.status ?? 'idle'
+    ) as CallUiStatus,
     callPeerName,
     callParticipantNames: activeCallParticipantNames,
     isGroupCallActive: activeCall?.isGroupCall ?? false,
@@ -3264,6 +3292,7 @@ export function useHomeDashboard() {
     remoteVideoRef,
     remoteParticipantVideos,
     isCallingAvailable: isCallConversationSelected,
+    onStartAudioCall: handleStartAudioCall,
     onStartVideoCall: handleStartVideoCall,
     onAcceptIncomingCall: handleAcceptIncomingCall,
     onRejectIncomingCall: handleRejectIncomingCall,

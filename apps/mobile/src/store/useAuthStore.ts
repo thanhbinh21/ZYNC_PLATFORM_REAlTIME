@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getToken, removeToken, saveToken } from '../services/auth';
+import { hasCompletedOnboardingProfile } from '../utils/onboarding';
 
 interface AuthState {
   isHydrated: boolean;
@@ -7,7 +8,7 @@ interface AuthState {
   accessToken: string | null;
   userInfo: any | null; // Can type this properly later using shared-types
   hydrate: () => Promise<void>;
-  login: (token: string, user: any) => Promise<void>;
+  login: (token: string, user: any, refreshToken?: string | null) => Promise<void>;
   updateUser: (user: any) => void;
   logout: () => Promise<void>;
 }
@@ -26,7 +27,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         const api = (await import('../services/api')).default;
         const res = await api.get('/users/me');
         if (res.data?.success && res.data?.user) {
-          set({ isAuthenticated: true, accessToken: token, userInfo: res.data.user, isHydrated: true });
+          const latestToken = await getToken();
+          const user = {
+            ...res.data.user,
+            onboardingCompleted: hasCompletedOnboardingProfile(res.data.user),
+          };
+          set({ isAuthenticated: true, accessToken: latestToken ?? token, userInfo: user, isHydrated: true });
         } else {
           throw new Error('Invalid user response');
         }
@@ -40,9 +46,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  login: async (token: string, user: any) => {
-    await saveToken(token);
-    set({ isAuthenticated: true, accessToken: token, userInfo: user });
+  login: async (token: string, user: any, refreshToken?: string | null) => {
+    await saveToken(token, refreshToken);
+    set({
+      isAuthenticated: true,
+      accessToken: token,
+      userInfo: {
+        ...user,
+        onboardingCompleted: hasCompletedOnboardingProfile(user),
+      },
+    });
   },
 
   updateUser: (user: any) => {

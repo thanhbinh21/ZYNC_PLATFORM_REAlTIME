@@ -1,3 +1,12 @@
 {
-  "expo": {}
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "b4d3e748-bb87-48dc-8383-bebaca834809"
+      }
+    },
+    "android": {
+      "package": "com.binhdev_mobile.zyncplatform"
+    }
+  }
 }

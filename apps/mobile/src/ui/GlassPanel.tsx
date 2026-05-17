@@ -12,7 +12,7 @@ interface GlassPanelProps {
 export function GlassPanel({ children, style, intensity = 84 }: GlassPanelProps) {
   return (
     <View style={[styles.panel, style]}>
-      <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <BlurView intensity={intensity} tint="light" style={StyleSheet.absoluteFillObject} />
       <View pointerEvents="none" style={styles.reflection} />
       <View pointerEvents="none" style={styles.refraction} />
       <View style={styles.content}>{children}</View>
@@ -28,8 +28,8 @@ const styles = StyleSheet.create({
     borderColor: colors.glassBorder,
     backgroundColor: colors.glassPanel,
     shadowColor: colors.glassShadow,
-    shadowOpacity: 0.46,
-    shadowRadius: 26,
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
     shadowOffset: {
       width: 0,
       height: 12,
@@ -38,16 +38,16 @@ const styles = StyleSheet.create({
   },
   reflection: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    opacity: 0.42,
+    backgroundColor: 'rgba(255,255,255,0.32)',
+    opacity: 0.5,
   },
   refraction: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.26)',
+    borderTopColor: 'rgba(255,255,255,0.7)',
     borderLeftWidth: 1,
-    borderLeftColor: 'rgba(255,255,255,0.12)',
+    borderLeftColor: 'rgba(255,255,255,0.5)',
   },
   content: {
     position: 'relative',

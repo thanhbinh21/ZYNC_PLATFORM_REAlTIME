@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: colors.text,
+    color: colors.textOnAccent,
     fontFamily: fonts.bold,
     fontSize: 16,
   },
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   joinButtonText: {
-    color: colors.text,
+    color: colors.textOnAccent,
     fontFamily: fonts.semiBold,
     fontSize: 13,
   },

@@ -1,6 +1,8 @@
 import { type Server, type Socket } from 'socket.io';
 import { CallsService } from '../modules/calls/calls.service';
 import { MessagesService } from '../modules/messages/messages.service';
+import { UserModel } from '../modules/users/user.model';
+import { ConversationModel } from '../modules/conversations/conversation.model';
 import { BadRequestError } from '../shared/errors';
 import { recordReconnectOfferAttempt } from '../modules/calls/calls.metrics';
 import { logger } from '../shared/logger';
@@ -12,10 +14,18 @@ interface AuthSocket extends Socket {
 interface CallInvitePayload {
   targetUserId: string;
   conversationId?: string;
+  callType: 'audio' | 'video';
 }
 
 interface CallGroupInvitePayload {
   conversationId: string;
+  callType: 'audio' | 'video';
+}
+
+interface CallNotificationMeta {
+  callerName?: string;
+  callerAvatarUrl?: string;
+  conversationName?: string;
 }
 
 interface CallSessionPayload {
@@ -151,6 +161,21 @@ async function emitCallSummaryMessage(
   });
 }
 
+async function loadCallNotificationMeta(userId: string, conversationId?: string | null): Promise<CallNotificationMeta> {
+  const [caller, conversation] = await Promise.all([
+    UserModel.findById(userId).select('displayName avatarUrl').lean(),
+    conversationId
+      ? ConversationModel.findById(conversationId).select('name type avatarUrl').lean()
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    callerName: typeof caller?.displayName === 'string' ? caller.displayName : undefined,
+    callerAvatarUrl: typeof caller?.avatarUrl === 'string' ? caller.avatarUrl : undefined,
+    conversationName: typeof conversation?.name === 'string' ? conversation.name : undefined,
+  };
+}
+
 // ─── Payload Parsers ─────────────────────────────────────────────────────────
 
 function parseCallInvitePayload(payload: unknown): CallInvitePayload {
@@ -158,19 +183,31 @@ function parseCallInvitePayload(payload: unknown): CallInvitePayload {
   const data = payload as Record<string, unknown>;
   const targetUserId = data['targetUserId'];
   const conversationId = data['conversationId'];
+  const callType = data['callType'];
   if (typeof targetUserId !== 'string' || targetUserId.length === 0) throw new BadRequestError('targetUserId is required');
   if (conversationId !== undefined && (typeof conversationId !== 'string' || conversationId.length === 0)) {
     throw new BadRequestError('conversationId must be a non-empty string');
   }
-  return { targetUserId, conversationId: typeof conversationId === 'string' ? conversationId : undefined };
+  if (callType !== undefined && callType !== 'audio' && callType !== 'video') {
+    throw new BadRequestError('callType must be audio or video');
+  }
+  return {
+    targetUserId,
+    conversationId: typeof conversationId === 'string' ? conversationId : undefined,
+    callType: callType === 'audio' ? 'audio' : 'video',
+  };
 }
 
 function parseCallGroupInvitePayload(payload: unknown): CallGroupInvitePayload {
   if (typeof payload !== 'object' || payload === null) throw new BadRequestError('Invalid call_group_invite payload');
   const data = payload as Record<string, unknown>;
   const conversationId = data['conversationId'];
+  const callType = data['callType'];
   if (typeof conversationId !== 'string' || conversationId.length === 0) throw new BadRequestError('conversationId is required');
-  return { conversationId };
+  if (callType !== undefined && callType !== 'audio' && callType !== 'video') {
+    throw new BadRequestError('callType must be audio or video');
+  }
+  return { conversationId, callType: callType === 'audio' ? 'audio' : 'video' };
 }
 
 function parseCallSessionPayload(payload: unknown): CallSessionPayload {
@@ -227,12 +264,13 @@ async function handleCallInvite(io: Server, socket: AuthSocket, payload: unknown
   const session = await CallsService.createOneToOneSession(userId, {
     targetUserId: input.targetUserId,
     conversationId: input.conversationId,
-    callType: 'video',
+    callType: input.callType,
   });
   const [callerToken, calleeToken] = await Promise.all([
     CallsService.issueSessionTokenForUser(session.sessionId, userId),
     CallsService.issueSessionTokenForUser(session.sessionId, input.targetUserId),
   ]);
+  const meta = await loadCallNotificationMeta(userId, session.conversationId);
 
   registerCallTimeout(session.sessionId, async () => {
     const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
@@ -263,6 +301,9 @@ async function handleCallInvite(io: Server, socket: AuthSocket, payload: unknown
     sessionId: session.sessionId,
     conversationId: session.conversationId,
     fromUserId: userId,
+    callerName: meta.callerName,
+    callerAvatarUrl: meta.callerAvatarUrl,
+    conversationName: meta.conversationName,
     callType: session.callType,
     timeoutAt: session.timeoutAt,
     callToken: calleeToken.token,
@@ -275,7 +316,7 @@ async function handleCallInvite(io: Server, socket: AuthSocket, payload: unknown
 async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
   const { userId } = socket;
   const input = parseCallGroupInvitePayload(payload);
-  const session = await CallsService.createGroupSession(userId, { conversationId: input.conversationId, callType: 'video' });
+  const session = await CallsService.createGroupSession(userId, { conversationId: input.conversationId, callType: input.callType });
 
   const tokenEntries = await Promise.all(
     session.participantIds.map(async (participantId) => {
@@ -302,6 +343,7 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
 
   const callerToken = tokensByUserId.get(userId);
   if (!callerToken) throw new BadRequestError('Caller token missing for group call');
+  const meta = await loadCallNotificationMeta(userId, session.conversationId);
 
   socket.emit('call_invited', {
     sessionId: session.sessionId,
@@ -322,6 +364,9 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
       sessionId: session.sessionId,
       conversationId: session.conversationId,
       fromUserId: userId,
+      callerName: meta.callerName,
+      callerAvatarUrl: meta.callerAvatarUrl,
+      conversationName: meta.conversationName,
       isGroupCall: true,
       participantIds: session.participantIds,
       callType: session.callType,

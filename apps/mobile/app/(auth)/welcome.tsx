@@ -14,6 +14,7 @@ import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/fonts';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { Zap, MessageCircle, Users, Shield, ArrowRight } from 'lucide-react-native';
+import { getPostAuthRoute } from '../../src/utils/onboarding';
 
 const FEATURES = [
   {
@@ -36,10 +37,11 @@ const FEATURES = [
 export default function WelcomeScreen() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const userInfo = useAuthStore((s) => s.userInfo);
 
   const handleLoginPress = () => {
     if (isAuthenticated) {
-      router.replace('/(tabs)');
+      router.replace(getPostAuthRoute(userInfo));
     } else {
       router.push('/(auth)/login');
     }
@@ -50,7 +52,7 @@ export default function WelcomeScreen() {
       colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
       style={styles.container}
     >
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safeArea}>
         {/* Logo Section */}
         <View style={styles.logoSection}>
@@ -108,7 +110,7 @@ export default function WelcomeScreen() {
 
         {/* Footer */}
         <Text style={styles.footerText}>
-          Tiếp tục，意味着 bạn đồng ý với{' '}
+          Tiếp tục nghĩa là bạn đồng ý với{' '}
           <Text style={styles.footerLink}>Điều khoản sử dụng</Text>
           {' '}và{' '}
           <Text style={styles.footerLink}>Chính sách bảo mật</Text>
@@ -239,3 +241,4 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 });
+

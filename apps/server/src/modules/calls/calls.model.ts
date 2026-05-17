@@ -1,6 +1,6 @@
 import { Schema, model, type Document } from 'mongoose';
 
-export type CallType = 'video';
+export type CallType = 'audio' | 'video';
 export type CallMode = 'p2p' | 'sfu';
 export type CallSessionStatus = 'ringing' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
 export type CallParticipantRole = 'caller' | 'callee' | 'participant';
@@ -44,7 +44,7 @@ export interface ICallEvent extends Document {
 const callSessionSchema = new Schema<ICallSession>(
   {
     conversationId: { type: String },
-    callType: { type: String, enum: ['video'], default: 'video', required: true },
+    callType: { type: String, enum: ['audio', 'video'], default: 'video', required: true },
     mode: { type: String, enum: ['p2p', 'sfu'], default: 'p2p', required: true },
     status: {
       type: String,
