@@ -35,7 +35,7 @@ export function FriendsStatusBadge({ status, size = 'md' }: FriendsStatusBadgePr
 
   return (
     <span
-      className={`${sizeClasses[size]} ${config.bg} ${config.shadow} rounded-full border-2 border-[var(--bg-primary)]`}
+      className={`${sizeClasses[size]} ${config.bg} ${config.shadow} box-border rounded-full ring-2 ring-[var(--bg-card)]`}
       title={config.label}
       aria-label={config.label}
     />

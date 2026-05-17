@@ -111,7 +111,8 @@ export async function searchUsers(
 
   const users = await UserModel.find({
     _id: { $ne: new Types.ObjectId(requesterId) },
-    allowSearchProfile: true,
+    /* Mặc định cho phép tìm (opt-out); user cũ không có field vẫn được tìm */
+    allowSearchProfile: { $ne: false },
     $or: [
       { username: regex },
       { email: regex },

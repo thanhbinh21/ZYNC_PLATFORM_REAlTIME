@@ -6,7 +6,10 @@ import { FriendsAvatar } from '../atoms/friends-avatar';
 interface SearchPanelProps {
   searchKeyword: string;
   searchResults: FriendUser[];
-  isLoading: boolean;
+  /** Từ khóa đã gọi API tìm kiếm thành công lần cuối (null = chưa tìm) */
+  lastSubmittedSearchQuery: string | null;
+  isSearchLoading: boolean;
+  isActionLoading: boolean;
   onSearchKeywordChange: (value: string) => void;
   onSearch: () => Promise<void>;
   onClearSearch: () => void;
@@ -16,7 +19,9 @@ interface SearchPanelProps {
 export function SearchPanel({
   searchKeyword,
   searchResults,
-  isLoading,
+  lastSubmittedSearchQuery,
+  isSearchLoading,
+  isActionLoading,
   onSearchKeywordChange,
   onSearch,
   onClearSearch,
@@ -34,19 +39,31 @@ export function SearchPanel({
     }
   };
 
-  const hasSearched = searchKeyword.trim().length > 0;
-  const showResults = hasSearched && searchResults.length > 0;
-  const showEmpty = hasSearched && searchResults.length === 0 && !isLoading;
+  const trimmed = searchKeyword.trim();
+  const showResults = searchResults.length > 0;
+  const showEmpty =
+    !isSearchLoading &&
+    searchResults.length === 0 &&
+    lastSubmittedSearchQuery !== null &&
+    trimmed === lastSubmittedSearchQuery;
+  const showInitial =
+    !isSearchLoading &&
+    searchResults.length === 0 &&
+    (lastSubmittedSearchQuery === null || trimmed !== lastSubmittedSearchQuery);
 
   return (
     <div className="space-y-4">
-      {/* Search Input */}
-      <div className={`relative transition-all duration-300 ${isFocused ? 'scale-[1.01]' : ''}`}>
-        <div className="relative">
+      <div
+        className={`relative flex w-full items-stretch overflow-hidden rounded-2xl border border-border bg-[var(--surface-glass)] shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] transition-all duration-300 focus-within:border-[rgba(20,184,166,0.46)] focus-within:bg-[var(--surface-glass-strong)] focus-within:shadow-[0_0_0_4px_var(--ring-soft)] ${
+          isFocused ? 'scale-[1.01]' : ''
+        }`}
+      >
+        <div className="relative min-h-12 min-w-0 flex-1">
           <Search
-            className={`absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 transition-colors ${
+            className={`pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transition-colors ${
               isFocused ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'
             }`}
+            aria-hidden
           />
           <input
             type="text"
@@ -56,44 +73,45 @@ export function SearchPanel({
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder="Tìm bạn bè bằng tên hoặc @username..."
-            className={`zync-soft-input w-full ${
-              isFocused ? 'ring-2 ring-[var(--accent)]/20' : ''
-            }`}
-            style={{ paddingLeft: '3rem', paddingRight: '3rem' }}
-            disabled={isLoading}
+            className="h-12 w-full min-w-0 border-0 bg-transparent py-0 pl-10 text-[0.95rem] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)] disabled:opacity-60"
+            style={{ paddingRight: searchKeyword ? '2.25rem' : '0.5rem' }}
+            disabled={isSearchLoading}
           />
-          {searchKeyword && (
+          {searchKeyword ? (
             <button
               type="button"
               onClick={onClearSearch}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
               aria-label="Xóa tìm kiếm"
             >
               <X className="h-4 w-4" />
             </button>
-          )}
+          ) : null}
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            void onSearch();
+          }}
+          disabled={isSearchLoading || !trimmed}
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 border-l border-border/70 bg-accent px-4 text-sm font-medium text-[var(--bg-primary)] shadow-sm transition hover:brightness-105 disabled:pointer-events-none disabled:opacity-45 sm:min-w-[7.5rem] sm:px-5"
+        >
+          <Search className="h-4 w-4" />
+          <span>Tìm kiếm</span>
+        </button>
       </div>
 
-      {/* Search Button */}
-      <button
-        type="button"
-        onClick={() => { void onSearch(); }}
-        disabled={isLoading || !searchKeyword.trim()}
-        className="zync-soft-button flex w-full items-center justify-center gap-2 py-3"
-      >
-        <Search className="h-4 w-4" />
-        Tìm kiếm
-      </button>
+      <p className="font-ui-meta text-[0.7rem] text-[var(--text-tertiary)]">
+        Tối thiểu 2 ký tự. Có thể tìm theo tên hiển thị, username (có hoặc không có @), hoặc email.
+      </p>
 
-      {/* Loading State */}
-      {isLoading && (
+      {isSearchLoading && (
         <div className="flex items-center justify-center py-8">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)]/30 border-t-[var(--accent)]" />
         </div>
       )}
 
-      {/* Results */}
       {showResults && (
         <div className="space-y-3">
           <p className="font-ui-meta text-xs text-[var(--text-tertiary)]">
@@ -107,7 +125,7 @@ export function SearchPanel({
               <FriendsAvatar name={user.displayName} avatarUrl={user.avatarUrl} size="md" />
 
               <div className="min-w-0 flex-1">
-                <p className="font-ui-title text-sm text-[var(--text-primary)] truncate">
+                <p className="font-ui-title truncate text-sm text-[var(--text-primary)]">
                   {user.displayName}
                 </p>
                 {user.username && (
@@ -116,7 +134,7 @@ export function SearchPanel({
                   </p>
                 )}
                 {user.bio && (
-                  <p className="font-ui-content mt-0.5 text-xs text-[var(--text-secondary)] line-clamp-1">
+                  <p className="font-ui-content mt-0.5 line-clamp-1 text-xs text-[var(--text-secondary)]">
                     {user.bio}
                   </p>
                 )}
@@ -125,7 +143,7 @@ export function SearchPanel({
               <button
                 type="button"
                 onClick={() => { void onSendRequest(user.id); }}
-                disabled={isLoading}
+                disabled={isSearchLoading || isActionLoading}
                 className="zync-soft-button flex shrink-0 items-center gap-1.5 px-4 py-2 text-sm"
               >
                 <UserPlus className="h-4 w-4" />
@@ -136,7 +154,6 @@ export function SearchPanel({
         </div>
       )}
 
-      {/* Empty State */}
       {showEmpty && (
         <div className="zync-soft-card-muted flex flex-col items-center gap-3 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-hover)]">
@@ -153,8 +170,7 @@ export function SearchPanel({
         </div>
       )}
 
-      {/* Initial State */}
-      {!hasSearched && !isLoading && (
+      {showInitial && (
         <div className="zync-soft-card flex flex-col items-center gap-3 py-12 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)]/10">
             <Search className="h-6 w-6 text-[var(--accent)]" />
@@ -164,7 +180,7 @@ export function SearchPanel({
               Tìm bạn mới
             </p>
             <p className="font-ui-content mt-1 text-xs text-[var(--text-secondary)]">
-              Nhập tên hoặc @username để tìm kiếm
+              Nhập tên hoặc @username rồi nhấn Tìm kiếm
             </p>
           </div>
         </div>

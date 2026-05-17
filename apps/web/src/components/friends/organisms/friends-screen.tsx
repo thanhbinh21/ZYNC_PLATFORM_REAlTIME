@@ -1,17 +1,43 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { useSearchParams } from 'next/navigation';
-import { Bell, CheckCircle2, Users, X } from 'lucide-react';
-import { FriendsTabNavigation } from '../atoms/friends-tab-navigation';
-import { FriendCard } from '../molecules/friend-card';
-import { RequestList } from '../molecules/request-list';
-import { SearchPanel } from '../molecules/search-panel';
-import { UserProfileModal } from '@/components/shared/UserProfileModal';
-import { useNavigationFlow } from '@/hooks/use-navigation-flow';
-import type { FriendUser } from '@/services/friends';
-import { ZyncSkeleton } from '@/components/shared/ZyncSkeleton';
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useSearchParams } from "next/navigation";
+import {
+  Bell,
+  CheckCircle2,
+  Sparkles,
+  Tag,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+import { FriendsTabNavigation } from "../atoms/friends-tab-navigation";
+import { FriendCard } from "../molecules/friend-card";
+import { RequestList } from "../molecules/request-list";
+import { SearchPanel } from "../molecules/search-panel";
+import { UserProfileModal } from "@/components/shared/UserProfileModal";
+import { useNavigationFlow } from "@/hooks/use-navigation-flow";
+import type { FriendUser } from "@/services/friends";
+import { FriendsAvatar } from "../atoms/friends-avatar";
+
+const FRIEND_TIPS = [
+  { tag: "tin-nhắn", label: "Chào hỏi ngắn gọn khi kết nối mới" },
+  { tag: "an-toan", label: "Chỉ chấp nhận lời mời từ người bạn tin tưởng" },
+  { tag: "cong-dong", label: "Chia sẻ trên Cộng đồng để gặp thêm dev" },
+];
+
+function formatRelativeTimeShort(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return "Vừa xong";
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  return `${Math.floor(diffHours / 24)} ngày trước`;
+}
 
 interface FriendsScreenProps {
   friends: FriendUser[];
@@ -33,9 +59,12 @@ interface FriendsScreenProps {
   }>;
   searchKeyword: string;
   searchResults: FriendUser[];
+  lastSubmittedSearchQuery: string | null;
   pendingTotal: number;
   nextCursor: string | null;
-  isLoading: boolean;
+  isFriendsLoading: boolean;
+  isSearchLoading: boolean;
+  isMutating: boolean;
   isLoadingMore?: boolean;
   infoMessage: string | null;
   errorMessage: string | null;
@@ -52,7 +81,7 @@ interface FriendsScreenProps {
   onUnblock: (userId: string) => Promise<void>;
 }
 
-type TabId = 'all' | 'requests' | 'search';
+type TabId = "all" | "requests" | "search";
 
 export function FriendsScreen({
   friends,
@@ -60,9 +89,12 @@ export function FriendsScreen({
   outgoingRequests,
   searchKeyword,
   searchResults,
+  lastSubmittedSearchQuery,
   pendingTotal,
   nextCursor,
-  isLoading,
+  isFriendsLoading,
+  isSearchLoading,
+  isMutating,
   isLoadingMore = false,
   infoMessage,
   errorMessage,
@@ -76,36 +108,32 @@ export function FriendsScreen({
   onCancelRequest,
   onUnfriend,
   onBlock,
-  onUnblock,
+  onUnblock: _onUnblock,
 }: FriendsScreenProps) {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabId>('all');
+  const [activeTab, setActiveTab] = useState<TabId>("all");
   const [showToast, setShowToast] = useState(true);
-  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
 
-  // Navigation flow hook
   const {
     navigateToChat,
-    chatLoading,
     profileModalUserId,
     profileModalOpen,
     profileModalUser,
     profileModalLoading,
+    currentUserId,
     openProfileModal,
     closeProfileModal,
   } = useNavigationFlow();
 
-  // Sync tab from URL on mount
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'requests') {
-      setActiveTab('requests');
-    } else if (tabParam === 'search') {
-      setActiveTab('search');
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "requests") {
+      setActiveTab("requests");
+    } else if (tabParam === "search") {
+      setActiveTab("search");
     }
   }, [searchParams]);
 
-  // Auto-hide toast messages
   useEffect(() => {
     if (infoMessage || errorMessage) {
       setShowToast(true);
@@ -114,120 +142,133 @@ export function FriendsScreen({
     }
   }, [infoMessage, errorMessage]);
 
-  // Update URL when tab changes
   const handleTabChange = (tab: TabId) => {
     setActiveTab(tab);
     const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tab);
-    // Use window.location for URL update to avoid router import
-    window.history.pushState({}, '', `/friends?${params.toString()}`);
+    params.set("tab", tab);
+    window.history.pushState({}, "", `/friends?${params.toString()}`);
   };
 
-  // Handle message action - navigate to chat via navigation flow
   const handleMessage = (friendId: string) => {
     void navigateToChat(friendId);
   };
 
-  // Handle friend request after send - refresh profile modal + track sent request
   const handleSendRequestFromModal = async (userId: string) => {
     await onSendRequest(userId);
-    setSentRequests((prev) => new Set([...prev, userId]));
-    // Refresh profile data after sending request
     void openProfileModal(userId);
   };
 
+  const subtitleParts: string[] = [];
+  subtitleParts.push(`${friends.length} kết nối`);
+  if (pendingTotal > 0) {
+    subtitleParts.push(`${pendingTotal} lời mời chờ xử lý`);
+  }
+
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
-      {/* Header - Topbar pattern */}
-      <header className="zync-soft-topbar">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            {/* Top row: Title + Notifications */}
-            <div className="flex items-start justify-between lg:flex-1">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-emerald-400 shadow-md shadow-[var(--accent)]/20">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="font-ui-title text-xl text-[var(--text-primary)] sm:text-2xl">
-                    Bạn bè
-                  </h1>
-                  <p className="font-ui-meta text-xs text-[var(--text-tertiary)] sm:text-sm">
-                    {friends.length} kết nối
-                    {pendingTotal > 0 && ` · ${pendingTotal} lời mời chờ`}
-                  </p>
+    <div className="flex h-full w-full overflow-hidden">
+      <div className="flex h-full w-full overflow-hidden">
+        {/* Main column — mirrors /community feed */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="border-b border-border-light px-4 py-4 sm:px-6">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3 lg:block">
+                  <div>
+                    <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
+                      Kết nối
+                    </p>
+                    <h2 className="font-ui-title mt-1 flex items-center gap-2 text-xl text-text-primary">
+                      <Users className="h-5 w-5 shrink-0 text-accent" />
+                      Bạn bè
+                    </h2>
+                    <p className="font-ui-content mt-0.5 text-xs text-text-secondary">
+                      {subtitleParts.join(" · ")}
+                    </p>
+                  </div>
+
+                  {pendingTotal > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange("requests")}
+                      className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] shadow-sm transition-all hover:border-accent/30 hover:shadow-md lg:hidden"
+                      aria-label={`${pendingTotal} lời mời kết bạn`}
+                    >
+                      <Bell className="h-5 w-5 text-accent" />
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow-sm">
+                        {pendingTotal > 9 ? "9+" : pendingTotal}
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Notification Badge */}
-              {pendingTotal > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleTabChange('requests')}
-                  className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:shadow-md lg:hidden"
-                  aria-label={`${pendingTotal} lời mời kết bạn`}
-                >
-                  <Bell className="h-5 w-5 text-[var(--accent)]" />
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow-sm">
-                    {pendingTotal > 9 ? '9+' : pendingTotal}
-                  </span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => handleTabChange("search")}
+                className="zync-soft-button flex shrink-0 items-center gap-2 px-4 py-2 text-sm"
+              >
+                <UserPlus className="h-4 w-4" />
+                Tìm bạn
+              </button>
             </div>
 
-            {/* Tab Navigation */}
             <FriendsTabNavigation
               activeTab={activeTab}
               onTabChange={handleTabChange}
               pendingCount={pendingTotal}
             />
           </div>
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* All Friends Tab */}
-          {activeTab === 'all' && (
-            <div className="space-y-4">
-              {friends.length === 0 && !isLoading ? (
-                <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-[var(--surface-muted)]/50 py-16 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-hover)]">
-                    <Users className="h-8 w-8 text-[var(--text-tertiary)]" />
-                  </div>
-                  <div>
-                    <p className="font-ui-title text-base text-[var(--text-primary)]">
-                      Chưa có bạn bè nào
-                    </p>
-                    <p className="font-ui-content mt-1 text-sm text-[var(--text-secondary)]">
-                      Tìm kiếm và kết nối với mọi người
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleTabChange('search')}
-                    className="zync-soft-button mt-2 px-5 py-2.5 text-sm"
-                  >
-                    Tìm bạn ngay
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Friends Grid */}
-                  {isLoading ? (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                        <ZyncSkeleton key={i} variant="card" className="h-44" />
-                      ))}
+          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+            {activeTab === "all" && (
+              <div className="space-y-4">
+                {friends.length === 0 && !isFriendsLoading ? (
+                  <div className="flex flex-col items-center gap-4 rounded-[1.4rem] border border-dashed border-border bg-bg-card py-16 text-center shadow-sm">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-hover">
+                      <Users className="h-8 w-8 text-text-tertiary" />
                     </div>
-                  ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    <div>
+                      <p className="font-ui-title text-base text-text-primary">
+                        Chưa có bạn bè nào
+                      </p>
+                      <p className="font-ui-content mt-1 text-sm text-text-secondary">
+                        Tìm kiếm và kết nối với mọi người
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange("search")}
+                      className="zync-soft-button mt-2 px-5 py-2.5 text-sm"
+                    >
+                      Tìm bạn ngay
+                    </button>
+                  </div>
+                ) : isFriendsLoading ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="flex min-h-[9rem] w-full max-w-full animate-pulse flex-col rounded-[1.05rem] border border-border bg-bg-card p-3 sm:min-h-[9.25rem] sm:rounded-[1.1rem] sm:p-3.5"
+                      >
+                        <div className="mx-auto mt-6 h-11 w-11 shrink-0 rounded-full bg-bg-hover" />
+                        <div className="mt-3 w-full space-y-2 px-2 text-center">
+                          <div className="mx-auto h-3.5 w-2/3 rounded bg-bg-hover" />
+                          <div className="mx-auto h-3 w-1/2 rounded bg-bg-hover" />
+                        </div>
+                        <div className="mt-auto h-9 w-full rounded-lg bg-bg-hover" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
                       {friends.map((friend, index) => (
                         <div
                           key={friend.id}
-                          className="zync-reveal-up"
-                          style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}
+                          className="zync-reveal-up h-full min-h-0 min-w-0"
+                          style={{
+                            animationDelay: `${Math.min(index * 30, 300)}ms`,
+                          }}
                         >
                           <FriendCard
                             friend={friend}
@@ -239,121 +280,235 @@ export function FriendsScreen({
                         </div>
                       ))}
                     </div>
-                  )}
 
-                  {/* Load More */}
-                  {nextCursor && !isLoading && (
-                    <div className="flex justify-center pt-2">
+                    {nextCursor && (
                       <button
                         type="button"
-                        onClick={() => { void onLoadMoreFriends(); }}
+                        onClick={() => {
+                          void onLoadMoreFriends();
+                        }}
                         disabled={isLoadingMore}
-                        className="zync-soft-button-secondary flex items-center gap-2 px-6 py-2.5 text-sm"
+                        className="zync-soft-button-secondary mt-2 w-full py-2.5 text-sm"
                       >
                         {isLoadingMore ? (
-                          <>
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-tertiary)]/30 border-t-[var(--text-tertiary)]" />
+                          <span className="inline-flex items-center justify-center gap-2">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-text-tertiary/30 border-t-text-tertiary" />
                             Đang tải...
-                          </>
+                          </span>
                         ) : (
-                          'Tải thêm bạn bè'
+                          "Tải thêm bạn bè"
                         )}
                       </button>
-                    </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === "requests" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <h3 className="font-ui-title text-lg text-text-primary">
+                    Lời mời kết bạn
+                  </h3>
+                  {pendingTotal > 0 && (
+                    <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-accent/10 px-2 text-xs font-semibold text-accent">
+                      {pendingTotal}
+                    </span>
                   )}
-                </>
+                </div>
+                <RequestList
+                  incomingRequests={incomingRequests}
+                  outgoingRequests={outgoingRequests}
+                  isLoading={isFriendsLoading || isMutating}
+                  onAcceptRequest={onAcceptRequest}
+                  onRejectRequest={onRejectRequest}
+                  onCancelRequest={onCancelRequest}
+                />
+              </div>
+            )}
+
+            {activeTab === "search" && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-ui-title text-lg text-text-primary">
+                    Tìm bạn mới
+                  </h3>
+                  <p className="font-ui-content mt-1 text-sm text-text-secondary">
+                    Tìm kiếm người quen để kết nối
+                  </p>
+                </div>
+                <SearchPanel
+                  searchKeyword={searchKeyword}
+                  searchResults={searchResults}
+                  lastSubmittedSearchQuery={lastSubmittedSearchQuery}
+                  isSearchLoading={isSearchLoading}
+                  isActionLoading={isMutating}
+                  onSearchKeywordChange={onSearchKeywordChange}
+                  onSearch={onSearch}
+                  onClearSearch={onClearSearch}
+                  onSendRequest={onSendRequest}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar — mirrors /community aside */}
+        <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border-light p-4 lg:flex lg:flex-col">
+          <div className="mb-4">
+            <h3 className="font-ui-title flex items-center gap-2 text-base text-text-primary">
+              <Sparkles className="h-4 w-4 text-accent" />
+              Tóm tắt kết nối
+            </h3>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-[1.2rem] border border-border bg-bg-card p-3 shadow-sm">
+              <p className="font-ui-meta text-[0.65rem] uppercase tracking-[0.15em] text-text-tertiary">
+                Bạn bè
+              </p>
+              <p className="font-ui-title mt-1 text-2xl text-text-primary">
+                {friends.length}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleTabChange("requests")}
+              className="w-full rounded-[1.2rem] border border-transparent bg-bg-hover p-3 text-left transition-all hover:border-accent/30 hover:bg-bg-active hover:shadow-sm"
+            >
+              <p className="font-ui-meta text-[0.65rem] uppercase tracking-[0.15em] text-text-tertiary">
+                Lời mời
+              </p>
+              <p className="font-ui-title mt-1 text-2xl text-accent-strong">
+                {pendingTotal}
+              </p>
+              <p className="font-ui-content mt-0.5 text-xs text-text-secondary">
+                Nhấn để xem chi tiết
+              </p>
+            </button>
+          </div>
+
+          {incomingRequests.length > 0 && (
+            <div className="mt-6">
+              <h4 className="font-ui-title mb-3 text-sm text-text-primary">
+                Lời mời mới
+              </h4>
+              <div className="space-y-2">
+                {incomingRequests.slice(0, 4).map((req) => (
+                  <div
+                    key={req.requestId}
+                    className="group cursor-pointer rounded-[1.1rem] border border-transparent bg-bg-hover p-2.5 transition-all hover:border-accent/30 hover:bg-bg-active"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleTabChange("requests")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleTabChange("requests");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FriendsAvatar
+                        name={req.displayName}
+                        avatarUrl={req.avatarUrl}
+                        size="sm"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-ui-title truncate text-sm text-text-primary">
+                          {req.displayName}
+                        </p>
+                        <p className="font-ui-meta text-[0.65rem] text-text-tertiary">
+                          {formatRelativeTimeShort(req.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {incomingRequests.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => handleTabChange("requests")}
+                  className="font-ui-meta mt-2 text-xs text-accent hover:underline"
+                >
+                  +{incomingRequests.length - 4} lời mời khác
+                </button>
               )}
             </div>
           )}
 
-          {/* Requests Tab */}
-          {activeTab === 'requests' && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <h2 className="font-ui-title text-lg text-[var(--text-primary)]">Lời mời kết bạn</h2>
-                {pendingTotal > 0 && (
-                  <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--accent)]/10 px-2 text-xs font-semibold text-[var(--accent)]">
-                    {pendingTotal}
-                  </span>
-                )}
-              </div>
-
-              <RequestList
-                incomingRequests={incomingRequests}
-                outgoingRequests={outgoingRequests}
-                isLoading={isLoading}
-                onAcceptRequest={onAcceptRequest}
-                onRejectRequest={onRejectRequest}
-                onCancelRequest={onCancelRequest}
-              />
-            </div>
-          )}
-
-          {/* Search Tab */}
-          {activeTab === 'search' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="font-ui-title text-lg text-[var(--text-primary)]">Tìm bạn mới</h2>
-                <p className="font-ui-content mt-1 text-sm text-[var(--text-secondary)]">
-                  Tìm kiếm người quen để kết nối
-                </p>
-              </div>
-
-              <SearchPanel
-                searchKeyword={searchKeyword}
-                searchResults={searchResults}
-                isLoading={isLoading}
-                onSearchKeywordChange={onSearchKeywordChange}
-                onSearch={onSearch}
-                onClearSearch={onClearSearch}
-                onSendRequest={onSendRequest}
-              />
-            </div>
-          )}
-
-        </div>
-      </main>
-
-      {/* Feedback Messages - rendered via portal to avoid transform containment */}
-      {infoMessage && showToast && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 shadow-lg">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--accent)]" />
-            <p className="font-ui-content flex-1 text-center text-sm text-[var(--success-text)] sm:text-left">
-              {infoMessage}
+          <div className="mt-6">
+            <p className="font-ui-meta mb-3 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
+              <Tag className="h-3 w-3" />
+              Gợi ý nhanh
             </p>
+            <div className="space-y-2">
+              {FRIEND_TIPS.map((tip) => (
+                <div
+                  key={tip.tag}
+                  className="rounded-[1rem] border border-border bg-bg-hover px-3 py-2.5 transition-colors hover:border-accent/25"
+                >
+                  <span className="font-ui-meta text-[0.65rem] text-accent">
+                    #{tip.tag}
+                  </span>
+                  <p className="font-ui-content mt-0.5 text-xs leading-snug text-text-secondary">
+                    {tip.label}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>,
-        document.body
-      )}
+        </aside>
+      </div>
 
-      {errorMessage && showToast && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-          role="alert"
-        >
-          <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 shadow-lg">
-            <X className="h-5 w-5 shrink-0 text-red-400" />
-            <p className="font-ui-content flex-1 text-center text-sm text-red-400 sm:text-left">{errorMessage}</p>
-          </div>
-        </div>,
-        document.body
-      )}
+      {infoMessage &&
+        showToast &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 shadow-lg">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-accent" />
+              <p className="font-ui-content flex-1 text-center text-sm text-[var(--success-text)] sm:text-left">
+                {infoMessage}
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )}
 
-      {/* Profile Modal */}
+      {errorMessage &&
+        showToast &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
+            role="alert"
+          >
+            <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 shadow-lg">
+              <X className="h-5 w-5 shrink-0 text-red-400" />
+              <p className="font-ui-content flex-1 text-center text-sm text-red-400 sm:text-left">
+                {errorMessage}
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )}
+
       <UserProfileModal
         visible={profileModalOpen}
         userId={profileModalUserId}
+        currentUserId={currentUserId ?? undefined}
         user={profileModalUser ?? undefined}
         loading={profileModalLoading}
         onClose={closeProfileModal}
-        onSendMessage={(userId) => { void navigateToChat(userId); }}
+        onSendMessage={(userId) => {
+          void navigateToChat(userId);
+        }}
         onSendFriendRequest={handleSendRequestFromModal}
-        friendRequestSent={profileModalUserId ? sentRequests.has(profileModalUserId) : false}
       />
     </div>
   );

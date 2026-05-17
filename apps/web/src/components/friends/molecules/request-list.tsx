@@ -44,7 +44,7 @@ export function RequestList({
 
   if (!hasRequests) {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-[var(--surface-muted)]/50 py-16 text-center">
+      <div className="flex flex-col items-center gap-4 rounded-[1.4rem] border border-dashed border-border bg-bg-card py-16 text-center shadow-sm">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-hover)]">
           <ArrowRightLeft className="h-7 w-7 text-[var(--text-tertiary)]" />
         </div>
@@ -73,7 +73,7 @@ export function RequestList({
             {incomingRequests.map((request) => (
               <article
                 key={request.requestId}
-                className="zync-soft-card flex items-center gap-4 p-4 transition-all hover:border-[var(--accent)]/30"
+                className="flex items-center gap-4 rounded-[1.4rem] border border-border bg-bg-card p-4 shadow-sm transition-all hover:border-accent/40 hover:shadow-md"
               >
                 <FriendsAvatar name={request.displayName} avatarUrl={request.avatarUrl} size="md" />
 
@@ -131,7 +131,7 @@ export function RequestList({
             {outgoingRequests.map((request) => (
               <article
                 key={request.requestId}
-                className="zync-soft-card-muted flex items-center gap-4 p-4 transition-all"
+                className="flex items-center gap-4 rounded-[1.4rem] border border-border bg-bg-hover/80 p-4 shadow-sm transition-all hover:border-accent/30"
               >
                 <FriendsAvatar name={request.displayName} avatarUrl={request.avatarUrl} size="md" />
 
