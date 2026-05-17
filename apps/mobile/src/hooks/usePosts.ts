@@ -63,7 +63,7 @@ export function usePosts(options: UsePostsOptions = {}) {
           if (activeFilter !== filter) setFilter(activeFilter);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Khong the tai bai viet');
+        setError(err instanceof Error ? err.message : 'Không thể tải bài viết');
       } finally {
         setIsLoading(false);
       }
@@ -92,7 +92,7 @@ export function usePosts(options: UsePostsOptions = {}) {
       setCursor(result.nextCursor);
       setHasMore(!!result.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Khong the tai them');
+      setError(err instanceof Error ? err.message : 'Không thể tải thêm');
     } finally {
       setIsLoadingMore(false);
     }
@@ -116,7 +116,7 @@ export function usePosts(options: UsePostsOptions = {}) {
         setPosts((prev) => [post, ...prev]);
         return post;
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Khong the tao bai viet');
+        setError(err instanceof Error ? err.message : 'Không thể tạo bài viết');
         return null;
       }
     },
@@ -243,7 +243,7 @@ export function usePostDetail(postId: string) {
       const data = await fetchPostById(postId);
       setPost(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Khong the tai bai viet');
+      setError(err instanceof Error ? err.message : 'Không thể tải bài viết');
     } finally {
       setIsLoadingPost(false);
     }
@@ -255,7 +255,7 @@ export function usePostDetail(postId: string) {
       const data = await fetchComments(postId);
       setComments(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Khong the tai binh luan');
+      setError(err instanceof Error ? err.message : 'Không thể tải bình luận');
     } finally {
       setIsLoadingComments(false);
     }
@@ -272,7 +272,7 @@ export function usePostDetail(postId: string) {
         return comment;
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Khong the gui binh luan'
+          err instanceof Error ? err.message : 'Không thể gửi bình luận'
         );
         return null;
       }

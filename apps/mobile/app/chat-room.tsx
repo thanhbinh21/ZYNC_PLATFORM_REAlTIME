@@ -397,7 +397,7 @@ function dedupeMessages(messages: Message[]): Message[] {
           : (incoming._id || current._id),
         idempotencyKey: current.idempotencyKey || incoming.idempotencyKey,
         type: 'system-recall',
-        content: current.content || '[Tin nhan da duoc thu hoi]',
+        content: current.content || '[Tin nhắn đã được thu hồi]',
         mediaUrl: undefined,
       };
     }
@@ -408,7 +408,7 @@ function dedupeMessages(messages: Message[]): Message[] {
         ...incoming,
         idempotencyKey: current.idempotencyKey || incoming.idempotencyKey,
         type: 'system-recall',
-        content: incoming.content || '[Tin nhan da duoc thu hoi]',
+        content: incoming.content || '[Tin nhắn đã được thu hồi]',
         mediaUrl: undefined,
       };
     }
@@ -701,6 +701,8 @@ export default function ChatRoomScreen() {
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const [isConversationPinned, setIsConversationPinned] = useState(false);
   const [conversationMutedUntil, setConversationMutedUntil] = useState<Date | null>(null);
+  const [penaltyScore, setPenaltyScore] = useState(0);
+  const [serverMutedUntil, setServerMutedUntil] = useState<Date | null>(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isMuteDurationModalOpen, setIsMuteDurationModalOpen] = useState(false);
   const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
@@ -713,6 +715,7 @@ export default function ChatRoomScreen() {
   const [groupAdminIds, setGroupAdminIds] = useState<string[]>([]);
   const [groupCreatorId, setGroupCreatorId] = useState<string | undefined>(undefined);
   const [targetUserId, setTargetUserId] = useState<string | undefined>(undefined);
+  const [socketReadyVersion, setSocketReadyVersion] = useState(0);
 
   const isGroupChat = isGroup === 'true';
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
@@ -803,7 +806,7 @@ export default function ChatRoomScreen() {
   const preserveViewportRef = useRef<{ offset: number; contentHeight: number } | null>(null);
 
   const notifyInaccessibleReplyTarget = useCallback(() => {
-    Alert.alert('Thong bao', 'Tin nhan khong the truy cap.');
+    Alert.alert('Thông báo', 'Tin nhắn không thể truy cập.');
   }, []);
 
   const openStatusDetails = useCallback((message: Message) => {
@@ -970,7 +973,7 @@ export default function ChatRoomScreen() {
       setIsUploadingGroupAvatar(true);
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -998,7 +1001,7 @@ export default function ChatRoomScreen() {
       setIsUploadingGroupAvatar(true);
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -1281,11 +1284,6 @@ export default function ChatRoomScreen() {
       return;
     }
 
-    const socket = socketService.getSocket();
-    if (!socket) {
-      return;
-    }
-
     const messageRef = resolveMessageRef(message);
     const requestId = generateUUID();
     const idempotencyKey = generateUUID();
@@ -1317,24 +1315,19 @@ export default function ChatRoomScreen() {
     applyReactionSummaryToMessage({ messageId: message._id, messageRef }, nextSummary, nextUserState);
     updateReactionUserStateCache(message._id, messageRef, nextUserState);
 
-    socket.emit('reaction_upsert', {
-      requestId,
+    socketService.emitReactionUpsert(
       conversationId,
       messageRef,
       emoji,
-      delta: 1,
+      1,
       idempotencyKey,
       actionSource,
-    });
+      requestId,
+    );
   }, [applyReactionSummaryToMessage, conversationId, getReactionUserStateForMessage, updateReactionUserStateCache]);
 
   const sendReactionRemoveAllMine = useCallback((message: Message) => {
     if (!conversationId) {
-      return;
-    }
-
-    const socket = socketService.getSocket();
-    if (!socket) {
       return;
     }
 
@@ -1368,12 +1361,12 @@ export default function ChatRoomScreen() {
     applyReactionSummaryToMessage({ messageId: message._id, messageRef }, nextSummary, clearedUserState);
     updateReactionUserStateCache(message._id, messageRef, clearedUserState);
 
-    socket.emit('reaction_remove_all_mine', {
-      requestId: generateUUID(),
+    socketService.emitReactionRemoveAllMine(
       conversationId,
       messageRef,
-      idempotencyKey: generateUUID(),
-    });
+      generateUUID(),
+      generateUUID(),
+    );
   }, [applyReactionSummaryToMessage, conversationId, getReactionUserStateForMessage, updateReactionUserStateCache]);
 
   const handlePickReaction = useCallback((emoji: string) => {
@@ -1679,11 +1672,36 @@ export default function ChatRoomScreen() {
   }, [findMessageIndexByRef, handleLoadMore, hasMore, isMoreLoading, messages.length, notifyInaccessibleReplyTarget]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    if (!conversationId) return () => { cancelled = true; };
+
+    void (async () => {
+      const existingSocket = socketService.getSocket();
+      if (existingSocket) {
+        if (!cancelled) {
+          setSocketReadyVersion((prev) => prev + 1);
+        }
+        return;
+      }
+
+      const connectedSocket = await socketService.connect();
+      if (!cancelled && connectedSocket) {
+        setSocketReadyVersion((prev) => prev + 1);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
     const socket = socketService.getSocket();
     if (!socket || !conversationId) return;
 
     const joinConversationRoom = () => {
-      socket.emit('join_conversation', { conversationId });
+      socketService.joinConversation(conversationId);
     };
 
     if (socket.connected) {
@@ -1704,10 +1722,7 @@ export default function ChatRoomScreen() {
       });
 
       if (getSenderId(message) !== userId) {
-        socket.emit('message_delivered', {
-          conversationId,
-          messageIds: [message._id],
-        });
+        socketService.markAsDelivered(conversationId, [message._id]);
       }
 
       setTimeout(() => scrollToBottom(), 80);
@@ -1822,7 +1837,7 @@ export default function ChatRoomScreen() {
         return {
           ...message,
           type: 'system-recall',
-          content: '[Tin nhan da duoc thu hoi]',
+          content: '[Tin nhắn đã được thu hồi]',
           mediaUrl: undefined,
         };
       }));
@@ -1932,33 +1947,79 @@ export default function ChatRoomScreen() {
       }
     };
 
+    const handleContentBlocked = (payload: { conversationId?: string; reason?: string }) => {
+      if (payload.conversationId && payload.conversationId !== conversationId) return;
+      openInfoDialog('Nội dung vi phạm', payload.reason || 'Tin nhắn đã bị chặn.', 'error');
+    };
+
+    const handleContentWarning = (payload: { conversationId?: string; message?: string }) => {
+      if (payload.conversationId && payload.conversationId !== conversationId) return;
+      if (payload.message) {
+        openInfoDialog('Cảnh báo nội dung', payload.message);
+      }
+    };
+
+    const handlePenaltyUpdated = (payload: { conversationId?: string; penaltyScore?: number; mutedUntil?: string }) => {
+      if (payload.conversationId && payload.conversationId !== conversationId) return;
+      setPenaltyScore(typeof payload.penaltyScore === 'number' ? payload.penaltyScore : 0);
+      if (payload.mutedUntil) {
+        const mutedDate = new Date(payload.mutedUntil);
+        setServerMutedUntil(Number.isNaN(mutedDate.getTime()) ? null : mutedDate);
+      } else {
+        setServerMutedUntil(null);
+      }
+    };
+
+    const handleMessageForwarded = (payload: { toConversationId?: string }) => {
+      if (payload.toConversationId && payload.toConversationId !== conversationId) return;
+      openInfoDialog('Thông báo', 'Đã chuyển tiếp tin nhắn.');
+    };
+
+    const handleReactionAck = (payload: { accepted?: boolean }) => {
+      if (payload.accepted === false) {
+        console.warn('[Reaction] Optimistic reaction update was rejected by server');
+      }
+    };
+
     socket.on('connect', joinConversationRoom);
-    socket.on('receive_message', handleReceiveMessage);
-    socket.on('status_update', handleStatusUpdate);
-    socket.on('message_sent', handleMessageSent);
-    socket.on('typing_indicator', handleTypingIndicator);
-    socket.on('message_recalled', handleRecallMessage);
-    socket.on('message_deleted_for_me', handleDeleteMessageForMe);
-    socket.on('group_updated', handleGroupUpdated);
-    socket.on('reaction_updated', handleReactionUpdated);
-    socket.on('reaction_error', handleReactionError);
+    socketService.listenToMessages(handleReceiveMessage);
+    socketService.listenToStatusUpdates(handleStatusUpdate);
+    socketService.listenToMessageSent(handleMessageSent);
+    socketService.listenToTypingIndicators(handleTypingIndicator);
+    socketService.listenToMessageRecall(handleRecallMessage);
+    socketService.listenToMessageDeletion(handleDeleteMessageForMe);
+    socketService.listenToGroupUpdated(handleGroupUpdated as any);
+    socketService.listenToReactionUpdated(handleReactionUpdated);
+    socketService.listenToReactionError(handleReactionError);
+    socketService.listenToContentBlocked(handleContentBlocked);
+    socketService.listenToContentWarning(handleContentWarning);
+    socketService.listenToUserPenaltyUpdated(handlePenaltyUpdated);
+    socketService.listenToMessageForwarded(handleMessageForwarded);
+    socketService.listenToReactionAck(handleReactionAck);
 
     return () => {
-      socket.emit('leave_conversation', { conversationId });
+      socketService.leaveConversation(conversationId);
       socket.off('connect', joinConversationRoom);
-      socket.off('receive_message', handleReceiveMessage);
-      socket.off('status_update', handleStatusUpdate);
-      socket.off('message_sent', handleMessageSent);
-      socket.off('typing_indicator', handleTypingIndicator);
-      socket.off('message_recalled', handleRecallMessage);
-      socket.off('message_deleted_for_me', handleDeleteMessageForMe);
-      socket.off('reaction_updated', handleReactionUpdated);
-      socket.off('reaction_error', handleReactionError);
+      socketService.unlistenToMessages(handleReceiveMessage);
+      socketService.unlistenToStatusUpdates(handleStatusUpdate);
+      socketService.unlistenToMessageSent(handleMessageSent);
+      socketService.unlistenToTypingIndicators(handleTypingIndicator);
+      socketService.unlistenToMessageRecall(handleRecallMessage);
+      socketService.unlistenToMessageDeletion(handleDeleteMessageForMe);
+      socketService.unlistenToGroupUpdated(handleGroupUpdated as any);
+      socketService.unlistenToReactionUpdated(handleReactionUpdated);
+      socketService.unlistenToReactionError(handleReactionError);
+      socketService.unlistenToContentBlocked(handleContentBlocked);
+      socketService.unlistenToContentWarning(handleContentWarning);
+      socketService.unlistenToUserPenaltyUpdated(handlePenaltyUpdated);
+      socketService.unlistenToMessageForwarded(handleMessageForwarded);
+      socketService.unlistenToReactionAck(handleReactionAck);
     };
   }, [
     applyReactionSummaryToMessage,
     conversationId,
     loadConversationMeta,
+    socketReadyVersion,
     scrollToBottom,
     updateReactionUserStateCache,
     userId,
@@ -1973,8 +2034,7 @@ export default function ChatRoomScreen() {
       .filter(Boolean);
 
     if (unreadMessageIds.length > 0) {
-      const socket = socketService.getSocket();
-      socket?.emit('message_read', { conversationId, messageIds: unreadMessageIds });
+      socketService.markAsRead(conversationId, unreadMessageIds);
     }
   }, [messages, conversationId, userId]);
 
@@ -1987,8 +2047,10 @@ export default function ChatRoomScreen() {
     const textToSend = (content ?? inputText).trim();
     if (!conversationId || (!textToSend && !mediaUrl)) return;
 
-    const socket = socketService.getSocket();
-    if (!socket) return;
+    if (serverMutedUntil && serverMutedUntil.getTime() > Date.now()) {
+      openInfoDialog('Thông báo', 'Bạn đang bị tạm khóa gửi tin nhắn trong hội thoại này.', 'error');
+      return;
+    }
 
     const idempotencyKey = options?.idempotencyKey || generateUUID();
     const optimisticMessage: Message = {
@@ -2026,24 +2088,12 @@ export default function ChatRoomScreen() {
     if (!mediaUrl) setInputText('');
 
     if (isTypingRef.current) {
-      socket.emit('typing_stop', { conversationId });
+      socketService.clearPendingTyping(conversationId);
       isTypingRef.current = false;
     }
 
     if (!options?.deferEmit) {
-      socket.emit('send_message', {
-        conversationId,
-        content: textToSend,
-        type,
-        mediaUrl,
-        idempotencyKey,
-        replyToMessageRef: options?.replyTo?.messageRef,
-        replyToMessageId: options?.replyTo?.messageId,
-        replyToSenderId: options?.replyTo?.senderId,
-        replyToSenderDisplayName: options?.replyTo?.senderDisplayName,
-        replyToPreview: options?.replyTo?.contentPreview,
-        replyToType: options?.replyTo?.type,
-      });
+      socketService.sendMessage(conversationId, textToSend, type, idempotencyKey, mediaUrl, options?.replyTo);
 
       if (options?.replyTo) {
         setReplyingTo(null);
@@ -2052,12 +2102,12 @@ export default function ChatRoomScreen() {
 
     setTimeout(() => scrollToBottom(), 80);
     return idempotencyKey;
-  }, [inputText, conversationId, userId, scrollToBottom]);
+  }, [inputText, conversationId, userId, scrollToBottom, serverMutedUntil]);
 
   const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -2175,8 +2225,8 @@ export default function ChatRoomScreen() {
 
   const handleRecall = async (messageId: string, idempotencyKey?: string) => {
     try {
-      const socket = socketService.getSocket();
-      socket?.emit('recall_message', { conversationId, messageId, idempotencyKey });
+      if (!conversationId) return;
+      socketService.recallMessage(conversationId, messageId, idempotencyKey || generateUUID());
       setShowOptionsId(null);
       setActionMenuVisible(false);
       setActionMenuMessage(null);
@@ -2187,8 +2237,8 @@ export default function ChatRoomScreen() {
 
   const handleDeleteForMe = async (messageId: string, idempotencyKey?: string) => {
     try {
-      const socket = socketService.getSocket();
-      socket?.emit('delete_message_for_me', { conversationId, messageId, idempotencyKey });
+      if (!conversationId) return;
+      socketService.deleteMessageForMe(conversationId, messageId, idempotencyKey || generateUUID());
       setShowOptionsId(null);
       setActionMenuVisible(false);
       setActionMenuMessage(null);
@@ -2208,13 +2258,7 @@ export default function ChatRoomScreen() {
   // Xu ly chuyen tiep tin nhan qua socket
   const handleForwardToConversation = useCallback((toConversationId: string) => {
     if (!forwardMessageId) return;
-    const socket = socketService.getSocket();
-    if (!socket) return;
-    socket.emit('forward_message', {
-      originalMessageId: forwardMessageId,
-      toConversationId,
-      idempotencyKey: generateUUID(),
-    });
+    socketService.emitForwardMessage(forwardMessageId, toConversationId, generateUUID());
     setForwardMessageId(null);
   }, [forwardMessageId]);
 
@@ -2248,11 +2292,10 @@ export default function ChatRoomScreen() {
   const handleTextChange = (text: string) => {
     setInputText(text);
 
-    const socket = socketService.getSocket();
-    if (!socket) return;
+    if (!conversationId) return;
 
     if (!isTypingRef.current && text.length > 0) {
-      socket.emit('typing_start', { conversationId });
+      socketService.startTyping(conversationId);
       isTypingRef.current = true;
     }
 
@@ -2262,7 +2305,7 @@ export default function ChatRoomScreen() {
 
     typingTimeoutRef.current = setTimeout(() => {
       if (isTypingRef.current) {
-        socket.emit('typing_stop', { conversationId });
+        socketService.stopTyping(conversationId);
         isTypingRef.current = false;
       }
     }, 2000);
@@ -2333,7 +2376,7 @@ export default function ChatRoomScreen() {
                     </Text>
                   )}
                   <Text style={[bubbleStyles.replyPreview, isMe && bubbleStyles.replyPreviewMe]} numberOfLines={1}>
-                    {message.replyTo.contentPreview || '[Tin nhan]'}
+                    {message.replyTo.contentPreview || '[Tin nhắn]'}
                   </Text>
                 </Pressable>
               )}
@@ -2492,7 +2535,7 @@ export default function ChatRoomScreen() {
       style={styles.safeArea}
     >
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -2576,6 +2619,10 @@ export default function ChatRoomScreen() {
               renderItem={renderMessage}
               contentContainerStyle={styles.messageList}
               showsVerticalScrollIndicator={false}
+              initialNumToRender={12}
+              maxToRenderPerBatch={8}
+              windowSize={9}
+              removeClippedSubviews
               onScroll={handleScrollList}
               onContentSizeChange={(_, height) => {
                 const pending = preserveViewportRef.current;
@@ -3073,7 +3120,7 @@ export default function ChatRoomScreen() {
                 <View style={styles.replyComposerMeta}>
                   <Text style={styles.replyComposerLabel}>Dang tra loi</Text>
                   <Text style={styles.replyComposerPreview} numberOfLines={1}>
-                    {replyingTo.contentPreview || '[Tin nhan]'}
+                    {replyingTo.contentPreview || '[Tin nhắn]'}
                   </Text>
                 </View>
                 <TouchableOpacity style={styles.replyComposerCancelBtn} onPress={() => setReplyingTo(null)}>
@@ -3219,7 +3266,7 @@ export default function ChatRoomScreen() {
                   onPress={handleComposerSend}
                   disabled={Boolean(pendingMediaSend)}
                 >
-                  <Ionicons name="send" size={20} color={colors.background} />
+                  <Ionicons name="send" size={20} color={colors.textOnAccent} />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.micBtn} disabled>
@@ -3575,8 +3622,8 @@ const bubbleStyles = StyleSheet.create({
     marginBottom: 8,
   },
   replyCardMe: {
-    borderLeftColor: colors.glassPanel,
-    backgroundColor: 'rgba(15, 157, 142, 0.18)',
+    borderLeftColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
   replyCardOther: {
     borderLeftColor: colors.accent,
@@ -3589,7 +3636,7 @@ const bubbleStyles = StyleSheet.create({
     marginBottom: 1,
   },
   replyLabelMe: {
-    color: colors.glassPanel,
+    color: 'rgba(255,255,255,0.82)',
   },
   replySenderName: {
     fontSize: 11,
@@ -3598,7 +3645,7 @@ const bubbleStyles = StyleSheet.create({
     marginBottom: 1,
   },
   replySenderNameMe: {
-    color: colors.glassPanelStrong,
+    color: colors.textOnAccent,
   },
   replyPreview: {
     fontSize: 12,
@@ -3606,7 +3653,7 @@ const bubbleStyles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_400Regular',
   },
   replyPreviewMe: {
-    color: colors.glassPanel,
+    color: 'rgba(255,255,255,0.82)',
   },
   msgText: {
     color: colors.text,
@@ -3615,7 +3662,7 @@ const bubbleStyles = StyleSheet.create({
     lineHeight: 22,
   },
   msgTextMe: {
-    color: colors.text,
+    color: colors.textOnAccent,
   },
   mediaCaptionText: {
     marginTop: 8,
@@ -3646,7 +3693,7 @@ const bubbleStyles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_400Regular',
   },
   mediaLabelMe: {
-    color: colors.text,
+    color: colors.textOnAccent,
   },
   mediaImage: {
     width: 220,
@@ -3745,7 +3792,7 @@ const bubbleStyles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_400Regular',
   },
   timeMe: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.78)',
   },
   readPreviewButton: {
     flexDirection: 'row',
@@ -4028,13 +4075,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   mediaDraftTitle: {
-    color: '#e2e8f0',
+    color: colors.text,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   mediaDraftStatus: {
     marginTop: 2,
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_400Regular',
   },
@@ -4044,7 +4091,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(30,41,59,0.8)',
+    backgroundColor: colors.surfaceHover,
   },
   inputBar: {
     flexDirection: 'row',
@@ -4063,7 +4110,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -4072,7 +4121,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    color: '#fff',
+    color: colors.text,
     fontFamily: 'BeVietnamPro_400Regular',
     fontSize: 15,
     lineHeight: 20,
@@ -4097,23 +4146,23 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(100,116,139,0.45)',
-    backgroundColor: 'rgba(15,23,42,0.45)',
+    borderColor: colors.glassBorderSoft,
+    backgroundColor: colors.glassPanel,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
   composerPickerTabActive: {
-    borderColor: 'rgba(16,185,129,0.75)',
-    backgroundColor: 'rgba(16,185,129,0.2)',
+    borderColor: colors.accent,
+    backgroundColor: colors.accentLight,
   },
   composerPickerTabText: {
-    color: '#94a3b8',
+    color: colors.textMuted,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_500Medium',
   },
   composerPickerTabTextActive: {
-    color: '#d1fae5',
+    color: colors.accent,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   quickEmojiPanel: {
@@ -4122,8 +4171,8 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(45,106,88,0.75)',
-    backgroundColor: 'rgba(2, 45, 35, 0.65)',
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glassPanelStrong,
     padding: 10,
   },
   quickEmojiBtn: {
@@ -4132,7 +4181,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15,23,42,0.5)',
+    backgroundColor: colors.glassSoft,
   },
   quickEmojiText: {
     fontSize: 22,
@@ -4142,7 +4191,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#10b981',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 0,

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { useAppPreferencesStore } from '../../store/useAppPreferencesStore';
-import { getAppTheme } from '../../theme/get-app-theme';
+import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
+import { getAppTheme } from '../theme/get-app-theme';
 
 /* ============================================================
  * Types
@@ -11,8 +11,8 @@ export type SkeletonRounded = 'sm' | 'md' | 'lg' | 'full';
 
 export interface ZyncSkeletonProps {
   variant?: SkeletonVariant;
-  width?: number | string;
-  height?: number | string;
+  width?: ViewStyle['width'];
+  height?: number;
   rounded?: SkeletonRounded;
   lines?: number;
   animated?: boolean;
@@ -30,7 +30,7 @@ const ROUNDED_MAP: Record<SkeletonRounded, number> = {
   full: 9999,
 };
 
-const VARIANT_DEFAULTS: Record<SkeletonVariant, { width: number | string; height: number; borderRadius: number }> = {
+const VARIANT_DEFAULTS: Record<SkeletonVariant, { width: ViewStyle['width']; height: number; borderRadius: number }> = {
   text: { width: '100%', height: 14, borderRadius: 4 },
   avatar: { width: 48, height: 48, borderRadius: 9999 },
   card: { width: '100%', height: 120, borderRadius: 16 },
@@ -42,7 +42,7 @@ const VARIANT_DEFAULTS: Record<SkeletonVariant, { width: number | string; height
  * Single Skeleton Element
  * ============================================================ */
 interface SkeletonElementProps {
-  width?: number | string;
+  width?: ViewStyle['width'];
   height?: number;
   borderRadius?: number;
   animated?: boolean;
@@ -85,15 +85,12 @@ function SkeletonElement({
     return () => animation.stop();
   }, [animated, animatedOpacity]);
 
-  const resolvedWidth = typeof width === 'number' ? width : width;
-  const resolvedHeight = typeof height === 'number' ? height : height ?? 14;
-
   return (
     <Animated.View
       style={[
         {
-          width: resolvedWidth as number | string,
-          height: resolvedHeight,
+          width,
+          height,
           borderRadius,
           backgroundColor: skeletonColor,
         },
@@ -101,8 +98,6 @@ function SkeletonElement({
         !animated && { opacity: 0.4 },
         style,
       ]}
-      // @ts-expect-error role for accessibility
-      role="presentation"
     />
   );
 }

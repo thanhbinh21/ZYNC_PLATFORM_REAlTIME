@@ -143,7 +143,7 @@ function getLastMessagePreview(msg?: LastMessage): string {
     case 'sticker':
       return 'Nhan dan';
     default:
-      return msg.content || 'Tin nhan moi';
+      return msg.content || 'Tin nhắn mới';
   }
 }
 
@@ -178,13 +178,11 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [socketReadyVersion, setSocketReadyVersion] = useState(0);
 
   const joinAllConversations = useCallback((items: Conversation[]) => {
-    const socket = socketService.getSocket();
-    if (!socket) return;
-
     for (const conversation of items) {
-      socket.emit('join_conversation', { conversationId: conversation._id });
+      socketService.joinConversation(conversation._id);
     }
   }, []);
 
@@ -241,6 +239,30 @@ export default function ChatScreen() {
       return undefined;
     }, [isAuthenticated, loadConversations]),
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthenticated) return () => { cancelled = true; };
+
+    void (async () => {
+      const existingSocket = socketService.getSocket();
+      if (existingSocket) {
+        if (!cancelled) {
+          setSocketReadyVersion((prev) => prev + 1);
+        }
+        return;
+      }
+
+      const connectedSocket = await socketService.connect();
+      if (!cancelled && connectedSocket) {
+        setSocketReadyVersion((prev) => prev + 1);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   // Listen for real-time updates (new messages = re-sort and update preview)
   useEffect(() => {
@@ -339,20 +361,20 @@ export default function ChatScreen() {
       }));
     };
 
-    socket.on('receive_message', handleNewMessage);
-    socket.on('message_recalled', handleMessageRecalled);
-    socket.on('message_deleted_for_me', handleMessageDeletedForMe);
-    socket.on('group_updated', handleGroupUpdated);
+    socketService.listenToMessages(handleNewMessage as any);
+    socketService.listenToMessageRecall(handleMessageRecalled as any);
+    socketService.listenToMessageDeletion(handleMessageDeletedForMe as any);
+    socketService.listenToGroupUpdated(handleGroupUpdated as any);
     socket.on('connect', handleSocketReconnect);
 
     return () => {
-      socket.off('receive_message', handleNewMessage);
-      socket.off('message_recalled', handleMessageRecalled);
-      socket.off('message_deleted_for_me', handleMessageDeletedForMe);
-      socket.off('group_updated', handleGroupUpdated);
+      socketService.unlistenToMessages(handleNewMessage);
+      socketService.unlistenToMessageRecall(handleMessageRecalled);
+      socketService.unlistenToMessageDeletion(handleMessageDeletedForMe);
+      socketService.unlistenToGroupUpdated(handleGroupUpdated);
       socket.off('connect', handleSocketReconnect);
     };
-  }, [loadConversations, userId]);
+  }, [loadConversations, socketReadyVersion, userId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -483,7 +505,7 @@ export default function ChatScreen() {
       openChatRoom(conversation);
     } catch (err: any) {
       const message = err?.response?.data?.error;
-      Alert.alert('Thong bao', typeof message === 'string' ? message : 'Khong the mo hoi thoai luc nay.');
+      Alert.alert('Thông báo', typeof message === 'string' ? message : 'Không thể mở hội thoại lúc này.');
     }
   }, [conversations, joinAllConversations, openChatRoom]);
 
@@ -515,7 +537,7 @@ export default function ChatScreen() {
       style={s.safeArea}
     >
       <SafeAreaView style={s.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <View style={s.container}>
         {/* Header */}
         <View style={s.header}>
@@ -569,6 +591,10 @@ export default function ChatScreen() {
             data={listData}
             keyExtractor={(item) => (isSearchTarget(item) ? item.key : item._id)}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={10}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+            removeClippedSubviews
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -892,4 +918,3 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       marginTop: 4,
     },
   });
-

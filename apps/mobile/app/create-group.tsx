@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { lightTheme } from '../src/theme/colors';
 import api from '../src/services/api';
 import { useAuthStore } from '../src/store/useAuthStore';
+import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
 
 interface Friend {
   _id: string;

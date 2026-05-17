@@ -5,9 +5,48 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 
 const redisStore = new Map<string, string>();
+function createRedisPipelineMock() {
+  const results: Array<Promise<[null, unknown]>> = [];
+
+  const pipeline = {
+    get: jest.fn((key: string) => {
+      results.push(Promise.resolve([null, redisStore.get(key) ?? null]));
+      return pipeline;
+    }),
+    set: jest.fn((key: string, value: string) => {
+      redisStore.set(key, value);
+      results.push(Promise.resolve([null, 'OK']));
+      return pipeline;
+    }),
+    setex: jest.fn((key: string, _ttl: number, value: string) => {
+      redisStore.set(key, value);
+      results.push(Promise.resolve([null, 'OK']));
+      return pipeline;
+    }),
+    setnx: jest.fn((key: string, value: string) => {
+      const inserted = redisStore.has(key) ? 0 : 1;
+      if (inserted) redisStore.set(key, value);
+      results.push(Promise.resolve([null, inserted]));
+      return pipeline;
+    }),
+    del: jest.fn((key: string) => {
+      const deleted = redisStore.delete(key) ? 1 : 0;
+      results.push(Promise.resolve([null, deleted]));
+      return pipeline;
+    }),
+    exec: jest.fn(() => Promise.all(results)),
+  };
+
+  return pipeline;
+}
+
 const redisMock = {
   get: jest.fn((key: string) => Promise.resolve(redisStore.get(key) ?? null)),
   set: jest.fn((key: string, value: string) => {
+    redisStore.set(key, value);
+    return Promise.resolve('OK');
+  }),
+  setex: jest.fn((key: string, _ttl: number, value: string) => {
     redisStore.set(key, value);
     return Promise.resolve('OK');
   }),
@@ -27,6 +66,7 @@ const redisMock = {
     const matched = [...redisStore.keys()].filter((key) => key.startsWith(prefix));
     return Promise.resolve(matched);
   }),
+  pipeline: jest.fn(() => createRedisPipelineMock()),
 };
 
 jest.mock('../../src/infrastructure/redis', () => ({
@@ -96,6 +136,53 @@ describe('Friends routes', () => {
     expect(acceptRes.body.success).toBe(true);
 
     const relations = await FriendshipModel.find({ status: 'accepted' });
+    expect(relations).toHaveLength(2);
+  });
+
+  it('should accept targetUserId alias when sending a friend request', async () => {
+    const userA = await UserModel.create({ displayName: 'User A', email: 'alias-a@example.com' });
+    const userB = await UserModel.create({ displayName: 'User B', email: 'alias-b@example.com' });
+
+    const tokenA = issueAccessToken(userA.id as string, 'friends-jti-alias-a');
+
+    const sendRes = await request(app)
+      .post('/api/friends/request')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ targetUserId: userB.id as string });
+
+    expect(sendRes.status).toBe(201);
+    expect(sendRes.body.success).toBe(true);
+    expect(sendRes.body.request.friendId).toBe(userB.id as string);
+  });
+
+  it('should auto-accept a reverse pending request', async () => {
+    const userA = await UserModel.create({ displayName: 'User A', email: 'reverse-a@example.com' });
+    const userB = await UserModel.create({ displayName: 'User B', email: 'reverse-b@example.com' });
+
+    await FriendshipModel.create({
+      userId: userB.id as string,
+      friendId: userA.id as string,
+      status: 'pending',
+    });
+
+    const tokenA = issueAccessToken(userA.id as string, 'friends-jti-reverse-a');
+
+    const sendRes = await request(app)
+      .post('/api/friends/request')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ toUserId: userB.id as string });
+
+    expect(sendRes.status).toBe(201);
+    expect(sendRes.body.success).toBe(true);
+    expect(sendRes.body.request.status).toBe('accepted');
+
+    const relations = await FriendshipModel.find({
+      status: 'accepted',
+      $or: [
+        { userId: userA.id as string, friendId: userB.id as string },
+        { userId: userB.id as string, friendId: userA.id as string },
+      ],
+    });
     expect(relations).toHaveLength(2);
   });
 

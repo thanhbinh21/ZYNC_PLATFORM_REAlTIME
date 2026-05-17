@@ -168,7 +168,7 @@ export function StickerPicker({ isOpen, onSelectSticker }: StickerPickerProps) {
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                {searchQuery ? 'Khong tim thay sticker' : 'Chon mot bo sticker'}
+                {searchQuery ? 'Không tìm thấy sticker' : 'Chọn một bộ sticker'}
               </Text>
             </View>
           )}

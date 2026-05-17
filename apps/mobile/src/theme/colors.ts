@@ -89,13 +89,16 @@ export const darkTheme = {
   divider: 'rgba(255, 255, 255, 0.1)',
 };
 
-// Flat color aliases (dark-mode defaults; components must use getAppTheme for light/dark)
+// Flat color aliases kept for older screens. Mobile is light-only, so these
+// aliases intentionally mirror the web light mode instead of dark fallbacks.
 export const colors = {
   // Teal accent (Web-aligned)
   primary: '#0f9d8e',
   primaryHover: '#0b8073',
   accent: '#0f9d8e',
+  accentLight: '#ccebe6',
   accentSoft: '#ccebe6',
+  textOnAccent: '#FFFFFF',
   info: '#2563EB',
   warning: '#F59E0B',
   danger: '#EF4444',
@@ -103,35 +106,38 @@ export const colors = {
   pink: '#EC4899',
   neutral: '#64748B',
 
-  backgroundDeep: '#021612',
-  backgroundMid: '#031e18',
-  backgroundSoft: '#0f4738',
-  backgroundAuth: '#044f3a',
+  backgroundDeep: '#eaf1f8',
+  backgroundMid: '#f1f6fb',
+  backgroundSoft: '#ffffff',
+  backgroundAuth: '#f6f9fc',
 
-  background: '#08111f',
-  surface: 'rgba(15, 157, 142, 0.08)',
-  surfaceHover: 'rgba(15, 157, 142, 0.14)',
+  background: '#eaf1f8',
+  surface: 'rgba(250, 252, 255, 0.84)',
+  surfaceHover: 'rgba(224, 234, 243, 0.9)',
 
   glassUltra: 'rgba(15, 157, 142, 0.08)',
-  glassSoft: 'rgba(15, 157, 142, 0.28)',
-  glassStrong: 'rgba(5, 30, 25, 0.72)',
-  glassPanel: 'rgba(15, 157, 142, 0.46)',
-  glassPanelStrong: 'rgba(3, 20, 18, 0.80)',
+  glassSoft: 'rgba(255, 255, 255, 0.72)',
+  glassStrong: 'rgba(255, 255, 255, 0.94)',
+  glassPanel: 'rgba(255, 255, 255, 0.86)',
+  glassPanelStrong: 'rgba(255, 255, 255, 0.98)',
 
   glassBorder: 'rgba(15, 157, 142, 0.24)',
   glassBorderSoft: 'rgba(15, 157, 142, 0.14)',
   glassGlow: 'rgba(15, 157, 142, 0.22)',
-  glassShadow: 'rgba(2, 6, 23, 0.5)',
-  divider: 'rgba(255, 255, 255, 0.1)',
+  glassShadow: 'rgba(11, 17, 32, 0.16)',
+  divider: 'rgba(11, 17, 32, 0.1)',
 
-  text: '#edf4fb',
-  textMuted: '#74859b',
-  textSubtle: '#9fb0c4',
+  text: '#0b1120',
+  textPrimary: '#0b1120',
+  textSecondary: '#1e293b',
+  textTertiary: '#5c6c85',
+  textMuted: '#5c6c85',
+  textSubtle: '#5c6c85',
 
   error: '#EF4444',
   success: '#22c7b5',
-  dangerSoft: 'rgba(239, 68, 68, 0.12)',
-  dangerBorder: 'rgba(248, 113, 113, 0.28)',
+  dangerSoft: 'rgba(239, 68, 68, 0.08)',
+  dangerBorder: 'rgba(239, 68, 68, 0.2)',
 
-  border: '#30363D',
+  border: '#D0D7DE',
 };

@@ -422,7 +422,7 @@ export interface CallInvitedPayload {
   targetUserId?: string;
   isGroupCall?: boolean;
   participantIds?: string[];
-  callType: 'video';
+  callType: 'audio' | 'video';
   timeoutAt?: string;
   callToken: string;
   callTokenExpiresInSeconds: number;
@@ -432,9 +432,12 @@ export interface CallIncomingPayload {
   sessionId: string;
   conversationId?: string;
   fromUserId: string;
+  callerName?: string;
+  callerAvatarUrl?: string;
+  conversationName?: string;
   isGroupCall?: boolean;
   participantIds?: string[];
-  callType: 'video';
+  callType: 'audio' | 'video';
   timeoutAt?: string;
   callToken: string;
   callTokenExpiresInSeconds: number;
@@ -471,7 +474,7 @@ export interface WebRtcIceCandidatePayload {
   candidate: RTCIceCandidateInit;
 }
 
-export function emitCallInvite(targetUserId: string, conversationId?: string): void {
+export function emitCallInvite(targetUserId: string, conversationId?: string, callType: 'audio' | 'video' = 'video'): void {
   if (!socket?.connected) {
     throw new Error('Socket not connected');
   }
@@ -479,16 +482,18 @@ export function emitCallInvite(targetUserId: string, conversationId?: string): v
   socket.emit('call_invite', {
     targetUserId,
     conversationId,
+    callType,
   });
 }
 
-export function emitCallGroupInvite(conversationId: string): void {
+export function emitCallGroupInvite(conversationId: string, callType: 'audio' | 'video' = 'video'): void {
   if (!socket?.connected) {
     throw new Error('Socket not connected');
   }
 
   socket.emit('call_group_invite', {
     conversationId,
+    callType,
   });
 }
 
@@ -578,9 +583,6 @@ export function listenToCallInvited(callback: (data: CallInvitedPayload) => void
   }
 
   const event = 'call_invited';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -588,14 +590,7 @@ export function unlistenToCallInvited(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'call_invited';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToCallIncoming(callback: (data: CallIncomingPayload) => void): void {
@@ -604,9 +599,6 @@ export function listenToCallIncoming(callback: (data: CallIncomingPayload) => vo
   }
 
   const event = 'call_incoming';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -614,14 +606,7 @@ export function unlistenToCallIncoming(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'call_incoming';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToCallStatus(callback: (data: CallStatusPayload) => void): void {
@@ -630,9 +615,6 @@ export function listenToCallStatus(callback: (data: CallStatusPayload) => void):
   }
 
   const event = 'call_status';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -640,14 +622,7 @@ export function unlistenToCallStatus(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'call_status';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToCallParticipantJoined(callback: (data: CallParticipantPayload) => void): void {
@@ -656,9 +631,6 @@ export function listenToCallParticipantJoined(callback: (data: CallParticipantPa
   }
 
   const event = 'call_participant_joined';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -666,14 +638,7 @@ export function unlistenToCallParticipantJoined(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'call_participant_joined';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToCallParticipantLeft(callback: (data: CallParticipantPayload) => void): void {
@@ -682,9 +647,6 @@ export function listenToCallParticipantLeft(callback: (data: CallParticipantPayl
   }
 
   const event = 'call_participant_left';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -692,14 +654,7 @@ export function unlistenToCallParticipantLeft(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'call_participant_left';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToWebRtcOffer(callback: (data: WebRtcOfferPayload) => void): void {
@@ -708,9 +663,6 @@ export function listenToWebRtcOffer(callback: (data: WebRtcOfferPayload) => void
   }
 
   const event = 'webrtc_offer';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -718,14 +670,7 @@ export function unlistenToWebRtcOffer(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'webrtc_offer';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToWebRtcAnswer(callback: (data: WebRtcAnswerPayload) => void): void {
@@ -734,9 +679,6 @@ export function listenToWebRtcAnswer(callback: (data: WebRtcAnswerPayload) => vo
   }
 
   const event = 'webrtc_answer';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -744,14 +686,7 @@ export function unlistenToWebRtcAnswer(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'webrtc_answer';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToWebRtcIceCandidate(callback: (data: WebRtcIceCandidatePayload) => void): void {
@@ -760,9 +695,6 @@ export function listenToWebRtcIceCandidate(callback: (data: WebRtcIceCandidatePa
   }
 
   const event = 'webrtc_ice_candidate';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
   socket.on(event, callback);
 }
 
@@ -770,14 +702,7 @@ export function unlistenToWebRtcIceCandidate(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'webrtc_ice_candidate';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
+  if (cb) socket.off(event, cb as any);
 }
 
 export function listenToContentBlocked(callback: (data: any) => void): void {

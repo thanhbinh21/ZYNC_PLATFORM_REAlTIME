@@ -115,7 +115,7 @@ function DeveloperCardComponent({
             onPress={handleMessage}
             style={[styles.iconButton, styles.primaryButton]}
           >
-            <MessageCircle size={16} color={colors.text} />
+            <MessageCircle size={16} color={colors.textOnAccent} />
           </TouchableOpacity>
         </View>
       </View>
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: colors.text,
+    color: colors.textOnAccent,
     fontFamily: fonts.bold,
     fontSize: 20,
   },

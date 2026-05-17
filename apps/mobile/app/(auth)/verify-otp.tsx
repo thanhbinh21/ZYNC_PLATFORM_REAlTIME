@@ -21,6 +21,7 @@ import api from '../../src/services/api';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import Constants from 'expo-constants';
 import { ShieldCheck, Smartphone } from 'lucide-react-native';
+import { getPostAuthRoute } from '../../src/utils/onboarding';
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
@@ -94,12 +95,8 @@ export default function VerifyOtpScreen() {
         });
         
         if (res.data.success) {
-          await login(res.data.accessToken, res.data.user);
-          if (!res.data.user.onboardingCompleted) {
-            router.replace('/(auth)/onboarding');
-          } else {
-            router.replace('/(tabs)');
-          }
+          await login(res.data.accessToken, res.data.user, res.data.refreshToken);
+          router.replace(getPostAuthRoute(res.data.user));
         }
       } else if (flow === 'register') {
         const res = await api.post('/auth/verify-otp', {
@@ -113,12 +110,8 @@ export default function VerifyOtpScreen() {
         });
         
         if (res.data.success) {
-          await login(res.data.accessToken, res.data.user);
-          if (!res.data.user.onboardingCompleted) {
-            router.replace('/(auth)/onboarding');
-          } else {
-            router.replace('/(tabs)');
-          }
+          await login(res.data.accessToken, res.data.user, res.data.refreshToken);
+          router.replace(getPostAuthRoute(res.data.user));
         }
       } else if (flow === 'forgot') {
         router.replace({
@@ -207,7 +200,6 @@ export default function VerifyOtpScreen() {
                   keyboardType="numeric"
                   maxLength={6}
                   textAlign="center"
-                  letterSpacing={12}
                   autoFocus
                 />
               </View>
@@ -348,3 +340,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+

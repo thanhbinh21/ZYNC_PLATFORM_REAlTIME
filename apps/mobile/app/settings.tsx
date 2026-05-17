@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,7 +16,6 @@ import {
   User,
   Users,
   Volume2,
-  Zap,
   MessageCircle,
 } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -29,20 +28,13 @@ export default function SettingsScreen() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
   const appThemeMode = useAppPreferencesStore((s) => s.theme);
-  const hydrateTheme = useAppPreferencesStore((s) => s.hydrate);
-  const setTheme = useAppPreferencesStore((s) => s.setTheme);
   const theme = getAppTheme(appThemeMode);
 
   const [notifyMessages, setNotifyMessages] = useState(true);
   const [notifyFriends, setNotifyFriends] = useState(true);
-  const [notifyStories, setNotifyStories] = useState(true);
   const [notifySounds, setNotifySounds] = useState(true);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [showReadReceipts, setShowReadReceipts] = useState(true);
-
-  useEffect(() => {
-    hydrateTheme();
-  }, [hydrateTheme]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
@@ -109,8 +101,8 @@ export default function SettingsScreen() {
                 <Text style={[styles.switchLabel, { color: theme.textPrimary }]}>Chế độ tối</Text>
               </View>
               <Switch
-                value={appThemeMode === 'dark'}
-                onValueChange={(value) => setTheme(value ? 'dark' : 'light')}
+                value={false}
+                disabled
                 trackColor={{ false: theme.border, true: theme.accent }}
                 thumbColor={theme.textOnAccent}
               />
@@ -124,7 +116,6 @@ export default function SettingsScreen() {
             {[
               { Icon: MessageCircle, label: 'Tin nhắn', value: notifyMessages, setValue: setNotifyMessages, color: theme.accent },
               { Icon: Users, label: 'Lời mời kết bạn', value: notifyFriends, setValue: setNotifyFriends, color: theme.info },
-              { Icon: Zap, label: 'Khoảnh khắc', value: notifyStories, setValue: setNotifyStories, color: theme.warning },
               { Icon: Volume2, label: 'Âm thanh', value: notifySounds, setValue: setNotifySounds, color: theme.pink },
             ].map((item, idx, arr) => (
               <View key={item.label} style={[styles.switchRow, idx < arr.length - 1 && styles.menuItemBorder, idx < arr.length - 1 && { borderBottomColor: theme.borderLight }]}>

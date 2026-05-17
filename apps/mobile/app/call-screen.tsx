@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { RTCView } from 'react-native-webrtc';
@@ -29,6 +30,7 @@ export default function CallScreen() {
     activeCall,
     localStream,
     remoteStream,
+    remoteStreams,
     isMicMuted,
     isCameraEnabled,
     startCall,
@@ -43,19 +45,20 @@ export default function CallScreen() {
 
   const [callDuration, setCallDuration] = useState(0);
   const [hasStartedCall, setHasStartedCall] = useState(false);
+  const remoteStreamList = Array.from(remoteStreams.entries()).filter(([_, stream]) => Boolean(stream?.toURL?.()));
 
   useEffect(() => {
     // Initiate outgoing call if not already active and not an incoming call pickup
     if (!activeCall && !hasStartedCall) {
       setHasStartedCall(true);
       if (incomingCallSession && callToken && fromUserId) {
-        acceptCall(incomingCallSession, callToken, fromUserId);
+        acceptCall(incomingCallSession, callToken, fromUserId, type || 'video');
       } else if (isGroup === 'true' && conversationId) {
         startGroupCall(conversationId, type || 'video');
       } else if (targetUserId) {
         startCall(targetUserId, type || 'video', conversationId);
       } else {
-        Alert.alert('Error', 'Missing target details for call.');
+        Alert.alert('Lỗi', 'Thiếu thông tin người nhận cuộc gọi.');
         router.back();
       }
     }
@@ -77,7 +80,7 @@ export default function CallScreen() {
         if (router.canGoBack()) {
            router.back();
         } else {
-           router.replace('/(tabs)/');
+           router.replace('/(tabs)/home');
         }
       }, 1500);
       return () => clearTimeout(timer);
@@ -95,7 +98,7 @@ export default function CallScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(tabs)/');
+      router.replace('/(tabs)/home');
     }
   };
 
@@ -128,12 +131,33 @@ export default function CallScreen() {
       />
       
       {/* Remote Video */}
-      {activeCall?.status === 'connected' && remoteStream && remoteStream.toURL() ? (
-        <RTCView
-          streamURL={remoteStream.toURL()}
-          style={StyleSheet.absoluteFillObject}
-          objectFit="cover"
-        />
+      {activeCall?.status === 'connected' && remoteStreamList.length > 0 ? (
+        activeCall.isGroupCall ? (
+          <View style={styles.remoteGrid}>
+            {remoteStreamList.slice(0, 4).map(([peerId, stream], index) => (
+              <View
+                key={peerId || `remote-${index}`}
+                style={[
+                  styles.remoteGridItem,
+                  remoteStreamList.length === 1 && styles.remoteGridItemFull,
+                  remoteStreamList.length === 3 && index === 0 && styles.remoteGridItemWide,
+                ]}
+              >
+                <RTCView
+                  streamURL={stream.toURL()}
+                  style={StyleSheet.absoluteFillObject}
+                  objectFit="cover"
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <RTCView
+            streamURL={remoteStream?.toURL() || ''}
+            style={StyleSheet.absoluteFillObject}
+            objectFit="cover"
+          />
+        )
       ) : (
         <View style={styles.statusContainer}>
           <View style={styles.avatarPlaceholder}>
@@ -240,6 +264,27 @@ const styles = StyleSheet.create({
   localVideo: {
     flex: 1,
   },
+  remoteGrid: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: '#0b1220',
+  },
+  remoteGridItem: {
+    width: '50%',
+    height: '50%',
+    borderWidth: 1,
+    borderColor: '#0f172a',
+    backgroundColor: '#0f172a',
+    overflow: 'hidden',
+  },
+  remoteGridItemFull: {
+    width: '100%',
+    height: '100%',
+  },
+  remoteGridItemWide: {
+    width: '100%',
+  },
   controlsSafeArea: {
     position: 'absolute',
     bottom: 0,
@@ -271,3 +316,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
   },
 });
+

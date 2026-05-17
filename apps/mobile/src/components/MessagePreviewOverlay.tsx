@@ -185,7 +185,7 @@ function PreviewCard({
       {sentFeedback && (
         <View style={cardStyles.sentRow}>
           <Ionicons name="checkmark-circle" size={16} color="#30d7ab" />
-          <Text style={cardStyles.sentText}>Da gui</Text>
+          <Text style={cardStyles.sentText}>Đã gửi</Text>
         </View>
       )}
 
