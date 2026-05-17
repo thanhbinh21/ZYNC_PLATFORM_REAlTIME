@@ -12,6 +12,7 @@
     "build": "tsc",
     "start": "node dist/main.js",
     "seed:users:4": "ts-node-dev --transpile-only scripts/seed.ts",
+    "seed:month": "ts-node-dev --transpile-only scripts/seed-month-data.ts",
     "reset:data": "ts-node-dev --transpile-only scripts/reset-data.ts",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",

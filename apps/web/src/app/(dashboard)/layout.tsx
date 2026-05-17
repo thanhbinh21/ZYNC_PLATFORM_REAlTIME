@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import { DashboardHeader } from '@/components/shared/DashboardHeader';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
+import { GlobalCallListener } from '@/components/home-dashboard/organisms/GlobalCallListener';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
@@ -232,6 +233,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             `,
           }}
         />
+        <GlobalCallListener />
       </main>
     </MediaViewerProvider>
   );

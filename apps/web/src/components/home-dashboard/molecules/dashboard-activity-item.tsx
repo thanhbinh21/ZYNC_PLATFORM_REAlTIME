@@ -17,12 +17,12 @@ export function DashboardActivityItemRow({ item, onClick }: DashboardActivityIte
       </span>
 
       <div className="min-w-0">
-        <p className="font-ui-title truncate text-sm text-text-primary">{item.title}</p>
-        <p className="font-ui-content mt-0.5 truncate text-xs text-text-secondary">{item.message}</p>
+        <p className="font-ui-title truncate text-sm font-semibold text-text-primary">{item.title}</p>
+        <p className="font-ui-content mt-0.5 truncate text-xs font-medium text-text-secondary">{item.message}</p>
       </div>
 
       <div className="flex flex-col items-end gap-1.5">
-        <span className="font-ui-meta whitespace-nowrap text-[10px] text-text-tertiary">{item.timeLabel}</span>
+        <span className="font-ui-meta whitespace-nowrap text-[10px] font-medium text-text-secondary">{item.timeLabel}</span>
         {item.isUnread && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-accent shadow-sm" />}
       </div>
     </article>

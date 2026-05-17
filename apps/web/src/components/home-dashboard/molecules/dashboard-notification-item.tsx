@@ -104,13 +104,13 @@ export function DashboardNotificationItemRow({ item, onClick }: DashboardNotific
 
       {/* Content */}
       <div className="min-w-0 flex-1">
-        <p className={`font-ui-title text-sm ${!item.isRead ? 'text-text-primary' : 'text-text-secondary'}`}>
+        <p className={`font-ui-title text-sm ${!item.isRead ? 'font-semibold text-text-primary' : 'font-medium text-text-primary/80'}`}>
           {item.title}
         </p>
-        <p className="font-ui-content mt-0.5 line-clamp-2 text-xs text-text-secondary">
+        <p className="font-ui-content mt-0.5 line-clamp-2 text-xs font-medium text-text-secondary">
           {item.body}
         </p>
-        <span className="font-ui-meta mt-1.5 inline-block text-[10px] text-text-tertiary">
+        <span className="font-ui-meta mt-1.5 inline-block text-[10px] font-medium text-text-secondary">
           {item.timeLabel}
         </span>
       </div>
