@@ -1091,9 +1091,10 @@ export function useHomeDashboard() {
     listenToReactionError(handleReactionError);
 
     return () => {
-      unlistenToReactionAck();
-      unlistenToReactionUpdated();
-      unlistenToReactionError();
+      // Truyen dung callback thay vi unlisten khong co param (se xoa tat ca).
+      unlistenToReactionAck(handleReactionAck);
+      unlistenToReactionUpdated(handleReactionUpdated);
+      unlistenToReactionError(handleReactionError);
     };
   }, [
     applyReactionSummaryToMessage,
@@ -2305,15 +2306,15 @@ export function useHomeDashboard() {
     listenToErrors(handleSocketError);
 
     return () => {
-      unlistenToCallInvited();
-      unlistenToCallIncoming();
-      unlistenToCallStatus();
-      unlistenToCallParticipantJoined();
-      unlistenToCallParticipantLeft();
-      unlistenToWebRtcOffer();
-      unlistenToWebRtcAnswer();
-      unlistenToWebRtcIceCandidate();
-      unlistenToErrors();
+      unlistenToCallInvited(handleCallInvited as (...args: unknown[]) => void);
+      unlistenToCallIncoming(handleCallIncoming as (...args: unknown[]) => void);
+      unlistenToCallStatus(handleCallStatus as (...args: unknown[]) => void);
+      unlistenToCallParticipantJoined(handleCallParticipantJoined as (...args: unknown[]) => void);
+      unlistenToCallParticipantLeft(handleCallParticipantLeft as (...args: unknown[]) => void);
+      unlistenToWebRtcOffer(handleWebRtcOffer as (...args: unknown[]) => void);
+      unlistenToWebRtcAnswer(handleWebRtcAnswer as (...args: unknown[]) => void);
+      unlistenToWebRtcIceCandidate(handleWebRtcIceCandidate as (...args: unknown[]) => void);
+      unlistenToErrors(handleSocketError as (...args: unknown[]) => void);
     };
   }, [
     closePeerConnection,

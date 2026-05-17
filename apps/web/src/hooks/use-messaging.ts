@@ -116,6 +116,8 @@ export function useChat({
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const previousConversationId = useRef<string>("");
+  // Luu callback theo event de co the cleanup dung callback thay vi xoa tat ca.
+  const socketCallbackRefs = useRef<Record<string, (...args: unknown[]) => void>>({});
 
   // Initialize socket on mount or when token changes
   useEffect(() => {
@@ -795,6 +797,10 @@ export function useChat({
       }));
     };
 
+    // Luu vao refs de cleanup dung callback thay vi xoa tat ca.
+    socketCallbackRefs.current['message_deleted_for_me'] = handleMessageDeletedForMe as (...args: unknown[]) => void;
+    socketCallbackRefs.current['message_recalled'] = handleMessageRecalled as (...args: unknown[]) => void;
+
     try {
       // Use listener functions instead of direct socket.on
       listenToMessageDeletion(handleMessageDeletedForMe);
@@ -810,6 +816,8 @@ export function useChat({
       } catch (err) {
         console.error("Failed to cleanup deletion listeners:", err);
       }
+      delete socketCallbackRefs.current['message_deleted_for_me'];
+      delete socketCallbackRefs.current['message_recalled'];
     };
   }, [conversationId, token]);
 

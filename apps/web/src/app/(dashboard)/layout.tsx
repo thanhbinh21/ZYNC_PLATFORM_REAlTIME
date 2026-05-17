@@ -6,11 +6,12 @@ import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data'
 import { DashboardHeader } from '@/components/shared/DashboardHeader';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
 import { PageLoading } from '@/components/shared/page-loading';
-import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
 import type { Notification } from '@/services/notifications';
 import { MediaViewerProvider } from '@/context/media-viewer-context';
+import { getAccessToken } from '@/utils/auth-token';
+import { getSocket } from '@/services/socket';
 
 type DashboardAppearanceSettings = {
   theme: 'dark' | 'light';
@@ -25,7 +26,6 @@ const DEFAULT_APPEARANCE_SETTINGS: DashboardAppearanceSettings = {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { userId } = useHomeDashboard();
   const { onLogout } = useLoginForm();
 
   const [appearanceSettings, setAppearanceSettings] = useState<DashboardAppearanceSettings>({
@@ -64,14 +64,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth guard: load profile once via module store (persists across page navigations)
   useEffect(() => {
-    if (!userId) return;
     if (profileStore.isReady || profileStore.isLoading) {
-      // Store already initialized; sync state
       setProfile(profileStore.profile);
       setIsReady(profileStore.isReady);
       return;
     }
-    // First load
     profileStore.load().then(() => {
       setProfile(profileStore.profile);
       setIsReady(profileStore.isReady);
@@ -79,7 +76,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.push('/onboarding');
       }
     });
-  }, [userId, router]);
+  }, [router]);
+
+  // Initialize socket at layout level (singleton) – chat page will re-use it.
+  // Chỉ init khi profile đã ready để đảm bảo user đã đăng nhập.
+  useEffect(() => {
+    if (!isReady || !profileStore.profile) return;
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    try {
+      getSocket(token);
+    } catch {
+      // Socket init sẽ throw nếu chưa login – ignore trong layout.
+    }
+  }, [isReady]);
 
   // Subscribe to store updates (e.g. after login from another tab)
   useEffect(() => {
