@@ -60,6 +60,7 @@ export interface NotificationEventPayload {
   data?: Record<string, string>;
   conversationId?: string;
   fromUserId?: string;
+  createAt?: Date;
 }
 
 export async function produceNotificationEvent(payload: NotificationEventPayload): Promise<void> {

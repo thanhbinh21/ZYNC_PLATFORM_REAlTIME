@@ -313,7 +313,7 @@ async function handleSendMessage(
 
         for (const member of members) {
           if (member.userId === userId) continue;
-          await produceNotificationEvent({ userId: member.userId, type: 'new_message', title: `Tin nhắn mới từ ${senderName}`, body: preview, conversationId: conversationId as string, fromUserId: userId, data: { conversationId: conversationId as string, action: 'open_chat' } });
+          await produceNotificationEvent({ userId: member.userId, type: 'new_message', title: `Tin nhắn mới từ ${senderName}`, body: preview, conversationId: conversationId as string, fromUserId: userId, data: { conversationId: conversationId as string, action: 'open_chat' }, createAt: message.createdAt });
         }
       } catch (err) {
         logger.error('Failed to produce message notifications', err);

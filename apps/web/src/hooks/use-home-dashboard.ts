@@ -81,6 +81,7 @@ import type {
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import { callStore, subscribeToCallStore, type CallSessionState } from '@/stores/call-store';
 import type { MessageType } from '@zync/shared-types';
+import { useNotifications } from './use-notifications';
 
 interface DashboardUserPatch {
   displayName?: string;
@@ -732,6 +733,38 @@ export function useHomeDashboard() {
 
     setCombinedMessageStatus(statusMap);
   }, [messageHistory.messages, messageStatus]);
+
+  const {notifications} = useNotifications()
+
+  useEffect(() => {
+    const latestNotification = notifications[0]
+    if (!latestNotification) return;
+    setConversations((prev) => prev.map((conv) => {
+        if (conv._id !== latestNotification.conversationId) return conv
+        return {...conv, lastMessage: {
+            senderId: latestNotification.fromUserId as string,
+            senderDisplayName: latestNotification.title.replace('Tin nhắn mới từ ', ''),
+            content: latestNotification.body,
+            sentAt: latestNotification.createdAt
+        }}
+      })
+    )
+  }, [notifications]);
+
+  useEffect(() => {
+    const lastMessage = messageHistory.messages[messageHistory.messages.length - 1]
+    if (!lastMessage) return;
+    setConversations((prev) => prev.map((conv) => {
+        if (conv._id !== lastMessage.conversationId) return conv
+        return {...conv, lastMessage: {
+            senderId: lastMessage.senderId,
+            senderDisplayName: lastMessage.sender?.displayName,
+            content: lastMessage.content,
+            sentAt: lastMessage.createdAt
+        }}
+      })
+    )
+  }, [messageHistory.messages]);
 
   const resolveMessageRef = useCallback((message: Message): string => {
     return message.idempotencyKey || message._id;

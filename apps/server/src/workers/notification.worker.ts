@@ -20,6 +20,7 @@ interface NotificationPayload {
   data?: Record<string, string>;
   conversationId?: string;
   fromUserId?: string;
+  createAt?: Date;
 }
 
 const DEBOUNCE_WINDOW_SECONDS = 5;
@@ -76,7 +77,7 @@ export async function stopNotificationWorker(): Promise<void> {
 }
 
 async function processNotification(payload: NotificationPayload): Promise<void> {
-  const { userId, type, title, body, data, conversationId, fromUserId } = payload;
+  const { userId, type, title, body, data, conversationId, fromUserId, createAt } = payload;
   const safeTitle = typeof title === 'string' && title.trim().length > 0
     ? title.trim()
     : 'Thong bao moi';
@@ -152,7 +153,7 @@ async function processNotification(payload: NotificationPayload): Promise<void> 
   if (!isMuted && pushEnabled) {
     emitNotification(
       userId,
-      notificationDoc.toObject() as unknown as Record<string, unknown>,
+      (createAt? {...notificationDoc.toObject(), createAt}: notificationDoc.toObject()) as unknown as Record<string, unknown>,
     );
   }
 
