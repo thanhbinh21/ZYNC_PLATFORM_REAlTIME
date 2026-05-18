@@ -277,6 +277,7 @@ interface ConversationItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+  haveRead: boolean;
 }
 
 interface GroupFriendOption {
@@ -440,7 +441,7 @@ function ConversationList({
                     </div>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="truncate text-[13.5px] font-medium text-text-secondary">{item.preview}</p>
+                    <p className={`truncate text-[13.5px] font-medium text-text-primary ${item.haveRead? 'opacity-60': ''}`}>{item.preview}</p>
                     {item.isPinned && (
                         <span className="inline-flex items-center text-accent" aria-label="Đã ghim" title="Đã ghim">
                         <PinMiniIcon />

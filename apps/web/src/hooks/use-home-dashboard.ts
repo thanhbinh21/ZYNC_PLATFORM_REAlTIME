@@ -122,6 +122,7 @@ interface ConversationListItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+  haveRead: boolean
 }
 
 interface PresenceState {
@@ -739,9 +740,15 @@ export function useHomeDashboard() {
   useEffect(() => {
     const latestNotification = notifications[0]
     if (!latestNotification) return;
+    if (latestNotification.type !== 'new_message') return;
     setConversations((prev) => prev.map((conv) => {
         if (conv._id !== latestNotification.conversationId) return conv
-        return {...conv, lastMessage: {
+        const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
+        if (conv._id !== selectedConversationId) {
+          const count = unreadCounts.get(userId)
+          unreadCounts.set(userId, count? count + 1: 1)
+        }
+        return {...conv, unreadCounts: Object.fromEntries(unreadCounts.entries()), lastMessage: {
             senderId: latestNotification.fromUserId as string,
             senderDisplayName: latestNotification.title.replace('Tin nhắn mới từ ', ''),
             content: latestNotification.body,
@@ -940,6 +947,12 @@ export function useHomeDashboard() {
 
   useEffect(() => {
     hydratedReactionStateRefsRef.current.clear();
+    setConversations((prev) => prev.map((conv) => {
+        const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
+        unreadCounts.delete(userId)
+        return {...conv, unreadCounts: Object.fromEntries(unreadCounts.entries())}
+      })
+    )
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -1593,7 +1606,9 @@ export function useHomeDashboard() {
       return bTs - aTs;
     });
 
-    return sortedConversations.map((conv, idx) => ({
+    return sortedConversations.map((conv, idx) => {
+      const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
+      return {
       id: conv._id,
       name: conv.type === 'group'
         ? conv.name || 'Nhóm'
@@ -1620,7 +1635,8 @@ export function useHomeDashboard() {
       members: conv.users,
       online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
-    }));
+      haveRead: unreadCounts.get(userId)? false: true
+    }});
   }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
 
   const createGroupConversation = useCallback(
