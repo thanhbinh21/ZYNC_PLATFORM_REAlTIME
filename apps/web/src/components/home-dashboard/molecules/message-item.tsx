@@ -1104,7 +1104,7 @@ export function ReactionPicker({
           key={emoji}
           type="button"
           onClick={() => handleForPicker.handleReactionClick(emoji, 'picker-select')}
-          className="rounded-full px-1.5 py-0.5 text-base transition-opacity hover:opacity-80"
+          className="rounded-full px-1.5 py-0.5 text-base reaction-menu-item transition-transform hover:scale-125"
         >
           {emoji}
         </button>

@@ -358,13 +358,8 @@ function ConversationList({
   const filteredConversations = normalizedQuery
     ? conversations.filter((item) => {
       return (item.name as string).toLowerCase().includes(normalizedQuery)
-        || item.preview.toLowerCase().includes(normalizedQuery);
     })
     : conversations;
-
-  const filteredSearchTargets = normalizedQuery
-    ? searchTargets.filter((target) => target.name.toLowerCase().includes(normalizedQuery))
-    : [];
 
   return (
     <aside className="h-full min-h-0 overflow-y-auto border-r border-border bg-bg-card p-4">
@@ -386,40 +381,6 @@ function ConversationList({
           className="w-full bg-transparent text-[15px] font-medium text-text-primary outline-none placeholder:text-text-tertiary"
         />
       </label>
-
-      {/* Search Results */}
-      {normalizedQuery && (
-        <div className="mb-4 space-y-2">
-          <p className="font-ui-meta px-2 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Kết quả tìm kiếm</p>
-          <div className="rounded-2xl border border-border-light bg-bg-hover p-2">
-            {filteredSearchTargets.length === 0 ? (
-              <p className="px-2 py-3 text-sm text-text-secondary">Không tìm thấy bạn bè hoặc nhóm phù hợp.</p>
-            ) : (
-              filteredSearchTargets.map((target) => (
-                <button
-                  key={`${target.type}-${target.id}`}
-                  type="button"
-                  onClick={() => {
-                    onSelectSearchTarget(target);
-                    setQuery('');
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-bg-active active:scale-[0.99]"
-                >
-                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full overflow-hidden bg-accent text-sm font-semibold text-white">
-                    {target.avatarUrl?
-                      <Image src={target.avatarUrl} alt={target.avatar as string} width={48} height={48} className="h-full w-full object-cover" />:
-                      (target.avatar || target.name).substring(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-ui-title text-sm text-text-primary">{target.name}</p>
-                    <p className="font-ui-content text-xs text-text-tertiary">{target.type === 'group' ? 'Nhóm' : 'Bạn bè'}</p>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Conversations */}
       {filteredConversations.length === 0 ? (
