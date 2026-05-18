@@ -32,15 +32,6 @@ function DeliveredIcon({ className }: { className: string }) {
   );
 }
 
-function ReadIcon({ className }: { className: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-      <polyline points="20 12 9 23 4 18" />
-    </svg>
-  );
-}
-
 function LikeIcon({ className }: { className: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">

@@ -18,7 +18,7 @@
 	--bg-primary: #eaf1f8; /* Toned down from white-ish to slightly grayish/blue */
 	--bg-secondary: #e8f0f6;
 	--bg-sidebar: rgba(255, 255, 255, 0.65);
-	--bg-hover: #e0eaf3;
+	--bg-hover: #d6dee4;
 	--bg-active: #d0e2ec;
 	--bg-code: #e1e7f0;
 	--bg-card: #f6f9fc;
@@ -33,13 +33,14 @@
 	--text-secondary: #1e293b; /* Darker secondary */
 	--text-tertiary: #5c6c85;
 	--text-link: #0a7569;
+	--chat-status-icon-color: #88898f;
 
 	--accent: #0f9d8e; /* Stronger accent color */
 	--accent-hover: #0b8073;
 	--accent-light: #ccebe6;
 	--accent-strong: #07544b;
 
-	--border: #d7e4ee;
+	--border: #cad6de;
 	--border-light: #e6eff5;
 	--ring-soft: rgba(20, 184, 166, 0.18);
 	--page-glow-1: rgba(84, 191, 255, 0.16);
@@ -103,6 +104,7 @@
 	--text-secondary: #9fb0c4;
 	--text-tertiary: #74859b;
 	--text-link: #53ddcf;
+	--chat-status-icon-color: #ffffff;
 
 	--accent: #22c7b5;
 	--accent-hover: #1ab1a1;
@@ -2024,18 +2026,15 @@ body.story-viewer-open {
 
 .chat-timestamp {
   font-size: 11px;
-  color: var(--text-tertiary, #65676b);
+	color: var(--chat-timestamp-color, var(--text-tertiary, #000000));
 }
 
-.chat-timestamp-row.own .chat-timestamp {
-  color: rgba(255, 255, 255, 0.7);
-}
 
 /* Message Status Icons */
 .chat-status-icon {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--chat-status-icon-color);
 }
 
 .chat-status-icon.read {

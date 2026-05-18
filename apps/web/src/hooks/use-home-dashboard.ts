@@ -81,6 +81,7 @@ import type {
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import { callStore, subscribeToCallStore, type CallSessionState } from '@/stores/call-store';
 import type { MessageType } from '@zync/shared-types';
+import { useNotifications } from './use-notifications';
 
 interface DashboardUserPatch {
   displayName?: string;
@@ -121,6 +122,7 @@ interface ConversationListItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+  haveRead: boolean
 }
 
 interface PresenceState {
@@ -733,6 +735,44 @@ export function useHomeDashboard() {
     setCombinedMessageStatus(statusMap);
   }, [messageHistory.messages, messageStatus]);
 
+  const {notifications} = useNotifications()
+
+  useEffect(() => {
+    const latestNotification = notifications[0]
+    if (!latestNotification) return;
+    if (latestNotification.type !== 'new_message') return;
+    setConversations((prev) => prev.map((conv) => {
+        if (conv._id !== latestNotification.conversationId) return conv
+        const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
+        if (conv._id !== selectedConversationId) {
+          const count = unreadCounts.get(userId)
+          unreadCounts.set(userId, count? count + 1: 1)
+        }
+        return {...conv, unreadCounts: Object.fromEntries(unreadCounts.entries()), lastMessage: {
+            senderId: latestNotification.fromUserId as string,
+            senderDisplayName: latestNotification.title.replace('Tin nhắn mới từ ', ''),
+            content: latestNotification.body,
+            sentAt: latestNotification.createdAt
+        }}
+      })
+    )
+  }, [notifications]);
+
+  useEffect(() => {
+    const lastMessage = messageHistory.messages[messageHistory.messages.length - 1]
+    if (!lastMessage) return;
+    setConversations((prev) => prev.map((conv) => {
+        if (conv._id !== lastMessage.conversationId) return conv
+        return {...conv, lastMessage: {
+            senderId: lastMessage.senderId,
+            senderDisplayName: lastMessage.sender?.displayName,
+            content: lastMessage.content,
+            sentAt: lastMessage.createdAt
+        }}
+      })
+    )
+  }, [messageHistory.messages]);
+
   const resolveMessageRef = useCallback((message: Message): string => {
     return message.idempotencyKey || message._id;
   }, []);
@@ -907,6 +947,12 @@ export function useHomeDashboard() {
 
   useEffect(() => {
     hydratedReactionStateRefsRef.current.clear();
+    setConversations((prev) => prev.map((conv) => {
+        const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
+        unreadCounts.delete(userId)
+        return {...conv, unreadCounts: Object.fromEntries(unreadCounts.entries())}
+      })
+    )
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -1560,7 +1606,9 @@ export function useHomeDashboard() {
       return bTs - aTs;
     });
 
-    return sortedConversations.map((conv, idx) => ({
+    return sortedConversations.map((conv, idx) => {
+      const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
+      return {
       id: conv._id,
       name: conv.type === 'group'
         ? conv.name || 'Nhóm'
@@ -1587,7 +1635,8 @@ export function useHomeDashboard() {
       members: conv.users,
       online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
-    }));
+      haveRead: unreadCounts.get(userId)? false: true
+    }});
   }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
 
   const createGroupConversation = useCallback(
