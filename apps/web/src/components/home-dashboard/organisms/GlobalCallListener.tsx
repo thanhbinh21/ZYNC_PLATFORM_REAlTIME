@@ -13,26 +13,67 @@ import {
 } from '@/services/socket';
 import { getAccessToken } from '@/utils/auth-token';
 import { callStore } from '@/stores/call-store';
+import { profileStore } from '@/stores/profile-store';
 import { WEB_IN_APP_TOAST_EVENT, type WebInAppToastDetail } from '@/components/notifications/InAppNotificationToasts';
 
-function setIncomingCall(payload: CallIncomingPayload) {
-  if (callStore.activeCall?.sessionId === payload.sessionId) {
-    return;
-  }
+function decodeUserIdFromToken(token: string | null): string | null {
+  if (!token) return null;
 
-  callStore.setActiveCall({
-    sessionId: payload.sessionId,
-    conversationId: payload.conversationId || null,
-    isGroupCall: Boolean(payload.isGroupCall),
-    initiatedBy: payload.fromUserId,
-    participantIds: payload.participantIds || [payload.fromUserId],
-    joinedParticipantIds: [payload.fromUserId],
-    participantDisplayNames: {},
-    direction: 'incoming',
-    status: 'incoming',
-    callToken: payload.callToken,
-    callType: payload.callType || 'video',
-    timeoutAt: payload.timeoutAt ?? null,
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const decoded = JSON.parse(window.atob(padded)) as { sub?: string; userId?: string; id?: string };
+    return decoded.sub || decoded.userId || decoded.id || null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveCurrentUserId(): string | null {
+  return profileStore.profile?._id || decodeUserIdFromToken(getAccessToken());
+}
+
+function setIncomingCall(payload: CallIncomingPayload) {
+  callStore.setActiveCall((prev) => {
+    const currentUserId = resolveCurrentUserId();
+    const participantIds = Array.from(new Set([
+      ...(payload.participantIds || []),
+      payload.fromUserId,
+      ...(currentUserId ? [currentUserId] : []),
+    ]));
+    if (prev?.sessionId === payload.sessionId) {
+      return {
+        ...prev,
+        conversationId: payload.conversationId || prev.conversationId,
+        isGroupCall: Boolean(payload.isGroupCall),
+        initiatedBy: payload.fromUserId,
+        participantIds,
+        joinedParticipantIds: Array.from(new Set([...prev.joinedParticipantIds, payload.fromUserId])),
+        direction: 'incoming',
+        status: prev.status === 'connected' || prev.status === 'connecting' ? prev.status : 'incoming',
+        callToken: payload.callToken,
+        callType: payload.callType || prev.callType || 'video',
+        timeoutAt: payload.timeoutAt ?? prev.timeoutAt ?? null,
+      };
+    }
+
+    return {
+      sessionId: payload.sessionId,
+      conversationId: payload.conversationId || null,
+      isGroupCall: Boolean(payload.isGroupCall),
+      initiatedBy: payload.fromUserId,
+      participantIds,
+      joinedParticipantIds: [payload.fromUserId],
+      participantDisplayNames: {},
+      direction: 'incoming',
+      status: 'incoming',
+      callToken: payload.callToken,
+      callType: payload.callType || 'video',
+      timeoutAt: payload.timeoutAt ?? null,
+    };
   });
 }
 

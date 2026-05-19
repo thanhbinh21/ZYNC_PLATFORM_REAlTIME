@@ -1,6 +1,7 @@
 import { MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
+import { callStore } from '@/stores/call-store';
 
 let socket: Socket | null = null;
 let currentToken: string | null = null;
@@ -94,6 +95,7 @@ export function getSocket(token?: string): Socket {
   if (socket && currentToken !== resolvedToken) {
     stopHeartbeat();
     listenerRegistry.clear();
+    callStore.setActiveCall(null);
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
@@ -144,6 +146,7 @@ export function isConnected(): boolean {
 export function disconnectSocket(): void {
   if (socket) {
     stopHeartbeat();
+    callStore.setActiveCall(null);
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
