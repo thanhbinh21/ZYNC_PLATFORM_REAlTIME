@@ -205,7 +205,7 @@ export function initSocketGateway(httpServer: HttpServer): Server {
       }
     })();
 
-    // Heartbeat: client gui `heartbeat` moi 30s de giu online
+    // Heartbeat: client gui `heartbeat` moi 50s de giu online
     socket.on('heartbeat', async () => {
       await refreshPresenceOnline(userId);
     });

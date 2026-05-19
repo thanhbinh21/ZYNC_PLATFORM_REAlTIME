@@ -5,8 +5,27 @@ import Cookies from 'js-cookie';
 let socket: Socket | null = null;
 let currentToken: string | null = null;
 const listenerRegistry = new Map<string, unknown>();
+let heartbeatTimer: NodeJS.Timeout | null = null;
 
 const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
+const HEARTBEAT_INTERVAL_MS = 50_000;
+
+function stopHeartbeat(): void {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+function startHeartbeat(targetSocket: Socket): void {
+  stopHeartbeat();
+
+  // Emit immediately so server refreshes presence right after connect/reconnect.
+  targetSocket.emit('heartbeat');
+  heartbeatTimer = setInterval(() => {
+    targetSocket.emit('heartbeat');
+  }, HEARTBEAT_INTERVAL_MS);
+}
 
 function getTokenFromCookie(): string | null {
   if (typeof window === 'undefined') return null;
@@ -65,12 +84,15 @@ export function getSocket(token?: string): Socket {
     // If disconnected but instance exists, reconnect instead of creating new
     if (socket.disconnected && !socket.active) {
       socket.connect();
+    } else if (socket.connected) {
+      startHeartbeat(socket);
     }
     return socket;
   }
 
   // Token changed (re-login) – disconnect old socket first
   if (socket && currentToken !== resolvedToken) {
+    stopHeartbeat();
     listenerRegistry.clear();
     socket.removeAllListeners();
     socket.disconnect();
@@ -90,11 +112,13 @@ export function getSocket(token?: string): Socket {
   });
 
   socket.on('connect', () => {
+    startHeartbeat(socket as Socket);
     console.info('[Socket] Connected to server');
   });
 
   // Auto-reconnect on disconnect
   socket.on('disconnect', (reason) => {
+    stopHeartbeat();
     console.warn('[Socket] Disconnected from server:', reason);
   });
 
@@ -119,6 +143,7 @@ export function isConnected(): boolean {
 
 export function disconnectSocket(): void {
   if (socket) {
+    stopHeartbeat();
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
