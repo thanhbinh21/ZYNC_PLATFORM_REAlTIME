@@ -16,6 +16,7 @@ export interface ICallSession extends Document {
   timeoutAt?: Date;
   startedAt?: Date;
   endedAt?: Date;
+  durationSeconds?: number;
   endedReason?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +42,13 @@ export interface ICallEvent extends Document {
   updatedAt: Date;
 }
 
+export interface IUserCallState extends Document {
+  userId: string;
+  activeCallSessionId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 const callSessionSchema = new Schema<ICallSession>(
   {
     conversationId: { type: String },
@@ -57,6 +65,7 @@ const callSessionSchema = new Schema<ICallSession>(
     timeoutAt: { type: Date },
     startedAt: { type: Date },
     endedAt: { type: Date },
+    durationSeconds: { type: Number },
     endedReason: { type: String },
   },
   { timestamps: true },
@@ -98,6 +107,17 @@ const callEventSchema = new Schema<ICallEvent>(
 
 callEventSchema.index({ sessionId: 1, createdAt: -1 });
 
+const userCallStateSchema = new Schema<IUserCallState>(
+  {
+    userId: { type: String, required: true, unique: true },
+    activeCallSessionId: { type: String },
+  },
+  { timestamps: true },
+);
+
+userCallStateSchema.index({ activeCallSessionId: 1 });
+
 export const CallSessionModel = model<ICallSession>('CallSession', callSessionSchema);
 export const CallParticipantModel = model<ICallParticipant>('CallParticipant', callParticipantSchema);
 export const CallEventModel = model<ICallEvent>('CallEvent', callEventSchema);
+export const UserCallStateModel = model<IUserCallState>('UserCallState', userCallStateSchema);

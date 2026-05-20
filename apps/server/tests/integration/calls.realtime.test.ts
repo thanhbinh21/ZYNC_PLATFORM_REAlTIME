@@ -92,6 +92,8 @@ import { FriendshipModel } from '../../src/modules/friends/friendship.model';
 import { CallEventModel, CallParticipantModel, CallSessionModel } from '../../src/modules/calls/calls.model';
 import { ConversationModel } from '../../src/modules/conversations/conversation.model';
 import { ConversationMemberModel } from '../../src/modules/conversations/conversation-member.model';
+import { ConversationsService } from '../../src/modules/conversations/conversations.service';
+import { MessageModel } from '../../src/modules/messages/message.model';
 
 let app: Application;
 let mongoServer: MongoMemoryServer;
@@ -308,6 +310,7 @@ beforeEach(async () => {
     ConversationMemberModel.deleteMany({}),
     ConversationModel.deleteMany({}),
     FriendshipModel.deleteMany({}),
+    MessageModel.deleteMany({}),
     UserModel.deleteMany({}),
   ]);
 });
@@ -1431,4 +1434,238 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
       disconnectSockets(callerSocket, participantASocket, participantBSocket);
     }
   }, 15000);
+
+  it('persists call_history message after group call ends and returns it from messages API', async () => {
+    const caller = await UserModel.create({ email: 'history-caller@test.com', displayName: 'History Caller' });
+    const participantA = await UserModel.create({ email: 'history-a@test.com', displayName: 'History A' });
+    const participantB = await UserModel.create({ email: 'history-b@test.com', displayName: 'History B' });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Nhom lich su cuoc goi',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      { conversationId: conversation._id.toString(), userId: caller._id.toString(), role: 'admin' },
+      { conversationId: conversation._id.toString(), userId: participantA._id.toString(), role: 'member' },
+      { conversationId: conversation._id.toString(), userId: participantB._id.toString(), role: 'member' },
+    ]);
+
+    const callerToken = issueAccessToken(caller._id.toString());
+    const callerSocket = await connectClient(callerToken);
+    const participantASocket = await connectClient(issueAccessToken(participantA._id.toString()));
+    const participantBSocket = await connectClient(issueAccessToken(participantB._id.toString()));
+
+    try {
+      callerSocket.emit('join_conversation', { conversationId: conversation._id.toString() });
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'conversation_active_call_updated',
+        (payload) => payload['conversationId'] === conversation._id.toString(),
+      );
+
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString(), callType: 'video' });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true,
+      );
+      const incomingA = await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+      await waitForEventMatching<Record<string, any>>(
+        participantBSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      participantASocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incomingA['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+
+      const receiveHistoryPromise = waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'receive_message',
+        (payload) => payload['conversationId'] === conversation._id.toString()
+          && payload['type'] === 'call_history'
+          && payload['callHistory']?.['callSessionId'] === invited['sessionId'],
+      );
+
+      callerSocket.emit('call_end', {
+        sessionId: invited['sessionId'],
+        callToken: invited['callToken'],
+        reason: 'ended',
+      });
+
+      const receivedHistory = await receiveHistoryPromise;
+      expect(receivedHistory['type']).toBe('call_history');
+      expect(receivedHistory['callHistory']).toMatchObject({
+        callSessionId: invited['sessionId'],
+        callType: 'video',
+        status: 'ended',
+        callerId: caller._id.toString(),
+      });
+
+      const storedMessage = await MessageModel.findOne({
+        conversationId: conversation._id.toString(),
+        type: 'call_history',
+      }).lean();
+      expect(storedMessage).toBeTruthy();
+      expect(storedMessage?.callHistory).toMatchObject({
+        callSessionId: invited['sessionId'],
+        callType: 'video',
+        status: 'ended',
+        callerId: caller._id.toString(),
+      });
+      expect(storedMessage?.callHistory?.startedAt).toBeTruthy();
+      expect(storedMessage?.callHistory?.endedAt).toBeTruthy();
+      expect(typeof storedMessage?.callHistory?.durationSeconds).toBe('number');
+      expect(storedMessage?.callHistory?.participantIds).toEqual(
+        expect.arrayContaining([
+          caller._id.toString(),
+          participantA._id.toString(),
+          participantB._id.toString(),
+        ]),
+      );
+
+      const response = await request(app)
+        .get(`/api/messages/${conversation._id.toString()}`)
+        .set('Authorization', `Bearer ${callerToken}`)
+        .expect(200);
+
+      const apiHistory = response.body.messages.find((message: Record<string, any>) => (
+        message['type'] === 'call_history'
+        && message['callHistory']?.['callSessionId'] === invited['sessionId']
+      ));
+      expect(apiHistory).toBeTruthy();
+      expect(apiHistory.callHistory).toMatchObject({
+        callSessionId: invited['sessionId'],
+        callType: 'video',
+        status: 'ended',
+        callerId: caller._id.toString(),
+      });
+    } finally {
+      disconnectSockets(callerSocket, participantASocket, participantBSocket);
+    }
+  }, 15000);
+
+  it('rejects starting or accepting a second concurrent call for the same user', async () => {
+    const userA = await UserModel.create({ email: 'busy-a@test.com', displayName: 'Busy A' });
+    const userB = await UserModel.create({ email: 'busy-b@test.com', displayName: 'Busy B' });
+    const userC = await UserModel.create({ email: 'busy-c@test.com', displayName: 'Busy C' });
+
+    await FriendshipModel.insertMany([
+      { userId: userA._id.toString(), friendId: userB._id.toString(), status: 'accepted' },
+      { userId: userB._id.toString(), friendId: userA._id.toString(), status: 'accepted' },
+      { userId: userA._id.toString(), friendId: userC._id.toString(), status: 'accepted' },
+      { userId: userC._id.toString(), friendId: userA._id.toString(), status: 'accepted' },
+      { userId: userB._id.toString(), friendId: userC._id.toString(), status: 'accepted' },
+      { userId: userC._id.toString(), friendId: userB._id.toString(), status: 'accepted' },
+    ]);
+
+    const socketA = await connectClient(issueAccessToken(userA._id.toString()));
+    const socketB = await connectClient(issueAccessToken(userB._id.toString()));
+    const socketC = await connectClient(issueAccessToken(userC._id.toString()));
+
+    try {
+      socketA.emit('call_invite', { targetUserId: userB._id.toString() });
+      const firstInvited = await waitForEventMatching<Record<string, any>>(
+        socketA,
+        'call_invited',
+        (payload) => typeof payload['sessionId'] === 'string',
+      );
+      const incomingForB = await waitForEventMatching<Record<string, any>>(
+        socketB,
+        'call_incoming',
+        (payload) => payload['sessionId'] === firstInvited['sessionId'],
+      );
+
+      socketA.emit('call_invite', { targetUserId: userC._id.toString() });
+      const startRejected = await waitForEventMatching<Record<string, any>>(
+        socketA,
+        'error',
+        (payload) => String(payload['message'] ?? '').includes('Bạn đang trong một cuộc gọi khác'),
+      );
+      expect(startRejected['message']).toBe('Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước.');
+
+      socketB.emit('call_invite', { targetUserId: userC._id.toString() });
+      await waitForEventMatching<Record<string, any>>(
+        socketB,
+        'call_invited',
+        (payload) => typeof payload['sessionId'] === 'string' && payload['sessionId'] !== firstInvited['sessionId'],
+      );
+
+      socketB.emit('call_accept', {
+        sessionId: firstInvited['sessionId'],
+        callToken: incomingForB['callToken'],
+      });
+      const acceptRejected = await waitForEventMatching<Record<string, any>>(
+        socketB,
+        'error',
+        (payload) => String(payload['message'] ?? '').includes('Bạn đang trong một cuộc gọi khác'),
+      );
+      expect(acceptRejected['message']).toBe('Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước.');
+    } finally {
+      disconnectSockets(socketA, socketB, socketC);
+    }
+  }, 15000);
+
+  it('conversation API clears stale activeCall when the referenced session is no longer active', async () => {
+    const caller = await UserModel.create({ email: 'stale-active-caller@test.com', displayName: 'Stale Active Caller' });
+    const participant = await UserModel.create({ email: 'stale-active-participant@test.com', displayName: 'Stale Active Participant' });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Stale active call group',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      { conversationId: conversation._id.toString(), userId: caller._id.toString(), role: 'admin' },
+      { conversationId: conversation._id.toString(), userId: participant._id.toString(), role: 'member' },
+    ]);
+
+    const endedSession = await CallSessionModel.create({
+      conversationId: conversation._id.toString(),
+      callType: 'video',
+      mode: 'sfu',
+      status: 'ended',
+      initiatedBy: caller._id.toString(),
+      participantIds: [caller._id.toString(), participant._id.toString()],
+      startedAt: new Date(Date.now() - 30_000),
+      endedAt: new Date(),
+      durationSeconds: 30,
+      endedReason: 'ended',
+    });
+
+    await ConversationModel.findByIdAndUpdate(conversation._id, {
+      activeCall: {
+        callSessionId: endedSession._id.toString(),
+        type: 'video',
+        status: 'connected',
+        startedAt: endedSession.startedAt,
+        initiatedBy: caller._id.toString(),
+      },
+    });
+
+    const conversations = await ConversationsService.getUserConversations(caller._id.toString());
+    const resolved = conversations.find((item) => item._id === conversation._id.toString());
+    expect(resolved?.activeCall).toBeNull();
+
+    const refreshedConversation = await ConversationModel.findById(conversation._id).lean();
+    expect(refreshedConversation?.activeCall).toBeUndefined();
+  });
 });

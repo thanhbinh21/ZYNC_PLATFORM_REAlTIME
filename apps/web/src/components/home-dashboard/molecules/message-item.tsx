@@ -551,6 +551,38 @@ function initialsFromNotice(content: string): string {
 }
 
 // ─── Main Component ───
+function formatCallHistoryDuration(durationSeconds?: number): string {
+  if (!durationSeconds || durationSeconds <= 0) {
+    return '0 giây';
+  }
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = Math.floor(durationSeconds % 60);
+  if (minutes <= 0) return `${seconds} giây`;
+  if (seconds <= 0) return `${minutes} phút`;
+  return `${minutes} phút ${seconds} giây`;
+}
+
+function getCallHistoryLabel(message: Message): { title: string; detail: string } {
+  const history = message.callHistory;
+  const callTypeLabel = history?.callType === 'audio' ? 'Cuộc gọi thoại' : 'Cuộc gọi video';
+  const duration = formatCallHistoryDuration(history?.durationSeconds);
+
+  if (history?.status === 'missed') {
+    return { title: `${callTypeLabel} bị nhỡ`, detail: 'Không có người tham gia' };
+  }
+
+  if (history?.status === 'rejected') {
+    return { title: `${callTypeLabel} bị từ chối`, detail: 'Lời mời gọi đã bị từ chối' };
+  }
+
+  if (history?.status === 'cancelled') {
+    return { title: `${callTypeLabel} đã hủy`, detail: `Thời lượng ${duration}` };
+  }
+
+  return { title: `${callTypeLabel} đã kết thúc`, detail: `Thời lượng ${duration}` };
+}
+
 export function MessageItem({
   message,
   isSender,
@@ -594,6 +626,7 @@ export function MessageItem({
 
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
   const isLifecycleNotice = isGroupLifecycleNotice(message);
+  const isCallHistory = message.type === 'call_history' && Boolean(message.callHistory);
   const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
 
   const summary = message.reactionSummary;
@@ -745,6 +778,34 @@ export function MessageItem({
     }
     openStatusDetailsModal(message);
   }, [canOpenReadStats, message, openStatusDetailsModal]);
+
+  if (isCallHistory) {
+    const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const { title, detail } = getCallHistoryLabel(message);
+
+    return (
+      <div className="my-3 flex flex-col items-center gap-1.5">
+        {showDateSeparator && dateSeparatorText && (
+          <div className="chat-date-separator">
+            <span>{dateSeparatorText}</span>
+          </div>
+        )}
+        <div className="inline-flex max-w-[90%] items-center gap-3 rounded-2xl border border-border bg-bg-card px-4 py-2.5 text-sm text-text-primary shadow-sm">
+          <span className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-accent-light text-accent">
+            {message.callHistory?.callType === 'audio' ? '☎' : '▣'}
+          </span>
+          <span className="min-w-0 text-left">
+            <span className="block truncate font-semibold">{title}</span>
+            <span className="block text-xs text-text-secondary">{detail}</span>
+          </span>
+          <span className="text-xs text-text-tertiary">{timeStr}</span>
+        </div>
+      </div>
+    );
+  }
 
   // Lifecycle notice messages
   if (isLifecycleNotice) {

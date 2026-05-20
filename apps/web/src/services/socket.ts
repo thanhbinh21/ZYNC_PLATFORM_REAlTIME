@@ -1,4 +1,4 @@
-import { MessageType, SenderInMessage } from '@zync/shared-types';
+import { type CallHistory, MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 import { callStore } from '@/stores/call-store';
@@ -224,15 +224,16 @@ export function listenToMessages(
     content: string;
     type: string;
     mediaUrl?: string;
-      moderationWarning?: boolean;
-      replyTo?: {
-        messageRef: string;
-        messageId?: string;
-        senderId?: string;
-        contentPreview?: string;
-        type?: string;
-        isDeleted?: boolean;
-      };
+    callHistory?: CallHistory;
+    moderationWarning?: boolean;
+    replyTo?: {
+      messageRef: string;
+      messageId?: string;
+      senderId?: string;
+      contentPreview?: string;
+      type?: string;
+      isDeleted?: boolean;
+    };
     idempotencyKey: string;
     createdAt: string;
   }) => void,

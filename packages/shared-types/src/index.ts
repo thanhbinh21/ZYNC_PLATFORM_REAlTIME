@@ -42,7 +42,7 @@ export interface Conversation {
 }
 
 // Kiểu dữ liệu Message
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export interface MessageReactionSummary {
@@ -82,6 +82,17 @@ export interface SenderInMessage {
   avatarUrl?: string;
 }
 
+export interface CallHistory {
+  callSessionId: string;
+  callType: 'audio' | 'video';
+  status: 'ended' | 'missed' | 'rejected' | 'cancelled';
+  startedAt?: string | Date;
+  endedAt?: string | Date;
+  durationSeconds?: number;
+  callerId: string;
+  participantIds: string[];
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -90,6 +101,7 @@ export interface Message {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  callHistory?: CallHistory;
   moderationWarning?: boolean;
   replyTo?: MessageReplyTo;
   idempotencyKey: string;
@@ -151,6 +163,7 @@ export interface ReceiveMessagePayload {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  callHistory?: CallHistory;
   moderationWarning?: boolean;
   replyTo?: MessageReplyTo;
   createdAt: string;

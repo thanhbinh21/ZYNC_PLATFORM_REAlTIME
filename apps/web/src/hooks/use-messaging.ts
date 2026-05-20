@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { Message, MessageStatus, SenderInMessage } from "@zync/shared-types";
+import type { CallHistory, Message, MessageStatus, SenderInMessage } from "@zync/shared-types";
 import {
   getSocket,
   isConnected,
@@ -175,6 +175,7 @@ export function useChat({
       content: string;
       type: string;
       mediaUrl?: string;
+      callHistory?: CallHistory;
       moderationWarning?: boolean;
       replyTo?: Message["replyTo"];
       idempotencyKey: string;
@@ -192,6 +193,7 @@ export function useChat({
         content: data.content,
         type: data.type as Message["type"],
         mediaUrl: data.mediaUrl,
+        callHistory: data.callHistory,
         moderationWarning: data.moderationWarning,
         replyTo: data.replyTo,
         idempotencyKey: data.idempotencyKey, // Will be set on send

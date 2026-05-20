@@ -20,6 +20,13 @@ export interface IConversation extends Document {
     senderId: string;
     sentAt: Date;
   };
+  activeCall?: {
+    callSessionId: string;
+    type: 'audio' | 'video';
+    status: 'ringing' | 'connecting' | 'connected';
+    startedAt?: Date;
+    initiatedBy: string;
+  };
   unreadCounts: Map<string, number>;
   updatedAt: Date;
 }
@@ -46,6 +53,13 @@ const conversationSchema = new Schema<IConversation>(
       content: { type: String },
       senderId: { type: String },
       sentAt: { type: Date },
+    },
+    activeCall: {
+      callSessionId: { type: String },
+      type: { type: String, enum: ['audio', 'video'] },
+      status: { type: String, enum: ['ringing', 'connecting', 'connected'] },
+      startedAt: { type: Date },
+      initiatedBy: { type: String },
     },
     unreadCounts: { type: Map, of: Number, default: {} },
   },

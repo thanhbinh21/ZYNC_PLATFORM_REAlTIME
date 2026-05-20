@@ -97,67 +97,127 @@ function emitCallStatus(
   }
 }
 
-function formatCallDuration(durationSeconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(durationSeconds));
-  const minutes = Math.floor(safeSeconds / 60);
-  const seconds = safeSeconds % 60;
-  return minutes <= 0 ? `${seconds}s` : `${minutes}m ${seconds}s`;
+function buildConversationActiveCallPayload(session: {
+  sessionId: string;
+  conversationId: string | null;
+  callType: 'audio' | 'video';
+  status: 'ringing' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
+  startedAt: string | null;
+  initiatedBy: string;
+  participantIds: string[];
+}): {
+  conversationId: string;
+  activeCall: null | {
+    callSessionId: string;
+    type: 'audio' | 'video';
+    status: 'ringing' | 'connecting' | 'connected';
+    startedAt: string | null;
+    initiatedBy: string;
+  };
+} | null {
+  if (!session.conversationId) {
+    return null;
+  }
+
+  const isActive = session.status === 'ringing' || session.status === 'connecting' || session.status === 'connected';
+  if (!isActive) {
+    return {
+      conversationId: session.conversationId,
+      activeCall: null,
+    };
+  }
+
+  const activeStatus = session.status as 'ringing' | 'connecting' | 'connected';
+  return {
+    conversationId: session.conversationId,
+    activeCall: {
+      callSessionId: session.sessionId,
+      type: session.callType,
+      status: activeStatus,
+      startedAt: session.startedAt,
+      initiatedBy: session.initiatedBy,
+    },
+  };
 }
 
-async function emitCallSummaryMessage(
+function emitConversationActiveCallUpdate(
+  io: Server,
+  session: {
+    sessionId: string;
+    conversationId: string | null;
+    callType: 'audio' | 'video';
+    status: 'ringing' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
+    startedAt: string | null;
+    initiatedBy: string;
+    participantIds: string[];
+  },
+): void {
+  const payload = buildConversationActiveCallPayload(session);
+  if (!payload) {
+    return;
+  }
+
+  io.to(`conv:${payload.conversationId}`).emit('conversation_active_call_updated', payload);
+  for (const participantId of session.participantIds) {
+    io.to(`user:${participantId}`).emit('conversation_active_call_updated', payload);
+  }
+}
+
+function resolveCallHistoryStatus(
+  status: 'ended' | 'rejected' | 'missed',
+  endedReason?: string | null,
+): 'ended' | 'rejected' | 'missed' | 'cancelled' {
+  const normalizedReason = (endedReason ?? '').trim().toLowerCase();
+  if (status === 'ended' && (normalizedReason === 'cancelled' || normalizedReason === 'canceled')) {
+    return 'cancelled';
+  }
+  return status;
+}
+
+async function emitCallHistoryMessage(
   io: Server,
   params: {
     sessionId: string;
     status: 'ended' | 'rejected' | 'missed';
     conversationId?: string;
-    senderId: string;
+    callerId: string;
+    participantIds: string[];
+    callType: 'audio' | 'video';
     endedReason?: string;
     startedAt?: string;
     endedAt?: string;
+    createdAt?: string;
+    durationSeconds?: number | null;
   },
 ): Promise<void> {
-  if (process.env['CALL_SUMMARY_MESSAGES_ENABLED'] !== 'true') return;
-
   if (!params.conversationId) return;
 
-  let content = 'Cuoc goi da ket thuc';
-  if (params.status === 'rejected') {
-    content = params.endedReason === 'busy' ? 'Cuoc goi bi tu choi (ban)' : 'Cuoc goi bi tu choi';
-  }
-  if (params.status === 'missed') {
-    content = 'Cuoc goi nho';
-  }
-
-  const startedAt = params.startedAt ? new Date(params.startedAt) : null;
-  const endedAt = params.endedAt ? new Date(params.endedAt) : null;
-
-  if (
-    params.status === 'ended'
-    && startedAt
-    && endedAt
-    && !Number.isNaN(startedAt.getTime())
-    && !Number.isNaN(endedAt.getTime())
-  ) {
-    const durationSeconds = (endedAt.getTime() - startedAt.getTime()) / 1000;
-    if (durationSeconds > 0) content = `${content} (${formatCallDuration(durationSeconds)})`;
-  }
-
-  if (params.endedReason && params.endedReason.trim().length > 0 && params.endedReason !== 'ended') {
-    content = `${content} - Ly do: ${params.endedReason}`;
-  }
-
-  const idempotencyKey = `call-summary:${params.sessionId}:${params.status}`;
-  const message = await MessagesService.createMessage(
-    params.conversationId, params.senderId, content, 'text', idempotencyKey,
-  );
+  const startedAt = params.startedAt ?? params.createdAt ?? params.endedAt;
+  const startedAtDate = startedAt ? new Date(startedAt) : undefined;
+  const endedAtDate = params.endedAt ? new Date(params.endedAt) : undefined;
+  const calculatedDurationSeconds = startedAtDate && endedAtDate
+    ? Math.max(0, Math.floor((endedAtDate.getTime() - startedAtDate.getTime()) / 1000))
+    : 0;
+  const callHistory = {
+    callSessionId: params.sessionId,
+    callType: params.callType,
+    status: resolveCallHistoryStatus(params.status, params.endedReason),
+    startedAt: startedAtDate,
+    endedAt: endedAtDate,
+    durationSeconds: params.durationSeconds ?? calculatedDurationSeconds,
+    callerId: params.callerId,
+    participantIds: params.participantIds,
+  };
+  const message = await MessagesService.createCallHistoryMessage(params.conversationId, callHistory);
 
   io.to(`conv:${params.conversationId}`).emit('receive_message', {
     messageId: message._id,
     conversationId: params.conversationId,
-    senderId: params.senderId,
-    content,
-    type: 'text',
-    idempotencyKey,
+    senderId: message.senderId,
+    content: message.content,
+    type: message.type,
+    callHistory: message.callHistory,
+    idempotencyKey: message.idempotencyKey,
     createdAt: message.createdAt,
   });
 
@@ -165,7 +225,7 @@ async function emitCallSummaryMessage(
     conversationId: params.conversationId,
     messageId: message._id,
     status: 'sent',
-    userId: params.senderId,
+    userId: message.senderId,
   });
 }
 
@@ -302,16 +362,21 @@ async function handleCallInvite(io: Server, socket: AuthSocket, payload: unknown
     registerCallTimeout(session.sessionId, async () => {
       const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
       if (!timeoutSession) return;
-      await emitCallSummaryMessage(io, {
+      await emitCallHistoryMessage(io, {
         sessionId: timeoutSession.sessionId,
         status: 'missed',
         conversationId: timeoutSession.conversationId ?? undefined,
-        senderId: timeoutSession.initiatedBy,
+        callerId: timeoutSession.initiatedBy,
+        participantIds: timeoutSession.participantIds,
+        callType: timeoutSession.callType,
         endedReason: timeoutSession.endedReason ?? undefined,
         startedAt: timeoutSession.startedAt ?? undefined,
         endedAt: timeoutSession.endedAt ?? undefined,
+        createdAt: timeoutSession.createdAt,
+        durationSeconds: timeoutSession.durationSeconds,
       });
       emitCallStatus(io, timeoutSession.participantIds, { sessionId: timeoutSession.sessionId, status: 'missed', reason: timeoutSession.endedReason });
+      emitConversationActiveCallUpdate(io, timeoutSession);
     });
   }
 
@@ -365,16 +430,21 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
     registerCallTimeout(session.sessionId, async () => {
       const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
       if (!timeoutSession) return;
-      await emitCallSummaryMessage(io, {
+      await emitCallHistoryMessage(io, {
         sessionId: timeoutSession.sessionId,
         status: 'missed',
         conversationId: timeoutSession.conversationId ?? undefined,
-        senderId: timeoutSession.initiatedBy,
+        callerId: timeoutSession.initiatedBy,
+        participantIds: timeoutSession.participantIds,
+        callType: timeoutSession.callType,
         endedReason: timeoutSession.endedReason ?? undefined,
         startedAt: timeoutSession.startedAt ?? undefined,
         endedAt: timeoutSession.endedAt ?? undefined,
+        createdAt: timeoutSession.createdAt,
+        durationSeconds: timeoutSession.durationSeconds,
       });
       emitCallStatus(io, timeoutSession.participantIds, { sessionId: timeoutSession.sessionId, status: 'missed', reason: timeoutSession.endedReason });
+      emitConversationActiveCallUpdate(io, timeoutSession);
     });
   }
 
@@ -425,6 +495,7 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
   }
 
   emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: session.status });
+  emitConversationActiveCallUpdate(io, session);
 }
 
 async function handleCallAccept(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
@@ -438,6 +509,7 @@ async function handleCallAccept(io: Server, socket: AuthSocket, payload: unknown
     io.to(`user:${participantId}`).emit('call_participant_joined', { sessionId: session.sessionId, userId, joinedParticipantIds });
   }
   emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: session.status });
+  emitConversationActiveCallUpdate(io, session);
 }
 
 async function handleCallReject(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
@@ -455,17 +527,24 @@ async function handleCallReject(io: Server, socket: AuthSocket, payload: unknown
     for (const participantId of session.participantIds) {
       io.to(`user:${participantId}`).emit('call_participant_left', { sessionId: session.sessionId, userId, reason: input.reason ?? 'rejected' });
     }
+    emitConversationActiveCallUpdate(io, session);
     return;
   }
 
-  await emitCallSummaryMessage(io, {
+  await emitCallHistoryMessage(io, {
     sessionId: session.sessionId, status: 'rejected',
     conversationId: session.conversationId ?? undefined,
-    senderId: userId, endedReason: session.endedReason ?? undefined,
+    callerId: session.initiatedBy,
+    participantIds: session.participantIds,
+    callType: session.callType,
+    endedReason: session.endedReason ?? undefined,
     startedAt: session.startedAt ?? undefined, endedAt: session.endedAt ?? undefined,
+    createdAt: session.createdAt,
+    durationSeconds: session.durationSeconds,
   });
 
   emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: 'rejected', reason: session.endedReason });
+  emitConversationActiveCallUpdate(io, session);
 }
 
 async function handleCallEnd(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
@@ -483,14 +562,20 @@ async function handleCallEnd(io: Server, socket: AuthSocket, payload: unknown): 
     for (const participantId of session.participantIds) {
       io.to(`user:${participantId}`).emit('call_participant_left', { sessionId: session.sessionId, userId, reason: input.reason ?? 'left' });
     }
+    emitConversationActiveCallUpdate(io, session);
     return;
   }
 
-  await emitCallSummaryMessage(io, {
+  await emitCallHistoryMessage(io, {
     sessionId: session.sessionId, status: 'ended',
     conversationId: session.conversationId ?? undefined,
-    senderId: userId, endedReason: session.endedReason ?? undefined,
+    callerId: session.initiatedBy,
+    participantIds: session.participantIds,
+    callType: session.callType,
+    endedReason: session.endedReason ?? undefined,
     startedAt: session.startedAt ?? undefined, endedAt: session.endedAt ?? undefined,
+    createdAt: session.createdAt,
+    durationSeconds: session.durationSeconds,
   });
 
   for (const participantId of session.participantIds) {
@@ -498,6 +583,7 @@ async function handleCallEnd(io: Server, socket: AuthSocket, payload: unknown): 
   }
 
   emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: 'ended', reason: session.endedReason });
+  emitConversationActiveCallUpdate(io, session);
 }
 
 async function handleWebRtcOffer(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
@@ -520,6 +606,7 @@ async function handleWebRtcAnswer(io: Server, socket: AuthSocket, payload: unkno
   clearCallTimeout(session.sessionId);
   io.to(`user:${input.toUserId}`).emit('webrtc_answer', { sessionId: input.sessionId, fromUserId: userId, sdp: input.sdp });
   emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: session.status });
+  emitConversationActiveCallUpdate(io, session);
 }
 
 async function handleWebRtcIceCandidate(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {

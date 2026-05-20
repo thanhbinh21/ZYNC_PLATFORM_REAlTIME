@@ -39,6 +39,20 @@ interface SendMessageOptions {
 }
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
+interface ConversationActiveCall {
+  callSessionId: string;
+  type: 'audio' | 'video';
+  status: string;
+  startedAt?: string | null;
+  initiatedBy: string;
+}
+
+function isActiveConversationCall(call?: ConversationActiveCall | null): call is ConversationActiveCall {
+  return Boolean(
+    call?.callSessionId
+    && (call.status === 'ringing' || call.status === 'connecting' || call.status === 'connected'),
+  );
+}
 
 // ==================== ICONS ====================
 
@@ -240,6 +254,7 @@ interface ChatPanelProps {
   }>;
   callStatus?: CallUiStatus;
   callType?: 'audio' | 'video';
+  activeConversationCall?: ConversationActiveCall | null;
   callPeerName?: string;
   callParticipantNames?: string[];
   isGroupCallActive?: boolean;
@@ -294,6 +309,7 @@ interface ConversationItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+  activeCall?: ConversationActiveCall | null;
   haveRead: boolean;
 }
 
@@ -459,6 +475,11 @@ function ConversationList({
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className={`truncate text-[13.5px] font-medium text-text-primary ${item.haveRead? 'opacity-60': ''}`}>{item.preview}</p>
+                    {isActiveConversationCall(item.activeCall) && (
+                      <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        Đang gọi
+                      </span>
+                    )}
                     {item.isPinned && (
                         <span className="inline-flex items-center text-accent" aria-label="Đã ghim" title="Đã ghim">
                         <PinMiniIcon />
@@ -511,6 +532,7 @@ function ChatPanel({
   reactionUserStateByMessage = {},
   callStatus = 'idle',
   callType = 'video',
+  activeConversationCall = null,
   callPeerName,
   callParticipantNames = [],
   isGroupCallActive = false,
@@ -662,8 +684,11 @@ function ChatPanel({
   const isCompactCallState = isTerminalCallState || callStatus === 'incoming';
   const shouldRenderCallOverlay = isCallVisible && callStatus !== 'incoming';
   const isActiveCallState = callStatus === 'outgoing' || callStatus === 'incoming' || callStatus === 'connecting' || callStatus === 'connected';
-  const isAudioCallActive = isActiveCallState && callType === 'audio';
-  const isVideoCallActive = isActiveCallState && callType === 'video';
+  const isIncomingCallStatus = (status: CallUiStatus) => status === 'incoming';
+  const isConversationActiveCall = isGroupConversation && isActiveConversationCall(activeConversationCall);
+  const activeHeaderCallType = activeConversationCall?.type ?? callType;
+  const isAudioCallActive = (isActiveCallState && callType === 'audio') || (isConversationActiveCall && activeHeaderCallType === 'audio');
+  const isVideoCallActive = (isActiveCallState && callType === 'video') || (isConversationActiveCall && activeHeaderCallType === 'video');
   const shouldRenderCallMedia = callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected';
   const callTypeLabel = callType === 'audio' ? 'Gọi thoại' : 'Gọi video';
   const showCameraOffBadge = callType === 'video' && !isCameraEnabled;
@@ -970,14 +995,20 @@ function ChatPanel({
               {participantName}
             </button>
             <div className="chat-header-status">
-              <span className={`online-dot ${isOnline ? '' : 'offline'}`} />
-              {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
+              {isConversationActiveCall ? <span className="online-dot" /> : <span className={`online-dot ${isOnline ? '' : 'offline'}`} />}
+              {isConversationActiveCall ? 'Đang gọi' : (isOnline ? 'Đang hoạt động' : 'Ngoại tuyến')}
             </div>
           </div>
         </div>
 
         {/* Header Action Buttons */}
         <div className="chat-header-actions flex-shrink-0">
+          {isConversationActiveCall && (
+            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Đang gọi
+            </span>
+          )}
           <button
             type="button"
             className={`chat-header-btn ${isAudioCallActive ? 'is-active' : ''}`}
@@ -1108,7 +1139,7 @@ function ChatPanel({
                     </button>
                   )}
 
-                  {callStatus === 'incoming' && (
+                  {isIncomingCallStatus(callStatus) && (
                     <>
                       <button
                         type="button"
@@ -1160,7 +1191,7 @@ function ChatPanel({
                     </>
                   )}
 
-                  {callStatus !== 'incoming' && callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected' && (
+                  {!isIncomingCallStatus(callStatus) && callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected' && (
                     <button
                       type="button"
                       onClick={onEndCall}
@@ -1232,7 +1263,7 @@ function ChatPanel({
                             if (!node) {
                               return;
                             }
-                            const localStream = localVideoRef.current?.srcObject;
+                            const localStream = localVideoRef?.current?.srcObject;
                             if (localStream && node.srcObject !== localStream) {
                               node.srcObject = localStream;
                             }

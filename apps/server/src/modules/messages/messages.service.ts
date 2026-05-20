@@ -1,4 +1,4 @@
-import { MessageModel, MessageType, type IMessage, type IReplyTo } from './message.model';
+import { MessageModel, MessageType, type ICallHistory, type IMessage, type IReplyTo } from './message.model';
 import { MessageStatusModel, type IMessageStatus } from './message-status.model';
 import { checkIdempotencyKey, setIdempotencyKey } from '../../infrastructure/redis';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -83,7 +83,66 @@ export class MessagesService {
     if (type?.startsWith('file/')) return 'Da gui tep dinh kem';
     if (type === 'audio') return 'Da gui am thanh';
     if (type === 'sticker') return 'Da gui sticker';
+    if (type === 'call_history') return content || 'Lich su cuoc goi';
     return '';
+  }
+
+  static getCallHistoryPreview(callHistory: ICallHistory): string {
+    const callTypeLabel = callHistory.callType === 'audio' ? 'Cuoc goi thoai' : 'Cuoc goi video';
+    if (callHistory.status === 'missed') return `${callTypeLabel} bi nho`;
+    if (callHistory.status === 'rejected') return `${callTypeLabel} bi tu choi`;
+    if (callHistory.status === 'cancelled') return `${callTypeLabel} da huy`;
+    return `${callTypeLabel} da ket thuc`;
+  }
+
+  static async createCallHistoryMessage(
+    conversationId: string,
+    callHistory: ICallHistory,
+  ): Promise<IMessage> {
+    const idempotencyKey = `call-history:${callHistory.callSessionId}:${callHistory.status}`;
+    const existing = await MessagesService.repo.findByIdempotencyKey(idempotencyKey);
+    if (existing) {
+      return existing as unknown as IMessage;
+    }
+
+    const content = this.getCallHistoryPreview(callHistory);
+    const message = await MessageModel.create({
+      conversationId,
+      senderId: callHistory.callerId,
+      content,
+      type: 'call_history',
+      callHistory,
+      idempotencyKey,
+      createdAt: callHistory.endedAt ?? new Date(),
+    });
+
+    const members = await ConversationMemberModel.find({ conversationId }).select('userId').lean();
+    await MessageStatusModel.insertMany(
+      members.map((member) => ({
+        messageId: message._id.toString(),
+        idempotencyKey,
+        userId: member.userId,
+        status: member.userId === callHistory.callerId ? 'sent' : 'delivered',
+      })),
+      { ordered: false },
+    ).catch((err) => {
+      logger.warn('[CallHistory] Failed to insert one or more message statuses', err);
+    });
+
+    await ConversationsService.updateLastMessage(conversationId, {
+      content,
+      senderId: callHistory.callerId,
+      sentAt: message.createdAt,
+    });
+    await ConversationsService.clearConversationMemberOverrideOnNewMessage(conversationId);
+
+    for (const member of members) {
+      if (member.userId !== callHistory.callerId) {
+        await ConversationsService.incrementUnreadCount(conversationId, member.userId);
+      }
+    }
+
+    return message.toObject() as unknown as IMessage;
   }
 
   /**

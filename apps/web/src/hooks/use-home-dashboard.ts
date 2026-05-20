@@ -105,7 +105,23 @@ interface Conversation {
   removedFromGroup?: boolean;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   lastMessage?: { senderId: string; senderDisplayName?: string; content: string; sentAt: string };
+  activeCall?: ConversationActiveCall | null;
   unreadCounts?: Record<string, number>;
+}
+
+interface ConversationActiveCall {
+  callSessionId: string;
+  type: 'audio' | 'video';
+  status: string;
+  startedAt?: string | null;
+  initiatedBy: string;
+}
+
+function isActiveConversationCall(call?: ConversationActiveCall | null): call is ConversationActiveCall {
+  return Boolean(
+    call?.callSessionId
+    && (call.status === 'ringing' || call.status === 'connecting' || call.status === 'connected'),
+  );
 }
 
 interface ConversationListItem {
@@ -127,6 +143,7 @@ interface ConversationListItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+  activeCall?: ConversationActiveCall | null;
   haveRead: boolean
 }
 
@@ -173,6 +190,10 @@ function isVisibleChatMessage(message: Message): boolean {
 }
 
 function isCallSummaryMessage(message: Message): boolean {
+  if (message.type === 'call_history') {
+    return false;
+  }
+
   const idempotencyKey = String(message.idempotencyKey || '');
   if (idempotencyKey.startsWith('call-summary:')) {
     return true;
@@ -268,6 +289,7 @@ interface PendingReactionRequest {
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
 type CallMediaType = 'audio' | 'video';
+const ACTIVE_CALL_CONFLICT_MESSAGE = 'Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước.';
 
 interface CallParticipantVideo {
   userId: string;
@@ -1614,7 +1636,27 @@ export function useHomeDashboard() {
       return;
     }
 
-    getSocket(token);
+    const socket = getSocket(token);
+
+    const handleConversationActiveCallUpdated = (payload: {
+      conversationId?: string;
+      activeCall?: ConversationActiveCall | null;
+    }) => {
+      if (!payload.conversationId) {
+        return;
+      }
+
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== payload.conversationId) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          activeCall: isActiveConversationCall(payload.activeCall) ? payload.activeCall : null,
+        };
+      }));
+    };
 
     const handleMessageDeletedForMe = (payload: {
       conversationId: string;
@@ -1719,10 +1761,12 @@ export function useHomeDashboard() {
 
     listenToMessageDeletion(handleMessageDeletedForMe);
     listenToMessageRecall(handleMessageRecalled);
+    socket.on('conversation_active_call_updated', handleConversationActiveCallUpdated);
 
     return () => {
       unlistenToMessageDeletion(handleMessageDeletedForMe);
       unlistenToMessageRecall(handleMessageRecalled);
+      socket.off('conversation_active_call_updated', handleConversationActiveCallUpdated);
     };
   }, [userId]);
 
@@ -1769,6 +1813,7 @@ export function useHomeDashboard() {
       members: conv.users,
       online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
+      activeCall: conv.activeCall ?? null,
       haveRead: unreadCounts.get(userId)? false: true
     }});
   }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
@@ -2221,6 +2266,18 @@ export function useHomeDashboard() {
       const participantDisplayNames = resolveParticipantDisplayNames(participantIds);
 
       const current = activeCallRef.current;
+      if (
+        current
+        && current.sessionId !== payload.sessionId
+        && current.status !== 'ended'
+        && current.status !== 'missed'
+        && current.status !== 'rejected'
+      ) {
+        emitCallReject(payload.sessionId, payload.callToken, 'busy');
+        setCallError(ACTIVE_CALL_CONFLICT_MESSAGE);
+        return;
+      }
+
       if (current?.sessionId === payload.sessionId) {
         setActiveCall((prev) => {
           if (!prev || prev.sessionId !== payload.sessionId) {
@@ -2632,6 +2689,20 @@ export function useHomeDashboard() {
       return;
     }
 
+    const currentCall = activeCallRef.current;
+    const selectedActiveCallId = selectedConversation.activeCall?.callSessionId;
+    if (
+      currentCall
+      && currentCall.sessionId
+      && currentCall.status !== 'ended'
+      && currentCall.status !== 'missed'
+      && currentCall.status !== 'rejected'
+      && currentCall.sessionId !== selectedActiveCallId
+    ) {
+      notifyCallBlockingIssue(ACTIVE_CALL_CONFLICT_MESSAGE);
+      return;
+    }
+
     const insecureContextMessage = getWebRtcInsecureContextMessage();
     if (insecureContextMessage) {
       notifyCallBlockingIssue(insecureContextMessage);
@@ -2731,6 +2802,18 @@ export function useHomeDashboard() {
   const handleAcceptIncomingCall = useCallback(async () => {
     const current = activeCallRef.current;
     if (!current || current.direction !== 'incoming') {
+      return;
+    }
+
+    const currentJoinedCall = activeCallRef.current;
+    if (
+      currentJoinedCall
+      && currentJoinedCall.sessionId !== current.sessionId
+      && currentJoinedCall.status !== 'ended'
+      && currentJoinedCall.status !== 'missed'
+      && currentJoinedCall.status !== 'rejected'
+    ) {
+      notifyCallBlockingIssue(ACTIVE_CALL_CONFLICT_MESSAGE);
       return;
     }
 
@@ -3420,6 +3503,7 @@ export function useHomeDashboard() {
   }, [forwardingMessage]);
 
   const selectedConversationRaw = conversations.find((conversation) => conversation._id === selectedConversationId);
+  const selectedConversationActiveCall = selectedConversationRaw?.activeCall ?? null;
   const isCallConversationSelected = Boolean(
     selectedConversationRaw && (selectedConversationRaw.type === 'direct' || selectedConversationRaw.type === 'group'),
   );
@@ -3596,6 +3680,7 @@ export function useHomeDashboard() {
     callParticipantNames: activeCallParticipantNames,
     callType: activeCall?.callType ?? 'video',
     isGroupCallActive: activeCall?.isGroupCall ?? false,
+    selectedConversationActiveCall,
     callError,
     callFriendError,
     onDismissCallFriendError: () => setCallFriendError(null),

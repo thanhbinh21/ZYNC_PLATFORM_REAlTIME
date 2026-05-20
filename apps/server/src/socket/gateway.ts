@@ -34,6 +34,7 @@ import {
   getFriendIds,
   getBulkPresence,
 } from '../modules/users/presence.service';
+import { resolveActiveCallForConversation } from '../modules/conversations/conversations.service';
 // Sub-controllers (Phase 1 Refactoring)
 import { registerCallController } from './call.controller';
 import { registerChatController, setChatKafkaFailureMode } from './chat.controller';
@@ -238,6 +239,16 @@ export function initSocketGateway(httpServer: HttpServer): Server {
           conversationId,
           penaltyScore: member.penaltyScore ?? 0,
           mutedUntil: member.mutedUntil ?? null,
+        });
+
+        const conversation = await ConversationModel.findById(conversationId).select('activeCall').lean();
+        const activeCall = await resolveActiveCallForConversation(
+          conversationId,
+          conversation?.activeCall as Parameters<typeof resolveActiveCallForConversation>[1],
+        );
+        socket.emit('conversation_active_call_updated', {
+          conversationId,
+          activeCall,
         });
       } catch (err) {
         logger.error('join_conversation error', err);

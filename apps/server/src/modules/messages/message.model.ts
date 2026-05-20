@@ -1,7 +1,7 @@
 import { Schema, model, type Document } from 'mongoose';
 import { type StoryMediaType } from '../stories/story.model';
 
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 export type DeleteType = 'unsend' | 'recall';
 
@@ -29,12 +29,24 @@ export interface IReadByPreviewItem {
   readAt: Date;
 }
 
+export interface ICallHistory {
+  callSessionId: string;
+  callType: 'audio' | 'video';
+  status: 'ended' | 'missed' | 'rejected' | 'cancelled';
+  startedAt?: Date;
+  endedAt?: Date;
+  durationSeconds?: number;
+  callerId: string;
+  participantIds: string[];
+}
+
 export interface IMessage extends Document {
   conversationId: string;
   senderId: string;
   content?: string;
   type: MessageType;
   mediaUrl?: string;
+  callHistory?: ICallHistory;
   storyRef?: IStoryRef;
   replyTo?: IReplyTo;
   idempotencyKey: string;
@@ -95,6 +107,20 @@ const readByPreviewSchema = new Schema<IReadByPreviewItem>(
   { _id: false },
 );
 
+const callHistorySchema = new Schema<ICallHistory>(
+  {
+    callSessionId: { type: String, required: true },
+    callType: { type: String, enum: ['audio', 'video'], required: true },
+    status: { type: String, enum: ['ended', 'missed', 'rejected', 'cancelled'], required: true },
+    startedAt: { type: Date },
+    endedAt: { type: Date },
+    durationSeconds: { type: Number },
+    callerId: { type: String, required: true },
+    participantIds: [{ type: String, required: true }],
+  },
+  { _id: false },
+);
+
 const messageSchema = new Schema<IMessage>(
   {
     conversationId: { type: String, required: true },
@@ -103,12 +129,13 @@ const messageSchema = new Schema<IMessage>(
     type: {
       type: String,
       validate: {
-        validator: (v: string) => /^(text|image|video|audio|sticker|file\/.+)$/.test(v),
-        message: 'Invalid message type. Must be: text, image, video, audio, sticker, or file/<filename>'
+        validator: (v: string) => /^(text|image|video|audio|sticker|system-recall|call_history|file\/.+)$/.test(v),
+        message: 'Invalid message type. Must be: text, image, video, audio, sticker, call_history, system-recall, or file/<filename>'
       },
       default: 'text',
     },
     mediaUrl: { type: String },
+    callHistory: { type: callHistorySchema },
     storyRef: { type: storyRefSchema },
     replyTo: { type: replyToSchema },
     idempotencyKey: { type: String, required: true, unique: true },
