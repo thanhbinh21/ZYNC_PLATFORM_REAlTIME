@@ -185,7 +185,7 @@ function formatConversationPreview(lastMessage?: Conversation['lastMessage']): s
     || normalizedContent.startsWith('cuoc goi bi tu choi')
     || normalizedContent.startsWith('cuoc goi nho')
   ) {
-    return 'KhÃ´ng cÃ³ tin nháº¯n';
+    return 'Không có tin nhắn';
   }
 
   const senderDisplayName = lastMessage.senderDisplayName?.trim();
@@ -714,6 +714,7 @@ export function useHomeDashboard() {
     stopLocalMedia();
     stopRemoteMedia();
   }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+  const resetCallUiRef = useRef(resetCallUi);
 
   const scheduleCallReset = useCallback((delayMs: number = 2500) => {
     if (autoResetCallTimeoutRef.current) {
@@ -732,6 +733,12 @@ export function useHomeDashboard() {
       autoResetCallTimeoutRef.current = null;
     }
   }, []);
+  const clearCallResetTimerRef = useRef(clearCallResetTimer);
+
+  useEffect(() => {
+    resetCallUiRef.current = resetCallUi;
+    clearCallResetTimerRef.current = clearCallResetTimer;
+  }, [clearCallResetTimer, resetCallUi]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -2890,7 +2897,7 @@ export function useHomeDashboard() {
         try {
           emitCallMediaState(current.sessionId, current.callToken, { isScreenSharing: false });
         } catch {
-          setCallError('KhÃ´ng thá»ƒ Ä‘á»“ng bá»™ tráº¡ng thÃ¡i chia sáº» mÃ n hÃ¬nh.');
+          setCallError('Không thể đồng bộ trạng thái chia sẻ màn hình.');
         }
       }
       return;
@@ -2913,7 +2920,7 @@ export function useHomeDashboard() {
         try {
           emitCallMediaState(current.sessionId, current.callToken, { isScreenSharing: true });
         } catch {
-          setCallError('KhÃ´ng thá»ƒ Ä‘á»“ng bá»™ tráº¡ng thÃ¡i chia sáº» mÃ n hÃ¬nh.');
+          setCallError('Không thể đồng bộ trạng thái chia sẻ màn hình.');
         }
       }
       displayTrack.onended = () => {
@@ -2930,7 +2937,7 @@ export function useHomeDashboard() {
           try {
             emitCallMediaState(latestCall.sessionId, latestCall.callToken, { isScreenSharing: false });
           } catch {
-            setCallError('KhÃ´ng thá»ƒ Ä‘á»“ng bá»™ tráº¡ng thÃ¡i chia sáº» mÃ n hÃ¬nh.');
+            setCallError('Không thể đồng bộ trạng thái chia sẻ màn hình.');
           }
         }
       };
@@ -3424,9 +3431,9 @@ export function useHomeDashboard() {
         }
       }
 
-      clearCallResetTimer();
+      clearCallResetTimerRef.current();
       if (!shouldPreserveIncomingCall) {
-        resetCallUi();
+        resetCallUiRef.current();
       }
 
       pendingReactionRequestsRef.current.forEach((pending) => {
@@ -3436,7 +3443,7 @@ export function useHomeDashboard() {
       });
       pendingReactionRequestsRef.current.clear();
     };
-  }, [clearCallResetTimer, resetCallUi]);
+  }, []);
 
   // Refresh notifications
   const refreshNotifications = useCallback(async () => {

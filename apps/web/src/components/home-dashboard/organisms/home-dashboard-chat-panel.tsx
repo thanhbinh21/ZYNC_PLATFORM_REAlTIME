@@ -765,7 +765,7 @@ function ChatPanel({
   const isViewingScreenShare = Boolean(isScreenSharing || remoteScreenShareParticipant);
   const participantVideosForTiles = remoteParticipantVideos.filter((participant) => participant.userId !== remoteScreenShareParticipant?.userId);
   const sharingParticipantName = isScreenSharing
-    ? 'Báº¡n'
+    ? 'Bạn'
     : remoteScreenShareParticipant?.displayName ?? null;
   const joinedParticipantCount = 1 + participantVideosForTiles.length;
   const callMediaLayout = isViewingScreenShare
@@ -984,7 +984,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Gọi điện thoại"
+            title={isGroupConversation ? 'Gọi hoặc tham gia thoại nhóm' : 'Gọi thoại'}
             disabled={!isCallingAvailable}
             onClick={onStartAudioCall}
           >
@@ -993,7 +993,7 @@ function ChatPanel({
           <button
             type="button"
             className="chat-header-btn"
-            title="Gọi video"
+            title={isGroupConversation ? 'Gọi hoặc tham gia video nhóm' : 'Gọi video'}
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
           >
@@ -1073,7 +1073,7 @@ function ChatPanel({
                   {callError && <p className="mt-1 text-xs text-text-primary">{callError}</p>}
                   {sharingParticipantName && callStatus === 'connected' && (
                     <p className="mt-1 text-xs font-semibold text-accent">
-                      Äang chia sáº»: {sharingParticipantName}
+                      Đang chia sẻ: {sharingParticipantName}
                     </p>
                   )}
                 </div>
@@ -1086,7 +1086,7 @@ function ChatPanel({
                       className="inline-flex items-center gap-1.5 rounded-lg bg-bg-hover px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-accent transition"
                     >
                       {isCallMinimized ? <MaximizeIcon className="h-3.5 w-3.5" /> : <MinimizeIcon className="h-3.5 w-3.5" />}
-                      {isCallMinimized ? 'Má»Ÿ rá»™ng' : 'Thu nhá»'}
+                      {isCallMinimized ? 'Mở rộng' : 'Thu nhỏ'}
                     </button>
                   )}
 
