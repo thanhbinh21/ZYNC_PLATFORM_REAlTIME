@@ -27,6 +27,7 @@ const TYPE_ICONS: Record<AppNotification['type'], React.ElementType> = {
   friend_request: Users,
   friend_accepted: UserCheck,
   group_invite: Users,
+  group_update: Users,
   story_reaction: Heart,
   story_reply: MessageCircle,
 };
@@ -129,7 +130,7 @@ export function NotificationsSheet({
             conversationId: n.conversationId,
             name: n.title.replace(/^Tin nhắn mới từ\s+/i, '').replace(/^Nhóm:\s*/i, '') || 'Chat',
             avatarUrl: '',
-            isGroup: n.type === 'group_invite' || n.title.toLowerCase().includes('nhóm') ? 'true' : 'false',
+            isGroup: n.type === 'group_invite' || n.type === 'group_update' || n.title.toLowerCase().includes('nhóm') ? 'true' : 'false',
           },
         });
         return;

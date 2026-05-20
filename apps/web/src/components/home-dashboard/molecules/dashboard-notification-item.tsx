@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import type { ComponentType } from 'react';
 import type { DashboardNotificationItem } from '../home-dashboard.types';
 import { Bell, Bookmark, MessageSquare, UserPlus, Users, Heart, Reply } from 'lucide-react';
 
@@ -9,32 +10,42 @@ interface DashboardNotificationItemProps {
   onClick?: (item: DashboardNotificationItem) => void;
 }
 
+type DashboardNotificationIcon = ComponentType<{ className?: string }>;
+const BellIcon = Bell as unknown as DashboardNotificationIcon;
+const BookmarkIcon = Bookmark as unknown as DashboardNotificationIcon;
+const MessageSquareIcon = MessageSquare as unknown as DashboardNotificationIcon;
+const UserPlusIcon = UserPlus as unknown as DashboardNotificationIcon;
+const UsersIcon = Users as unknown as DashboardNotificationIcon;
+const HeartIcon = Heart as unknown as DashboardNotificationIcon;
+const ReplyIcon = Reply as unknown as DashboardNotificationIcon;
+
 /**
  * Lấy icon dựa trên loại notification
  */
 function getNotificationIcon(type: DashboardNotificationItem['type']) {
   switch (type) {
     case 'new_message':
-      return MessageSquare;
+      return MessageSquareIcon;
     case 'friend_request':
-      return UserPlus;
+      return UserPlusIcon;
     case 'friend_accepted':
-      return UserPlus;
+      return UserPlusIcon;
     case 'group_invite':
-      return Users;
+    case 'group_update':
+      return UsersIcon;
     case 'story_reaction':
-      return Heart;
+      return HeartIcon;
     case 'story_reply':
-      return Reply;
+      return ReplyIcon;
     case 'community_post':
     case 'post_comment':
-      return MessageSquare;
+      return MessageSquareIcon;
     case 'post_like':
-      return Heart;
+      return HeartIcon;
     case 'post_bookmark':
-      return Bookmark;
+      return BookmarkIcon;
     default:
-      return Bell;
+      return BellIcon;
   }
 }
 
@@ -49,6 +60,7 @@ function getNotificationColor(type: DashboardNotificationItem['type']): string {
     case 'friend_accepted':
       return 'bg-[#8b5cf6]';
     case 'group_invite':
+    case 'group_update':
       return 'bg-[#f59e0b]';
     case 'story_reaction':
       return 'bg-[#ec4899]';

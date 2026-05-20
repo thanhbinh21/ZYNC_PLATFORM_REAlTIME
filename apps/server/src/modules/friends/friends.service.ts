@@ -176,6 +176,7 @@ export async function sendFriendRequest(
     throw new ConflictError('Friend request already sent');
   }
 
+  const reversePending = reverse?.status === 'pending' ? reverse : null;
   if (reversePending) {
     await acceptFriendRequest(requesterId, reversePending._id.toString());
     const accepted = await FriendshipModel.findOne({
@@ -189,13 +190,7 @@ export async function sendFriendRequest(
     return accepted;
   }
 
-  const reverseAccepted = await FriendshipModel.findOne({
-    userId: toUserId,
-    friendId: requesterId,
-    status: 'accepted',
-  });
-
-  if (reverseAccepted) {
+  if (reverse?.status === 'accepted') {
     const accepted = await FriendshipModel.findOneAndUpdate(
       { userId: requesterId, friendId: toUserId },
       { status: 'accepted' },

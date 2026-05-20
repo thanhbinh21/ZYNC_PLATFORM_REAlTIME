@@ -1,6 +1,7 @@
 import { MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
+import { callStore } from '@/stores/call-store';
 
 let socket: Socket | null = null;
 let currentToken: string | null = null;
@@ -94,6 +95,7 @@ export function getSocket(token?: string): Socket {
   if (socket && currentToken !== resolvedToken) {
     stopHeartbeat();
     listenerRegistry.clear();
+    callStore.setActiveCall(null);
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
@@ -144,6 +146,7 @@ export function isConnected(): boolean {
 export function disconnectSocket(): void {
   if (socket) {
     stopHeartbeat();
+    callStore.setActiveCall(null);
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
@@ -499,6 +502,12 @@ export interface WebRtcIceCandidatePayload {
   candidate: RTCIceCandidateInit;
 }
 
+export interface CallMediaStatePayload {
+  sessionId: string;
+  userId: string;
+  isScreenSharing: boolean;
+}
+
 export function emitCallInvite(targetUserId: string, conversationId?: string, callType: 'audio' | 'video' = 'video'): void {
   if (!socket?.connected) {
     throw new Error('Socket not connected');
@@ -599,6 +608,22 @@ export function emitWebRtcIceCandidate(
     toUserId,
     callToken,
     candidate,
+  });
+}
+
+export function emitCallMediaState(
+  sessionId: string,
+  callToken: string,
+  state: { isScreenSharing?: boolean },
+): void {
+  if (!socket?.connected) {
+    throw new Error('Socket not connected');
+  }
+
+  socket.emit('call_media_state', {
+    sessionId,
+    callToken,
+    ...state,
   });
 }
 
@@ -727,6 +752,22 @@ export function unlistenToWebRtcIceCandidate(cb?: unknown): void {
   if (!socket) return;
 
   const event = 'webrtc_ice_candidate';
+  if (cb) socket.off(event, cb as any);
+}
+
+export function listenToCallMediaState(callback: (data: CallMediaStatePayload) => void): void {
+  if (!socket) {
+    return;
+  }
+
+  const event = 'call_media_state';
+  socket.on(event, callback);
+}
+
+export function unlistenToCallMediaState(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'call_media_state';
   if (cb) socket.off(event, cb as any);
 }
 

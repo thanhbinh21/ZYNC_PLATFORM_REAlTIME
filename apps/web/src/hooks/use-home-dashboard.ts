@@ -8,6 +8,7 @@ import {
   emitCallEnd,
   emitCallGroupInvite,
   emitCallInvite,
+  emitCallMediaState,
   emitCallReject,
   emitWebRtcAnswer,
   emitWebRtcIceCandidate,
@@ -15,6 +16,7 @@ import {
   emitForwardMessage,
   type CallIncomingPayload,
   type CallInvitedPayload,
+  type CallMediaStatePayload,
   type CallParticipantPayload,
   type CallStatusPayload,
   type WebRtcAnswerPayload,
@@ -22,8 +24,11 @@ import {
   type WebRtcOfferPayload,
   emitReactionRemoveAllMine,
   emitReactionUpsert,
+  getRawSocket,
+  getSocket,
   listenToCallIncoming,
   listenToCallInvited,
+  listenToCallMediaState,
   listenToCallParticipantJoined,
   listenToCallParticipantLeft,
   listenToCallStatus,
@@ -38,6 +43,7 @@ import {
   listenToReactionUpdated,
   unlistenToCallIncoming,
   unlistenToCallInvited,
+  unlistenToCallMediaState,
   unlistenToCallParticipantJoined,
   unlistenToCallParticipantLeft,
   unlistenToCallStatus,
@@ -71,7 +77,6 @@ import {
   unpinConversation,
 } from '@/services/notifications';
 import { fetchNotifications, fetchUnreadCount, type Notification } from '@/services/notifications';
-import { getSocket } from '@/services/socket';
 import { useChat, useMessageHistory, type SendMessageOptions } from '@/hooks/use-messaging';
 import type {
   DashboardHomeMockData,
@@ -155,8 +160,43 @@ function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string
               : 'Tin nhắn media';
 }
 
+function normalizeCallText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function isVisibleChatMessage(message: Message): boolean {
+  return !isCallSummaryMessage(message);
+}
+
+function isCallSummaryMessage(message: Message): boolean {
+  const idempotencyKey = String(message.idempotencyKey || '');
+  if (idempotencyKey.startsWith('call-summary:')) {
+    return true;
+  }
+
+  const content = normalizeCallText(String(message.content || ''));
+  return (
+    content.startsWith('cuoc goi')
+    || content.startsWith('dang trong cuoc goi')
+    || content.startsWith('dang co cuoc goi')
+  );
+}
+
 function formatConversationPreview(lastMessage?: Conversation['lastMessage']): string {
   if (!lastMessage?.content) {
+    return 'Không có tin nhắn';
+  }
+
+  const normalizedContent = normalizeCallText(lastMessage.content);
+  if (
+    normalizedContent.startsWith('cuoc goi')
+    || normalizedContent.startsWith('dang trong cuoc goi')
+    || normalizedContent.startsWith('dang co cuoc goi')
+  ) {
     return 'Không có tin nhắn';
   }
 
@@ -267,12 +307,15 @@ export function useHomeDashboard() {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenSharingUserId, setScreenSharingUserId] = useState<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingReactionRequestsRef = useRef<Map<string, PendingReactionRequest>>(new Map());
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
   const activeCallRef = useRef<CallSessionState | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenShareVideoRef = useRef<HTMLVideoElement>(null);
+  const screenShareStreamRef = useRef<MediaStream | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteParticipantVideos, setRemoteParticipantVideos] = useState<CallParticipantVideo[]>([]);
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
@@ -353,6 +396,16 @@ export function useHomeDashboard() {
     }
   }, []);
 
+  const syncScreenSharePreview = useCallback(() => {
+    if (!screenShareVideoRef.current || !screenShareStreamRef.current) {
+      return;
+    }
+
+    if (screenShareVideoRef.current.srcObject !== screenShareStreamRef.current) {
+      screenShareVideoRef.current.srcObject = screenShareStreamRef.current;
+    }
+  }, []);
+
   const syncRemoteParticipantsPreview = useCallback((nextCall?: CallSessionState | null) => {
     const callContext = nextCall ?? activeCallRef.current;
     const streams = Array.from(remoteStreamsRef.current.entries())
@@ -407,11 +460,24 @@ export function useHomeDashboard() {
       localStreamRef.current = null;
     }
 
+    if (screenShareStreamRef.current) {
+      screenShareStreamRef.current.getTracks().forEach((track) => {
+        track.onended = null;
+        track.stop();
+      });
+      screenShareStreamRef.current = null;
+    }
+
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
 
+    if (screenShareVideoRef.current) {
+      screenShareVideoRef.current.srcObject = null;
+    }
+
     setIsScreenSharing(false);
+    setScreenSharingUserId(null);
   }, []);
 
   const stopRemoteMedia = useCallback(() => {
@@ -608,6 +674,25 @@ export function useHomeDashboard() {
       return;
     }
 
+    const existingStream = localStreamRef.current;
+    const existingAudioTrack = existingStream?.getAudioTracks().find((track) => track.readyState === 'live') ?? null;
+    const existingVideoTrack = existingStream?.getVideoTracks().find((track) => track.readyState === 'live') ?? null;
+
+    if (existingStream && existingAudioTrack && (!cameraEnabled || existingVideoTrack)) {
+      existingAudioTrack.enabled = !isMicMuted;
+      existingStream.getVideoTracks().forEach((track) => {
+        track.enabled = cameraEnabled;
+      });
+
+      if (!screenShareStreamRef.current) {
+        replacePeerVideoTrack(cameraEnabled ? existingVideoTrack : null);
+      }
+
+      setIsCameraEnabled(cameraEnabled);
+      syncLocalPreview();
+      return;
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: cameraEnabled,
@@ -626,9 +711,10 @@ export function useHomeDashboard() {
     }
 
     localStreamRef.current = stream;
-    replacePeerVideoTrack(stream.getVideoTracks()[0] ?? null);
+    if (!screenShareStreamRef.current) {
+      replacePeerVideoTrack(stream.getVideoTracks()[0] ?? null);
+    }
     setIsCameraEnabled(cameraEnabled);
-    setIsScreenSharing(false);
     syncLocalPreview();
   }, [isMicMuted, replacePeerVideoTrack, syncLocalPreview]);
 
@@ -640,6 +726,7 @@ export function useHomeDashboard() {
     stopLocalMedia();
     stopRemoteMedia();
   }, [closePeerConnection, stopLocalMedia, stopRemoteMedia]);
+  const resetCallUiRef = useRef(resetCallUi);
 
   const scheduleCallReset = useCallback((delayMs: number = 2500) => {
     if (autoResetCallTimeoutRef.current) {
@@ -658,10 +745,38 @@ export function useHomeDashboard() {
       autoResetCallTimeoutRef.current = null;
     }
   }, []);
+  const clearCallResetTimerRef = useRef(clearCallResetTimer);
+
+  useEffect(() => {
+    resetCallUiRef.current = resetCallUi;
+    clearCallResetTimerRef.current = clearCallResetTimer;
+  }, [clearCallResetTimer, resetCallUi]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    if (!userId || !activeCall || activeCall.participantIds.includes(userId)) {
+      return;
+    }
+
+    if (activeCall.direction === 'incoming') {
+      setActiveCall((prev) => {
+        if (!prev || prev.sessionId !== activeCall.sessionId || prev.participantIds.includes(userId)) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          participantIds: [...prev.participantIds, userId],
+        };
+      });
+      return;
+    }
+
+    resetCallUi();
+  }, [activeCall, resetCallUi, userId]);
 
   useEffect(() => {
     const callStatus = activeCall?.status;
@@ -689,6 +804,12 @@ export function useHomeDashboard() {
     syncLocalPreview();
     syncRemoteParticipantsPreview(activeCall);
   }, [activeCall, syncLocalPreview, syncRemoteParticipantsPreview]);
+
+  useEffect(() => {
+    if (isScreenSharing) {
+      syncScreenSharePreview();
+    }
+  }, [isScreenSharing, syncScreenSharePreview]);
 
   // Initialize chat hook for real-time messaging
   const {
@@ -898,11 +1019,17 @@ export function useHomeDashboard() {
       const merged = new Map<string, Message>();
 
       prev.forEach((msg) => {
+        if (isCallSummaryMessage(msg)) {
+          return;
+        }
         const key = String(msg.idempotencyKey || msg._id);
         merged.set(key, msg);
       });
 
       messages.forEach((msg) => {
+        if (isCallSummaryMessage(msg)) {
+          return;
+        }
         const key = String(msg.idempotencyKey || msg._id);
         const existing = merged.get(key);
 
@@ -1275,6 +1402,7 @@ export function useHomeDashboard() {
           avatarUrl: notif.data?.avatarUrl,
           conversationId: notif.conversationId,
           fromUserId: notif.fromUserId,
+          action: notif.data?.action,
           postId: notif.data?.postId,
         }));
 
@@ -1435,6 +1563,9 @@ export function useHomeDashboard() {
     if (messages.length === 0) return;
 
     const latestMessage = messages[messages.length - 1];
+    if (isCallSummaryMessage(latestMessage)) {
+      return;
+    }
     setConversations(prev => prev.map(conv => {
       if (conv._id === latestMessage.conversationId) {
         const senderDisplayName = conv.users.find((member) => member._id === latestMessage.senderId)?.displayName;
@@ -1455,6 +1586,9 @@ export function useHomeDashboard() {
   }, [messages]);
 
   const updatePreviewConversation = (message: Message) => {
+    if (isCallSummaryMessage(message)) {
+      return;
+    }
     setConversations(prev => prev.map(conv => {
       if (conv._id === message.conversationId) {
         const senderDisplayName = conv.users.find((member) => member._id === message.senderId)?.displayName;
@@ -2086,6 +2220,31 @@ export function useHomeDashboard() {
         : [userId, payload.fromUserId];
       const participantDisplayNames = resolveParticipantDisplayNames(participantIds);
 
+      const current = activeCallRef.current;
+      if (current?.sessionId === payload.sessionId) {
+        setActiveCall((prev) => {
+          if (!prev || prev.sessionId !== payload.sessionId) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            conversationId: payload.conversationId ?? prev.conversationId ?? peerInfo.conversationId ?? null,
+            isGroupCall,
+            initiatedBy: payload.fromUserId,
+            participantIds,
+            participantDisplayNames: {
+              ...participantDisplayNames,
+              ...prev.participantDisplayNames,
+            },
+            callToken: payload.callToken,
+            callType: payload.callType ?? prev.callType ?? 'video',
+            status: prev.status === 'connected' || prev.status === 'connecting' ? prev.status : 'incoming',
+          };
+        });
+        return;
+      }
+
       clearCallResetTimer();
       closePeerConnection();
       stopRemoteMedia();
@@ -2126,10 +2285,12 @@ export function useHomeDashboard() {
         const nextStatus: CallUiStatus = payload.status === 'ringing'
           ? (prev.direction === 'incoming' ? 'incoming' : 'outgoing')
           : payload.status;
+        const isAwaitingAccept = prev.direction === 'incoming' && !prev.joinedParticipantIds.includes(userId);
+        const shouldKeepIncoming = isAwaitingAccept && (nextStatus === 'connecting' || nextStatus === 'connected');
 
         return {
           ...prev,
-          status: nextStatus,
+          status: shouldKeepIncoming ? 'incoming' : nextStatus,
           reason: payload.reason,
         };
       });
@@ -2159,6 +2320,7 @@ export function useHomeDashboard() {
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
         const latestCall = activeCallRef.current;
         if (latestCall && latestCall.sessionId === payload.sessionId) {
+          setScreenSharingUserId(null);
           setCallError(null);
           scheduleCallReset();
         }
@@ -2168,6 +2330,10 @@ export function useHomeDashboard() {
     const handleCallParticipantJoined = async (payload: CallParticipantPayload) => {
       const current = activeCallRef.current;
       if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      if (current.direction === 'incoming' && !current.joinedParticipantIds.includes(userId) && payload.userId !== userId) {
         return;
       }
 
@@ -2210,12 +2376,31 @@ export function useHomeDashboard() {
       }
 
       try {
-            await ensureLocalMedia(latestCall.callType === 'audio' ? false : isCameraEnabled);
+        try {
+          await ensureLocalMedia(latestCall.callType === 'audio' ? false : isCameraEnabled);
+        } catch (error: unknown) {
+          if (latestCall.callType === 'video') {
+            await ensureLocalMedia(false);
+            setCallError('Không truy cập được camera, tiếp tục cuộc gọi với audio.');
+          } else {
+            throw error;
+          }
+        }
+        let hasOfferFailure = false;
         for (const peerUserId of peersToOffer) {
-          await createOfferForPeer(latestCall, peerUserId);
+          try {
+            await createOfferForPeer(latestCall, peerUserId);
+          } catch (error) {
+            hasOfferFailure = true;
+            console.warn('[Call] Failed to create WebRTC offer', { sessionId: payload.sessionId, peerUserId, error });
+          }
+        }
+
+        if (hasOfferFailure) {
+          setCallError('Một vài thành viên chưa kết nối được WebRTC. Cuộc gọi vẫn đang tiếp tục.');
         }
       } catch {
-        setCallError('Không thể tạo kết nối WebRTC cho cuộc gọi.');
+        setCallError('Không thể chuẩn bị camera hoặc microphone cho cuộc gọi.');
       }
     };
 
@@ -2228,6 +2413,7 @@ export function useHomeDashboard() {
       if (payload.userId !== userId) {
         closePeerConnection(payload.userId);
       }
+      setScreenSharingUserId((prev) => (prev === payload.userId ? null : prev));
 
       setActiveCall((prev) => {
         if (!prev || prev.sessionId !== payload.sessionId) {
@@ -2236,7 +2422,7 @@ export function useHomeDashboard() {
 
         const nextJoined = prev.joinedParticipantIds.filter((participantId) => participantId !== payload.userId);
         const remainingPeers = nextJoined.filter((participantId) => participantId !== userId);
-        const shouldEnd = remainingPeers.length === 0;
+        const shouldEnd = !prev.isGroupCall && remainingPeers.length === 0;
 
         if (!shouldEnd) {
           return {
@@ -2263,10 +2449,24 @@ export function useHomeDashboard() {
         const remainingPeers = latestCall.joinedParticipantIds
           .filter((participantId) => participantId !== payload.userId)
           .filter((participantId) => participantId !== userId);
-        if (remainingPeers.length === 0) {
+        if (!latestCall.isGroupCall && remainingPeers.length === 0) {
           scheduleCallReset();
         }
       }
+    };
+
+    const handleCallMediaState = (payload: CallMediaStatePayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      setScreenSharingUserId((prev) => {
+        if (payload.isScreenSharing) {
+          return payload.userId;
+        }
+        return prev === payload.userId ? null : prev;
+      });
     };
 
     const handleWebRtcOffer = async (payload: WebRtcOfferPayload) => {
@@ -2375,6 +2575,11 @@ export function useHomeDashboard() {
       }
 
       setCallError(payload.message);
+      const current = activeCallRef.current;
+      if (current && (!current.sessionId || !current.callToken)) {
+        resetCallUi();
+        setCallError(payload.message);
+      }
     };
 
     listenToCallInvited(handleCallInvited);
@@ -2382,6 +2587,7 @@ export function useHomeDashboard() {
     listenToCallStatus(handleCallStatus);
     listenToCallParticipantJoined(handleCallParticipantJoined);
     listenToCallParticipantLeft(handleCallParticipantLeft);
+    listenToCallMediaState(handleCallMediaState);
     listenToWebRtcOffer(handleWebRtcOffer);
     listenToWebRtcAnswer(handleWebRtcAnswer);
     listenToWebRtcIceCandidate(handleWebRtcIceCandidate);
@@ -2393,6 +2599,7 @@ export function useHomeDashboard() {
       unlistenToCallStatus(handleCallStatus as (...args: unknown[]) => void);
       unlistenToCallParticipantJoined(handleCallParticipantJoined as (...args: unknown[]) => void);
       unlistenToCallParticipantLeft(handleCallParticipantLeft as (...args: unknown[]) => void);
+      unlistenToCallMediaState(handleCallMediaState as (...args: unknown[]) => void);
       unlistenToWebRtcOffer(handleWebRtcOffer as (...args: unknown[]) => void);
       unlistenToWebRtcAnswer(handleWebRtcAnswer as (...args: unknown[]) => void);
       unlistenToWebRtcIceCandidate(handleWebRtcIceCandidate as (...args: unknown[]) => void);
@@ -2408,6 +2615,7 @@ export function useHomeDashboard() {
     isCameraEnabled,
     resolveParticipantDisplayNames,
     resolvePeerInfo,
+    resetCallUi,
     scheduleCallReset,
     shouldCreateOfferForPeer,
     stopRemoteMedia,
@@ -2534,10 +2742,11 @@ export function useHomeDashboard() {
 
     clearCallResetTimer();
     setCallError(null);
+    setIsCameraEnabled(current.callType === 'video');
 
     try {
       try {
-        await ensureLocalMedia(current.callType === 'audio' ? false : isCameraEnabled);
+        await ensureLocalMedia(current.callType === 'audio' ? false : true);
       } catch {
         await ensureLocalMedia(false);
         setCallError('Không truy cập được camera, tiếp tục cuộc gọi với audio.');
@@ -2619,7 +2828,11 @@ export function useHomeDashboard() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!activeCall || activeCall.direction !== 'incoming' || activeCall.status !== 'incoming') {
+    if (!activeCall || activeCall.direction !== 'incoming') {
+      return;
+    }
+
+    if (activeCall.status !== 'incoming' && activeCall.status !== 'ringing') {
       return;
     }
 
@@ -2698,7 +2911,26 @@ export function useHomeDashboard() {
     }
 
     if (isScreenSharing) {
-      await ensureLocalMedia(isCameraEnabled);
+      const current = activeCallRef.current;
+      const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
+      screenShareStreamRef.current?.getTracks().forEach((track) => {
+        track.onended = null;
+        track.stop();
+      });
+      screenShareStreamRef.current = null;
+      if (screenShareVideoRef.current) {
+        screenShareVideoRef.current.srcObject = null;
+      }
+      replacePeerVideoTrack(cameraTrack);
+      setIsScreenSharing(false);
+      setScreenSharingUserId(null);
+      if (current?.sessionId && current.callToken) {
+        try {
+          emitCallMediaState(current.sessionId, current.callToken, { isScreenSharing: false });
+        } catch {
+          setCallError('Không thể đồng bộ trạng thái chia sẻ màn hình.');
+        }
+      }
       return;
     }
 
@@ -2709,19 +2941,36 @@ export function useHomeDashboard() {
         return;
       }
 
-      const audioTracks = localStreamRef.current?.getAudioTracks() ?? [];
-      localStreamRef.current?.getVideoTracks().forEach((track) => track.stop());
-
-      const mergedStream = new MediaStream([...audioTracks, displayTrack]);
-      localStreamRef.current = mergedStream;
+      screenShareStreamRef.current = displayStream;
       replacePeerVideoTrack(displayTrack);
       setIsScreenSharing(true);
-      syncLocalPreview();
-
+      setScreenSharingUserId(userId);
+      syncScreenSharePreview();
+      const current = activeCallRef.current;
+      if (current?.sessionId && current.callToken) {
+        try {
+          emitCallMediaState(current.sessionId, current.callToken, { isScreenSharing: true });
+        } catch {
+          setCallError('Không thể đồng bộ trạng thái chia sẻ màn hình.');
+        }
+      }
       displayTrack.onended = () => {
-        void ensureLocalMedia(isCameraEnabled).catch((error: unknown) => {
-          setCallError(resolveCallMediaErrorMessage(error, 'Không thể quay lại camera sau khi dừng chia sẻ màn hình.'));
-        });
+        const latestCall = activeCallRef.current;
+        const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
+        screenShareStreamRef.current = null;
+        if (screenShareVideoRef.current) {
+          screenShareVideoRef.current.srcObject = null;
+        }
+        replacePeerVideoTrack(cameraTrack);
+        setIsScreenSharing(false);
+        setScreenSharingUserId(null);
+        if (latestCall?.sessionId && latestCall.callToken) {
+          try {
+            emitCallMediaState(latestCall.sessionId, latestCall.callToken, { isScreenSharing: false });
+          } catch {
+            setCallError('Không thể đồng bộ trạng thái chia sẻ màn hình.');
+          }
+        }
       };
     } catch (error: unknown) {
       const message = resolveCallMediaErrorMessage(error, 'Không thể bật chia sẻ màn hình.');
@@ -2731,7 +2980,7 @@ export function useHomeDashboard() {
         setCallError(message);
       }
     }
-  }, [ensureLocalMedia, isCameraEnabled, isScreenSharing, notifyCallBlockingIssue, replacePeerVideoTrack, syncLocalPreview]);
+  }, [isScreenSharing, notifyCallBlockingIssue, replacePeerVideoTrack, syncScreenSharePreview, userId]);
 
   const disbandGroupConversation = useCallback(
     async (groupId: string) => {
@@ -3176,8 +3425,11 @@ export function useHomeDashboard() {
   );
   const activeCallParticipantNames = activeCall
     ? activeCall.participantIds
-      .filter((participantId) => participantId !== userId)
-      .map((participantId) => activeCall.participantDisplayNames[participantId] ?? resolvePeerInfo(participantId).displayName)
+      .filter((participantId) => activeCall.isGroupCall || participantId !== userId)
+      .map((participantId) => {
+        const name = activeCall.participantDisplayNames[participantId] ?? resolvePeerInfo(participantId).displayName;
+        return participantId === userId ? `${name} (Bạn)` : name;
+      })
     : [];
   const callPeerName = activeCall?.isGroupCall
     ? (selectedConversationRaw?.name ?? 'Nhóm gọi')
@@ -3190,22 +3442,30 @@ export function useHomeDashboard() {
         clearTimeout(typingTimeoutRef.current);
       }
 
-      if (activeCallRef.current && !['ended', 'missed', 'rejected'].includes(activeCallRef.current.status)) {
-        const token = getAccessToken();
-        if (token) {
-          try {
-            const socket = getSocket(token);
-            socket.emit('call_end', {
-              sessionId: activeCallRef.current.sessionId,
-              callToken: activeCallRef.current.callToken,
-              reason: 'ended'
-            });
-          } catch {}
+      const currentCall = activeCallRef.current;
+      const shouldPreserveIncomingCall = currentCall?.direction === 'incoming';
+
+      if (
+        currentCall
+        && currentCall.direction !== 'incoming'
+        && currentCall.sessionId
+        && currentCall.callToken
+        && !['ended', 'missed', 'rejected'].includes(currentCall.status)
+      ) {
+        const socket = getRawSocket();
+        if (socket?.connected) {
+          socket.emit('call_end', {
+            sessionId: currentCall.sessionId,
+            callToken: currentCall.callToken,
+            reason: 'ended'
+          });
         }
       }
 
-      clearCallResetTimer();
-      resetCallUi();
+      clearCallResetTimerRef.current();
+      if (!shouldPreserveIncomingCall) {
+        resetCallUiRef.current();
+      }
 
       pendingReactionRequestsRef.current.forEach((pending) => {
         if (pending.ackTimeout) {
@@ -3214,7 +3474,7 @@ export function useHomeDashboard() {
       });
       pendingReactionRequestsRef.current.clear();
     };
-  }, [clearCallResetTimer, resetCallUi]);
+  }, []);
 
   // Refresh notifications
   const refreshNotifications = useCallback(async () => {
@@ -3233,6 +3493,7 @@ export function useHomeDashboard() {
         avatarUrl: notif.data?.avatarUrl,
         conversationId: notif.conversationId,
         fromUserId: notif.fromUserId,
+        action: notif.data?.action,
         postId: notif.data?.postId,
       }));
 
@@ -3294,7 +3555,7 @@ export function useHomeDashboard() {
     onSelectConversation: setSelectedConversationId,
     searchTargets: searchTargets(),
     onSelectSearchTarget: openConversationFromSearch,
-    messages: messageHistory.messages,
+    messages: messageHistory.messages.filter(isVisibleChatMessage),
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
     messagesHasMore: messageHistory.hasMore,
@@ -3333,6 +3594,7 @@ export function useHomeDashboard() {
     ) as CallUiStatus,
     callPeerName,
     callParticipantNames: activeCallParticipantNames,
+    callType: activeCall?.callType ?? 'video',
     isGroupCallActive: activeCall?.isGroupCall ?? false,
     callError,
     callFriendError,
@@ -3340,7 +3602,9 @@ export function useHomeDashboard() {
     isMicMuted,
     isCameraEnabled,
     isScreenSharing,
+    screenSharingUserId,
     localVideoRef,
+    screenShareVideoRef,
     remoteVideoRef,
     remoteParticipantVideos,
     isCallingAvailable: isCallConversationSelected,

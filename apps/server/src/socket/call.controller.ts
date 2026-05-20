@@ -53,6 +53,12 @@ interface WebRtcSignalPayload {
   candidate?: unknown;
 }
 
+interface CallMediaStatePayload {
+  sessionId: string;
+  callToken: string;
+  isScreenSharing?: boolean;
+}
+
 const callTimeoutRegistry = new Map<string, NodeJS.Timeout>();
 
 function registerCallTimeout(sessionId: string, task: () => Promise<void>, timeoutMs?: number): void {
@@ -110,6 +116,8 @@ async function emitCallSummaryMessage(
     endedAt?: string;
   },
 ): Promise<void> {
+  if (process.env['CALL_SUMMARY_MESSAGES_ENABLED'] !== 'true') return;
+
   if (!params.conversationId) return;
 
   let content = 'Cuoc goi da ket thuc';
@@ -256,6 +264,24 @@ function parseWebRtcSignalPayload(payload: unknown): WebRtcSignalPayload {
   return { sessionId, toUserId, callToken, sdp: data['sdp'], candidate: data['candidate'] };
 }
 
+function parseCallMediaStatePayload(payload: unknown): CallMediaStatePayload {
+  if (typeof payload !== 'object' || payload === null) throw new BadRequestError('Invalid call_media_state payload');
+  const data = payload as Record<string, unknown>;
+  const sessionId = data['sessionId'];
+  const callToken = data['callToken'];
+  const isScreenSharing = data['isScreenSharing'];
+  if (typeof sessionId !== 'string' || sessionId.length === 0) throw new BadRequestError('sessionId is required');
+  if (typeof callToken !== 'string' || callToken.length === 0) throw new BadRequestError('callToken is required');
+  if (isScreenSharing !== undefined && typeof isScreenSharing !== 'boolean') {
+    throw new BadRequestError('isScreenSharing must be boolean');
+  }
+  return { sessionId, callToken, isScreenSharing };
+}
+
+function isInactiveCallSignalError(error: unknown): boolean {
+  return error instanceof BadRequestError && error.message === 'Call session is no longer active';
+}
+
 // ─── Event Handlers ──────────────────────────────────────────────────────────
 
 async function handleCallInvite(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
@@ -272,43 +298,52 @@ async function handleCallInvite(io: Server, socket: AuthSocket, payload: unknown
   ]);
   const meta = await loadCallNotificationMeta(userId, session.conversationId);
 
-  registerCallTimeout(session.sessionId, async () => {
-    const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
-    if (!timeoutSession) return;
-    await emitCallSummaryMessage(io, {
-      sessionId: timeoutSession.sessionId,
-      status: 'missed',
-      conversationId: timeoutSession.conversationId ?? undefined,
-      senderId: timeoutSession.initiatedBy,
-      endedReason: timeoutSession.endedReason ?? undefined,
-      startedAt: timeoutSession.startedAt ?? undefined,
-      endedAt: timeoutSession.endedAt ?? undefined,
+  if (!session.reused) {
+    registerCallTimeout(session.sessionId, async () => {
+      const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
+      if (!timeoutSession) return;
+      await emitCallSummaryMessage(io, {
+        sessionId: timeoutSession.sessionId,
+        status: 'missed',
+        conversationId: timeoutSession.conversationId ?? undefined,
+        senderId: timeoutSession.initiatedBy,
+        endedReason: timeoutSession.endedReason ?? undefined,
+        startedAt: timeoutSession.startedAt ?? undefined,
+        endedAt: timeoutSession.endedAt ?? undefined,
+      });
+      emitCallStatus(io, timeoutSession.participantIds, { sessionId: timeoutSession.sessionId, status: 'missed', reason: timeoutSession.endedReason });
     });
-    emitCallStatus(io, timeoutSession.participantIds, { sessionId: timeoutSession.sessionId, status: 'missed', reason: timeoutSession.endedReason });
-  });
+  }
 
   socket.emit('call_invited', {
     sessionId: session.sessionId,
     conversationId: session.conversationId,
     targetUserId: input.targetUserId,
+    isGroupCall: false,
+    participantIds: session.participantIds,
     callType: session.callType,
     timeoutAt: session.timeoutAt,
     callToken: callerToken.token,
     callTokenExpiresInSeconds: callerToken.expiresInSeconds,
   });
 
-  io.to(`user:${input.targetUserId}`).emit('call_incoming', {
-    sessionId: session.sessionId,
-    conversationId: session.conversationId,
-    fromUserId: userId,
-    callerName: meta.callerName,
-    callerAvatarUrl: meta.callerAvatarUrl,
-    conversationName: meta.conversationName,
-    callType: session.callType,
-    timeoutAt: session.timeoutAt,
-    callToken: calleeToken.token,
-    callTokenExpiresInSeconds: calleeToken.expiresInSeconds,
-  });
+  const targetParticipant = session.participants.find((participant) => participant.userId === input.targetUserId);
+  if (!session.reused || targetParticipant?.status !== 'joined') {
+    io.to(`user:${input.targetUserId}`).emit('call_incoming', {
+      sessionId: session.sessionId,
+      conversationId: session.conversationId,
+      fromUserId: userId,
+      callerName: meta.callerName,
+      callerAvatarUrl: meta.callerAvatarUrl,
+      conversationName: meta.conversationName,
+      isGroupCall: false,
+      participantIds: session.participantIds,
+      callType: session.callType,
+      timeoutAt: session.timeoutAt,
+      callToken: calleeToken.token,
+      callTokenExpiresInSeconds: calleeToken.expiresInSeconds,
+    });
+  }
 
   emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: 'ringing' });
 }
@@ -326,20 +361,22 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
   );
   const tokensByUserId = new Map(tokenEntries);
 
-  registerCallTimeout(session.sessionId, async () => {
-    const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
-    if (!timeoutSession) return;
-    await emitCallSummaryMessage(io, {
-      sessionId: timeoutSession.sessionId,
-      status: 'missed',
-      conversationId: timeoutSession.conversationId ?? undefined,
-      senderId: timeoutSession.initiatedBy,
-      endedReason: timeoutSession.endedReason ?? undefined,
-      startedAt: timeoutSession.startedAt ?? undefined,
-      endedAt: timeoutSession.endedAt ?? undefined,
+  if (!session.reused) {
+    registerCallTimeout(session.sessionId, async () => {
+      const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
+      if (!timeoutSession) return;
+      await emitCallSummaryMessage(io, {
+        sessionId: timeoutSession.sessionId,
+        status: 'missed',
+        conversationId: timeoutSession.conversationId ?? undefined,
+        senderId: timeoutSession.initiatedBy,
+        endedReason: timeoutSession.endedReason ?? undefined,
+        startedAt: timeoutSession.startedAt ?? undefined,
+        endedAt: timeoutSession.endedAt ?? undefined,
+      });
+      emitCallStatus(io, timeoutSession.participantIds, { sessionId: timeoutSession.sessionId, status: 'missed', reason: timeoutSession.endedReason });
     });
-    emitCallStatus(io, timeoutSession.participantIds, { sessionId: timeoutSession.sessionId, status: 'missed', reason: timeoutSession.endedReason });
-  });
+  }
 
   const callerToken = tokensByUserId.get(userId);
   if (!callerToken) throw new BadRequestError('Caller token missing for group call');
@@ -358,6 +395,8 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
 
   for (const participantId of session.participantIds) {
     if (participantId === userId) continue;
+    const participant = session.participants.find((item) => item.userId === participantId);
+    if (session.reused && participant?.status === 'joined') continue;
     const participantToken = tokensByUserId.get(participantId);
     if (!participantToken) continue;
     io.to(`user:${participantId}`).emit('call_incoming', {
@@ -376,7 +415,16 @@ async function handleCallGroupInvite(io: Server, socket: AuthSocket, payload: un
     });
   }
 
-  emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: 'ringing' });
+  const joinedParticipantIds = await CallsService.listJoinedParticipantIds(session.sessionId);
+  for (const participantId of session.participantIds) {
+    io.to(`user:${participantId}`).emit('call_participant_joined', {
+      sessionId: session.sessionId,
+      userId,
+      joinedParticipantIds,
+    });
+  }
+
+  emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: session.status });
 }
 
 async function handleCallAccept(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
@@ -427,7 +475,7 @@ async function handleCallEnd(io: Server, socket: AuthSocket, payload: unknown): 
   const session = await CallsService.endCallSession(input.sessionId, userId, input.reason);
 
   const isSessionActive = session.status === 'ringing' || session.status === 'connecting' || session.status === 'connected';
-  const isGroupPartialLeave = session.mode === 'sfu' && isSessionActive && session.initiatedBy !== userId;
+  const isGroupPartialLeave = session.mode === 'sfu' && isSessionActive;
 
   if (!isGroupPartialLeave && session.status !== 'ringing') clearCallTimeout(session.sessionId);
 
@@ -456,7 +504,7 @@ async function handleWebRtcOffer(io: Server, socket: AuthSocket, payload: unknow
   const { userId } = socket;
   const input = parseWebRtcSignalPayload(payload);
   if (!input.sdp) throw new BadRequestError('sdp is required for webrtc_offer');
-  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   const sessionStatus = await CallsService.assertSignalRoute(input.sessionId, userId, input.toUserId);
   if (sessionStatus === 'connected') recordReconnectOfferAttempt();
   io.to(`user:${input.toUserId}`).emit('webrtc_offer', { sessionId: input.sessionId, fromUserId: userId, sdp: input.sdp });
@@ -466,7 +514,7 @@ async function handleWebRtcAnswer(io: Server, socket: AuthSocket, payload: unkno
   const { userId } = socket;
   const input = parseWebRtcSignalPayload(payload);
   if (!input.sdp) throw new BadRequestError('sdp is required for webrtc_answer');
-  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   await CallsService.assertSignalRoute(input.sessionId, userId, input.toUserId);
   const session = await CallsService.markSessionConnected(input.sessionId, userId);
   clearCallTimeout(session.sessionId);
@@ -478,9 +526,28 @@ async function handleWebRtcIceCandidate(io: Server, socket: AuthSocket, payload:
   const { userId } = socket;
   const input = parseWebRtcSignalPayload(payload);
   if (!input.candidate) throw new BadRequestError('candidate is required for webrtc_ice_candidate');
-  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   await CallsService.assertSignalRoute(input.sessionId, userId, input.toUserId);
   io.to(`user:${input.toUserId}`).emit('webrtc_ice_candidate', { sessionId: input.sessionId, fromUserId: userId, candidate: input.candidate });
+}
+
+async function handleCallMediaState(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
+  const { userId } = socket;
+  const input = parseCallMediaStatePayload(payload);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
+  const participantIds = await CallsService.listParticipantIds(input.sessionId);
+  if (!participantIds.includes(userId)) {
+    throw new BadRequestError('You are not a participant of this call session');
+  }
+
+  for (const participantId of participantIds) {
+    if (participantId === userId) continue;
+    io.to(`user:${participantId}`).emit('call_media_state', {
+      sessionId: input.sessionId,
+      userId,
+      isScreenSharing: input.isScreenSharing === true,
+    });
+  }
 }
 
 /**
@@ -536,6 +603,10 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
     try {
       await handleWebRtcOffer(io, socket, payload);
     } catch (err) {
+      if (isInactiveCallSignalError(err)) {
+        logger.debug('Ignoring WebRTC offer for inactive call session');
+        return;
+      }
       logger.error('webrtc_offer error', err);
       socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay offer' });
     }
@@ -545,6 +616,10 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
     try {
       await handleWebRtcAnswer(io, socket, payload);
     } catch (err) {
+      if (isInactiveCallSignalError(err)) {
+        logger.debug('Ignoring WebRTC answer for inactive call session');
+        return;
+      }
       logger.error('webrtc_answer error', err);
       socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay answer' });
     }
@@ -554,8 +629,25 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
     try {
       await handleWebRtcIceCandidate(io, socket, payload);
     } catch (err) {
+      if (isInactiveCallSignalError(err)) {
+        logger.debug('Ignoring ICE candidate for inactive call session');
+        return;
+      }
       logger.error('webrtc_ice_candidate error', err);
       socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay ICE candidate' });
+    }
+  });
+
+  socket.on('call_media_state', async (payload: unknown) => {
+    try {
+      await handleCallMediaState(io, socket, payload);
+    } catch (err) {
+      if (isInactiveCallSignalError(err)) {
+        logger.debug('Ignoring media-state update for inactive call session');
+        return;
+      }
+      logger.error('call_media_state error', err);
+      socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay call media state' });
     }
   });
 }

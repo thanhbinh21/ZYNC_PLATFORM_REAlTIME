@@ -55,6 +55,7 @@ interface CallSessionDetail {
   endedAt: string | null;
   endedReason: string | null;
   createdAt: string;
+  reused?: boolean;
 }
 
 interface CallTokenPayload {
@@ -112,9 +113,9 @@ function getCallTokenSecret(): string {
 
 function getCallTokenTtlSeconds(): number {
   const raw = process.env['CALL_EPHEMERAL_TOKEN_TTL_SECONDS'];
-  const parsed = Number.parseInt(raw ?? '120', 10);
-  if (Number.isNaN(parsed) || parsed < 30) {
-    return 120;
+  const parsed = Number.parseInt(raw ?? '21600', 10);
+  if (Number.isNaN(parsed) || parsed < 60) {
+    return 21_600;
   }
   return parsed;
 }
@@ -195,12 +196,25 @@ async function appendCallEvent(
   });
 }
 
-async function countActiveParticipants(sessionId: string): Promise<number> {
-  return CallParticipantModel.countDocuments({
-    sessionId,
-    status: { $in: ['joined', 'invited'] },
-  });
+async function countActiveParticipants(sessionId: string): Promise<{ active: number; joined: number }> {
+  const [active, joined] = await Promise.all([
+    CallParticipantModel.countDocuments({
+      sessionId,
+      status: { $in: ['joined', 'invited'] },
+    }),
+    CallParticipantModel.countDocuments({
+      sessionId,
+      status: 'joined',
+    }),
+  ]);
+
+  return { active, joined };
 }
+
+function shouldEndGroupSession(counts: { active: number; joined: number }): boolean {
+  return counts.joined <= 0 || counts.active <= 1;
+}
+
 
 export class CallsService {
   private static async cleanupExpiredRingingSessionsForPair(
@@ -394,7 +408,19 @@ export class CallsService {
     }
 
     if (activeSession) {
-      throw new ConflictError('A call between these users is already active');
+      await CallParticipantModel.updateOne(
+        { sessionId: activeSession._id.toString(), userId: callerUserId },
+        {
+          $set: {
+            status: 'joined',
+            joinedAt: new Date(),
+            leftAt: null,
+          },
+        },
+      );
+
+      const detail = await buildCallSessionDetail(activeSession._id.toString());
+      return { ...detail, reused: true };
     }
 
     const timeoutAt = new Date(Date.now() + getCallRingTimeoutMs());
@@ -492,7 +518,18 @@ export class CallsService {
     }
 
     if (activeSession) {
-      throw new ConflictError('A group call is already active in this conversation');
+      await CallParticipantModel.updateOne(
+        { sessionId: activeSession._id.toString(), userId: callerUserId },
+        {
+          $set: {
+            status: 'joined',
+            joinedAt: new Date(),
+            leftAt: null,
+          },
+        },
+      );
+      const detail = await buildCallSessionDetail(activeSession._id.toString());
+      return { ...detail, reused: true };
     }
 
     const timeoutAt = new Date(Date.now() + getCallRingTimeoutMs());
@@ -605,7 +642,7 @@ export class CallsService {
 
     if (session.mode === 'sfu') {
       const remainingActive = await countActiveParticipants(sessionId);
-      if (remainingActive <= 0) {
+      if (shouldEndGroupSession(remainingActive)) {
         session.status = 'rejected';
         session.endedAt = new Date();
         session.endedReason = reason;
@@ -668,7 +705,7 @@ export class CallsService {
       return buildCallSessionDetail(sessionId);
     }
 
-    if (session.mode === 'sfu' && session.initiatedBy !== userId) {
+    if (session.mode === 'sfu') {
       await CallParticipantModel.updateOne(
         {
           sessionId,
@@ -685,7 +722,7 @@ export class CallsService {
       await appendCallEvent(sessionId, 'call_left', userId, { reason: reason ?? 'left' });
 
       const remainingActive = await countActiveParticipants(sessionId);
-      if (remainingActive <= 0) {
+      if (shouldEndGroupSession(remainingActive)) {
         session.status = 'ended';
         session.endedAt = new Date();
         session.endedReason = reason ?? 'ended';

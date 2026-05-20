@@ -10,6 +10,7 @@ import { MessageModel } from '../modules/messages/message.model';
 import { MessageStatusModel } from '../modules/messages/message-status.model';
 import { produceMessage, KAFKA_TOPICS } from '../infrastructure/kafka';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
+import { ConversationModel } from '../modules/conversations/conversation.model';
 import { UserModel } from '../modules/users/user.model';
 import { stickerService } from '../modules/stickers/sticker.service';
 import { setKafkaInsertFailureCallback } from '../workers/message.worker';
@@ -559,28 +560,30 @@ async function handleCallInvite(
     CallsService.issueSessionTokenForUser(session.sessionId, input.targetUserId),
   ]);
 
-  registerCallTimeout(session.sessionId, async () => {
-    const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
-    if (!timeoutSession) {
-      return;
-    }
+  if (!session.reused) {
+    registerCallTimeout(session.sessionId, async () => {
+      const timeoutSession = await CallsService.markMissedIfNoAnswer(session.sessionId);
+      if (!timeoutSession) {
+        return;
+      }
 
-    await emitCallSummaryMessage(io, {
-      sessionId: timeoutSession.sessionId,
-      status: 'missed',
-      conversationId: timeoutSession.conversationId ?? undefined,
-      senderId: timeoutSession.initiatedBy,
-      endedReason: timeoutSession.endedReason ?? undefined,
-      startedAt: timeoutSession.startedAt ?? undefined,
-      endedAt: timeoutSession.endedAt ?? undefined,
-    });
+      await emitCallSummaryMessage(io, {
+        sessionId: timeoutSession.sessionId,
+        status: 'missed',
+        conversationId: timeoutSession.conversationId ?? undefined,
+        senderId: timeoutSession.initiatedBy,
+        endedReason: timeoutSession.endedReason ?? undefined,
+        startedAt: timeoutSession.startedAt ?? undefined,
+        endedAt: timeoutSession.endedAt ?? undefined,
+      });
 
-    emitCallStatus(io, timeoutSession.participantIds, {
-      sessionId: timeoutSession.sessionId,
-      status: 'missed',
-      reason: timeoutSession.endedReason,
+      emitCallStatus(io, timeoutSession.participantIds, {
+        sessionId: timeoutSession.sessionId,
+        status: 'missed',
+        reason: timeoutSession.endedReason,
+      });
     });
-  });
+  }
 
   socket.emit('call_invited', {
     sessionId: session.sessionId,
@@ -668,31 +671,42 @@ async function handleCallGroupInvite(
     callTokenExpiresInSeconds: callerToken.expiresInSeconds,
   });
 
-  for (const participantId of session.participantIds) {
-    if (participantId === userId) {
-      continue;
-    }
-    const participantToken = tokensByUserId.get(participantId);
-    if (!participantToken) {
-      continue;
-    }
+  if (!session.reused) {
+    for (const participantId of session.participantIds) {
+      if (participantId === userId) {
+        continue;
+      }
+      const participantToken = tokensByUserId.get(participantId);
+      if (!participantToken) {
+        continue;
+      }
 
-    io.to(`user:${participantId}`).emit('call_incoming', {
+      io.to(`user:${participantId}`).emit('call_incoming', {
+        sessionId: session.sessionId,
+        conversationId: session.conversationId,
+        fromUserId: userId,
+        isGroupCall: true,
+        participantIds: session.participantIds,
+        callType: session.callType,
+        timeoutAt: session.timeoutAt,
+        callToken: participantToken.token,
+        callTokenExpiresInSeconds: participantToken.expiresInSeconds,
+      });
+    }
+  }
+
+  const joinedParticipantIds = await CallsService.listJoinedParticipantIds(session.sessionId);
+  for (const participantId of session.participantIds) {
+    io.to(`user:${participantId}`).emit('call_participant_joined', {
       sessionId: session.sessionId,
-      conversationId: session.conversationId,
-      fromUserId: userId,
-      isGroupCall: true,
-      participantIds: session.participantIds,
-      callType: session.callType,
-      timeoutAt: session.timeoutAt,
-      callToken: participantToken.token,
-      callTokenExpiresInSeconds: participantToken.expiresInSeconds,
+      userId,
+      joinedParticipantIds,
     });
   }
 
   emitCallStatus(io, session.participantIds, {
     sessionId: session.sessionId,
-    status: 'ringing',
+    status: session.status,
   });
 }
 
@@ -783,7 +797,7 @@ async function handleCallEnd(
   const session = await CallsService.endCallSession(input.sessionId, userId, input.reason);
 
   const isSessionActive = session.status === 'ringing' || session.status === 'connecting' || session.status === 'connected';
-  const isGroupPartialLeave = session.mode === 'sfu' && isSessionActive && session.initiatedBy !== userId;
+  const isGroupPartialLeave = session.mode === 'sfu' && isSessionActive;
 
   if (!isGroupPartialLeave && session.status !== 'ringing') {
     clearCallTimeout(session.sessionId);
@@ -1313,6 +1327,10 @@ async function handleSendMessage(
 
         const sender = await UserModel.findById(userId).select('displayName').lean();
         const senderName = (sender?.displayName as string) ?? 'Someone';
+        const conversation = await ConversationModel.findById(conversationId as string).select('name type').lean();
+        const conversationName = typeof conversation?.name === 'string' && conversation.name.trim().length > 0
+          ? conversation.name.trim()
+          : senderName;
         const rawText = typeof content === 'string' ? content.trim() : '';
         const preview = rawText.length > 0
           ? rawText.slice(0, 100)
@@ -1328,7 +1346,7 @@ async function handleSendMessage(
             body: preview,
             conversationId: conversationId as string,
             fromUserId: userId,
-            data: { conversationId: conversationId as string, action: 'open_chat' },
+            data: { conversationId: conversationId as string, conversationName, action: 'open_chat' },
           });
         }
       } catch (notifErr) {

@@ -5,6 +5,7 @@ export type NotificationType =
   | 'friend_request'
   | 'friend_accepted'
   | 'group_invite'
+  | 'group_update'
   | 'story_reaction'
   | 'story_reply'
   | 'post_like'
@@ -34,6 +35,7 @@ const notificationSchema = new Schema<INotification>(
         'friend_request',
         'friend_accepted',
         'group_invite',
+        'group_update',
         'story_reaction',
         'story_reply',
         'post_like',

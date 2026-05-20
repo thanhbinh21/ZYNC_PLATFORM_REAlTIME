@@ -1,45 +1,13 @@
 'use client';
 
-import type { JSX } from 'react';
-import { Toaster as HotToaster, toast as hotToast } from 'react-hot-toast';
+import { showSystemToast } from '@/components/notifications/InAppNotificationToasts';
 
-const SafeHotToaster = HotToaster as unknown as (props: Record<string, unknown>) => JSX.Element;
-
-export const Toaster = () => {
-  return (
-    <SafeHotToaster
-      position="top-right"
-      toastOptions={{
-        duration: 3000,
-        style: {
-          background: 'var(--bg-card)',
-          color: 'var(--text-primary)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-md)',
-          boxShadow: 'var(--shadow-lg)',
-          fontSize: '0.95rem',
-        },
-        success: {
-          iconTheme: {
-            primary: 'var(--accent)',
-            secondary: 'var(--bg-primary)',
-          },
-        },
-        error: {
-          iconTheme: {
-            primary: '#ef4444',
-            secondary: 'var(--bg-primary)',
-          },
-        },
-      }}
-    />
-  );
-};
+export const Toaster = () => null;
 
 export const toast = {
-  success: (message: string) => hotToast.success(message),
-  error: (message: string) => hotToast.error(message),
-  info: (message: string) => hotToast(message, { icon: 'ℹ️' }),
-  warning: (message: string) => hotToast(message, { icon: '⚠️' }),
-  dismiss: (toastId?: string) => hotToast.dismiss(toastId),
+  success: (message: string) => showSystemToast({ id: 'system-success', title: 'Thành công', body: message, variant: 'success' }),
+  error: (message: string) => showSystemToast({ id: 'system-error', title: 'Không thể thực hiện', body: message, variant: 'error' }),
+  info: (message: string) => showSystemToast({ id: 'system-info', title: 'Thông báo', body: message, variant: 'info' }),
+  warning: (message: string) => showSystemToast({ id: 'system-warning', title: 'Lưu ý', body: message, variant: 'warning' }),
+  dismiss: () => undefined,
 };

@@ -112,7 +112,7 @@ export function LoginScreen({
         />
       </div>
 
-      {/* Floating toast */}
+      {/* System toast bridge */}
       <LoginSubmitToast
         message={toastMessage ?? null}
         variant={toastVariant ?? 'info'}

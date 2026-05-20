@@ -57,7 +57,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             conversationId: n.conversationId,
             name: n.title.replace(/^Tin nhắn mới từ\s+/i, '').replace(/^Nhóm:\s*/i, '') || 'Chat',
             avatarUrl: '',
-            isGroup: n.type === 'group_invite' || n.title.toLowerCase().includes('nhóm') ? 'true' : 'false',
+            isGroup: n.type === 'group_invite' || n.type === 'group_update' || n.title.toLowerCase().includes('nhóm') ? 'true' : 'false',
           },
         });
         return;
@@ -114,7 +114,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               ? '🤝'
               : notification.type === 'friend_accepted'
                 ? '🎉'
-                : notification.type === 'group_invite'
+                : notification.type === 'group_invite' || notification.type === 'group_update'
                   ? '👥'
                   : notification.type === 'story_reaction'
                     ? '❤️'

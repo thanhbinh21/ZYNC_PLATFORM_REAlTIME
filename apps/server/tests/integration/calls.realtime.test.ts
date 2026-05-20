@@ -106,6 +106,18 @@ function issueAccessToken(userId: string): string {
   );
 }
 
+function issueExpiredCallToken(sessionId: string, userId: string): string {
+  return jwt.sign(
+    {
+      sid: sessionId,
+      typ: 'call_ephemeral',
+      exp: Math.floor(Date.now() / 1000) - 10,
+    },
+    process.env['CALL_EPHEMERAL_TOKEN_SECRET'] as string,
+    { subject: userId },
+  );
+}
+
 function waitForEvent<T>(socket: ClientSocket, eventName: string, timeoutMs: number = 4000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -384,6 +396,20 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
 
       const endedStatus = await endedStatusPromise;
       expect(endedStatus['reason']).toBe('ended');
+
+      callerSocket.emit('webrtc_ice_candidate', {
+        sessionId: invited['sessionId'],
+        toUserId: calleeId,
+        candidate: { candidate: 'late-candidate', sdpMid: '0', sdpMLineIndex: 0 },
+        callToken: invited['callToken'],
+      });
+
+      await expectNoMatchingEvent<Record<string, any>>(
+        callerSocket,
+        'error',
+        (payload) => String(payload['message'] ?? '').includes('Call session is no longer active'),
+        300,
+      );
     } finally {
       disconnectSockets(callerSocket, calleeSocket);
     }
@@ -422,6 +448,54 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
 
       const rejected = await rejectedPromise;
       expect(rejected['reason']).toBe('busy');
+    } finally {
+      disconnectSockets(callerSocket, calleeSocket);
+    }
+  });
+
+  it('reinvite while ringing reuses the 1-1 session and notifies callee again', async () => {
+    const { calleeId, callerToken, calleeToken } = await seedCallUsers();
+    const callerSocket = await connectClient(callerToken);
+    const calleeSocket = await connectClient(calleeToken);
+
+    try {
+      callerSocket.emit('call_invite', { targetUserId: calleeId });
+
+      const firstInvited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => typeof payload['sessionId'] === 'string',
+      );
+      await waitForEventMatching<Record<string, any>>(
+        calleeSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === firstInvited['sessionId'],
+      );
+
+      const noActiveConflict = expectNoMatchingEvent<Record<string, any>>(
+        callerSocket,
+        'error',
+        (payload) => String(payload['message'] ?? '').includes('already active'),
+        800,
+      );
+
+      callerSocket.emit('call_invite', { targetUserId: calleeId });
+
+      const reinvited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['sessionId'] === firstInvited['sessionId'] && Boolean(payload['callToken']),
+      );
+      const reincoming = await waitForEventMatching<Record<string, any>>(
+        calleeSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === firstInvited['sessionId'] && Boolean(payload['callToken']),
+      );
+
+      expect(reinvited['participantIds']).toContain(calleeId);
+      expect(reincoming['participantIds']).toContain(calleeId);
+      expect(await CallSessionModel.countDocuments({ status: { $in: ['ringing', 'connecting', 'connected'] } })).toBe(1);
+      await noActiveConflict;
     } finally {
       disconnectSockets(callerSocket, calleeSocket);
     }
@@ -545,6 +619,76 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
 
       const errorPayload = await errorPromise;
       expect(errorPayload['message']).toContain('callToken is required');
+    } finally {
+      disconnectSockets(callerSocket, calleeSocket);
+    }
+  });
+
+  it('connected signaling accepts an expired but valid call token', async () => {
+    const { callerId, calleeId, callerToken, calleeToken } = await seedCallUsers();
+    const callerSocket = await connectClient(callerToken);
+    const calleeSocket = await connectClient(calleeToken);
+
+    try {
+      callerSocket.emit('call_invite', { targetUserId: calleeId });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => typeof payload['sessionId'] === 'string',
+      );
+      const incoming = await waitForEventMatching<Record<string, any>>(
+        calleeSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      calleeSocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incoming['callToken'],
+      });
+
+      callerSocket.emit('webrtc_offer', {
+        sessionId: invited['sessionId'],
+        toUserId: calleeId,
+        sdp: { type: 'offer', sdp: 'offer-before-expired-token' },
+        callToken: invited['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        calleeSocket,
+        'webrtc_offer',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['fromUserId'] === callerId,
+      );
+
+      calleeSocket.emit('webrtc_answer', {
+        sessionId: invited['sessionId'],
+        toUserId: callerId,
+        sdp: { type: 'answer', sdp: 'answer-before-expired-token' },
+        callToken: incoming['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_status',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['status'] === 'connected',
+      );
+
+      const expiredCallerCallToken = issueExpiredCallToken(invited['sessionId'], callerId);
+      callerSocket.emit('webrtc_ice_candidate', {
+        sessionId: invited['sessionId'],
+        toUserId: calleeId,
+        candidate: { candidate: 'candidate-with-expired-token', sdpMid: '0', sdpMLineIndex: 0 },
+        callToken: expiredCallerCallToken,
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        calleeSocket,
+        'webrtc_ice_candidate',
+        (payload) => payload['sessionId'] === invited['sessionId']
+          && payload['fromUserId'] === callerId
+          && payload['candidate']?.['candidate'] === 'candidate-with-expired-token',
+      );
     } finally {
       disconnectSockets(callerSocket, calleeSocket);
     }
@@ -854,6 +998,199 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
     }
   });
 
+  it('group call: rejected or left participant can rejoin the active room with a new group invite', async () => {
+    const caller = await UserModel.create({ email: 'group-rejoin-after-left-caller@test.com', displayName: 'Group Rejoin After Left Caller' });
+    const participantA = await UserModel.create({ email: 'group-rejoin-after-left-a@test.com', displayName: 'Group Rejoin After Left A' });
+    const participantB = await UserModel.create({ email: 'group-rejoin-after-left-b@test.com', displayName: 'Group Rejoin After Left B' });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Nhom test rejoin after reject',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      { conversationId: conversation._id.toString(), userId: caller._id.toString(), role: 'admin' },
+      { conversationId: conversation._id.toString(), userId: participantA._id.toString(), role: 'member' },
+      { conversationId: conversation._id.toString(), userId: participantB._id.toString(), role: 'member' },
+    ]);
+
+    const callerSocket = await connectClient(issueAccessToken(caller._id.toString()));
+    const participantASocket = await connectClient(issueAccessToken(participantA._id.toString()));
+    const participantBSocket = await connectClient(issueAccessToken(participantB._id.toString()));
+
+    try {
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true,
+      );
+      const incomingA = await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+      const incomingB = await waitForEventMatching<Record<string, any>>(
+        participantBSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      participantASocket.emit('call_reject', {
+        sessionId: invited['sessionId'],
+        reason: 'rejected',
+        callToken: incomingA['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_left',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+
+      participantBSocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incomingB['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantB._id.toString(),
+      );
+
+      participantASocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_invited',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['isGroupCall'] === true,
+      );
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId']
+          && payload['userId'] === participantA._id.toString()
+          && Array.isArray(payload['joinedParticipantIds'])
+          && payload['joinedParticipantIds'].includes(participantA._id.toString()),
+      );
+
+      participantASocket.emit('call_end', {
+        sessionId: invited['sessionId'],
+        callToken: incomingA['callToken'],
+        reason: 'left',
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_left',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+
+      participantASocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_invited',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['isGroupCall'] === true,
+      );
+
+      const participantARecord = await CallParticipantModel.findOne({
+        sessionId: invited['sessionId'],
+        userId: participantA._id.toString(),
+      }).lean();
+      expect(participantARecord?.status).toBe('joined');
+
+      const session = await CallSessionModel.findById(invited['sessionId']).lean();
+      expect(['connecting', 'connected']).toContain(session?.status);
+    } finally {
+      disconnectSockets(callerSocket, participantASocket, participantBSocket);
+    }
+  }, 15000);
+
+  it('group call: ends when all invited peers reject and allows a new invite', async () => {
+    const caller = await UserModel.create({ email: 'group-retry-caller@test.com', displayName: 'Group Retry Caller' });
+    const participantA = await UserModel.create({ email: 'group-retry-a@test.com', displayName: 'Group Retry A' });
+    const participantB = await UserModel.create({ email: 'group-retry-b@test.com', displayName: 'Group Retry B' });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Nhom test retry',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      { conversationId: conversation._id.toString(), userId: caller._id.toString(), role: 'admin' },
+      { conversationId: conversation._id.toString(), userId: participantA._id.toString(), role: 'member' },
+      { conversationId: conversation._id.toString(), userId: participantB._id.toString(), role: 'member' },
+    ]);
+
+    const callerSocket = await connectClient(issueAccessToken(caller._id.toString()));
+    const participantASocket = await connectClient(issueAccessToken(participantA._id.toString()));
+    const participantBSocket = await connectClient(issueAccessToken(participantB._id.toString()));
+
+    try {
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true,
+      );
+      const incomingA = await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+      const incomingB = await waitForEventMatching<Record<string, any>>(
+        participantBSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      participantASocket.emit('call_reject', {
+        sessionId: invited['sessionId'],
+        reason: 'rejected',
+        callToken: incomingA['callToken'],
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_left',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+
+      participantBSocket.emit('call_reject', {
+        sessionId: invited['sessionId'],
+        reason: 'busy',
+        callToken: incomingB['callToken'],
+      });
+
+      let endedSession = await CallSessionModel.findById(invited['sessionId']).lean();
+      for (let attempt = 0; attempt < 20 && endedSession?.status !== 'rejected'; attempt += 1) {
+        await new Promise((resolve) => { setTimeout(resolve, 100); });
+        endedSession = await CallSessionModel.findById(invited['sessionId']).lean();
+      }
+      expect(endedSession?.status).toBe('rejected');
+      expect(endedSession?.endedReason).toBe('busy');
+
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+      const secondInvited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true && payload['sessionId'] !== invited['sessionId'],
+      );
+      expect(secondInvited['sessionId']).toBeTruthy();
+    } finally {
+      disconnectSockets(callerSocket, participantASocket, participantBSocket);
+    }
+  }, 15000);
+
   it('group call: non-host end call only leaves self and does not end room', async () => {
     const caller = await UserModel.create({ email: 'group3-caller@test.com', displayName: 'Group3 Caller' });
     const participantA = await UserModel.create({ email: 'group3-a@test.com', displayName: 'Group3 A' });
@@ -933,4 +1270,165 @@ describe('Calls realtime integration (Phase 7.5 Milestone A)', () => {
       disconnectSockets(callerSocket, participantASocket, participantBSocket);
     }
   });
+
+  it('group call: host can leave while two other participants keep the room active', async () => {
+    const caller = await UserModel.create({ email: 'group-host-leave-caller@test.com', displayName: 'Group Host Leave Caller' });
+    const participantA = await UserModel.create({ email: 'group-host-leave-a@test.com', displayName: 'Group Host Leave A' });
+    const participantB = await UserModel.create({ email: 'group-host-leave-b@test.com', displayName: 'Group Host Leave B' });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Nhom host leave',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      { conversationId: conversation._id.toString(), userId: caller._id.toString(), role: 'admin' },
+      { conversationId: conversation._id.toString(), userId: participantA._id.toString(), role: 'member' },
+      { conversationId: conversation._id.toString(), userId: participantB._id.toString(), role: 'member' },
+    ]);
+
+    const callerSocket = await connectClient(issueAccessToken(caller._id.toString()));
+    const participantASocket = await connectClient(issueAccessToken(participantA._id.toString()));
+    const participantBSocket = await connectClient(issueAccessToken(participantB._id.toString()));
+
+    try {
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true,
+      );
+      const incomingA = await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+      const incomingB = await waitForEventMatching<Record<string, any>>(
+        participantBSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      const participantAJoinedPromise = waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+      const participantBJoinedPromise = waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantB._id.toString(),
+      );
+
+      participantASocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incomingA['callToken'],
+      });
+      participantBSocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incomingB['callToken'],
+      });
+
+      await participantAJoinedPromise;
+      await participantBJoinedPromise;
+
+      callerSocket.emit('call_end', {
+        sessionId: invited['sessionId'],
+        callToken: invited['callToken'],
+        reason: 'left',
+      });
+
+      await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_participant_left',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === caller._id.toString(),
+      );
+
+      await expectNoMatchingEvent<Record<string, any>>(
+        participantASocket,
+        'call_status',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['status'] === 'ended',
+        300,
+      );
+
+      const refreshedSession = await CallSessionModel.findById(invited['sessionId']).lean();
+      expect(refreshedSession?.status === 'ringing' || refreshedSession?.status === 'connecting').toBe(true);
+    } finally {
+      disconnectSockets(callerSocket, participantASocket, participantBSocket);
+    }
+  }, 15000);
+
+  it('group call: reinvite joins existing active room without notifying joined peers again', async () => {
+    const caller = await UserModel.create({ email: 'group-rejoin-caller@test.com', displayName: 'Group Rejoin Caller' });
+    const participantA = await UserModel.create({ email: 'group-rejoin-a@test.com', displayName: 'Group Rejoin A' });
+    const participantB = await UserModel.create({ email: 'group-rejoin-b@test.com', displayName: 'Group Rejoin B' });
+
+    const conversation = await ConversationModel.create({
+      type: 'group',
+      name: 'Nhom rejoin',
+      createdBy: caller._id.toString(),
+      adminIds: [caller._id.toString()],
+    });
+
+    await ConversationMemberModel.insertMany([
+      { conversationId: conversation._id.toString(), userId: caller._id.toString(), role: 'admin' },
+      { conversationId: conversation._id.toString(), userId: participantA._id.toString(), role: 'member' },
+      { conversationId: conversation._id.toString(), userId: participantB._id.toString(), role: 'member' },
+    ]);
+
+    const callerSocket = await connectClient(issueAccessToken(caller._id.toString()));
+    const participantASocket = await connectClient(issueAccessToken(participantA._id.toString()));
+    const participantBSocket = await connectClient(issueAccessToken(participantB._id.toString()));
+
+    try {
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+
+      const invited = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true,
+      );
+      const incomingA = await waitForEventMatching<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+      await waitForEventMatching<Record<string, any>>(
+        participantBSocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+      );
+
+      const participantAJoinedPromise = waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_participant_joined',
+        (payload) => payload['sessionId'] === invited['sessionId'] && payload['userId'] === participantA._id.toString(),
+      );
+      participantASocket.emit('call_accept', {
+        sessionId: invited['sessionId'],
+        callToken: incomingA['callToken'],
+      });
+      await participantAJoinedPromise;
+
+      callerSocket.emit('call_group_invite', { conversationId: conversation._id.toString() });
+      const rejoin = await waitForEventMatching<Record<string, any>>(
+        callerSocket,
+        'call_invited',
+        (payload) => payload['isGroupCall'] === true && payload['sessionId'] === invited['sessionId'],
+      );
+      expect(rejoin['callToken']).toBeTruthy();
+
+      await expectNoMatchingEvent<Record<string, any>>(
+        participantASocket,
+        'call_incoming',
+        (payload) => payload['sessionId'] === invited['sessionId'],
+        300,
+      );
+    } finally {
+      disconnectSockets(callerSocket, participantASocket, participantBSocket);
+    }
+  }, 15000);
 });

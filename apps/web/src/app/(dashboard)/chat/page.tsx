@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
-import { useMessagePreview } from '@/hooks/use-message-preview';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
-import { MessagePreviewPopup } from '@/components/home-dashboard/organisms/MessagePreviewPopup';
 import { PageLoading } from '@/components/shared/page-loading';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
+import { setActiveConversationId } from '@/services/active-conversation';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -69,7 +68,9 @@ export default function ChatPage() {
     isMicMuted,
     isCameraEnabled,
     isScreenSharing,
+    screenSharingUserId,
     localVideoRef,
+    screenShareVideoRef,
     remoteVideoRef,
     remoteParticipantVideos,
     isCallingAvailable,
@@ -86,10 +87,10 @@ export default function ChatPage() {
     userMutedUntil,
   } = useHomeDashboard();
 
-  const { previews, dismissPreview, pauseDismiss, resumeDismiss, quickReply } = useMessagePreview({
-    selectedConversationId,
-    conversations,
-  });
+  useEffect(() => {
+    setActiveConversationId(selectedConversationId || null);
+    return () => setActiveConversationId(null);
+  }, [selectedConversationId]);
 
   // Deep link: /chat?conversationId=... (alias: ?conversation= for legacy links)
   useEffect(() => {
@@ -170,7 +171,9 @@ export default function ChatPage() {
           isMicMuted: isMicMuted,
           isCameraEnabled: isCameraEnabled,
           isScreenSharing: isScreenSharing,
+          screenSharingUserId: screenSharingUserId,
           localVideoRef: localVideoRef,
+          screenShareVideoRef: screenShareVideoRef,
           remoteVideoRef: remoteVideoRef,
           remoteParticipantVideos: remoteParticipantVideos,
           isCallingAvailable: isCallingAvailable,
@@ -190,16 +193,6 @@ export default function ChatPage() {
           forwardLoading,
           onCloseForwardModal,
           onExecuteForward
-        }}
-      />
-      <MessagePreviewPopup
-        previews={previews}
-        onDismiss={dismissPreview}
-        onPauseDismiss={pauseDismiss}
-        onResumeDismiss={resumeDismiss}
-        onQuickReply={quickReply}
-        onNavigate={(conversationId) => {
-          onSelectConversation(conversationId);
         }}
       />
     </ZyncPageTransition>

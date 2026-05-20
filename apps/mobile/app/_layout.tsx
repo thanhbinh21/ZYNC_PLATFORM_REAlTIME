@@ -88,7 +88,7 @@ export default function RootLayout() {
       if (conversationId) {
         router.push({
           pathname: '/chat-room',
-          params: { conversationId, name: 'Chat', isGroup: type === 'group_invite' ? 'true' : 'false' },
+          params: { conversationId, name: 'Chat', isGroup: type === 'group_invite' || type === 'group_update' ? 'true' : 'false' },
         });
         return;
       }
