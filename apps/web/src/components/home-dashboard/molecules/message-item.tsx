@@ -53,15 +53,6 @@ function EmptyLikeIcon({ className }: { className: string }) {
   );
 }
 
-function FlagIcon({ className }: { className: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-      <line x1="4" y1="22" x2="4" y2="15" />
-    </svg>
-  );
-}
-
 const QUICK_REACTIONS = ['👍', '❤️', '🤣', '😳', '😭', '😡'];
 const DEFAULT_MENU_REACTIONS = ['❤️', '👍', '😆', '😢', '😡'];
 const PICKER_HIDE_DELAY_MS = 700;
@@ -75,7 +66,6 @@ interface MenuHandle {
   handleRecallClick: () => void;
   handleForwardClick: () => void;
   handleReplyClick: () => void;
-  handleReportClick: () => void;
 }
 
 interface MenuContextType {
@@ -157,7 +147,6 @@ interface MessageItemProps {
   onReactionUpsert?: (message: Message, emoji: string, delta: 1 | 2 | 3, actionSource: string) => void;
   onReactionRemoveAllMine?: (message: Message) => void;
   onFetchReactionDetails?: (message: Message) => Promise<ReactionDetailsResponse>;
-  onReport?: (messageId: string) => void;
   onReact?: (messageId: string, reactionType: string) => void;
   showSenderInfo?: boolean;
   showDateSeparator?: boolean;
@@ -551,6 +540,38 @@ function initialsFromNotice(content: string): string {
 }
 
 // ─── Main Component ───
+function formatCallHistoryDuration(durationSeconds?: number): string {
+  if (!durationSeconds || durationSeconds <= 0) {
+    return '0 giây';
+  }
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = Math.floor(durationSeconds % 60);
+  if (minutes <= 0) return `${seconds} giây`;
+  if (seconds <= 0) return `${minutes} phút`;
+  return `${minutes} phút ${seconds} giây`;
+}
+
+function getCallHistoryLabel(message: Message): { title: string; detail: string } {
+  const history = message.callHistory;
+  const callTypeLabel = history?.callType === 'audio' ? 'Cuộc gọi thoại' : 'Cuộc gọi video';
+  const duration = formatCallHistoryDuration(history?.durationSeconds);
+
+  if (history?.status === 'missed') {
+    return { title: `${callTypeLabel} bị nhỡ`, detail: 'Không có người tham gia' };
+  }
+
+  if (history?.status === 'rejected') {
+    return { title: `${callTypeLabel} bị từ chối`, detail: 'Lời mời gọi đã bị từ chối' };
+  }
+
+  if (history?.status === 'cancelled') {
+    return { title: `${callTypeLabel} đã hủy`, detail: `Thời lượng ${duration}` };
+  }
+
+  return { title: `${callTypeLabel} đã kết thúc`, detail: `Thời lượng ${duration}` };
+}
+
 export function MessageItem({
   message,
   isSender,
@@ -567,7 +588,6 @@ export function MessageItem({
   onReactionUpsert,
   onReactionRemoveAllMine,
   onFetchReactionDetails,
-  onReport,
   onReact,
   showSenderInfo = true,
   showDateSeparator = false,
@@ -594,6 +614,7 @@ export function MessageItem({
 
   const status = (messageStatus?.[message._id] || message.status) as MessageStatus | undefined;
   const isLifecycleNotice = isGroupLifecycleNotice(message);
+  const isCallHistory = message.type === 'call_history' && Boolean(message.callHistory);
   const lastSelectedEmoji = reactionUserState?.lastEmoji ?? null;
 
   const summary = message.reactionSummary;
@@ -700,11 +721,6 @@ export function MessageItem({
     scheduleCloseReactionPicker();
   }, [scheduleCloseReactionPicker]);
 
-  const handleReportClick = useCallback(() => {
-    onReport?.(message.idempotencyKey || message._id);
-    closeMenu();
-  }, [closeMenu, message.idempotencyKey, message._id, onReport]);
-
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -720,7 +736,6 @@ export function MessageItem({
           handleRecallClick,
           handleForwardClick,
           handleReplyClick,
-          handleReportClick,
         });
       }
     }
@@ -731,7 +746,6 @@ export function MessageItem({
     handleReactionClick,
     handleRecallClick,
     handleReplyClick,
-    handleReportClick,
     isRecalled,
     isSender,
     menuReactions,
@@ -745,6 +759,34 @@ export function MessageItem({
     }
     openStatusDetailsModal(message);
   }, [canOpenReadStats, message, openStatusDetailsModal]);
+
+  if (isCallHistory) {
+    const timeStr = new Date(message.createdAt).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const { title, detail } = getCallHistoryLabel(message);
+
+    return (
+      <div className="my-3 flex flex-col items-center gap-1.5">
+        {showDateSeparator && dateSeparatorText && (
+          <div className="chat-date-separator">
+            <span>{dateSeparatorText}</span>
+          </div>
+        )}
+        <div className="inline-flex max-w-[90%] items-center gap-3 rounded-2xl border border-border bg-bg-card px-4 py-2.5 text-sm text-text-primary shadow-sm">
+          <span className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-accent-light text-accent">
+            {message.callHistory?.callType === 'audio' ? '☎' : '▣'}
+          </span>
+          <span className="min-w-0 text-left">
+            <span className="block truncate font-semibold">{title}</span>
+            <span className="block text-xs text-text-secondary">{detail}</span>
+          </span>
+          <span className="text-xs text-text-tertiary">{timeStr}</span>
+        </div>
+      </div>
+    );
+  }
 
   // Lifecycle notice messages
   if (isLifecycleNotice) {
@@ -830,7 +872,6 @@ export function MessageItem({
                     handleRecallClick,
                     handleForwardClick,
                     handleReplyClick,
-                    handleReportClick,
                   });
                 }}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-light bg-transparent text-text-secondary transition-colors hover:bg-bg-hover hover:text-text-primary"
@@ -850,7 +891,6 @@ export function MessageItem({
           mediaUrl={message.mediaUrl}
           replyTo={message.replyTo}
           onJumpToMessage={onJumpToMessage}
-          moderationWarning={Boolean((message as any).moderationWarning)}
           status={status}
           readByPreview={message.readByPreview}
           readByCount={message.readBy?.length}
@@ -1143,10 +1183,10 @@ export function Menu({
     const containerRect = containerRef.current.getBoundingClientRect();
     const anchorRect = anchorElementForMenu.getBoundingClientRect();
 
-    const estimatedWidth = handleForMenu.isSender ? 170 : 220;
+    const estimatedWidth = handleForMenu.isSender ? 170 : 170;
     const estimatedHeight = handleForMenu.isSender
       ? (handleForMenu.canRecall ? 220 : 182)
-      : 140;
+      : 64;
     const horizontalPadding = 8;
     const verticalGap = 8;
 
@@ -1183,7 +1223,7 @@ export function Menu({
 
       const containerRect = containerRef.current.getBoundingClientRect();
       const anchorRect = anchorElementForMenu.getBoundingClientRect();
-      const estimatedWidth = handleForMenu.isSender ? 170 : 220;
+      const estimatedWidth = handleForMenu.isSender ? 170 : 170;
       const horizontalPadding = 8;
 
       let left = handleForMenu.isSender
@@ -1238,7 +1278,6 @@ export function Menu({
     handleRecallClick,
     handleForwardClick,
     handleReplyClick,
-    handleReportClick,
   } = handleForMenu;
 
   return (
@@ -1249,7 +1288,7 @@ export function Menu({
       } ${
         isSender ? 'text-right' : 'text-left'
         }`}
-      style={{ top: `${coords.top}px`, left: `${coords.left}px`, minWidth: isSender ? '160px' : '220px' }}
+      style={{ top: `${coords.top}px`, left: `${coords.left}px`, minWidth: '160px' }}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-1 border-b border-border-light px-3 py-2">
@@ -1299,13 +1338,6 @@ export function Menu({
         </>
       ) : (
         <>
-          <button
-            onClick={handleReportClick}
-            className="message-menu-button-report flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
-          >
-            <FlagIcon className="h-4 w-4 flex-shrink-0" />
-            <span>Báo cáo vi phạm</span>
-          </button>
           <button
             onClick={handleReplyClick}
             className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"

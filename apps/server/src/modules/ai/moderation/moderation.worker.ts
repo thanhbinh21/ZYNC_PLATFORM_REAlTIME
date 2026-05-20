@@ -9,7 +9,8 @@
  */
 
 import type { Consumer, EachMessagePayload } from 'kafkajs';
-import { KAFKA_TOPICS, createConsumer, produceMessage } from '../../../infrastructure/kafka';
+import { createConsumer, produceMessage } from '../../../infrastructure/kafka';
+const RAW_MESSAGES_TOPIC = 'raw-messages';
 import { moderateMessage } from './moderation.service';
 import { getIO } from '../../../socket/gateway';
 import { MessagesService } from '../../messages/messages.service';
@@ -36,10 +37,10 @@ export async function startModerationWorker(): Promise<void> {
     logger.info(`[ModerationWorker] Connected (groupId: ${MODERATION_WORKER_GROUP_ID})`);
 
     await moderationConsumer.subscribe({
-      topic: KAFKA_TOPICS.RAW_MESSAGES,
+      topic: RAW_MESSAGES_TOPIC,
       fromBeginning: false,
     });
-    logger.info(`[ModerationWorker] Subscribed to topic: ${KAFKA_TOPICS.RAW_MESSAGES}`);
+    logger.info(`[ModerationWorker] Subscribed to topic: ${RAW_MESSAGES_TOPIC}`);
 
     await moderationConsumer.run({
       eachMessage: async (payload: EachMessagePayload) => {
@@ -98,7 +99,7 @@ export async function startModerationWorker(): Promise<void> {
             }
 
             // 3) Publish moderation action for downstream consumers
-            await produceMessage(KAFKA_TOPICS.MODERATION_ACTIONS, messageReference, {
+            await produceMessage('moderation-actions', messageReference, {
               messageId: messageReference,
               conversationId: raw.conversationId,
               senderId: raw.senderId,
@@ -133,7 +134,7 @@ export async function startModerationWorker(): Promise<void> {
               confidence: result.confidence,
             });
 
-            await produceMessage(KAFKA_TOPICS.MODERATION_ACTIONS, messageReference, {
+            await produceMessage('moderation-actions', messageReference, {
               messageId: messageReference,
               conversationId: raw.conversationId,
               senderId: raw.senderId,

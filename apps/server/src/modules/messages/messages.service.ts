@@ -1,4 +1,4 @@
-import { MessageModel, MessageType, type IMessage, type IReplyTo } from './message.model';
+import { MessageModel, MessageType, type ICallHistory, type IMessage, type IReplyTo } from './message.model';
 import { MessageStatusModel, type IMessageStatus } from './message-status.model';
 import { checkIdempotencyKey, setIdempotencyKey } from '../../infrastructure/redis';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { MessageReactionsService } from './message-reaction.service';
 import { UserModel } from '../users/user.model';
 import { MessageRepository } from '../../shared/repositories/message.repository';
-import type { IConversationMemberPenaltyProfile } from '../../shared/repositories/message.repository';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -59,16 +58,6 @@ export class MessagesService {
   /** Repository singleton – all DB queries go through here */
   private static readonly repo = new MessageRepository();
 
-  /**
-   * Fetch conversation member penalty profile (penalty fields + user profile)
-   */
-  static async getConversationMemberPenaltyProfile(
-    conversationId: string,
-    userId: string,
-  ): Promise<IConversationMemberPenaltyProfile | null> {
-    return this.repo.findConversationMemberPenaltyProfile(conversationId, userId);
-  }
-
   private static getLastMessagePreview(
     content: string,
     type: MessageType,
@@ -83,7 +72,66 @@ export class MessagesService {
     if (type?.startsWith('file/')) return 'Da gui tep dinh kem';
     if (type === 'audio') return 'Da gui am thanh';
     if (type === 'sticker') return 'Da gui sticker';
+    if (type === 'call_history') return content || 'Lich su cuoc goi';
     return '';
+  }
+
+  static getCallHistoryPreview(callHistory: ICallHistory): string {
+    const callTypeLabel = callHistory.callType === 'audio' ? 'Cuoc goi thoai' : 'Cuoc goi video';
+    if (callHistory.status === 'missed') return `${callTypeLabel} bi nho`;
+    if (callHistory.status === 'rejected') return `${callTypeLabel} bi tu choi`;
+    if (callHistory.status === 'cancelled') return `${callTypeLabel} da huy`;
+    return `${callTypeLabel} da ket thuc`;
+  }
+
+  static async createCallHistoryMessage(
+    conversationId: string,
+    callHistory: ICallHistory,
+  ): Promise<IMessage> {
+    const idempotencyKey = `call-history:${callHistory.callSessionId}:${callHistory.status}`;
+    const existing = await MessagesService.repo.findByIdempotencyKey(idempotencyKey);
+    if (existing) {
+      return existing as unknown as IMessage;
+    }
+
+    const content = this.getCallHistoryPreview(callHistory);
+    const message = await MessageModel.create({
+      conversationId,
+      senderId: callHistory.callerId,
+      content,
+      type: 'call_history',
+      callHistory,
+      idempotencyKey,
+      createdAt: callHistory.endedAt ?? new Date(),
+    });
+
+    const members = await ConversationMemberModel.find({ conversationId }).select('userId').lean();
+    await MessageStatusModel.insertMany(
+      members.map((member) => ({
+        messageId: message._id.toString(),
+        idempotencyKey,
+        userId: member.userId,
+        status: member.userId === callHistory.callerId ? 'sent' : 'delivered',
+      })),
+      { ordered: false },
+    ).catch((err) => {
+      logger.warn('[CallHistory] Failed to insert one or more message statuses', err);
+    });
+
+    await ConversationsService.updateLastMessage(conversationId, {
+      content,
+      senderId: callHistory.callerId,
+      sentAt: message.createdAt,
+    });
+    await ConversationsService.clearConversationMemberOverrideOnNewMessage(conversationId);
+
+    for (const member of members) {
+      if (member.userId !== callHistory.callerId) {
+        await ConversationsService.incrementUnreadCount(conversationId, member.userId);
+      }
+    }
+
+    return message.toObject() as unknown as IMessage;
   }
 
   /**
@@ -130,7 +178,6 @@ export class MessagesService {
     type: MessageType,
     idempotencyKey: string,
     mediaUrl?: string,
-    moderationWarning: boolean = false,
     replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check idempotency cache
@@ -144,7 +191,7 @@ export class MessagesService {
         content: cachedMessage.content,
         type: cachedMessage.type,
         mediaUrl: cachedMessage.mediaUrl,
-        moderationWarning: Boolean(cachedMessage.moderationWarning),
+        moderationWarning: false,
         replyTo: cachedMessage.replyTo as IReplyTo | undefined,
         idempotencyKey,
         createdAt: new Date(cachedMessage.createdAt as number),
@@ -161,7 +208,6 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
-      moderationWarning,
       replyTo,
       createdAt: now,
     });
@@ -175,7 +221,6 @@ export class MessagesService {
         content,
         type,
         mediaUrl,
-        moderationWarning,
         replyTo,
         idempotencyKey,
         createdAt: now,
@@ -194,7 +239,6 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
-      moderationWarning,
       replyTo,
       idempotencyKey,
       createdAt: now,
@@ -216,7 +260,6 @@ export class MessagesService {
     idempotencyKey: string,
     mediaUrl?: string,
     mockId?: string,
-    moderationWarning: boolean = false,
     replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
@@ -233,7 +276,6 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
-      moderationWarning,
       replyTo,
       idempotencyKey,
       createdAt: new Date(),
@@ -357,7 +399,6 @@ export class MessagesService {
       content: string;
       type: string;
       mediaUrl?: string;
-      moderationWarning?: boolean;
       replyTo?: IReplyTo;
       idempotencyKey: string;
       createdAt: Date;
@@ -375,7 +416,6 @@ export class MessagesService {
           msg.idempotencyKey,
           msg.mediaUrl,
           msg.mockId,
-          Boolean(msg.moderationWarning),
           msg.replyTo,
         );
       } catch (err) {

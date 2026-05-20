@@ -41,6 +41,7 @@ import {
   listenToMessageRecall,
   listenToReactionError,
   listenToReactionUpdated,
+  listenToAiCatchupDigestUpdated,
   unlistenToCallIncoming,
   unlistenToCallInvited,
   unlistenToCallMediaState,
@@ -56,9 +57,19 @@ import {
   unlistenToMessageRecall,
   unlistenToReactionError,
   unlistenToReactionUpdated,
+  unlistenToAiCatchupDigestUpdated,
 } from '@/services/socket';
 import { getMessageReactionDetails, type ReactionDetailsResponse } from '@/services/chat';
-import type { Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
+import type { AiCatchupDigest, AiCatchupDigestUpdatedPayload, AiReminder, Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
+import {
+  createAiCatchupDigest,
+  getLatestAiCatchupDigest,
+  regenerateAiCatchupDigest,
+  updateAiCatchupSettings,
+} from '@/services/ai-catchup';
+import {
+  createReminderFromActionItem,
+} from '@/services/ai-reminder';
 import {
   addGroupMembers,
   createGroup,
@@ -105,7 +116,27 @@ interface Conversation {
   removedFromGroup?: boolean;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   lastMessage?: { senderId: string; senderDisplayName?: string; content: string; sentAt: string };
+  activeCall?: ConversationActiveCall | null;
   unreadCounts?: Record<string, number>;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
+}
+
+interface ConversationActiveCall {
+  callSessionId: string;
+  type: 'audio' | 'video';
+  status: string;
+  startedAt?: string | null;
+  initiatedBy: string;
+}
+
+function isActiveConversationCall(call?: ConversationActiveCall | null): call is ConversationActiveCall {
+  return Boolean(
+    call?.callSessionId
+    && (call.status === 'ringing' || call.status === 'connecting' || call.status === 'connected'),
+  );
 }
 
 interface ConversationListItem {
@@ -127,7 +158,10 @@ interface ConversationListItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
-  haveRead: boolean
+  activeCall?: ConversationActiveCall | null;
+  haveRead: boolean;
+  unreadCount: number;
+  aiCatchupEnabled: boolean;
 }
 
 interface PresenceState {
@@ -173,6 +207,10 @@ function isVisibleChatMessage(message: Message): boolean {
 }
 
 function isCallSummaryMessage(message: Message): boolean {
+  if (message.type === 'call_history') {
+    return false;
+  }
+
   const idempotencyKey = String(message.idempotencyKey || '');
   if (idempotencyKey.startsWith('call-summary:')) {
     return true;
@@ -268,6 +306,7 @@ interface PendingReactionRequest {
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
 type CallMediaType = 'audio' | 'video';
+const ACTIVE_CALL_CONFLICT_MESSAGE = 'Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước.';
 
 interface CallParticipantVideo {
   userId: string;
@@ -291,6 +330,9 @@ export function useHomeDashboard() {
   const [forwardLoading, setForwardLoading] = useState(false);
   const [reactionUserStateByMessage, setReactionUserStateByMessage] = useState<Record<string, MessageReactionUserState>>({});
   const [activeCall, setActiveCallState] = useState<CallSessionState | null>(callStore.activeCall);
+  const [aiCatchupByConversation, setAiCatchupByConversation] = useState<Record<string, AiCatchupDigest>>({});
+  const [aiCatchupRequestingByConversation, setAiCatchupRequestingByConversation] = useState<Record<string, boolean>>({});
+  const [aiReminders, setAiReminders] = useState<AiReminder[]>([]);
 
   useEffect(() => {
     return subscribeToCallStore((call) => {
@@ -825,8 +867,6 @@ export function useHomeDashboard() {
     recallMessage,
     unsetMessages_Status,
     isLoading: chatLoading,
-    userPenaltyScore,
-    userMutedUntil,
   } = useChat({
     conversationId: selectedConversationId,
     userId,
@@ -897,6 +937,187 @@ export function useHomeDashboard() {
   const resolveMessageRef = useCallback((message: Message): string => {
     return message.idempotencyKey || message._id;
   }, []);
+
+  const getConversationUnreadCount = useCallback((conversationId: string): number => {
+    const conversation = conversations.find((item) => item._id === conversationId);
+    const unreadValue = conversation?.unreadCounts?.[userId];
+    return typeof unreadValue === 'number' && unreadValue > 0 ? unreadValue : 0;
+  }, [conversations, userId]);
+
+  const getLatestLoadedMessageRef = useCallback((conversationId: string): string | undefined => {
+    if (conversationId !== selectedConversationId) {
+      return undefined;
+    }
+
+    const latestMessage = [...messageHistory.messages]
+      .reverse()
+      .find((message) => !isCallSummaryMessage(message));
+
+    return latestMessage ? resolveMessageRef(latestMessage) : undefined;
+  }, [messageHistory.messages, resolveMessageRef, selectedConversationId]);
+
+  const requestAiCatchup = useCallback(async (conversationId?: string) => {
+    const targetConversationId = conversationId ?? selectedConversationId;
+    if (!targetConversationId) {
+      return;
+    }
+
+    const targetConversation = conversations.find((item) => item._id === targetConversationId);
+    if (targetConversation?.aiPreferences?.catchupEnabled === false) {
+      return;
+    }
+
+    setAiCatchupRequestingByConversation((prev) => ({ ...prev, [targetConversationId]: true }));
+    try {
+      const digest = await createAiCatchupDigest(targetConversationId, {
+        trigger: 'manual',
+        unreadCountHint: getConversationUnreadCount(targetConversationId),
+        toMessageRef: getLatestLoadedMessageRef(targetConversationId),
+      });
+      setAiCatchupByConversation((prev) => ({ ...prev, [targetConversationId]: digest }));
+    } finally {
+      setAiCatchupRequestingByConversation((prev) => ({ ...prev, [targetConversationId]: false }));
+    }
+  }, [
+    conversations,
+    getConversationUnreadCount,
+    getLatestLoadedMessageRef,
+    selectedConversationId,
+  ]);
+
+  const regenerateAiCatchup = useCallback(async (digestId?: string) => {
+    const digest = digestId
+      ? Object.values(aiCatchupByConversation).find((item) => item._id === digestId)
+      : aiCatchupByConversation[selectedConversationId];
+    if (!digest) {
+      return;
+    }
+
+    setAiCatchupRequestingByConversation((prev) => ({ ...prev, [digest.conversationId]: true }));
+    try {
+      const nextDigest = await regenerateAiCatchupDigest(digest._id);
+      setAiCatchupByConversation((prev) => ({ ...prev, [nextDigest.conversationId]: nextDigest }));
+    } finally {
+      setAiCatchupRequestingByConversation((prev) => ({ ...prev, [digest.conversationId]: false }));
+    }
+  }, [aiCatchupByConversation, selectedConversationId]);
+
+  const toggleAiCatchupSetting = useCallback(async (conversationId: string, catchupEnabled: boolean) => {
+    const previousConversation = conversations.find((conversation) => conversation._id === conversationId);
+    setConversations((prev) => prev.map((conversation) => {
+      if (conversation._id !== conversationId) {
+        return conversation;
+      }
+
+      return {
+        ...conversation,
+        aiPreferences: {
+          ...(conversation.aiPreferences ?? { catchupEnabled: true }),
+          catchupEnabled,
+        },
+      };
+    }));
+
+    try {
+      await updateAiCatchupSettings(conversationId, catchupEnabled);
+    } catch (error) {
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== conversationId) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          aiPreferences: previousConversation?.aiPreferences ?? { catchupEnabled: true },
+        };
+      }));
+      throw error;
+    }
+  }, [conversations]);
+
+  const createReminderFromAiActionItem = useCallback(async (
+    actionItem: { text: string; sourceMessageRefs: string[] },
+  ) => {
+    if (!selectedConversationId) {
+      return;
+    }
+    const digest = aiCatchupByConversation[selectedConversationId];
+    await createReminderFromActionItem(selectedConversationId, actionItem, digest?._id);
+  }, [selectedConversationId, aiCatchupByConversation]);
+
+  useEffect(() => {
+    if (!selectedConversationId || !userId) {
+      return;
+    }
+
+    let cancelled = false;
+    getLatestAiCatchupDigest(selectedConversationId)
+      .then((digest) => {
+        if (cancelled || !digest) {
+          return;
+        }
+        setAiCatchupByConversation((prev) => ({ ...prev, [selectedConversationId]: digest }));
+      })
+      .catch((error) => {
+        console.warn('[AI Catch-up] Failed to load latest digest', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedConversationId, userId]);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token || !userId) {
+      return;
+    }
+
+    getSocket(token);
+
+    const handleAiCatchupDigestUpdated = (payload: AiCatchupDigestUpdatedPayload) => {
+      setAiCatchupRequestingByConversation((prev) => ({ ...prev, [payload.conversationId]: false }));
+      setAiCatchupByConversation((prev) => {
+        const existing = prev[payload.conversationId];
+        const fallbackDigest: AiCatchupDigest = {
+          _id: payload.digestId,
+          userId,
+          conversationId: payload.conversationId,
+          cacheKey: '',
+          fromMessageRef: '',
+          toMessageRef: '',
+          messageRefs: [],
+          messageCount: 0,
+          omittedOlderCount: 0,
+          trigger: 'manual',
+          status: payload.status,
+          summary: payload.summary,
+          inputHash: '',
+          error: payload.error,
+          createdAt: payload.updatedAt,
+          updatedAt: payload.updatedAt,
+        };
+
+        return {
+          ...prev,
+          [payload.conversationId]: existing
+            ? {
+                ...existing,
+                status: payload.status,
+                summary: payload.summary ?? existing.summary,
+                error: payload.error,
+                updatedAt: payload.updatedAt,
+              }
+            : fallbackDigest,
+        };
+      });
+    };
+
+    listenToAiCatchupDigestUpdated(handleAiCatchupDigestUpdated);
+    return () => {
+      unlistenToAiCatchupDigestUpdated(handleAiCatchupDigestUpdated);
+    };
+  }, [userId]);
 
   const applyReactionSummaryToMessage = useCallback(
     (
@@ -1614,7 +1835,27 @@ export function useHomeDashboard() {
       return;
     }
 
-    getSocket(token);
+    const socket = getSocket(token);
+
+    const handleConversationActiveCallUpdated = (payload: {
+      conversationId?: string;
+      activeCall?: ConversationActiveCall | null;
+    }) => {
+      if (!payload.conversationId) {
+        return;
+      }
+
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== payload.conversationId) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          activeCall: isActiveConversationCall(payload.activeCall) ? payload.activeCall : null,
+        };
+      }));
+    };
 
     const handleMessageDeletedForMe = (payload: {
       conversationId: string;
@@ -1719,10 +1960,12 @@ export function useHomeDashboard() {
 
     listenToMessageDeletion(handleMessageDeletedForMe);
     listenToMessageRecall(handleMessageRecalled);
+    socket.on('conversation_active_call_updated', handleConversationActiveCallUpdated);
 
     return () => {
       unlistenToMessageDeletion(handleMessageDeletedForMe);
       unlistenToMessageRecall(handleMessageRecalled);
+      socket.off('conversation_active_call_updated', handleConversationActiveCallUpdated);
     };
   }, [userId]);
 
@@ -1769,7 +2012,10 @@ export function useHomeDashboard() {
       members: conv.users,
       online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
-      haveRead: unreadCounts.get(userId)? false: true
+      activeCall: conv.activeCall ?? null,
+      haveRead: unreadCounts.get(userId)? false: true,
+      unreadCount: unreadCounts.get(userId) ?? 0,
+      aiCatchupEnabled: conv.aiPreferences?.catchupEnabled !== false,
     }});
   }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
 
@@ -2221,6 +2467,18 @@ export function useHomeDashboard() {
       const participantDisplayNames = resolveParticipantDisplayNames(participantIds);
 
       const current = activeCallRef.current;
+      if (
+        current
+        && current.sessionId !== payload.sessionId
+        && current.status !== 'ended'
+        && current.status !== 'missed'
+        && current.status !== 'rejected'
+      ) {
+        emitCallReject(payload.sessionId, payload.callToken, 'busy');
+        setCallError(ACTIVE_CALL_CONFLICT_MESSAGE);
+        return;
+      }
+
       if (current?.sessionId === payload.sessionId) {
         setActiveCall((prev) => {
           if (!prev || prev.sessionId !== payload.sessionId) {
@@ -2632,6 +2890,20 @@ export function useHomeDashboard() {
       return;
     }
 
+    const currentCall = activeCallRef.current;
+    const selectedActiveCallId = selectedConversation.activeCall?.callSessionId;
+    if (
+      currentCall
+      && currentCall.sessionId
+      && currentCall.status !== 'ended'
+      && currentCall.status !== 'missed'
+      && currentCall.status !== 'rejected'
+      && currentCall.sessionId !== selectedActiveCallId
+    ) {
+      notifyCallBlockingIssue(ACTIVE_CALL_CONFLICT_MESSAGE);
+      return;
+    }
+
     const insecureContextMessage = getWebRtcInsecureContextMessage();
     if (insecureContextMessage) {
       notifyCallBlockingIssue(insecureContextMessage);
@@ -2731,6 +3003,18 @@ export function useHomeDashboard() {
   const handleAcceptIncomingCall = useCallback(async () => {
     const current = activeCallRef.current;
     if (!current || current.direction !== 'incoming') {
+      return;
+    }
+
+    const currentJoinedCall = activeCallRef.current;
+    if (
+      currentJoinedCall
+      && currentJoinedCall.sessionId !== current.sessionId
+      && currentJoinedCall.status !== 'ended'
+      && currentJoinedCall.status !== 'missed'
+      && currentJoinedCall.status !== 'rejected'
+    ) {
+      notifyCallBlockingIssue(ACTIVE_CALL_CONFLICT_MESSAGE);
       return;
     }
 
@@ -3420,6 +3704,7 @@ export function useHomeDashboard() {
   }, [forwardingMessage]);
 
   const selectedConversationRaw = conversations.find((conversation) => conversation._id === selectedConversationId);
+  const selectedConversationActiveCall = selectedConversationRaw?.activeCall ?? null;
   const isCallConversationSelected = Boolean(
     selectedConversationRaw && (selectedConversationRaw.type === 'direct' || selectedConversationRaw.type === 'group'),
   );
@@ -3553,12 +3838,21 @@ export function useHomeDashboard() {
     conversations: convertConversationsToListItems(),
     selectedConversationId,
     onSelectConversation: setSelectedConversationId,
+    aiCatchupByConversation,
+    onRequestAiCatchup: requestAiCatchup,
+    onRegenerateAiCatchup: regenerateAiCatchup,
+    onToggleAiCatchupSetting: toggleAiCatchupSetting,
+    onCreateReminder: createReminderFromAiActionItem,
     searchTargets: searchTargets(),
     onSelectSearchTarget: openConversationFromSearch,
     messages: messageHistory.messages.filter(isVisibleChatMessage),
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
     messagesHasMore: messageHistory.hasMore,
+    aiCatchupDigest: selectedConversationId ? (aiCatchupByConversation[selectedConversationId] ?? null) : null,
+    aiCatchupUnreadCount: selectedConversationId ? getConversationUnreadCount(selectedConversationId) : 0,
+    aiCatchupEnabled: selectedConversationRaw?.aiPreferences?.catchupEnabled !== false,
+    aiCatchupRequesting: selectedConversationId ? Boolean(aiCatchupRequestingByConversation[selectedConversationId]) : false,
     conversationInfo: getSelectedConversationInfo(),
     typingUsers,
     friendsForGroup,
@@ -3596,6 +3890,7 @@ export function useHomeDashboard() {
     callParticipantNames: activeCallParticipantNames,
     callType: activeCall?.callType ?? 'video',
     isGroupCallActive: activeCall?.isGroupCall ?? false,
+    selectedConversationActiveCall,
     callError,
     callFriendError,
     onDismissCallFriendError: () => setCallFriendError(null),
@@ -3617,8 +3912,6 @@ export function useHomeDashboard() {
     onToggleMic: handleToggleMic,
     onToggleCamera: handleToggleCamera,
     onToggleScreenShare: handleToggleScreenShare,
-    userPenaltyScore,
-    userMutedUntil,
     forwardModalOpen,
     setForwardModalOpen,
     forwardingMessage,

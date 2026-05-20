@@ -1,4 +1,4 @@
-import { MessageType, SenderInMessage } from '@zync/shared-types';
+import { type AiCatchupDigestUpdatedPayload, type AiAssistantItemPayload, type CallHistory, MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 import { callStore } from '@/stores/call-store';
@@ -224,15 +224,15 @@ export function listenToMessages(
     content: string;
     type: string;
     mediaUrl?: string;
-      moderationWarning?: boolean;
-      replyTo?: {
-        messageRef: string;
-        messageId?: string;
-        senderId?: string;
-        contentPreview?: string;
-        type?: string;
-        isDeleted?: boolean;
-      };
+    callHistory?: CallHistory;
+    replyTo?: {
+      messageRef: string;
+      messageId?: string;
+      senderId?: string;
+      contentPreview?: string;
+      type?: string;
+      isDeleted?: boolean;
+    };
     idempotencyKey: string;
     createdAt: string;
   }) => void,
@@ -771,54 +771,6 @@ export function unlistenToCallMediaState(cb?: unknown): void {
   if (cb) socket.off(event, cb as any);
 }
 
-export function listenToContentBlocked(callback: (data: any) => void): void {
-  if (!socket) return;
-
-  const event = 'content_blocked';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
-  socket.on(event, callback);
-}
-
-export function unlistenToContentBlocked(cb?: unknown): void {
-  if (!socket) return;
-
-  const event = 'content_blocked';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
-}
-
-export function listenToContentWarning(callback: (data: any) => void): void {
-  if (!socket) return;
-
-  const event = 'content_warning';
-  listenerRegistry.delete(event);
-  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
-  socket.off(event);
-  socket.on(event, callback);
-}
-
-export function unlistenToContentWarning(cb?: unknown): void {
-  if (!socket) return;
-
-  const event = 'content_warning';
-  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
-  const toRemove = cb ?? registeredCb;
-  if (toRemove) {
-    socket.off(event, toRemove as any);
-  } else {
-    socket.off(event);
-  }
-  listenerRegistry.delete(event);
-}
-
 // ─── Delete & Recall Events ───
 
 /**
@@ -964,7 +916,7 @@ export function unlistenToMessageRecall(cb?: unknown): void {
   listenerRegistry.delete(event);
 }
 
-// ─── Reactions & Moderation ───
+// ─── Reactions ───
 
 export function listenToMessageReacted(callback: (data: any) => void): void {
   if (!socket) return;
@@ -990,20 +942,30 @@ export function unlistenToMessageReacted(cb?: unknown): void {
   listenerRegistry.delete(event);
 }
 
-export function listenToUserPenaltyUpdated(callback: (data: any) => void): void {
+// ─── Forward Message ───
+
+/**
+ * Emit forward message event
+ * @param originalMessageId Message ID to forward
+ * @param toConversationId Target conversation
+ * @param idempotencyKey Unique key for idempotency
+ */
+export function listenToAiCatchupDigestUpdated(
+  callback: (data: AiCatchupDigestUpdatedPayload) => void,
+): void {
   if (!socket) return;
 
-  const event = 'user_penalty_updated';
+  const event = 'ai_catchup_digest_updated';
   listenerRegistry.delete(event);
   listenerRegistry.set(event, callback as (...args: unknown[]) => void);
   socket.off(event);
   socket.on(event, callback);
 }
 
-export function unlistenToUserPenaltyUpdated(cb?: unknown): void {
+export function unlistenToAiCatchupDigestUpdated(cb?: unknown): void {
   if (!socket) return;
 
-  const event = 'user_penalty_updated';
+  const event = 'ai_catchup_digest_updated';
   const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
   const toRemove = cb ?? registeredCb;
   if (toRemove) {
@@ -1014,14 +976,32 @@ export function unlistenToUserPenaltyUpdated(cb?: unknown): void {
   listenerRegistry.delete(event);
 }
 
-// ─── Forward Message ───
+export function listenToAiAssistantItemUpdated(
+  callback: (data: AiAssistantItemPayload) => void,
+): void {
+  if (!socket) return;
 
-/**
- * Emit forward message event
- * @param originalMessageId Message ID to forward
- * @param toConversationId Target conversation
- * @param idempotencyKey Unique key for idempotency
- */
+  const event = 'ai_assistant_item_updated';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
+}
+
+export function unlistenToAiAssistantItemUpdated(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'ai_assistant_item_updated';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
+}
+
 export function emitForwardMessage(
   originalMessageId: string,
   toConversationId: string,
@@ -1373,14 +1353,12 @@ export const socketService = {
   sendQuickReply,
   listenToErrors,
   unlistenToErrors,
-  listenToContentBlocked,
-  unlistenToContentBlocked,
-  listenToContentWarning,
-  unlistenToContentWarning,
   listenToMessageReacted,
   unlistenToMessageReacted,
-  listenToUserPenaltyUpdated,
-  unlistenToUserPenaltyUpdated,
+  listenToAiCatchupDigestUpdated,
+  unlistenToAiCatchupDigestUpdated,
+  listenToAiAssistantItemUpdated,
+  unlistenToAiAssistantItemUpdated,
 };
 
 export default socketService;

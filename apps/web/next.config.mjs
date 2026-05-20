@@ -6,8 +6,10 @@ const require = createRequire(import.meta.url);
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['zync-media.s3.ap-southeast-1.amazonaws.com', 'res.cloudinary.com', 'images.unsplash.com'],
     remotePatterns: [
+      { protocol: 'https', hostname: 'zync-media.s3.ap-southeast-1.amazonaws.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },

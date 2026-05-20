@@ -1,24 +1,26 @@
-/**
- * AI Routes – Phase AI-0 scaffold
- *
- * Exposes:
- *   GET  /api/ai/health  — check Gemini + Neon reachability (auth required)
- *
- * Full chat + search endpoints are added in Phase AI-3.
- */
-
 import { Router, type Request, type Response } from 'express';
 import { authenticate } from '../../shared/middleware/auth.middleware';
 import { isAIEnabled } from '../../infrastructure/gemini';
 import { isNeonAvailable } from '../../infrastructure/neon';
 import { logger } from '../../shared/logger';
+import {
+  createCatchupDigestHandler,
+  getCatchupDigestHandler,
+  getLatestCatchupDigestHandler,
+  regenerateCatchupDigestHandler,
+  updateCatchupSettingsHandler,
+} from './catchup/catchup.controller';
+import {
+  createReminderHandler,
+  listRemindersHandler,
+  getReminderHandler,
+  updateReminderHandler,
+  deleteReminderHandler,
+} from './reminders/reminder.controller';
+import { assistantRouter } from './assistant/assistant.routes';
 
 export const aiRouter = Router();
 
-/**
- * GET /api/ai/health
- * Returns current status of AI subsystems (Gemini, Neon, rate limits).
- */
 aiRouter.get('/health', authenticate, (_req: Request, res: Response) => {
   const aiEnabled = isAIEnabled();
   const neonAvailable = isNeonAvailable();
@@ -32,15 +34,54 @@ aiRouter.get('/health', authenticate, (_req: Request, res: Response) => {
         enabled: aiEnabled,
         gemini: aiEnabled ? 'configured' : 'missing GEMINI_API_KEY',
         neon: neonAvailable ? 'configured' : 'missing NEON_DATABASE_URL',
-        moderation: process.env['AI_MODERATION_ENABLED'] !== 'false',
         assistant: process.env['AI_ASSISTANT_ENABLED'] !== 'false',
         search: process.env['AI_SEARCH_ENABLED'] !== 'false',
+        catchup: process.env['AI_CATCHUP_ENABLED'] !== 'false',
       },
     },
   });
 });
 
-// ── Placeholder for AI-3 endpoints ────────────────────────────────────────────
-// POST /api/ai/chat        → implemented in Phase AI-3 (ai.controller.ts)
-// GET  /api/ai/suggestions → implemented in Phase AI-3
-// GET  /api/search         → implemented in Phase AI-2 (search.routes.ts)
+aiRouter.post(
+  '/catchup/conversations/:conversationId/digests',
+  authenticate,
+  createCatchupDigestHandler,
+);
+
+aiRouter.get(
+  '/catchup/conversations/:conversationId/digests/latest',
+  authenticate,
+  getLatestCatchupDigestHandler,
+);
+
+aiRouter.get(
+  '/catchup/digests/:digestId',
+  authenticate,
+  getCatchupDigestHandler,
+);
+
+aiRouter.post(
+  '/catchup/digests/:digestId/regenerate',
+  authenticate,
+  regenerateCatchupDigestHandler,
+);
+
+aiRouter.patch(
+  '/catchup/conversations/:conversationId/settings',
+  authenticate,
+  updateCatchupSettingsHandler,
+);
+
+// ─── Reminders ──────────────────────────────────────────────────────────────────
+aiRouter.post('/reminders', authenticate, createReminderHandler);
+
+aiRouter.get('/reminders', authenticate, listRemindersHandler);
+
+aiRouter.get('/reminders/:reminderId', authenticate, getReminderHandler);
+
+aiRouter.patch('/reminders/:reminderId', authenticate, updateReminderHandler);
+
+aiRouter.delete('/reminders/:reminderId', authenticate, deleteReminderHandler);
+
+// ─── AI Assistant Box ────────────────────────────────────────────────────────────
+aiRouter.use('/assistant', assistantRouter);

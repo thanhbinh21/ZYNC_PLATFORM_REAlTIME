@@ -122,7 +122,7 @@ function ProfilePageContent() {
         error={null}
         feed={feed}
         myStories={myStories}
-        initialTab={initialTab}
+        initialTab={initialTab === 'info' ? initialTab : undefined}
         onProfileUpdated={handleProfileUpdated}
         onOpenCreateStory={() => setIsCreateStoryOpen(true)}
         onViewStoryFeed={handleViewStoryFeed}

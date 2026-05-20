@@ -1,8 +1,8 @@
 'use client';
 
 import { type ChangeEvent, type ComponentType, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, PenLine, Heart } from 'lucide-react';
-import type { Message, MessageStatus } from '@zync/shared-types';
+import { AlertCircle, Bot, CheckCircle2, ListChecks, HelpCircle, Bell, MessageSquare, Loader2, Play, PenLine, RefreshCw, Sparkles, Heart, Phone, Video } from 'lucide-react';
+import type { AiCatchupDigest, Message, MessageStatus } from '@zync/shared-types';
 import {
   Menu,
   MenuProvider,
@@ -20,7 +20,7 @@ import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { ReactionDetailsResponse } from '@/services/chat';
-import { reportMessage, reactMessage } from '@/services/chat';
+import { reactMessage } from '@/services/chat';
 import { fetchPostsByAuthor, type Post } from '@/services/posts';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -31,6 +31,15 @@ type LucideIconComponent = ComponentType<{ className?: string; 'aria-hidden'?: b
 const PlayIcon = Play as unknown as LucideIconComponent;
 const PenLineIcon = PenLine as unknown as LucideIconComponent;
 const HeartIcon = Heart as unknown as LucideIconComponent;
+const AlertCircleIcon = AlertCircle as unknown as LucideIconComponent;
+const BotIcon = Bot as unknown as LucideIconComponent;
+const CheckCircleIcon = CheckCircle2 as unknown as LucideIconComponent;
+const LoaderIcon = Loader2 as unknown as LucideIconComponent;
+const RefreshIcon = RefreshCw as unknown as LucideIconComponent;
+const SparklesIcon = Sparkles as unknown as LucideIconComponent;
+const PhoneIcon = Phone as unknown as LucideIconComponent;
+const VideoIcon = Video as unknown as LucideIconComponent;
+const InfoIcon = AlertCircle as unknown as LucideIconComponent;
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -39,56 +48,58 @@ interface SendMessageOptions {
 }
 
 type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected' | 'ended' | 'missed' | 'rejected';
-
-// ==================== ICONS ====================
-
-function PhoneIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 3a2.5 2.5 0 0 1 2.5-2.5h2.69a2.5 2.5 0 0 1 2.5 2.5v3.69a2.5 2.5 0 0 1-2.5 2.5H5a13 13 0 0 0 13 13v-3.81a2.5 2.5 0 0 1 2.5-2.5h3.69a2.5 2.5 0 0 1 2.5 2.5V21a2.5 2.5 0 0 1-2.5 2.5h-6.5A18 18 0 0 1 3.5 3Z" /></svg>;
+interface ConversationActiveCall {
+  callSessionId: string;
+  type: 'audio' | 'video';
+  status: string;
+  startedAt?: string | null;
+  initiatedBy: string;
 }
 
-function VideoIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x={1} y={5} width={15} height={14} rx={2} ry={2} /></svg>;
+function isActiveConversationCall(call?: ConversationActiveCall | null): call is ConversationActiveCall {
+  return Boolean(
+    call?.callSessionId
+    && (call.status === 'ringing' || call.status === 'connecting' || call.status === 'connected'),
+  );
 }
+
+// ==================== CALL UI ICONS ====================
 
 function MicIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={2} width={6} height={11} rx={3} /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v5" /><path d="M8 22h8" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v5" /><path d="M8 22h8" /></svg>;
 }
 
 function CameraControlIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect x={2} y={6} width={14} height={12} rx={2} ry={2} /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect x="2" y="6" width="14" height="12" rx="2" ry="2" /></svg>;
 }
 
 function ScreenShareIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={2} y={3} width={20} height={14} rx={2} /><path d="M8 21h8" /><path d="M12 17v4" /><path d="m9 10 3-3 3 3" /><path d="M12 7v7" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /><path d="m9 10 3-3 3 3" /><path d="M12 7v7" /></svg>;
 }
 
 function MinimizeIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v5H3" /><path d="M21 16h-5v5" /><path d="M3 8l6-6" /><path d="M15 22l6-6" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v5H3" /><path d="M21 16h-5v5" /><path d="M3 8l6-6" /><path d="M15 22l6-6" /></svg>;
 }
 
 function MaximizeIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>;
 }
 
 function EndCallIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 15.5c4.8-4.5 10.2-4.5 15 0" /><path d="M8.5 12.5c.4 1.6.8 2.6 1.4 3.1" /><path d="M15.5 12.5c-.4 1.6-.8 2.6-1.4 3.1" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 15.5c4.8-4.5 10.2-4.5 15 0" /><path d="M8.5 12.5c.4 1.6.8 2.6 1.4 3.1" /><path d="M15.5 12.5c-.4 1.6-.8 2.6-1.4 3.1" /></svg>;
 }
 
 function CheckIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>;
 }
 
 function CloseIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>;
-}
-
-function InfoIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={10} /><line x1={12} y1={16} x2={12} y2={12} /><line x1={12} y1={8} x2={12.01} y2={8} /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>;
 }
 
 function SearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="11" cy="11" r="6" />
       <path d="m16 16 4 4" strokeLinecap="round" />
     </svg>
@@ -97,7 +108,7 @@ function SearchIcon() {
 
 function BellOffMiniIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M3 3l18 18" strokeLinecap="round" />
       <path d="M10.58 6.53A5 5 0 0 1 17 11v3l2 2H7" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M9 18a3 3 0 0 0 6 0" strokeLinecap="round" />
@@ -108,7 +119,7 @@ function BellOffMiniIcon() {
 
 function PinMiniIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M15 3l6 6-2 2-3-3-3 3v4l-2 2v-6l-5 5-2-2 5-5H3l2-2h4l3-3-3-3 2-2 6 6z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -240,6 +251,7 @@ interface ChatPanelProps {
   }>;
   callStatus?: CallUiStatus;
   callType?: 'audio' | 'video';
+  activeConversationCall?: ConversationActiveCall | null;
   callPeerName?: string;
   callParticipantNames?: string[];
   isGroupCallActive?: boolean;
@@ -271,8 +283,13 @@ interface ChatPanelProps {
   isLoading?: boolean;
   hasMoreMessages?: boolean;
   error?: string | null;
-  userPenaltyScore?: number;
-  userMutedUntil?: Date | null;
+  aiCatchupDigest?: AiCatchupDigest | null;
+  aiCatchupUnreadCount?: number;
+  aiCatchupEnabled?: boolean;
+  aiCatchupRequesting?: boolean;
+  onRequestAiCatchup?: () => Promise<void> | void;
+  onRegenerateAiCatchup?: () => Promise<void> | void;
+  onCreateReminder?: (actionItem: { text: string; sourceMessageRefs: string[] }) => Promise<void> | void;
 }
 
 interface ConversationItem {
@@ -294,7 +311,10 @@ interface ConversationItem {
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
+  activeCall?: ConversationActiveCall | null;
   haveRead: boolean;
+  unreadCount: number;
+  aiCatchupEnabled: boolean;
 }
 
 interface GroupFriendOption {
@@ -327,6 +347,8 @@ interface ConversationListProps {
   conversations?: ConversationItem[];
   selectedId?: string;
   onSelectConversation?: (id: string) => void;
+  aiCatchupByConversation?: Record<string, AiCatchupDigest>;
+  onRequestAiCatchup?: (conversationId: string) => Promise<void> | void;
   searchTargets?: ConversationSearchTarget[];
   onSelectSearchTarget?: (target: ConversationSearchTarget) => void;
 }
@@ -344,6 +366,8 @@ function ConversationList({
   conversations = [],
   selectedId,
   onSelectConversation = () => {},
+  aiCatchupByConversation = {},
+  onRequestAiCatchup,
   searchTargets = [],
   onSelectSearchTarget = () => {},
 }: ConversationListProps) {
@@ -422,6 +446,15 @@ function ConversationList({
           {filteredConversations.map((item) => (
             (() => {
               const isMuted = Boolean(item.mutedUntil && new Date(item.mutedUntil) > new Date());
+              const catchupDigest = aiCatchupByConversation[item.id];
+              const shouldShowCatchup = item.aiCatchupEnabled && item.unreadCount >= 5;
+              const catchupLabel = catchupDigest?.status === 'ready'
+                ? 'AI san sang'
+                : catchupDigest?.status === 'failed'
+                  ? 'AI loi'
+                  : catchupDigest?.status === 'queued' || catchupDigest?.status === 'processing'
+                    ? 'AI dang tom tat'
+                    : 'AI tom tat';
 
               return (
             <button
@@ -459,6 +492,23 @@ function ConversationList({
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className={`truncate text-[13.5px] font-medium text-text-primary ${item.haveRead? 'opacity-60': ''}`}>{item.preview}</p>
+                    {isActiveConversationCall(item.activeCall) && (
+                      <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        Đang gọi
+                      </span>
+                    )}
+                    {shouldShowCatchup && (
+                      <span
+                        title={catchupLabel}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void onRequestAiCatchup?.(item.id);
+                        }}
+                        className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/15"
+                      >
+                        AI
+                      </span>
+                    )}
                     {item.isPinned && (
                         <span className="inline-flex items-center text-accent" aria-label="Đã ghim" title="Đã ghim">
                         <PinMiniIcon />
@@ -511,6 +561,7 @@ function ChatPanel({
   reactionUserStateByMessage = {},
   callStatus = 'idle',
   callType = 'video',
+  activeConversationCall = null,
   callPeerName,
   callParticipantNames = [],
   isGroupCallActive = false,
@@ -535,9 +586,14 @@ function ChatPanel({
   onToggleMic = () => {},
   onToggleCamera = () => {},
   onToggleScreenShare = () => {},
-  userPenaltyScore = 0,
-  userMutedUntil = null,
   hasMoreMessages = true,
+  aiCatchupDigest = null,
+  aiCatchupUnreadCount = 0,
+  aiCatchupEnabled = true,
+  aiCatchupRequesting = false,
+  onRequestAiCatchup = () => {},
+  onRegenerateAiCatchup = () => {},
+  onCreateReminder = () => {},
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -662,8 +718,11 @@ function ChatPanel({
   const isCompactCallState = isTerminalCallState || callStatus === 'incoming';
   const shouldRenderCallOverlay = isCallVisible && callStatus !== 'incoming';
   const isActiveCallState = callStatus === 'outgoing' || callStatus === 'incoming' || callStatus === 'connecting' || callStatus === 'connected';
-  const isAudioCallActive = isActiveCallState && callType === 'audio';
-  const isVideoCallActive = isActiveCallState && callType === 'video';
+  const isIncomingCallStatus = (status: CallUiStatus) => status === 'incoming';
+  const isConversationActiveCall = isGroupConversation && isActiveConversationCall(activeConversationCall);
+  const activeHeaderCallType = activeConversationCall?.type ?? callType;
+  const isAudioCallActive = (isActiveCallState && callType === 'audio') || (isConversationActiveCall && activeHeaderCallType === 'audio');
+  const isVideoCallActive = (isActiveCallState && callType === 'video') || (isConversationActiveCall && activeHeaderCallType === 'video');
   const shouldRenderCallMedia = callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected';
   const callTypeLabel = callType === 'audio' ? 'Gọi thoại' : 'Gọi video';
   const showCameraOffBadge = callType === 'video' && !isCameraEnabled;
@@ -675,6 +734,42 @@ function ChatPanel({
     ended: 'Đã kết thúc',
     missed: 'Nhỡ cuộc gọi',
     rejected: 'Đã từ chối',
+  };
+
+  const catchupStatus = aiCatchupDigest?.status;
+  const canRequestCatchup = aiCatchupEnabled && !inputDisabled && !aiCatchupRequesting
+    && catchupStatus !== 'queued'
+    && catchupStatus !== 'processing';
+  const shouldShowCatchupCard = aiCatchupEnabled && (
+    aiCatchupUnreadCount >= 5
+    || Boolean(aiCatchupDigest)
+  );
+  const catchupStatusLabel = catchupStatus === 'ready'
+    ? 'San sang'
+    : catchupStatus === 'failed'
+      ? 'Loi'
+      : catchupStatus === 'processing'
+        ? 'Dang xu ly'
+        : catchupStatus === 'queued'
+          ? 'Dang cho'
+          : `${aiCatchupUnreadCount} tin moi`;
+
+  const handleRequestCatchup = () => {
+    if (!canRequestCatchup) {
+      return;
+    }
+    void onRequestAiCatchup();
+  };
+
+  const handleRegenerateCatchup = () => {
+    if (!canRequestCatchup) {
+      return;
+    }
+    void onRegenerateAiCatchup();
+  };
+
+  const handleCreateReminder = (actionItem: { text: string; sourceMessageRefs: string[] }) => {
+    void onCreateReminder?.(actionItem);
   };
 
   useEffect(() => {
@@ -792,29 +887,6 @@ function ChatPanel({
       setIsCallMinimized(false);
     }
   }, [isCallVisible, isCompactCallState]);
-  // Report message
-  const handleReportMessage = useCallback(async (messageId: string) => {
-    try {
-      const res = await reportMessage(messageId);
-      showSystemToast({
-        id: `report-message-${messageId}`,
-        type: 'community_post',
-        title: res.result === 'block' ? 'Tin nhắn đã bị xóa' : 'Đã gửi báo cáo',
-        body: res.result === 'block'
-          ? 'Tin nhắn đã bị xóa do vi phạm tiêu chuẩn cộng đồng.'
-          : 'Không phát hiện vi phạm trong tin nhắn này.',
-        variant: res.result === 'block' ? 'warning' : 'success',
-      });
-    } catch {
-      showSystemToast({
-        id: `report-message-${messageId}`,
-        type: 'community_post',
-        title: 'Không thể gửi báo cáo',
-        body: 'Vui lòng thử lại.',
-        variant: 'error',
-      });
-    }
-  }, []);
 
   // React to message
   const handleReactMessage = useCallback(async (messageId: string, reactionType: string) => {
@@ -970,14 +1042,20 @@ function ChatPanel({
               {participantName}
             </button>
             <div className="chat-header-status">
-              <span className={`online-dot ${isOnline ? '' : 'offline'}`} />
-              {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
+              {isConversationActiveCall ? <span className="online-dot" /> : <span className={`online-dot ${isOnline ? '' : 'offline'}`} />}
+              {isConversationActiveCall ? 'Đang gọi' : (isOnline ? 'Đang hoạt động' : 'Ngoại tuyến')}
             </div>
           </div>
         </div>
 
         {/* Header Action Buttons */}
         <div className="chat-header-actions flex-shrink-0">
+          {isConversationActiveCall && (
+            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Đang gọi
+            </span>
+          )}
           <button
             type="button"
             className={`chat-header-btn ${isAudioCallActive ? 'is-active' : ''}`}
@@ -1108,7 +1186,7 @@ function ChatPanel({
                     </button>
                   )}
 
-                  {callStatus === 'incoming' && (
+                  {isIncomingCallStatus(callStatus) && (
                     <>
                       <button
                         type="button"
@@ -1160,7 +1238,7 @@ function ChatPanel({
                     </>
                   )}
 
-                  {callStatus !== 'incoming' && callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected' && (
+                  {!isIncomingCallStatus(callStatus) && callStatus !== 'ended' && callStatus !== 'missed' && callStatus !== 'rejected' && (
                     <button
                       type="button"
                       onClick={onEndCall}
@@ -1232,7 +1310,7 @@ function ChatPanel({
                             if (!node) {
                               return;
                             }
-                            const localStream = localVideoRef.current?.srcObject;
+                            const localStream = localVideoRef?.current?.srcObject;
                             if (localStream && node.srcObject !== localStream) {
                               node.srcObject = localStream;
                             }
@@ -1415,7 +1493,6 @@ function ChatPanel({
                       onReactionUpsert={onReactionUpsert}
                       onReactionRemoveAllMine={onReactionRemoveAllMine}
                       onFetchReactionDetails={onFetchReactionDetails}
-                      onReport={handleReportMessage}
                       onReact={handleReactMessage}
                     />
                   </div>)
@@ -1443,34 +1520,6 @@ function ChatPanel({
         </ReactionDetailsModalProvider>
       </div>
 
-      {/* Moderation Bar */}
-      <div className="chat-moderation-bar">
-        <svg className="w-3.5 h-3.5 text-[#929292] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-        <span className="chat-moderation-text">Mức độ vi phạm tiêu chuẩn cộng đồng</span>
-        <span className={`font-semibold text-[11px] ml-auto ${
-          userPenaltyScore >= 80 ? 'text-red-500' :
-          userPenaltyScore >= 50 ? 'text-orange-500' :
-          userPenaltyScore > 0 ? 'text-yellow-500' : 'text-[#929292]'
-        }`}>
-          {userPenaltyScore}%
-        </span>
-      </div>
-
-      {/* User Muted Warning */}
-      {userMutedUntil && new Date(userMutedUntil) > new Date() && (
-        <div className="bg-[#fef2f2] border-t border-[#fecaca] px-4 py-2">
-          <div className="flex items-center gap-2 text-xs text-red-600">
-            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-            </svg>
-            Bạn đang bị cấm chat đến {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-          </div>
-        </div>
-      )}
-
       {/* Input Area */}
       <MessageInput
         onSend={(content, type, mediaUrl, options) => {
@@ -1482,7 +1531,6 @@ function ChatPanel({
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
         isLoading={isLoading}
-        disabled={!!userMutedUntil && new Date(userMutedUntil) > new Date()}
       />
     </article>
   );
@@ -1501,6 +1549,9 @@ interface HomeDashboardChatPanelProps {
   onUnmuteConversation?: (conversationId: string) => Promise<void>;
   isConversationPinned?: boolean;
   conversationMutedUntil?: Date | null;
+  aiCatchupByConversation?: Record<string, AiCatchupDigest>;
+  onRequestAiCatchup?: (conversationId: string) => Promise<void> | void;
+  onToggleAiCatchupSetting?: (conversationId: string, catchupEnabled: boolean) => Promise<void> | void;
   friends?: GroupFriendOption[];
   onCreateGroup?: (name: string, memberIds: string[]) => Promise<{ _id: string }>;
   onUpdateGroup?: (groupId: string, payload: { name?: string; avatarUrl?: string | null }) => Promise<void>;
@@ -1957,6 +2008,9 @@ export function HomeDashboardChatPanel({
   onUnmuteConversation,
   isConversationPinned = false,
   conversationMutedUntil = null,
+  aiCatchupByConversation = {},
+  onRequestAiCatchup,
+  onToggleAiCatchupSetting,
   friends = [],
   onCreateGroup,
   onUpdateGroup,
@@ -2383,6 +2437,15 @@ export function HomeDashboardChatPanel({
   const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
   const isConversationMuted = Boolean(conversationMutedUntil && new Date(conversationMutedUntil) > new Date());
 
+  const isAiCatchupEnabled = selectedConversation?.aiCatchupEnabled !== false;
+
+  const handleToggleAiCatchup = () => {
+    if (!selectedConversationId || !onToggleAiCatchupSetting) {
+      return;
+    }
+    void onToggleAiCatchupSetting(selectedConversationId, !isAiCatchupEnabled);
+  };
+
   const allMessages = chatPanelProps.messages || [];
   const allMediaItems = allMessages.filter((m) => m.type === 'image' || m.type === 'video');
   const allFileItems = allMessages.filter((m) => String(m.type).startsWith('file/') || m.type === 'audio');
@@ -2415,6 +2478,8 @@ export function HomeDashboardChatPanel({
             conversations={visibleConversations}
             selectedId={selectedConversationId}
             onSelectConversation={onSelectConversation}
+            aiCatchupByConversation={aiCatchupByConversation}
+            onRequestAiCatchup={onRequestAiCatchup}
             searchTargets={visibleSearchTargets}
             onSelectSearchTarget={onSelectSearchTarget}
           />
@@ -2494,6 +2559,15 @@ export function HomeDashboardChatPanel({
                     : 'border-transparent bg-bg-hover text-text-primary hover:bg-bg-active'}`}
                 >
                   {isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleAiCatchup}
+                  className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isAiCatchupEnabled
+                    ? 'border-accent-light bg-accent/10 text-accent'
+                    : 'border-transparent bg-bg-hover text-text-primary hover:bg-bg-active'}`}
+                >
+                  {isAiCatchupEnabled ? 'Tat AI' : 'Bat AI'}
                 </button>
                 {isGroupConversation ? (
                   <>

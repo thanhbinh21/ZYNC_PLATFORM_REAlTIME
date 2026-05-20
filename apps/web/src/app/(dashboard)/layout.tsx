@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { Sparkles } from 'lucide-react';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import { DashboardHeader } from '@/components/shared/DashboardHeader';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
@@ -13,6 +14,8 @@ import type { Notification } from '@/services/notifications';
 import { MediaViewerProvider } from '@/context/media-viewer-context';
 import { getAccessToken } from '@/utils/auth-token';
 import { getSocket } from '@/services/socket';
+import { useAiAssistant } from '@/hooks/use-ai-assistant';
+import { AiAssistantBox } from '@/components/ai-assistant/ai-assistant-box';
 
 type DashboardAppearanceSettings = {
   theme: 'dark' | 'light';
@@ -111,6 +114,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     globalThis.localStorage?.setItem('zync.dashboard.messageFontSize', newSettings.messageFontSize);
   };
 
+  // ── AI Assistant Box ─────────────────────────────────────────────────────────
+  const aiAssistant = useAiAssistant({ defaultLimit: 10 });
+
   // Determine active nav from pathname
   const getActiveNavId = (): string => {
     if (pathname.startsWith('/chat')) return 'chat';
@@ -208,6 +214,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             theme={appearanceSettings.theme}
             onToggleTheme={handleToggleTheme}
             notificationSlot={<NotificationHub onNavigate={handleNotificationNavigate} />}
+            aiAssistantSlot={
+              <button
+                type="button"
+                onClick={aiAssistant.openBox}
+                className="zync-soft-badge relative flex h-10 w-10 items-center justify-center p-0 text-accent hover:bg-accent/10"
+                title="Zync AI Assistant"
+                aria-label="Mở AI Assistant"
+              >
+                <Sparkles className="h-5 w-5" />
+                {aiAssistant.unreadDigestCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {aiAssistant.unreadDigestCount > 9 ? '9+' : aiAssistant.unreadDigestCount}
+                  </span>
+                )}
+              </button>
+            }
             onNavSelect={(id) => {
               if (id === 'logout') onLogout();
             }}
@@ -239,6 +261,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}
         />
         <GlobalCallListener />
+
+        {/* AI Assistant Box */}
+        <AiAssistantBox
+          isOpen={aiAssistant.isOpen}
+          activeTab={aiAssistant.activeTab}
+          conversations={aiAssistant.conversations}
+          items={aiAssistant.items}
+          total={aiAssistant.total}
+          loadingList={aiAssistant.loadingList}
+          loadingItems={aiAssistant.loadingItems}
+          onClose={aiAssistant.closeBox}
+          onTabChange={aiAssistant.setActiveTab}
+          onSummarize={aiAssistant.createDigest}
+          onRegenerate={aiAssistant.regenerate}
+          onOpenChat={(conversationId) => {
+            router.push(`/chat?conversationId=${conversationId}`);
+          }}
+          onLoadMore={aiAssistant.loadItems}
+        />
       </main>
     </MediaViewerProvider>
   );

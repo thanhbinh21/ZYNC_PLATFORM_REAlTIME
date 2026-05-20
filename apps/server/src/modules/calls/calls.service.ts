@@ -9,6 +9,7 @@ import {
   CallEventModel,
   CallParticipantModel,
   CallSessionModel,
+  UserCallStateModel,
   type CallParticipantStatus,
   type CallSessionStatus,
 } from './calls.model';
@@ -21,6 +22,7 @@ import {
 } from './calls.metrics';
 
 const ACTIVE_SESSION_STATUSES: CallSessionStatus[] = ['ringing', 'connecting', 'connected'];
+export const ACTIVE_CALL_CONFLICT_MESSAGE = 'Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước.';
 
 interface CreateOneToOneCallInput {
   targetUserId: string;
@@ -53,6 +55,7 @@ interface CallSessionDetail {
   timeoutAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
+  durationSeconds: number | null;
   endedReason: string | null;
   createdAt: string;
   reused?: boolean;
@@ -177,6 +180,7 @@ async function buildCallSessionDetail(sessionId: string): Promise<CallSessionDet
     timeoutAt: toIso(session.timeoutAt),
     startedAt: toIso(session.startedAt),
     endedAt: toIso(session.endedAt),
+    durationSeconds: typeof session.durationSeconds === 'number' ? session.durationSeconds : null,
     endedReason: session.endedReason ?? null,
     createdAt: session.createdAt.toISOString(),
   };
@@ -215,6 +219,77 @@ function shouldEndGroupSession(counts: { active: number; joined: number }): bool
   return counts.joined <= 0 || counts.active <= 1;
 }
 
+function calculateCallDurationSeconds(startedAt?: Date | null, endedAt?: Date | null): number | undefined {
+  if (!startedAt || !endedAt) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+}
+
+async function ensureUserNotInOtherActiveCall(userId: string, sessionId?: string): Promise<void> {
+  const state = await UserCallStateModel.findOne({ userId }).lean();
+  if (state?.activeCallSessionId && state.activeCallSessionId !== sessionId) {
+    throw new ConflictError(ACTIVE_CALL_CONFLICT_MESSAGE);
+  }
+}
+
+async function setUserActiveCall(userId: string, sessionId: string): Promise<void> {
+  await ensureUserNotInOtherActiveCall(userId, sessionId);
+  await UserCallStateModel.updateOne(
+    { userId },
+    { $set: { activeCallSessionId: sessionId } },
+    { upsert: true },
+  );
+}
+
+async function clearUserActiveCall(userId: string, sessionId: string): Promise<void> {
+  await UserCallStateModel.updateOne(
+    { userId, activeCallSessionId: sessionId },
+    { $unset: { activeCallSessionId: 1 } },
+  );
+}
+
+async function setConversationActiveCall(sessionId: string): Promise<void> {
+  const session = await CallSessionModel.findById(sessionId).lean();
+  if (!session?.conversationId || session.mode !== 'sfu' || !ACTIVE_SESSION_STATUSES.includes(session.status)) {
+    return;
+  }
+
+  await ConversationModel.findByIdAndUpdate(session.conversationId, {
+    $set: {
+      activeCall: {
+        callSessionId: session._id.toString(),
+        type: session.callType,
+        status: session.status,
+        startedAt: session.startedAt,
+        initiatedBy: session.initiatedBy,
+      },
+    },
+  });
+}
+
+async function clearConversationActiveCall(sessionId: string): Promise<void> {
+  const session = await CallSessionModel.findById(sessionId).select('conversationId mode').lean();
+  if (!session?.conversationId || session.mode !== 'sfu') {
+    return;
+  }
+
+  await ConversationModel.updateOne(
+    {
+      _id: session.conversationId,
+      'activeCall.callSessionId': sessionId,
+    },
+    { $unset: { activeCall: 1 } },
+  );
+}
+
+async function clearJoinedUserCallStates(sessionId: string): Promise<void> {
+  await UserCallStateModel.updateMany(
+    { activeCallSessionId: sessionId },
+    { $unset: { activeCallSessionId: 1 } },
+  );
+}
 
 export class CallsService {
   private static async cleanupExpiredRingingSessionsForPair(
@@ -303,13 +378,13 @@ export class CallsService {
 
     session.status = 'ended';
     session.endedAt = now;
+    session.durationSeconds = calculateCallDurationSeconds(session.startedAt, session.endedAt);
     session.endedReason = 'superseded_reinvite';
     await session.save();
+    await clearJoinedUserCallStates(sessionId);
+    await clearConversationActiveCall(sessionId);
 
-    const durationSeconds = session.startedAt
-      ? (session.endedAt.getTime() - session.startedAt.getTime()) / 1000
-      : undefined;
-    recordCallEnded(session.endedReason, durationSeconds);
+    recordCallEnded(session.endedReason, session.durationSeconds);
     await appendCallEvent(sessionId, 'call_force_ended', undefined, {
       reason: session.endedReason,
     });
@@ -408,6 +483,7 @@ export class CallsService {
     }
 
     if (activeSession) {
+      await ensureUserNotInOtherActiveCall(callerUserId, activeSession._id.toString());
       await CallParticipantModel.updateOne(
         { sessionId: activeSession._id.toString(), userId: callerUserId },
         {
@@ -418,10 +494,13 @@ export class CallsService {
           },
         },
       );
+      await setUserActiveCall(callerUserId, activeSession._id.toString());
 
       const detail = await buildCallSessionDetail(activeSession._id.toString());
       return { ...detail, reused: true };
     }
+
+    await ensureUserNotInOtherActiveCall(callerUserId);
 
     const timeoutAt = new Date(Date.now() + getCallRingTimeoutMs());
     const session = await CallSessionModel.create({
@@ -454,6 +533,7 @@ export class CallsService {
       targetUserId: calleeUserId,
       conversationId: input.conversationId ?? null,
     });
+    await setUserActiveCall(callerUserId, session._id.toString());
     recordCallInvite();
 
     return buildCallSessionDetail(session._id.toString());
@@ -518,6 +598,7 @@ export class CallsService {
     }
 
     if (activeSession) {
+      await ensureUserNotInOtherActiveCall(callerUserId, activeSession._id.toString());
       await CallParticipantModel.updateOne(
         { sessionId: activeSession._id.toString(), userId: callerUserId },
         {
@@ -528,9 +609,13 @@ export class CallsService {
           },
         },
       );
+      await setUserActiveCall(callerUserId, activeSession._id.toString());
+      await setConversationActiveCall(activeSession._id.toString());
       const detail = await buildCallSessionDetail(activeSession._id.toString());
       return { ...detail, reused: true };
     }
+
+    await ensureUserNotInOtherActiveCall(callerUserId);
 
     const timeoutAt = new Date(Date.now() + getCallRingTimeoutMs());
     const session = await CallSessionModel.create({
@@ -568,6 +653,8 @@ export class CallsService {
       conversationId: input.conversationId,
       participantCount: participantIds.length,
     });
+    await setUserActiveCall(callerUserId, session._id.toString());
+    await setConversationActiveCall(session._id.toString());
     recordCallInvite();
 
     return buildCallSessionDetail(session._id.toString());
@@ -590,6 +677,7 @@ export class CallsService {
     if (!ACTIVE_SESSION_STATUSES.includes(session.status)) {
       throw new BadRequestError('Call session is no longer active');
     }
+    await ensureUserNotInOtherActiveCall(userId, sessionId);
 
     await CallParticipantModel.updateOne(
       { sessionId, userId },
@@ -607,6 +695,8 @@ export class CallsService {
       await session.save();
     }
 
+    await setUserActiveCall(userId, sessionId);
+    await setConversationActiveCall(sessionId);
     await appendCallEvent(sessionId, 'call_accepted', userId);
     return buildCallSessionDetail(sessionId);
   }
@@ -639,14 +729,18 @@ export class CallsService {
 
     await appendCallEvent(sessionId, 'call_rejected', userId, { reason });
     recordCallRejected(reason);
+    await clearUserActiveCall(userId, sessionId);
 
     if (session.mode === 'sfu') {
       const remainingActive = await countActiveParticipants(sessionId);
       if (shouldEndGroupSession(remainingActive)) {
         session.status = 'rejected';
         session.endedAt = new Date();
+        session.durationSeconds = calculateCallDurationSeconds(session.startedAt, session.endedAt);
         session.endedReason = reason;
         await session.save();
+        await clearJoinedUserCallStates(sessionId);
+        await clearConversationActiveCall(sessionId);
         recordCallEnded(reason);
       }
 
@@ -655,8 +749,10 @@ export class CallsService {
 
     session.status = 'rejected';
     session.endedAt = new Date();
+    session.durationSeconds = calculateCallDurationSeconds(session.startedAt, session.endedAt);
     session.endedReason = reason;
     await session.save();
+    await clearJoinedUserCallStates(sessionId);
     recordCallEnded(reason);
 
     return buildCallSessionDetail(sessionId);
@@ -680,6 +776,7 @@ export class CallsService {
         session.startedAt = new Date();
       }
       await session.save();
+      await setConversationActiveCall(sessionId);
       const setupSeconds = (session.startedAt.getTime() - session.createdAt.getTime()) / 1000;
       recordCallConnected(setupSeconds);
       await appendCallEvent(sessionId, 'call_connected', actorUserId);
@@ -705,7 +802,8 @@ export class CallsService {
       return buildCallSessionDetail(sessionId);
     }
 
-    if (session.mode === 'sfu') {
+    const isGroupHostEndingRoom = session.mode === 'sfu' && session.initiatedBy === userId && reason !== 'left';
+    if (session.mode === 'sfu' && !isGroupHostEndingRoom) {
       await CallParticipantModel.updateOne(
         {
           sessionId,
@@ -718,6 +816,7 @@ export class CallsService {
           },
         },
       );
+      await clearUserActiveCall(userId, sessionId);
 
       await appendCallEvent(sessionId, 'call_left', userId, { reason: reason ?? 'left' });
 
@@ -725,12 +824,12 @@ export class CallsService {
       if (shouldEndGroupSession(remainingActive)) {
         session.status = 'ended';
         session.endedAt = new Date();
+        session.durationSeconds = calculateCallDurationSeconds(session.startedAt, session.endedAt);
         session.endedReason = reason ?? 'ended';
         await session.save();
-        const durationSeconds = session.startedAt
-          ? (session.endedAt.getTime() - session.startedAt.getTime()) / 1000
-          : undefined;
-        recordCallEnded(session.endedReason, durationSeconds);
+        await clearJoinedUserCallStates(sessionId);
+        await clearConversationActiveCall(sessionId);
+        recordCallEnded(session.endedReason, session.durationSeconds);
         await appendCallEvent(sessionId, 'call_ended', userId, { reason: session.endedReason });
       }
 
@@ -749,15 +848,16 @@ export class CallsService {
         },
       },
     );
+    await clearUserActiveCall(userId, sessionId);
 
     session.status = 'ended';
     session.endedAt = new Date();
+    session.durationSeconds = calculateCallDurationSeconds(session.startedAt, session.endedAt);
     session.endedReason = reason ?? 'ended';
     await session.save();
-    const durationSeconds = session.startedAt
-      ? (session.endedAt.getTime() - session.startedAt.getTime()) / 1000
-      : undefined;
-    recordCallEnded(session.endedReason, durationSeconds);
+    await clearJoinedUserCallStates(sessionId);
+    await clearConversationActiveCall(sessionId);
+    recordCallEnded(session.endedReason, session.durationSeconds);
 
     await appendCallEvent(sessionId, 'call_ended', userId, { reason: session.endedReason });
     return buildCallSessionDetail(sessionId);
@@ -786,8 +886,11 @@ export class CallsService {
 
     session.status = 'missed';
     session.endedAt = new Date();
+    session.durationSeconds = calculateCallDurationSeconds(session.startedAt, session.endedAt);
     session.endedReason = 'timeout';
     await session.save();
+    await clearJoinedUserCallStates(sessionId);
+    await clearConversationActiveCall(sessionId);
     recordCallMissed();
     recordCallEnded('timeout');
 

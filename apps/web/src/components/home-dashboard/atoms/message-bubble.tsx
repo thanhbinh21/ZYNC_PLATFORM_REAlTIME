@@ -34,18 +34,18 @@ function DeliveredIcon({ className }: { className: string }) {
 
 function LikeIcon({ className }: { className: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 18.58 3 21 5.42 21 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
 }
 
 function MoreIcon({ className }: { className: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="12" cy="5" r="2" />
-      <circle cx="12" cy="19" r="2" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1" fill="currentColor" />
+      <circle cx="12" cy="5" r="1" fill="currentColor" />
+      <circle cx="12" cy="19" r="1" fill="currentColor" />
     </svg>
   );
 }
@@ -62,7 +62,6 @@ interface MessageBubbleProps {
   mediaUrl?: string;
   replyTo?: MessageReplyTo;
   onJumpToMessage?: (messageRef: string) => void;
-  moderationWarning?: boolean;
   status?: MessageStatus;
   readByPreview?: MessageReadParticipantWithTime[];
   readByCount?: number;
@@ -89,7 +88,6 @@ export function MessageBubble({
   mediaUrl,
   replyTo,
   onJumpToMessage,
-  moderationWarning = false,
   status,
   readByPreview = [],
   readByCount = 0,
@@ -322,14 +320,6 @@ export function MessageBubble({
         {/* Timestamp + Status Row */}
         <div className={`chat-timestamp-row ${isOwn ? 'own' : ''}`}>
           <span className="chat-timestamp">{timeStr}</span>
-
-          {moderationWarning && type !== 'system-recall' && (
-            <span className="inline-flex items-center gap-0.5 text-yellow-500" title="Tin nhắn cảnh báo nội dung">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z" />
-              </svg>
-            </span>
-          )}
 
           {type !== 'system-recall' && isOwn && (
             <span className="chat-status-icon">

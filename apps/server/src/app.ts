@@ -12,7 +12,6 @@ import { messagesRouter } from './modules/messages/messages.routes';
 import { uploadRouter } from './modules/upload/upload.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { aiRouter } from './modules/ai/ai.routes';
-import { moderationAdminRouter } from './modules/ai/moderation/moderation.controller';
 import { callsRouter } from './modules/calls/calls.routes';
 import { stickersRouter } from './modules/stickers/sticker.routes';
 import { postsRouter } from './modules/posts/posts.routes';
@@ -71,7 +70,6 @@ export function createApp(): Application {
   app.use('/api/calls', callsRouter);
   app.use('/api/stickers', stickersRouter);
   app.use('/api/posts', postsRouter);
-  app.use('/api/admin/moderation', moderationAdminRouter);
 
   // Xử lý route không tồn tại
   app.use((_req: Request, res: Response) => {

@@ -1,0 +1,114 @@
+import { type NextFunction, type RequestHandler, type Response } from 'express';
+import { BadRequestError } from '../../../shared/errors';
+import { type AuthRequest } from '../../../shared/middleware/auth.middleware';
+import {
+  CreateCatchupDigestSchema,
+  UpdateCatchupSettingsSchema,
+  AssistantQuerySchema,
+  UnreadConversationsQuerySchema,
+} from './assistant.schema';
+import { AiAssistantService } from './assistant.service';
+
+const asyncHandler = (fn: unknown): RequestHandler => fn as RequestHandler;
+
+export const getAssistantListHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const parsed = AssistantQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const { type, conversationId, limit, skip } = parsed.data;
+      const result = await AiAssistantService.getItemList(req.userId, {
+        type,
+        conversationId,
+        limit,
+        skip,
+      });
+
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const getUnreadConversationsHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const parsed = UnreadConversationsQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const result = await AiAssistantService.getUnreadConversations(req.userId, {
+        limit: parsed.data.limit,
+        skip: parsed.data.skip,
+      });
+
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const createCatchupDigestHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const parsed = CreateCatchupDigestSchema.safeParse(req.body);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const result = await AiAssistantService.createCatchupDigest(req.userId, parsed.data);
+      res.status(201).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const getCatchupLatestHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId } = req.params;
+      if (!conversationId) throw new BadRequestError('conversationId is required');
+
+      const result = await AiAssistantService.getCatchupLatest(req.userId, conversationId);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const regenerateCatchupHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId } = req.params;
+      if (!conversationId) throw new BadRequestError('conversationId is required');
+
+      const result = await AiAssistantService.regenerateCatchup(req.userId, conversationId);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const updateSettingsHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId } = req.params;
+      if (!conversationId) throw new BadRequestError('conversationId is required');
+
+      const parsed = UpdateCatchupSettingsSchema.safeParse(req.body);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const result = await AiAssistantService.updateSettings(
+        req.userId,
+        conversationId,
+        parsed.data.catchupEnabled,
+      );
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

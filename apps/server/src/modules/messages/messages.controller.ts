@@ -8,9 +8,7 @@ import { type AuthRequest } from '../../shared/middleware/auth.middleware';
 import { getIO } from '../../socket/gateway';
 import { MessageType } from './message.model';
 import { ConversationsService } from '../conversations/conversations.service';
-import { reportAndReviewMessage } from '../ai/moderation/moderation.service';
 import { ConversationMemberModel } from '../conversations/conversation-member.model';
-import { refreshPenaltyWindow } from '../ai/moderation/penalty-policy';
 import { UserModel } from '../users/user.model';
 
 // â”€â”€â”€ POST /api/messages/send â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -42,25 +40,13 @@ export const sendMessageHandler = (async (
     } = validationResult.data;
     const userId = req.userId;
 
-    const membership = await ConversationMemberModel.findOne({
+    const membership = await ConversationMemberModel.exists({
       conversationId,
       userId,
-    }).select('penaltyScore mutedUntil penaltyWindowStartedAt');
+    });
 
     if (!membership) {
       return next(new ForbiddenError('Not allowed to send message in this conversation'));
-    }
-
-    if (refreshPenaltyWindow(membership)) {
-      await membership.save();
-    }
-
-    if (membership.mutedUntil && membership.mutedUntil > new Date()) {
-      return next(
-        new ForbiddenError(
-          `Bạn đang bị tạm khóa gửi tin đến ${membership.mutedUntil.toLocaleTimeString('vi-VN')}`,
-        ),
-      );
     }
 
     // Create message
@@ -84,7 +70,6 @@ export const sendMessageHandler = (async (
       type as MessageType,
       idempotencyKey,
       mediaUrl ?? undefined,
-      false,
       replyTo,
     );
 
@@ -355,34 +340,6 @@ export const getMessageReactionDetailsHandler = (async (
       conversationId: data.conversationId,
       tabs: data.tabs,
       rows: data.rows,
-    });
-  } catch (err) {
-    next(err);
-  }
-}) as unknown as RequestHandler;
-
-// ─── POST /api/messages/:messageId/report ──────────────────────────────────
-
-export const reportMessageHandler = (async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
-  try {
-    const { messageId } = req.params;
-
-    if (!messageId || messageId.trim().length === 0) {
-      return next(new BadRequestError('messageId is required'));
-    }
-
-    const userId = req.userId!;
-    const action = await reportAndReviewMessage(messageId, userId);
-
-    res.json({
-      success: true,
-      messageId,
-      reportedBy: userId,
-      result: action,
     });
   } catch (err) {
     next(err);

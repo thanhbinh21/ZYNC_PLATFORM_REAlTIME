@@ -42,7 +42,7 @@ export interface Conversation {
 }
 
 // Kiểu dữ liệu Message
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export interface MessageReactionSummary {
@@ -82,6 +82,17 @@ export interface SenderInMessage {
   avatarUrl?: string;
 }
 
+export interface CallHistory {
+  callSessionId: string;
+  callType: 'audio' | 'video';
+  status: 'ended' | 'missed' | 'rejected' | 'cancelled';
+  startedAt?: string | Date;
+  endedAt?: string | Date;
+  durationSeconds?: number;
+  callerId: string;
+  participantIds: string[];
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -90,6 +101,7 @@ export interface Message {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  callHistory?: CallHistory;
   moderationWarning?: boolean;
   replyTo?: MessageReplyTo;
   idempotencyKey: string;
@@ -151,6 +163,7 @@ export interface ReceiveMessagePayload {
   content: string;
   type: MessageType;
   mediaUrl?: string;
+  callHistory?: CallHistory;
   moderationWarning?: boolean;
   replyTo?: MessageReplyTo;
   createdAt: string;
@@ -171,6 +184,121 @@ export interface TypingIndicatorPayload {
   userId: string;
   conversationId: string;
   isTyping: boolean;
+}
+
+export type AiCatchupDigestStatus = 'queued' | 'processing' | 'ready' | 'failed';
+export type AiCatchupDigestTrigger = 'manual' | 'auto_suggested';
+export type AiCatchupMode = 'unread' | 'since_last_digest' | 'recent';
+
+export interface AiCatchupSummary {
+  title: string;
+  overview: string;
+  bullets: string[];
+  mentionedUserIds: string[];
+  sourceMessageRefs: string[];
+}
+
+export interface AiCatchupFutureSignals {
+  decisions: string[];
+  questionsForUser: string[];
+  actionItems: Array<{ text: string; sourceMessageRefs: string[] }>;
+  suggestedReplies: string[];
+}
+
+export interface AiCatchupDigest {
+  _id: string;
+  userId: string;
+  conversationId: string;
+  cacheKey: string;
+  fromMessageRef: string;
+  toMessageRef: string;
+  messageRefs: string[];
+  messageCount: number;
+  omittedOlderCount: number;
+  catchupMode?: AiCatchupMode;
+  trigger: AiCatchupDigestTrigger;
+  status: AiCatchupDigestStatus;
+  summary?: AiCatchupSummary;
+  futureSignals?: AiCatchupFutureSignals;
+  model?: string;
+  inputHash: string;
+  error?: string;
+  generatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiCatchupDigestUpdatedPayload {
+  digestId: string;
+  conversationId: string;
+  status: AiCatchupDigestStatus;
+  summary?: AiCatchupSummary;
+  error?: string;
+  updatedAt: string;
+}
+
+// ─── AI Reminders ──────────────────────────────────────────────────────────────
+export type AiReminderStatus = 'pending' | 'done' | 'dismissed';
+export type AiReminderCreatedBy = 'ai_suggestion' | 'user';
+
+export interface AiReminder {
+  _id: string;
+  userId: string;
+  conversationId: string;
+  digestId?: string;
+  sourceMessageRefs: string[];
+  title: string;
+  description?: string;
+  dueAt?: string;
+  status: AiReminderStatus;
+  createdBy: AiReminderCreatedBy;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiReminderUpdatedPayload extends Omit<AiReminder, 'status'> {
+  status: AiReminderStatus | 'deleted';
+}
+
+// ─── AI Assistant Box ────────────────────────────────────────────────────────────
+export type AiItemType = 'catchup_digest' | 'task' | 'search_result' | 'group_note' | 'call_summary';
+export type AiItemStatus = 'not_started' | 'queued' | 'processing' | 'ready' | 'failed';
+
+export interface AiAssistantItemMetadata {
+  unreadCount?: number;
+  latestMessageAt?: string;
+  lastDigestAt?: string;
+  catchupMode?: AiCatchupMode;
+  actionItemCount?: number;
+  messageCount?: number;
+}
+
+export interface AiAssistantItem {
+  _id: string;
+  userId: string;
+  type: AiItemType;
+  conversationId?: string;
+  refId?: string;
+  status: AiItemStatus;
+  title?: string;
+  summarySnippet?: string;
+  metadata?: AiAssistantItemMetadata;
+  trigger: 'manual' | 'auto';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiAssistantItemPayload {
+  itemId: string;
+  type: AiItemType;
+  conversationId?: string;
+  status: AiItemStatus;
+  title?: string;
+  summarySnippet?: string;
+  metadata?: AiAssistantItemMetadata;
+  detail?: unknown;
+  error?: string;
+  updatedAt: string;
 }
 
 export interface UserOnlinePayload {
@@ -211,7 +339,26 @@ export interface IStickerPack {
   updatedAt?: string;
 }
 
-// Wrapper Response chuẩn cho REST API
+// ─── AI Provider abstraction ──────────────────────────────────────────────────
+export type AIProviderType = 'gemini' | 'openrouter';
+
+export interface AIProviderResult {
+  text: string;
+  modelId: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+}
+
+export interface AIProvider {
+  readonly type: AIProviderType;
+  readonly modelId: string;
+  generateJson(prompt: string, repairRaw?: string): Promise<AIProviderResult>;
+}
+
+// ─── Wrapper Response chuẩn cho REST API ─────────────────────────────────────
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;

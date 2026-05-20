@@ -34,7 +34,7 @@ if (lanIp) {
   console.log(`[web:lan] LAN IP not found automatically. Use 'ipconfig' and open http://<your-ip>:${PORT}`);
 }
 
-const nextBin = require.resolve('next/dist/bin/next');
+const nextBin = require.resolve('./next-with-react18.cjs');
 const child = spawn(
   process.execPath,
   [nextBin, 'dev', '--hostname', '0.0.0.0', '--port', PORT],

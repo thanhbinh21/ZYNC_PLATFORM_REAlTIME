@@ -19,7 +19,7 @@ export interface EmptyStateProps {
 }
 
 const EMPTY_STATE_CONFIG: Record<EmptyStateVariant, {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>;
   defaultTitle: string;
   defaultDescription: string;
   defaultAction?: { label: string; actionType: 'navigate' | 'retry' | 'custom' };

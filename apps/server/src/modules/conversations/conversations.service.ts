@@ -3,8 +3,19 @@ import { ConversationModel } from './conversation.model';
 import { UserModel } from '../users/user.model';
 import { ensureAcceptedFriendship } from '../friends/friends.service';
 import { MessageModel } from '../messages/message.model';
+import { CallSessionModel } from '../calls/calls.model';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
+
+const ACTIVE_CALL_SESSION_STATUSES = ['ringing', 'connecting', 'connected'] as const;
+
+type ActiveConversationCall = {
+  callSessionId: string;
+  type: 'audio' | 'video';
+  status: 'ringing' | 'connecting' | 'connected';
+  startedAt?: Date | string | null;
+  initiatedBy: string;
+};
 
 interface EnrichedConversation {
   _id: string;
@@ -20,7 +31,12 @@ interface EnrichedConversation {
     senderDisplayName?: string;
     sentAt: Date;
   };
+  activeCall: ActiveConversationCall | null;
   unreadCounts?: Record<string, number>;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
   updatedAt: Date;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
 }
@@ -30,6 +46,10 @@ interface ConversationMemberOverride {
   lastVisibleMessageRef?: string;
   lastVisibleAt?: Date;
   unreadCount?: number;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
 }
 
 interface LastVisibleMessage {
@@ -72,6 +92,43 @@ function getMessagePreview(content: unknown, type: unknown): string {
   return 'Tin nhan media';
 }
 
+export async function resolveActiveCallForConversation(
+  conversationId: string,
+  activeCall?: ActiveConversationCall | null,
+): Promise<ActiveConversationCall | null> {
+  if (!activeCall?.callSessionId) {
+    return null;
+  }
+
+  const session = await CallSessionModel.findById(activeCall.callSessionId)
+    .select('conversationId callType status startedAt initiatedBy')
+    .lean();
+
+  const sessionConversationId = session?.conversationId ? String(session.conversationId) : null;
+  if (
+    !session
+    || sessionConversationId !== conversationId
+    || !ACTIVE_CALL_SESSION_STATUSES.includes(session.status as ActiveConversationCall['status'])
+  ) {
+    await ConversationModel.updateOne(
+      {
+        _id: conversationId,
+        'activeCall.callSessionId': activeCall.callSessionId,
+      },
+      { $unset: { activeCall: 1 } },
+    );
+    return null;
+  }
+
+  return {
+    callSessionId: session._id.toString(),
+    type: session.callType,
+    status: session.status as ActiveConversationCall['status'],
+    startedAt: session.startedAt ?? null,
+    initiatedBy: session.initiatedBy,
+  };
+}
+
 async function enrichConversationById(
   conversationId: string,
   viewerId?: string,
@@ -82,7 +139,7 @@ async function enrichConversationById(
   }
 
   const membersRaw = await ConversationMemberModel.find({ conversationId })
-    .select('userId lastVisibleMessageRef lastVisibleAt unreadCount')
+    .select('userId lastVisibleMessageRef lastVisibleAt unreadCount aiPreferences')
     .lean();
 
   const members = membersRaw as unknown as ConversationMemberOverride[];
@@ -107,6 +164,10 @@ async function enrichConversationById(
     : undefined;
 
   const unreadCounts = normalizeUnreadCounts(conversation.unreadCounts);
+  const activeCall = await resolveActiveCallForConversation(
+    conversation._id.toString(),
+    conversation.activeCall as ActiveConversationCall | null | undefined,
+  );
 
   if (viewerId) {
     const viewerMember = members.find((member) => member.userId === viewerId);
@@ -151,7 +212,11 @@ async function enrichConversationById(
     adminIds: conversation.adminIds,
     memberApprovalEnabled: conversation.memberApprovalEnabled,
     lastMessage,
+    activeCall,
     unreadCounts,
+    aiPreferences: viewerId
+      ? members.find((member) => member.userId === viewerId)?.aiPreferences ?? { catchupEnabled: true }
+      : undefined,
     updatedAt: conversation.updatedAt,
     users: usersNormalized,
   };
