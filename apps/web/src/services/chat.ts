@@ -114,14 +114,6 @@ export async function getMessageReactionDetails(messageRef: string): Promise<Rea
 }
 
 /**
- * Report a message for AI moderation
- */
-export async function reportMessage(messageId: string): Promise<{ success: boolean; result: string }> {
-  const { data } = await apiClient.post(`/api/messages/${messageId}/report`);
-  return data;
-}
-
-/**
  * React to a message
  */
 export async function reactMessage(messageId: string, reactionType: string): Promise<{ success: boolean; action: string }> {

@@ -60,13 +60,16 @@ import {
   unlistenToAiCatchupDigestUpdated,
 } from '@/services/socket';
 import { getMessageReactionDetails, type ReactionDetailsResponse } from '@/services/chat';
-import type { AiCatchupDigest, AiCatchupDigestUpdatedPayload, Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
+import type { AiCatchupDigest, AiCatchupDigestUpdatedPayload, AiReminder, Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
 import {
   createAiCatchupDigest,
   getLatestAiCatchupDigest,
   regenerateAiCatchupDigest,
   updateAiCatchupSettings,
 } from '@/services/ai-catchup';
+import {
+  createReminderFromActionItem,
+} from '@/services/ai-reminder';
 import {
   addGroupMembers,
   createGroup,
@@ -329,6 +332,7 @@ export function useHomeDashboard() {
   const [activeCall, setActiveCallState] = useState<CallSessionState | null>(callStore.activeCall);
   const [aiCatchupByConversation, setAiCatchupByConversation] = useState<Record<string, AiCatchupDigest>>({});
   const [aiCatchupRequestingByConversation, setAiCatchupRequestingByConversation] = useState<Record<string, boolean>>({});
+  const [aiReminders, setAiReminders] = useState<AiReminder[]>([]);
 
   useEffect(() => {
     return subscribeToCallStore((call) => {
@@ -863,8 +867,6 @@ export function useHomeDashboard() {
     recallMessage,
     unsetMessages_Status,
     isLoading: chatLoading,
-    userPenaltyScore,
-    userMutedUntil,
   } = useChat({
     conversationId: selectedConversationId,
     userId,
@@ -1032,6 +1034,16 @@ export function useHomeDashboard() {
       throw error;
     }
   }, [conversations]);
+
+  const createReminderFromAiActionItem = useCallback(async (
+    actionItem: { text: string; sourceMessageRefs: string[] },
+  ) => {
+    if (!selectedConversationId) {
+      return;
+    }
+    const digest = aiCatchupByConversation[selectedConversationId];
+    await createReminderFromActionItem(selectedConversationId, actionItem, digest?._id);
+  }, [selectedConversationId, aiCatchupByConversation]);
 
   useEffect(() => {
     if (!selectedConversationId || !userId) {
@@ -3830,6 +3842,7 @@ export function useHomeDashboard() {
     onRequestAiCatchup: requestAiCatchup,
     onRegenerateAiCatchup: regenerateAiCatchup,
     onToggleAiCatchupSetting: toggleAiCatchupSetting,
+    onCreateReminder: createReminderFromAiActionItem,
     searchTargets: searchTargets(),
     onSelectSearchTarget: openConversationFromSearch,
     messages: messageHistory.messages.filter(isVisibleChatMessage),
@@ -3899,8 +3912,6 @@ export function useHomeDashboard() {
     onToggleMic: handleToggleMic,
     onToggleCamera: handleToggleCamera,
     onToggleScreenShare: handleToggleScreenShare,
-    userPenaltyScore,
-    userMutedUntil,
     forwardModalOpen,
     setForwardModalOpen,
     forwardingMessage,

@@ -12,10 +12,30 @@ import { connectKafka } from './infrastructure/kafka';
 import { initSocketGateway } from './socket/gateway';
 import { startMessageWorker, stopMessageWorker } from './workers/message.worker';
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
-import { startModerationWorker, stopModerationWorker } from './modules/ai/moderation/moderation.worker';
 import { startCatchupWorker, stopCatchupWorker } from './modules/ai/catchup/catchup.worker';
+import { startAssistantWorker, stopAssistantWorker } from './modules/ai/workers/ai-assistant.worker';
 import { runPgvectorMigration, isNeonAvailable } from './infrastructure/neon';
 import { logger } from './shared/logger';
+
+const originalEmitWarning = process.emitWarning.bind(process) as (...args: any[]) => void;
+process.emitWarning = ((warning: string | Error, ...args: any[]) => {
+  const typeOrOptions = args[0] as string | NodeJS.EmitWarningOptions | undefined;
+  const warningName = warning instanceof Error
+    ? warning.name
+    : typeof typeOrOptions === 'string'
+      ? typeOrOptions
+      : typeOrOptions?.type;
+  const warningMessage = warning instanceof Error ? warning.message : warning;
+
+  if (
+    warningName === 'TimeoutNegativeWarning'
+    && warningMessage.includes('is a negative number')
+  ) {
+    return;
+  }
+
+  originalEmitWarning(warning, ...args);
+}) as typeof process.emitWarning;
 
 const PORT = parseInt(process.env['PORT'] ?? '3000', 10);
 const HOST = process.env['HOST'];
@@ -44,15 +64,14 @@ async function bootstrap(): Promise<void> {
     void startNotificationWorker().catch((err: unknown) => {
       logger.error('Notification worker failed', err);
     });
-    // AI-1: Moderation worker (passive, fail-open)
-    if (process.env['AI_MODERATION_ENABLED'] !== 'false') {
-      void startModerationWorker().catch((err: unknown) => {
-        logger.error('Moderation worker failed to start (non-fatal)', err);
-      });
-    }
+    // AI Catchup + AI Assistant Box
     if (process.env['AI_CATCHUP_ENABLED'] !== 'false') {
       void startCatchupWorker().catch((err: unknown) => {
         logger.error('AI Catch-up worker failed to start (non-fatal)', err);
+      });
+      // AI Assistant Box worker (Phase 1)
+      void startAssistantWorker().catch((err: unknown) => {
+        logger.error('AI Assistant worker failed to start (non-fatal)', err);
       });
     }
   } else {
@@ -85,8 +104,8 @@ async function bootstrap(): Promise<void> {
     if (process.env['KAFKA_ENABLED'] === 'true') {
       await stopMessageWorker();
       await stopNotificationWorker();
-      await stopModerationWorker();
       await stopCatchupWorker();
+      await stopAssistantWorker();
     }
     
     httpServer.close(() => {
@@ -103,4 +122,3 @@ bootstrap().catch((err: unknown) => {
   logger.error('Failed to start server', err);
   process.exit(1);
 });
-

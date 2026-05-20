@@ -10,6 +10,14 @@ import {
   regenerateCatchupDigestHandler,
   updateCatchupSettingsHandler,
 } from './catchup/catchup.controller';
+import {
+  createReminderHandler,
+  listRemindersHandler,
+  getReminderHandler,
+  updateReminderHandler,
+  deleteReminderHandler,
+} from './reminders/reminder.controller';
+import { assistantRouter } from './assistant/assistant.routes';
 
 export const aiRouter = Router();
 
@@ -26,7 +34,6 @@ aiRouter.get('/health', authenticate, (_req: Request, res: Response) => {
         enabled: aiEnabled,
         gemini: aiEnabled ? 'configured' : 'missing GEMINI_API_KEY',
         neon: neonAvailable ? 'configured' : 'missing NEON_DATABASE_URL',
-        moderation: process.env['AI_MODERATION_ENABLED'] !== 'false',
         assistant: process.env['AI_ASSISTANT_ENABLED'] !== 'false',
         search: process.env['AI_SEARCH_ENABLED'] !== 'false',
         catchup: process.env['AI_CATCHUP_ENABLED'] !== 'false',
@@ -64,3 +71,17 @@ aiRouter.patch(
   authenticate,
   updateCatchupSettingsHandler,
 );
+
+// ─── Reminders ──────────────────────────────────────────────────────────────────
+aiRouter.post('/reminders', authenticate, createReminderHandler);
+
+aiRouter.get('/reminders', authenticate, listRemindersHandler);
+
+aiRouter.get('/reminders/:reminderId', authenticate, getReminderHandler);
+
+aiRouter.patch('/reminders/:reminderId', authenticate, updateReminderHandler);
+
+aiRouter.delete('/reminders/:reminderId', authenticate, deleteReminderHandler);
+
+// ─── AI Assistant Box ────────────────────────────────────────────────────────────
+aiRouter.use('/assistant', assistantRouter);

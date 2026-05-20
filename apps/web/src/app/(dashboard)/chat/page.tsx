@@ -29,6 +29,7 @@ function ChatPageContent() {
     onRequestAiCatchup,
     onRegenerateAiCatchup,
     onToggleAiCatchupSetting,
+    onCreateReminder,
     searchTargets,
     onSelectSearchTarget,
     friendsForGroup,
@@ -100,8 +101,6 @@ function ChatPageContent() {
     onToggleMic,
     onToggleCamera,
     onToggleScreenShare,
-    userPenaltyScore,
-    userMutedUntil,
   } = useHomeDashboard();
 
   useEffect(() => {
@@ -176,6 +175,7 @@ function ChatPageContent() {
           aiCatchupRequesting,
           onRequestAiCatchup: () => onRequestAiCatchup(selectedConversationId),
           onRegenerateAiCatchup: () => onRegenerateAiCatchup(aiCatchupDigest?._id),
+          onCreateReminder: (actionItem) => void onCreateReminder?.(actionItem),
           onSendMessage: onSendMessage,
           onCancelPendingMessage: onCancelPendingMessage,
           onStartTyping: onStartTyping,
@@ -213,8 +213,6 @@ function ChatPageContent() {
           onToggleMic: onToggleMic,
           onToggleCamera: onToggleCamera,
           onToggleScreenShare: onToggleScreenShare,
-          userPenaltyScore: userPenaltyScore,
-          userMutedUntil: userMutedUntil,
           forwardingMessage,
           forwardModalOpen,
           forwardLoading,

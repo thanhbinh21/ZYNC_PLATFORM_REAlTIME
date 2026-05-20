@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, type ComponentType, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Bot, CheckCircle2, Loader2, Play, PenLine, RefreshCw, Sparkles, Heart } from 'lucide-react';
+import { AlertCircle, Bot, CheckCircle2, ListChecks, HelpCircle, Bell, MessageSquare, Loader2, Play, PenLine, RefreshCw, Sparkles, Heart, Phone, Video } from 'lucide-react';
 import type { AiCatchupDigest, Message, MessageStatus } from '@zync/shared-types';
 import {
   Menu,
@@ -20,7 +20,7 @@ import { MessageInput } from '../molecules/message-input';
 import { MessageType } from '@zync/shared-types';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { ReactionDetailsResponse } from '@/services/chat';
-import { reportMessage, reactMessage } from '@/services/chat';
+import { reactMessage } from '@/services/chat';
 import { fetchPostsByAuthor, type Post } from '@/services/posts';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -37,6 +37,9 @@ const CheckCircleIcon = CheckCircle2 as unknown as LucideIconComponent;
 const LoaderIcon = Loader2 as unknown as LucideIconComponent;
 const RefreshIcon = RefreshCw as unknown as LucideIconComponent;
 const SparklesIcon = Sparkles as unknown as LucideIconComponent;
+const PhoneIcon = Phone as unknown as LucideIconComponent;
+const VideoIcon = Video as unknown as LucideIconComponent;
+const InfoIcon = AlertCircle as unknown as LucideIconComponent;
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -60,55 +63,43 @@ function isActiveConversationCall(call?: ConversationActiveCall | null): call is
   );
 }
 
-// ==================== ICONS ====================
-
-function PhoneIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 3a2.5 2.5 0 0 1 2.5-2.5h2.69a2.5 2.5 0 0 1 2.5 2.5v3.69a2.5 2.5 0 0 1-2.5 2.5H5a13 13 0 0 0 13 13v-3.81a2.5 2.5 0 0 1 2.5-2.5h3.69a2.5 2.5 0 0 1 2.5 2.5V21a2.5 2.5 0 0 1-2.5 2.5h-6.5A18 18 0 0 1 3.5 3Z" /></svg>;
-}
-
-function VideoIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x={1} y={5} width={15} height={14} rx={2} ry={2} /></svg>;
-}
+// ==================== CALL UI ICONS ====================
 
 function MicIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={9} y={2} width={6} height={11} rx={3} /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v5" /><path d="M8 22h8" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v5" /><path d="M8 22h8" /></svg>;
 }
 
 function CameraControlIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect x={2} y={6} width={14} height={12} rx={2} ry={2} /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z" /><rect x="2" y="6" width="14" height="12" rx="2" ry="2" /></svg>;
 }
 
 function ScreenShareIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x={2} y={3} width={20} height={14} rx={2} /><path d="M8 21h8" /><path d="M12 17v4" /><path d="m9 10 3-3 3 3" /><path d="M12 7v7" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /><path d="m9 10 3-3 3 3" /><path d="M12 7v7" /></svg>;
 }
 
 function MinimizeIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v5H3" /><path d="M21 16h-5v5" /><path d="M3 8l6-6" /><path d="M15 22l6-6" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v5H3" /><path d="M21 16h-5v5" /><path d="M3 8l6-6" /><path d="M15 22l6-6" /></svg>;
 }
 
 function MaximizeIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>;
 }
 
 function EndCallIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 15.5c4.8-4.5 10.2-4.5 15 0" /><path d="M8.5 12.5c.4 1.6.8 2.6 1.4 3.1" /><path d="M15.5 12.5c-.4 1.6-.8 2.6-1.4 3.1" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 15.5c4.8-4.5 10.2-4.5 15 0" /><path d="M8.5 12.5c.4 1.6.8 2.6 1.4 3.1" /><path d="M15.5 12.5c-.4 1.6-.8 2.6-1.4 3.1" /></svg>;
 }
 
 function CheckIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>;
 }
 
 function CloseIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>;
-}
-
-function InfoIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><circle cx={12} cy={12} r={10} /><line x1={12} y1={16} x2={12} y2={12} /><line x1={12} y1={8} x2={12.01} y2={8} /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>;
 }
 
 function SearchIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="11" cy="11" r="6" />
       <path d="m16 16 4 4" strokeLinecap="round" />
     </svg>
@@ -117,7 +108,7 @@ function SearchIcon() {
 
 function BellOffMiniIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M3 3l18 18" strokeLinecap="round" />
       <path d="M10.58 6.53A5 5 0 0 1 17 11v3l2 2H7" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M9 18a3 3 0 0 0 6 0" strokeLinecap="round" />
@@ -128,7 +119,7 @@ function BellOffMiniIcon() {
 
 function PinMiniIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M15 3l6 6-2 2-3-3-3 3v4l-2 2v-6l-5 5-2-2 5-5H3l2-2h4l3-3-3-3 2-2 6 6z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -292,14 +283,13 @@ interface ChatPanelProps {
   isLoading?: boolean;
   hasMoreMessages?: boolean;
   error?: string | null;
-  userPenaltyScore?: number;
-  userMutedUntil?: Date | null;
   aiCatchupDigest?: AiCatchupDigest | null;
   aiCatchupUnreadCount?: number;
   aiCatchupEnabled?: boolean;
   aiCatchupRequesting?: boolean;
   onRequestAiCatchup?: () => Promise<void> | void;
   onRegenerateAiCatchup?: () => Promise<void> | void;
+  onCreateReminder?: (actionItem: { text: string; sourceMessageRefs: string[] }) => Promise<void> | void;
 }
 
 interface ConversationItem {
@@ -596,8 +586,6 @@ function ChatPanel({
   onToggleMic = () => {},
   onToggleCamera = () => {},
   onToggleScreenShare = () => {},
-  userPenaltyScore = 0,
-  userMutedUntil = null,
   hasMoreMessages = true,
   aiCatchupDigest = null,
   aiCatchupUnreadCount = 0,
@@ -605,6 +593,7 @@ function ChatPanel({
   aiCatchupRequesting = false,
   onRequestAiCatchup = () => {},
   onRegenerateAiCatchup = () => {},
+  onCreateReminder = () => {},
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -779,6 +768,10 @@ function ChatPanel({
     void onRegenerateAiCatchup();
   };
 
+  const handleCreateReminder = (actionItem: { text: string; sourceMessageRefs: string[] }) => {
+    void onCreateReminder?.(actionItem);
+  };
+
   useEffect(() => {
     if (!isGroupCallActive || callStatus !== 'connected' || remoteParticipantVideos.length === 0) {
       setActiveSpeakerUserId(null);
@@ -894,29 +887,6 @@ function ChatPanel({
       setIsCallMinimized(false);
     }
   }, [isCallVisible, isCompactCallState]);
-  // Report message
-  const handleReportMessage = useCallback(async (messageId: string) => {
-    try {
-      const res = await reportMessage(messageId);
-      showSystemToast({
-        id: `report-message-${messageId}`,
-        type: 'community_post',
-        title: res.result === 'block' ? 'Tin nhắn đã bị xóa' : 'Đã gửi báo cáo',
-        body: res.result === 'block'
-          ? 'Tin nhắn đã bị xóa do vi phạm tiêu chuẩn cộng đồng.'
-          : 'Không phát hiện vi phạm trong tin nhắn này.',
-        variant: res.result === 'block' ? 'warning' : 'success',
-      });
-    } catch {
-      showSystemToast({
-        id: `report-message-${messageId}`,
-        type: 'community_post',
-        title: 'Không thể gửi báo cáo',
-        body: 'Vui lòng thử lại.',
-        variant: 'error',
-      });
-    }
-  }, []);
 
   // React to message
   const handleReactMessage = useCallback(async (messageId: string, reactionType: string) => {
@@ -1435,82 +1405,6 @@ function ChatPanel({
             <ReactionPickerProvider>
               <MenuProvider>
             <div ref={menuLayerRef} className="relative">
-            {shouldShowCatchupCard && (
-              <section className="mb-4 rounded-2xl border border-accent/20 bg-accent/5 px-4 py-3 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">
-                        {catchupStatus === 'failed' ? (
-                          <AlertCircleIcon className="h-4 w-4" aria-hidden />
-                        ) : catchupStatus === 'ready' ? (
-                          <CheckCircleIcon className="h-4 w-4" aria-hidden />
-                        ) : catchupStatus === 'queued' || catchupStatus === 'processing' ? (
-                          <LoaderIcon className="h-4 w-4 animate-spin" aria-hidden />
-                        ) : (
-                          <SparklesIcon className="h-4 w-4" aria-hidden />
-                        )}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-text-primary">Tom tat tin moi</p>
-                        <p className="text-xs text-text-secondary">{catchupStatusLabel}</p>
-                      </div>
-                    </div>
-
-                    {aiCatchupDigest?.status === 'ready' && aiCatchupDigest.summary ? (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-sm font-semibold text-text-primary">{aiCatchupDigest.summary.title}</p>
-                        <p className="text-sm leading-relaxed text-text-secondary">{aiCatchupDigest.summary.overview}</p>
-                        {aiCatchupDigest.summary.bullets.length > 0 && (
-                          <ul className="space-y-1 text-sm text-text-secondary">
-                            {aiCatchupDigest.summary.bullets.slice(0, 6).map((bullet, index) => (
-                              <li key={`${bullet}-${index}`} className="flex gap-2">
-                                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-accent" />
-                                <span>{bullet}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <p className="text-[11px] text-text-tertiary">
-                          Nguon: {aiCatchupDigest.fromMessageRef || 'snapshot'} - {aiCatchupDigest.toMessageRef || 'latest'}
-                          {aiCatchupDigest.omittedOlderCount > 0 ? `, bo qua ${aiCatchupDigest.omittedOlderCount} tin cu hon` : ''}
-                        </p>
-                      </div>
-                    ) : aiCatchupDigest?.status === 'failed' ? (
-                      <p className="mt-2 text-sm text-red-500">{aiCatchupDigest.error || 'AI khong the tom tat luc nay.'}</p>
-                    ) : (
-                      <p className="mt-2 text-sm text-text-secondary">
-                        Tao ban tom tat rieng cho nhung tin ban chua doc trong hoi thoai nay.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex shrink-0 gap-2">
-                    {aiCatchupDigest?.status === 'ready' ? (
-                      <button
-                        type="button"
-                        onClick={handleRegenerateCatchup}
-                        disabled={!canRequestCatchup}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-3 py-2 text-xs font-semibold text-text-primary transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <RefreshIcon className="h-3.5 w-3.5" aria-hidden />
-                        Tao lai
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={aiCatchupDigest?.status === 'failed' ? handleRegenerateCatchup : handleRequestCatchup}
-                        disabled={!canRequestCatchup}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <BotIcon className="h-3.5 w-3.5" aria-hidden />
-                        {aiCatchupDigest?.status === 'failed' ? 'Thu lai' : 'Tom tat'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )}
             {/* Load More Button */}
             {messages.length > 0 && hasMoreMessages && (
               <div className="flex justify-center mb-6">
@@ -1599,7 +1493,6 @@ function ChatPanel({
                       onReactionUpsert={onReactionUpsert}
                       onReactionRemoveAllMine={onReactionRemoveAllMine}
                       onFetchReactionDetails={onFetchReactionDetails}
-                      onReport={handleReportMessage}
                       onReact={handleReactMessage}
                     />
                   </div>)
@@ -1627,34 +1520,6 @@ function ChatPanel({
         </ReactionDetailsModalProvider>
       </div>
 
-      {/* Moderation Bar */}
-      <div className="chat-moderation-bar">
-        <svg className="w-3.5 h-3.5 text-[#929292] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-        <span className="chat-moderation-text">Mức độ vi phạm tiêu chuẩn cộng đồng</span>
-        <span className={`font-semibold text-[11px] ml-auto ${
-          userPenaltyScore >= 80 ? 'text-red-500' :
-          userPenaltyScore >= 50 ? 'text-orange-500' :
-          userPenaltyScore > 0 ? 'text-yellow-500' : 'text-[#929292]'
-        }`}>
-          {userPenaltyScore}%
-        </span>
-      </div>
-
-      {/* User Muted Warning */}
-      {userMutedUntil && new Date(userMutedUntil) > new Date() && (
-        <div className="bg-[#fef2f2] border-t border-[#fecaca] px-4 py-2">
-          <div className="flex items-center gap-2 text-xs text-red-600">
-            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-            </svg>
-            Bạn đang bị cấm chat đến {new Date(userMutedUntil).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-          </div>
-        </div>
-      )}
-
       {/* Input Area */}
       <MessageInput
         onSend={(content, type, mediaUrl, options) => {
@@ -1666,7 +1531,6 @@ function ChatPanel({
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
         isLoading={isLoading}
-        disabled={!!userMutedUntil && new Date(userMutedUntil) > new Date()}
       />
     </article>
   );

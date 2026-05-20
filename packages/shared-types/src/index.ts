@@ -188,6 +188,7 @@ export interface TypingIndicatorPayload {
 
 export type AiCatchupDigestStatus = 'queued' | 'processing' | 'ready' | 'failed';
 export type AiCatchupDigestTrigger = 'manual' | 'auto_suggested';
+export type AiCatchupMode = 'unread' | 'since_last_digest' | 'recent';
 
 export interface AiCatchupSummary {
   title: string;
@@ -214,6 +215,7 @@ export interface AiCatchupDigest {
   messageRefs: string[];
   messageCount: number;
   omittedOlderCount: number;
+  catchupMode?: AiCatchupMode;
   trigger: AiCatchupDigestTrigger;
   status: AiCatchupDigestStatus;
   summary?: AiCatchupSummary;
@@ -231,6 +233,70 @@ export interface AiCatchupDigestUpdatedPayload {
   conversationId: string;
   status: AiCatchupDigestStatus;
   summary?: AiCatchupSummary;
+  error?: string;
+  updatedAt: string;
+}
+
+// ─── AI Reminders ──────────────────────────────────────────────────────────────
+export type AiReminderStatus = 'pending' | 'done' | 'dismissed';
+export type AiReminderCreatedBy = 'ai_suggestion' | 'user';
+
+export interface AiReminder {
+  _id: string;
+  userId: string;
+  conversationId: string;
+  digestId?: string;
+  sourceMessageRefs: string[];
+  title: string;
+  description?: string;
+  dueAt?: string;
+  status: AiReminderStatus;
+  createdBy: AiReminderCreatedBy;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiReminderUpdatedPayload extends Omit<AiReminder, 'status'> {
+  status: AiReminderStatus | 'deleted';
+}
+
+// ─── AI Assistant Box ────────────────────────────────────────────────────────────
+export type AiItemType = 'catchup_digest' | 'task' | 'search_result' | 'group_note' | 'call_summary';
+export type AiItemStatus = 'not_started' | 'queued' | 'processing' | 'ready' | 'failed';
+
+export interface AiAssistantItemMetadata {
+  unreadCount?: number;
+  latestMessageAt?: string;
+  lastDigestAt?: string;
+  catchupMode?: AiCatchupMode;
+  actionItemCount?: number;
+  messageCount?: number;
+}
+
+export interface AiAssistantItem {
+  _id: string;
+  userId: string;
+  type: AiItemType;
+  conversationId?: string;
+  refId?: string;
+  status: AiItemStatus;
+  title?: string;
+  summarySnippet?: string;
+  metadata?: AiAssistantItemMetadata;
+  trigger: 'manual' | 'auto';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiAssistantItemPayload {
+  itemId: string;
+  type: AiItemType;
+  conversationId?: string;
+  status: AiItemStatus;
+  title?: string;
+  summarySnippet?: string;
+  metadata?: AiAssistantItemMetadata;
+  detail?: unknown;
   error?: string;
   updatedAt: string;
 }

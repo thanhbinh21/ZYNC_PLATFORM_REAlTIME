@@ -1,10 +1,9 @@
-import { Kafka, type Producer, type Consumer, type Admin, logLevel } from 'kafkajs';
+import { Kafka, Partitioners, type Producer, type Consumer, type Admin, logLevel } from 'kafkajs';
 import { logger } from '../shared/logger';
 
 export const KAFKA_TOPICS = {
   RAW_MESSAGES: 'raw-messages',
   NOTIFICATIONS: 'notifications',
-  MODERATION_ACTIONS: 'moderation-actions',   // AI-1: content moderation results
   MESSAGE_EMBEDDINGS: 'message-embeddings',    // AI-2: async embed worker
   AI_CATCHUP_JOBS: 'ai-catchup-jobs',
   // ─── Dead Letter Queue (DLQ) Topics ────────────────────────────────────────
@@ -18,6 +17,17 @@ export const KAFKA_TOPICS = {
 let kafka: Kafka | null = null;
 let producer: Producer | null = null;
 
+const REQUIRED_TOPICS = [
+  { topic: KAFKA_TOPICS.RAW_MESSAGES, numPartitions: 3, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.NOTIFICATIONS, numPartitions: 3, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.MESSAGE_EMBEDDINGS, numPartitions: 3, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.AI_CATCHUP_JOBS, numPartitions: 3, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.RAW_MESSAGES_RETRY, numPartitions: 1, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.RAW_MESSAGES_DLQ, numPartitions: 1, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.NOTIFICATIONS_RETRY, numPartitions: 1, replicationFactor: 1 },
+  { topic: KAFKA_TOPICS.NOTIFICATIONS_DLQ, numPartitions: 1, replicationFactor: 1 },
+] as const;
+
 export async function connectKafka(): Promise<void> {
   const brokers = (process.env['KAFKA_BROKERS'] ?? 'localhost:9092').split(',');
 
@@ -28,30 +38,35 @@ export async function connectKafka(): Promise<void> {
     retry: { initialRetryTime: 200, retries: 10 },
   });
 
-  producer = kafka.producer({ idempotent: true });
+  producer = kafka.producer({
+    idempotent: true,
+    createPartitioner: Partitioners.LegacyPartitioner,
+    retry: { retries: Number.MAX_SAFE_INTEGER },
+  });
 
   await producer.connect();
   logger.info('Kafka producer connected');
 
-  // Tạo topic nếu chưa tồn tại
+  // Tạo topic nếu chưa tồn tại. KafkaJS log ERROR nếu gọi createTopics cho topic đã có,
+  // nên lọc trước để log server sạch hơn khi restart local.
   const admin: Admin = kafka.admin();
   await admin.connect();
-  await admin.createTopics({
-    topics: [
-      { topic: KAFKA_TOPICS.RAW_MESSAGES, numPartitions: 3, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.NOTIFICATIONS, numPartitions: 3, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.MODERATION_ACTIONS, numPartitions: 1, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.MESSAGE_EMBEDDINGS, numPartitions: 3, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.AI_CATCHUP_JOBS, numPartitions: 3, replicationFactor: 1 },
-      // DLQ & Retry topics
-      { topic: KAFKA_TOPICS.RAW_MESSAGES_RETRY, numPartitions: 1, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.RAW_MESSAGES_DLQ, numPartitions: 1, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.NOTIFICATIONS_RETRY, numPartitions: 1, replicationFactor: 1 },
-      { topic: KAFKA_TOPICS.NOTIFICATIONS_DLQ, numPartitions: 1, replicationFactor: 1 },
-    ],
-    waitForLeaders: true,
-  });
-  await admin.disconnect();
+  try {
+    const existingTopics = new Set(await admin.listTopics());
+    const missingTopics = REQUIRED_TOPICS.filter(({ topic }) => !existingTopics.has(topic));
+
+    if (missingTopics.length > 0) {
+      await admin.createTopics({
+        topics: [...missingTopics],
+        waitForLeaders: true,
+      });
+      logger.info(`Kafka topics created: ${missingTopics.map(({ topic }) => topic).join(', ')}`);
+    } else {
+      logger.info('Kafka topics already exist');
+    }
+  } finally {
+    await admin.disconnect();
+  }
 }
 
 export function getProducer(): Producer {

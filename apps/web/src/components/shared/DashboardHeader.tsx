@@ -13,6 +13,8 @@ interface DashboardHeaderProps {
   theme?: string;
   onToggleTheme?: () => void;
   notificationSlot?: React.ReactNode;
+  /** Slot cho nút Sparkles của AI Assistant Box */
+  aiAssistantSlot?: React.ReactNode;
 }
 
 export function DashboardHeader({
@@ -22,6 +24,7 @@ export function DashboardHeader({
   theme,
   onToggleTheme,
   notificationSlot,
+  aiAssistantSlot,
 }: DashboardHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -162,6 +165,8 @@ export function DashboardHeader({
                 <DashboardIcon name="bell" className="h-4 w-4" />
               </button>
             )}
+
+            {aiAssistantSlot}
 
             <div className="relative">
               <button

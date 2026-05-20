@@ -2,6 +2,7 @@ import { Schema, model, type Document } from 'mongoose';
 
 export type AiCatchupDigestTrigger = 'manual' | 'auto_suggested';
 export type AiCatchupDigestStatus = 'queued' | 'processing' | 'ready' | 'failed';
+export type AiCatchupMode = 'unread' | 'since_last_digest' | 'recent';
 
 export interface AiCatchupSummary {
   title: string;
@@ -27,6 +28,7 @@ export interface IAiCatchupDigest extends Document {
   messageRefs: string[];
   messageCount: number;
   omittedOlderCount: number;
+  catchupMode?: AiCatchupMode;
   trigger: AiCatchupDigestTrigger;
   status: AiCatchupDigestStatus;
   summary?: AiCatchupSummary;
@@ -74,6 +76,7 @@ const catchupDigestSchema = new Schema<IAiCatchupDigest>(
     messageRefs: [{ type: String, required: true }],
     messageCount: { type: Number, required: true, min: 0 },
     omittedOlderCount: { type: Number, default: 0, min: 0 },
+    catchupMode: { type: String, enum: ['unread', 'since_last_digest', 'recent'] },
     trigger: { type: String, enum: ['manual', 'auto_suggested'], default: 'manual' },
     status: { type: String, enum: ['queued', 'processing', 'ready', 'failed'], default: 'queued' },
     summary: { type: summarySchema },

@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { MessageReactionsService } from './message-reaction.service';
 import { UserModel } from '../users/user.model';
 import { MessageRepository } from '../../shared/repositories/message.repository';
-import type { IConversationMemberPenaltyProfile } from '../../shared/repositories/message.repository';
 
 export interface PaginatedMessages {
   messages: IMessage[];
@@ -58,16 +57,6 @@ export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
   /** Repository singleton – all DB queries go through here */
   private static readonly repo = new MessageRepository();
-
-  /**
-   * Fetch conversation member penalty profile (penalty fields + user profile)
-   */
-  static async getConversationMemberPenaltyProfile(
-    conversationId: string,
-    userId: string,
-  ): Promise<IConversationMemberPenaltyProfile | null> {
-    return this.repo.findConversationMemberPenaltyProfile(conversationId, userId);
-  }
 
   private static getLastMessagePreview(
     content: string,
@@ -189,7 +178,6 @@ export class MessagesService {
     type: MessageType,
     idempotencyKey: string,
     mediaUrl?: string,
-    moderationWarning: boolean = false,
     replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check idempotency cache
@@ -203,7 +191,7 @@ export class MessagesService {
         content: cachedMessage.content,
         type: cachedMessage.type,
         mediaUrl: cachedMessage.mediaUrl,
-        moderationWarning: Boolean(cachedMessage.moderationWarning),
+        moderationWarning: false,
         replyTo: cachedMessage.replyTo as IReplyTo | undefined,
         idempotencyKey,
         createdAt: new Date(cachedMessage.createdAt as number),
@@ -220,7 +208,6 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
-      moderationWarning,
       replyTo,
       createdAt: now,
     });
@@ -234,7 +221,6 @@ export class MessagesService {
         content,
         type,
         mediaUrl,
-        moderationWarning,
         replyTo,
         idempotencyKey,
         createdAt: now,
@@ -253,7 +239,6 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
-      moderationWarning,
       replyTo,
       idempotencyKey,
       createdAt: now,
@@ -275,7 +260,6 @@ export class MessagesService {
     idempotencyKey: string,
     mediaUrl?: string,
     mockId?: string,
-    moderationWarning: boolean = false,
     replyTo?: IReplyTo,
   ): Promise<IMessage> {
     // Step 1: Check if message already exists (idempotency)
@@ -292,7 +276,6 @@ export class MessagesService {
       content,
       type,
       mediaUrl,
-      moderationWarning,
       replyTo,
       idempotencyKey,
       createdAt: new Date(),
@@ -416,7 +399,6 @@ export class MessagesService {
       content: string;
       type: string;
       mediaUrl?: string;
-      moderationWarning?: boolean;
       replyTo?: IReplyTo;
       idempotencyKey: string;
       createdAt: Date;
@@ -434,7 +416,6 @@ export class MessagesService {
           msg.idempotencyKey,
           msg.mediaUrl,
           msg.mockId,
-          Boolean(msg.moderationWarning),
           msg.replyTo,
         );
       } catch (err) {

@@ -22,6 +22,8 @@ interface CatchupJobPayload {
   digestId: string;
   userId: string;
   conversationId: string;
+  itemId?: string;
+  type?: string;
 }
 
 interface CatchupMessage {
@@ -346,6 +348,15 @@ export async function startCatchupWorker(): Promise<void> {
 
       try {
         const payload = JSON.parse(message.value.toString()) as CatchupJobPayload;
+        if (payload.itemId || payload.type === 'catchup_digest') {
+          logger.debug('[AI Catch-up Worker] Skipping AI Assistant job', {
+            digestId: payload.digestId,
+            itemId: payload.itemId,
+            type: payload.type,
+          });
+          return;
+        }
+
         if (!payload.digestId || !payload.userId || !payload.conversationId) {
           logger.warn('[AI Catch-up Worker] Invalid job payload', payload);
           return;

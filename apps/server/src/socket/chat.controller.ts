@@ -21,13 +21,6 @@ import { UserModel } from '../modules/users/user.model';
 import { stickerService } from '../modules/stickers/sticker.service';
 import { produceNotificationEvent } from '../modules/notifications/notifications.service';
 import { checkMessageRateLimit } from '../infrastructure/redis';
-import { runKeywordFilter } from '../modules/ai/moderation/keyword-filter';
-import {
-  PENALTY_BLOCK_PERCENT,
-  PENALTY_WARNING_PERCENT,
-  applyPenaltyScore,
-  refreshPenaltyWindow,
-} from '../modules/ai/moderation/penalty-policy';
 import { getIO } from './gateway';
 import { logger } from '../shared/logger';
 
@@ -40,63 +33,6 @@ export interface AuthSocket extends Socket {
 let _kafkaFailureMode = false;
 export function setChatKafkaFailureMode(mode: boolean): void {
   _kafkaFailureMode = mode;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-async function produceModerationNotification(
-  userId: string,
-  conversationId: string,
-  body: string,
-): Promise<void> {
-  await produceNotificationEvent({
-    userId,
-    type: 'new_message',
-    title: 'Thong bao kiem duyet',
-    body,
-    conversationId,
-    fromUserId: userId,
-    data: { conversationId, action: 'moderation_notice' },
-  });
-}
-
-async function applyRealtimeKeywordPenalty(
-  conversationId: string,
-  userId: string,
-  amount: number,
-): Promise<void> {
-  try {
-    const member = await ConversationMemberModel.findOne({ conversationId, userId });
-    if (!member) return;
-
-    const { mutedUntil, becameMuted } = applyPenaltyScore(member, amount);
-
-    if (becameMuted) {
-      await UserModel.findByIdAndUpdate(userId, { $inc: { globalViolationCount: 1 } });
-    }
-
-    await member.save();
-
-    const io = getIO();
-    if (io) {
-      io.to(`user:${userId}`).emit('user_penalty_updated', {
-        conversationId,
-        penaltyScore: member.penaltyScore,
-        mutedUntil: member.mutedUntil ?? null,
-      });
-    }
-
-    if (becameMuted && mutedUntil) {
-      await produceModerationNotification(
-        userId,
-        conversationId,
-        `Ban da dat 100% vi pham va bi khoa chat 5 phut den ${mutedUntil.toLocaleTimeString('vi-VN')}.`,
-      );
-      logger.warn('[ChatController] User muted after keyword overflow', { conversationId, userId });
-    }
-  } catch (err) {
-    logger.error('[ChatController] Failed to apply realtime keyword penalty', err);
-  }
 }
 
 // ─── send_message ─────────────────────────────────────────────────────────────
@@ -199,54 +135,20 @@ async function handleSendMessage(
     };
   }
 
-  // ─── Membership + Penalty Check (using aggregate + profile) ───
-  const memberProfile = await MessagesService.getConversationMemberPenaltyProfile(conversationId as string, userId);
-
-  if (!memberProfile) {
+  // ─── Membership Check ───
+  const membership = await ConversationMemberModel.exists({
+    conversationId: conversationId as string,
+    userId,
+  });
+  if (!membership) {
     socket.emit('error', { message: 'Not allowed to send message in this conversation' });
     return;
   }
 
-  // Prepare minimal PenaltyMemberState for refresh (same shape as penalty-policy expects)
-  const penaltyState: { penaltyScore?: number; mutedUntil?: Date | undefined; penaltyWindowStartedAt?: Date | undefined } = {
-    penaltyScore: memberProfile.penaltyScore,
-    mutedUntil: memberProfile.mutedUntil ? new Date(memberProfile.mutedUntil) : undefined,
-    penaltyWindowStartedAt: memberProfile.penaltyWindowStartedAt ? new Date(memberProfile.penaltyWindowStartedAt) : undefined,
-  };
-
-  const windowChanged = refreshPenaltyWindow(penaltyState as any);
-  if (windowChanged) {
-    // Persist changes back to ConversationMember document
-    const update: Record<string, any> = { $set: { penaltyScore: penaltyState.penaltyScore ?? 0 } };
-    const unset: Record<string, ''> = {};
-    if (penaltyState.mutedUntil) update.$set.mutedUntil = penaltyState.mutedUntil;
-    else unset.mutedUntil = '';
-    if (penaltyState.penaltyWindowStartedAt) update.$set.penaltyWindowStartedAt = penaltyState.penaltyWindowStartedAt;
-    else unset.penaltyWindowStartedAt = '';
-    if (Object.keys(unset).length > 0) update.$unset = unset;
-
-    try {
-      await ConversationMemberModel.updateOne({ conversationId: conversationId as string, userId }, update as any);
-    } catch (err) {
-      logger.warn('[ChatController] Failed to persist penalty window changes', err);
-    }
-  }
-
-  if (penaltyState.mutedUntil && penaltyState.mutedUntil > new Date()) {
-    socket.emit('error', {
-      message: `Bạn đang bị tạm khóa gửi tin đến ${penaltyState.mutedUntil.toLocaleTimeString('vi-VN')}`,
-    });
-    socket.emit('user_penalty_updated', {
-      conversationId: conversationId as string,
-      penaltyScore: penaltyState.penaltyScore ?? 0,
-      mutedUntil: penaltyState.mutedUntil,
-    });
-    return;
-  }
+  // Resolve sender profile for broadcast
+  const senderProfile = await UserModel.findById(userId).select('displayName avatarUrl').lean();
 
   await socket.join(`conv:${conversationId as string}`);
-
-  let moderationWarning = false;
 
   // ─── Sticker Validation ───
   if (normalizedType === 'sticker') {
@@ -261,26 +163,6 @@ async function handleSendMessage(
     content = '';
   }
 
-  // ─── Keyword Moderation ───
-  if (normalizedType === 'text' && typeof content === 'string' && content.trim().length > 0) {
-    const quickModeration = runKeywordFilter(content);
-
-    if (quickModeration.label === 'blocked') {
-      await applyRealtimeKeywordPenalty(conversationId as string, userId, PENALTY_BLOCK_PERCENT);
-      socket.emit('content_warning', { conversationId, message: `Tin nhan vi pham keyword va da duoc tinh +${PENALTY_BLOCK_PERCENT}% vi pham.` });
-      socket.emit('content_blocked', { messageId: idempotencyKey, conversationId, reason: 'Tin nhan cua ban vi pham tieu chuan cong dong va da bi chan.', confidence: quickModeration.confidence });
-      io.to(`conv:${conversationId as string}`).emit('message_recalled', { messageId: idempotencyKey, idempotencyKey, conversationId, recalledBy: 'system', recalledAt: new Date().toISOString() });
-      await produceModerationNotification(userId, conversationId as string, `Tin nhan cua ban da bi thu hoi do vi pham tieu chuan cong dong (+${PENALTY_BLOCK_PERCENT}%).`);
-      return;
-    }
-
-    if (quickModeration.label === 'warning') {
-      moderationWarning = true;
-      await applyRealtimeKeywordPenalty(conversationId as string, userId, PENALTY_WARNING_PERCENT);
-      socket.emit('content_warning', { conversationId, messageId: idempotencyKey, message: `Tin nhan cua ban co noi dung nhay cam. He thong da cong +${PENALTY_WARNING_PERCENT}% vi pham.` });
-    }
-  }
-
   // ─── Create Message ───
   try {
     const message = await MessagesService.createMessage(
@@ -289,14 +171,14 @@ async function handleSendMessage(
       normalizedType as MessageType,
       idempotencyKey as string,
       mediaUrl ? (mediaUrl as string) : undefined,
-      moderationWarning, resolvedReplyTo,
+      resolvedReplyTo,
     );
 
     socket.to(`conv:${conversationId}`).emit('receive_message', {
       messageId: message._id, conversationId, senderId: userId,
-      sender: { senderId: userId, displayName: memberProfile.displayName ?? undefined, avatarUrl: memberProfile.avatarUrl ?? undefined },
+      sender: { senderId: userId, displayName: senderProfile?.displayName ?? undefined, avatarUrl: senderProfile?.avatarUrl ?? undefined },
       content: typeof content === 'string' ? content : '',
-      type: normalizedType, mediaUrl, moderationWarning,
+      type: normalizedType, mediaUrl,
       replyTo: message.replyTo, idempotencyKey, createdAt: message.createdAt,
     });
 
@@ -444,65 +326,30 @@ async function handleForwardMessage(io: Server, socket: AuthSocket, payload: unk
   const { originalMessageId, toConversationId, idempotencyKey } = payload as { originalMessageId?: string; toConversationId?: string; idempotencyKey?: string };
   if (!originalMessageId || !toConversationId || !idempotencyKey) { socket.emit('error', { message: 'Missing required fields' }); return; }
 
-  // ─── Membership + Penalty Check (using aggregate + profile) ───
-  const memberProfile = await MessagesService.getConversationMemberPenaltyProfile(toConversationId as string, userId);
-
-  if (!memberProfile) {
+  // ─── Membership Check ───
+  const membership = await ConversationMemberModel.exists({ conversationId: toConversationId as string, userId });
+  if (!membership) {
     socket.emit('error', { message: 'Not allowed to send message in this conversation' });
     return;
   }
 
-  // Prepare minimal PenaltyMemberState for refresh (same shape as penalty-policy expects)
-  const penaltyState: { penaltyScore?: number; mutedUntil?: Date | undefined; penaltyWindowStartedAt?: Date | undefined } = {
-    penaltyScore: memberProfile.penaltyScore,
-    mutedUntil: memberProfile.mutedUntil ? new Date(memberProfile.mutedUntil) : undefined,
-    penaltyWindowStartedAt: memberProfile.penaltyWindowStartedAt ? new Date(memberProfile.penaltyWindowStartedAt) : undefined,
-  };
-
-  const windowChanged = refreshPenaltyWindow(penaltyState as any);
-  if (windowChanged) {
-    // Persist changes back to ConversationMember document
-    const update: Record<string, any> = { $set: { penaltyScore: penaltyState.penaltyScore ?? 0 } };
-    const unset: Record<string, ''> = {};
-    if (penaltyState.mutedUntil) update.$set.mutedUntil = penaltyState.mutedUntil;
-    else unset.mutedUntil = '';
-    if (penaltyState.penaltyWindowStartedAt) update.$set.penaltyWindowStartedAt = penaltyState.penaltyWindowStartedAt;
-    else unset.penaltyWindowStartedAt = '';
-    if (Object.keys(unset).length > 0) update.$unset = unset;
-
-    try {
-      await ConversationMemberModel.updateOne({ conversationId: toConversationId as string, userId }, update as any);
-    } catch (err) {
-      logger.warn('[ChatController] Failed to persist penalty window changes', err);
-    }
-  }
-
-  if (penaltyState.mutedUntil && penaltyState.mutedUntil > new Date()) {
-    socket.emit('error', {
-      message: `Bạn đang bị tạm khóa gửi tin đến ${penaltyState.mutedUntil.toLocaleTimeString('vi-VN')}`,
-    });
-    socket.emit('user_penalty_updated', {
-      conversationId: toConversationId as string,
-      penaltyScore: penaltyState.penaltyScore ?? 0,
-      mutedUntil: penaltyState.mutedUntil,
-    });
-    return;
-  }
+  // Resolve sender profile
+  const senderProfile = await UserModel.findById(userId).select('displayName avatarUrl').lean();
 
   MessagesService.forwardMessage(originalMessageId, toConversationId, userId, idempotencyKey)
     .then((newMessage) => {
-      io.to(`conv:${toConversationId}`).emit('receive_message', 
-        { 
-          messageId: newMessage._id, 
-          conversationId: toConversationId, 
+      io.to(`conv:${toConversationId}`).emit('receive_message',
+        {
+          messageId: newMessage._id,
+          conversationId: toConversationId,
           senderId: userId,
-          sender: { senderId: userId, displayName: memberProfile.displayName ?? undefined, avatarUrl: memberProfile.avatarUrl ?? undefined },
-          content: newMessage.content, 
-          type: newMessage.type, 
-          mediaUrl: newMessage.mediaUrl, 
-          status: 'sent', 
-          createdAt: newMessage.createdAt, 
-          idempotencyKey: newMessage.idempotencyKey 
+          sender: { senderId: userId, displayName: senderProfile?.displayName ?? undefined, avatarUrl: senderProfile?.avatarUrl ?? undefined },
+          content: newMessage.content,
+          type: newMessage.type,
+          mediaUrl: newMessage.mediaUrl,
+          status: 'sent',
+          createdAt: newMessage.createdAt,
+          idempotencyKey: newMessage.idempotencyKey
         });
       socket.emit('message_forwarded', { messageId: newMessage._id, idempotencyKey, toConversationId });
     })
