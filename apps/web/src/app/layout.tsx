@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Be_Vietnam_Pro, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import { Toaster } from '@/components/shared/Toast';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'latin-ext'],
@@ -47,7 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${beVietnamPro.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
         <Providers>{children}</Providers>
-        <Toaster />
       </body>
     </html>
   );

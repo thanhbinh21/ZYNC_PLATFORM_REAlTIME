@@ -113,9 +113,9 @@ function getCallTokenSecret(): string {
 
 function getCallTokenTtlSeconds(): number {
   const raw = process.env['CALL_EPHEMERAL_TOKEN_TTL_SECONDS'];
-  const parsed = Number.parseInt(raw ?? '120', 10);
-  if (Number.isNaN(parsed) || parsed < 30) {
-    return 120;
+  const parsed = Number.parseInt(raw ?? '21600', 10);
+  if (Number.isNaN(parsed) || parsed < 60) {
+    return 21_600;
   }
   return parsed;
 }
@@ -196,16 +196,25 @@ async function appendCallEvent(
   });
 }
 
-async function countActiveParticipants(sessionId: string): Promise<number> {
-  return CallParticipantModel.countDocuments({
-    sessionId,
-    status: { $in: ['joined', 'invited'] },
-  });
+async function countActiveParticipants(sessionId: string): Promise<{ active: number; joined: number }> {
+  const [active, joined] = await Promise.all([
+    CallParticipantModel.countDocuments({
+      sessionId,
+      status: { $in: ['joined', 'invited'] },
+    }),
+    CallParticipantModel.countDocuments({
+      sessionId,
+      status: 'joined',
+    }),
+  ]);
+
+  return { active, joined };
 }
 
-function shouldEndGroupSession(remainingActiveParticipants: number): boolean {
-  return remainingActiveParticipants <= 1;
+function shouldEndGroupSession(counts: { active: number; joined: number }): boolean {
+  return counts.joined <= 0 || counts.active <= 1;
 }
+
 
 export class CallsService {
   private static async cleanupExpiredRingingSessionsForPair(

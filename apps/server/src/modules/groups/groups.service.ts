@@ -205,6 +205,49 @@ async function createAndEmitGroupSystemMessage(
   }
 }
 
+async function notifyGroupRecipients(input: {
+  recipientIds: string[];
+  actorId: string;
+  groupId: string;
+  groupName?: string;
+  type?: 'group_invite' | 'group_update';
+  title: string;
+  body: (actorName: string, groupName: string) => string;
+  excludeIds?: string[];
+  action?: string;
+}): Promise<void> {
+  const uniqueRecipientIds = Array.from(new Set(input.recipientIds))
+    .filter((id) => id && !input.excludeIds?.includes(id));
+
+  if (uniqueRecipientIds.length === 0) {
+    return;
+  }
+
+  try {
+    const actor = await UserModel.findById(input.actorId).select('displayName').lean();
+    const actorName = (actor?.displayName as string) ?? 'Một thành viên';
+    const groupName = input.groupName?.trim() || 'nhóm';
+
+    await Promise.allSettled(uniqueRecipientIds.map((recipientId) =>
+      produceNotificationEvent({
+        userId: recipientId,
+        type: input.type ?? 'group_update',
+        title: input.title,
+        body: input.body(actorName, groupName),
+        conversationId: input.groupId,
+        fromUserId: input.actorId,
+        data: {
+          conversationId: input.groupId,
+          conversationName: groupName,
+          action: input.action ?? 'open_chat',
+        },
+      }),
+    ));
+  } catch (err) {
+    logger.error('Failed to produce group notifications', err);
+  }
+}
+
 export class GroupsService {
   static async createGroup(
     creatorId: string,
@@ -255,6 +298,16 @@ export class GroupsService {
       data: { group: summary },
     });
 
+    void notifyGroupRecipients({
+      recipientIds: uniqueMembers,
+      actorId: creatorId,
+      groupId: summary._id,
+      groupName: summary.name,
+      type: 'group_invite',
+      title: 'Được thêm vào nhóm',
+      body: (actorName, groupName) => `${actorName} đã thêm bạn vào nhóm ${groupName}`,
+    });
+
     return summary;
   }
 
@@ -296,6 +349,22 @@ export class GroupsService {
           updatedBy: currentUserId,
         },
       });
+    });
+
+    const title = changedFields.includes('name_changed') && changedFields.includes('avatar_changed')
+      ? 'Thông tin nhóm đã được cập nhật'
+      : changedFields.includes('name_changed')
+        ? 'Tên nhóm đã được cập nhật'
+        : 'Ảnh nhóm đã được cập nhật';
+
+    void notifyGroupRecipients({
+      recipientIds: memberIds,
+      actorId: currentUserId,
+      groupId,
+      groupName: summary.name,
+      title,
+      body: (actorName, groupName) => `${actorName} đã cập nhật ${groupName}`,
+      excludeIds: [currentUserId],
     });
 
     return summary;
@@ -454,6 +523,25 @@ export class GroupsService {
       },
     });
 
+    void notifyGroupRecipients({
+      recipientIds: [targetUserId],
+      actorId: currentUserId,
+      groupId,
+      groupName: group.name,
+      title: 'Bạn đã bị xóa khỏi nhóm',
+      body: (actorName, groupName) => `${actorName} đã xóa bạn khỏi nhóm ${groupName}`,
+      action: 'group_removed',
+    });
+    void notifyGroupRecipients({
+      recipientIds: memberIds,
+      actorId: currentUserId,
+      groupId,
+      groupName: group.name,
+      title: 'Thành viên đã rời nhóm',
+      body: (_actorName, groupName) => `${targetDisplayName} đã bị xóa khỏi nhóm ${groupName}`,
+      excludeIds: [currentUserId],
+    });
+
     return buildGroupSummary(groupId);
   }
 
@@ -539,6 +627,15 @@ export class GroupsService {
       },
     });
 
+    void notifyGroupRecipients({
+      recipientIds: remainingIds,
+      actorId: currentUserId,
+      groupId,
+      groupName: group.name,
+      title: 'Thành viên đã rời nhóm',
+      body: (actorName, groupName) => `${actorName} đã rời khỏi nhóm ${groupName}`,
+    });
+
     return { disbanded: false, groupId };
   }
 
@@ -608,6 +705,17 @@ export class GroupsService {
       },
     });
 
+    void notifyGroupRecipients({
+      recipientIds: [targetUserId],
+      actorId: currentUserId,
+      groupId,
+      groupName: summary.name,
+      title: role === 'admin' ? 'Bạn được đặt làm quản trị viên' : 'Quyền quản trị viên đã được gỡ',
+      body: (actorName, groupName) => role === 'admin'
+        ? `${actorName} đã đặt bạn làm quản trị viên nhóm ${groupName}`
+        : `${actorName} đã gỡ quyền quản trị viên của bạn trong nhóm ${groupName}`,
+    });
+
     return summary;
   }
 
@@ -633,6 +741,16 @@ export class GroupsService {
       },
     });
 
+    void notifyGroupRecipients({
+      recipientIds: summary.users.map((u) => u._id),
+      actorId: currentUserId,
+      groupId,
+      groupName: summary.name,
+      title: 'Cài đặt duyệt thành viên đã đổi',
+      body: (actorName, groupName) => `${actorName} đã ${memberApprovalEnabled ? 'bật' : 'tắt'} duyệt thành viên trong nhóm ${groupName}`,
+      excludeIds: [currentUserId],
+    });
+
     return summary;
   }
 
@@ -651,6 +769,17 @@ export class GroupsService {
       data: {
         by: currentUserId,
       },
+    });
+
+    void notifyGroupRecipients({
+      recipientIds: memberIds,
+      actorId: currentUserId,
+      groupId,
+      groupName: group.name,
+      title: 'Nhóm đã bị giải tán',
+      body: (actorName, groupName) => `${actorName} đã giải tán nhóm ${groupName}`,
+      excludeIds: [currentUserId],
+      action: 'group_deleted',
     });
   }
 

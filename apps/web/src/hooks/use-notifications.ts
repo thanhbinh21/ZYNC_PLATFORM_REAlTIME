@@ -14,6 +14,7 @@ import {
   type NotificationPreferences,
 } from '@/services/notifications';
 import { subscribeToPush, requestNotificationPermission } from '@/services/web-push';
+import { isConversationVisible } from '@/services/active-conversation';
 
 const NOTIFICATION_SOUND_URL = '/sounds/notification.mp3';
 
@@ -145,6 +146,16 @@ export function useNotifications() {
     const socket = getSocket(token);
 
     const handleNewNotification = (notification: Notification) => {
+      if (notification.type === 'new_message' && isConversationVisible(notification.conversationId)) {
+        void apiMarkAsRead([notification._id]).catch(() => {});
+        setNotifications((prev) =>
+          prev.some((item) => item._id === notification._id)
+            ? prev.map((item) => (item._id === notification._id ? { ...item, read: true } : item))
+            : prev,
+        );
+        return;
+      }
+
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
       playSound();

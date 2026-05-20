@@ -128,6 +128,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const conversationId = notification.conversationId ?? notification.data?.conversationId;
     const storyId = notification.data?.storyId;
 
+    if (action === 'group_deleted' || action === 'group_removed') {
+      router.push('/home');
+      return;
+    }
+
     if (action === 'open_chat') {
       router.push(conversationId ? `/chat?conversationId=${conversationId}` : '/chat');
       return;
@@ -143,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    if (notification.type === 'new_message' || notification.type === 'group_invite') {
+    if (notification.type === 'new_message' || notification.type === 'group_invite' || notification.type === 'group_update') {
       router.push(conversationId ? `/chat?conversationId=${conversationId}` : '/chat');
       return;
     }

@@ -67,7 +67,7 @@ export default function NotificationsScreen() {
       if (!item.read) {
         void markRead([item._id]);
       }
-      if (item.conversationId && (item.type === 'new_message' || item.type === 'group_invite')) {
+      if (item.conversationId && (item.type === 'new_message' || item.type === 'group_invite' || item.type === 'group_update')) {
         router.push({
           pathname: '/chat-room',
           params: { conversationId: item.conversationId },
@@ -88,6 +88,7 @@ export default function NotificationsScreen() {
         case 'friend_request': icon = 'person-add'; color = theme.accent; break;
         case 'friend_accepted': icon = 'people'; color = theme.violet; break;
         case 'group_invite': icon = 'chatbubbles'; color = theme.warning; break;
+        case 'group_update': icon = 'chatbubbles'; color = theme.warning; break;
         case 'story_reaction': icon = 'heart'; color = theme.danger; break;
         case 'story_reply': icon = 'chatbox'; color = theme.pink; break;
       }

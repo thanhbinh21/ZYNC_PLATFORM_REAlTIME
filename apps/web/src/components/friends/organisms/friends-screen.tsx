@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { type ComponentType, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Bell,
-  CheckCircle2,
   Sparkles,
   Tag,
   UserPlus,
   Users,
-  X,
 } from "lucide-react";
 import { FriendsTabNavigation } from "../atoms/friends-tab-navigation";
 import { FriendCard } from "../molecules/friend-card";
@@ -20,6 +17,14 @@ import { UserProfileModal } from "@/components/shared/UserProfileModal";
 import { useNavigationFlow } from "@/hooks/use-navigation-flow";
 import type { FriendUser } from "@/services/friends";
 import { FriendsAvatar } from "../atoms/friends-avatar";
+import { showSystemToast } from "@/components/notifications/InAppNotificationToasts";
+
+type FriendsIcon = ComponentType<{ className?: string }>;
+const BellIcon = Bell as unknown as FriendsIcon;
+const SparklesIcon = Sparkles as unknown as FriendsIcon;
+const TagIcon = Tag as unknown as FriendsIcon;
+const UserPlusIcon = UserPlus as unknown as FriendsIcon;
+const UsersIcon = Users as unknown as FriendsIcon;
 
 const FRIEND_TIPS = [
   { tag: "tin-nhắn", label: "Chào hỏi ngắn gọn khi kết nối mới" },
@@ -112,7 +117,6 @@ export function FriendsScreen({
 }: FriendsScreenProps) {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("all");
-  const [showToast, setShowToast] = useState(true);
 
   const {
     navigateToChat,
@@ -135,12 +139,28 @@ export function FriendsScreen({
   }, [searchParams]);
 
   useEffect(() => {
-    if (infoMessage || errorMessage) {
-      setShowToast(true);
-      const timer = setTimeout(() => setShowToast(false), 4000);
-      return () => clearTimeout(timer);
+    if (infoMessage) {
+      showSystemToast({
+        id: "friends-info",
+        type: "friend_accepted",
+        title: "Bạn bè",
+        body: infoMessage,
+        variant: "success",
+      });
     }
-  }, [infoMessage, errorMessage]);
+  }, [infoMessage]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      showSystemToast({
+        id: "friends-error",
+        type: "friend_request",
+        title: "Không thể cập nhật bạn bè",
+        body: errorMessage,
+        variant: "error",
+      });
+    }
+  }, [errorMessage]);
 
   const handleTabChange = (tab: TabId) => {
     setActiveTab(tab);
@@ -178,7 +198,7 @@ export function FriendsScreen({
                       Kết nối
                     </p>
                     <h2 className="font-ui-title mt-1 flex items-center gap-2 text-xl text-text-primary">
-                      <Users className="h-5 w-5 shrink-0 text-accent" />
+                      <UsersIcon className="h-5 w-5 shrink-0 text-accent" />
                       Bạn bè
                     </h2>
                     <p className="font-ui-content mt-0.5 text-xs text-text-secondary">
@@ -193,7 +213,7 @@ export function FriendsScreen({
                       className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] shadow-sm transition-all hover:border-accent/30 hover:shadow-md lg:hidden"
                       aria-label={`${pendingTotal} lời mời kết bạn`}
                     >
-                      <Bell className="h-5 w-5 text-accent" />
+                      <BellIcon className="h-5 w-5 text-accent" />
                       <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shadow-sm">
                         {pendingTotal > 9 ? "9+" : pendingTotal}
                       </span>
@@ -207,7 +227,7 @@ export function FriendsScreen({
                 onClick={() => handleTabChange("search")}
                 className="zync-soft-button flex shrink-0 items-center gap-2 px-4 py-2 text-sm"
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlusIcon className="h-4 w-4" />
                 Tìm bạn
               </button>
             </div>
@@ -225,7 +245,7 @@ export function FriendsScreen({
                 {friends.length === 0 && !isFriendsLoading ? (
                   <div className="flex flex-col items-center gap-4 rounded-[1.4rem] border border-dashed border-border bg-bg-card py-16 text-center shadow-sm">
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-hover">
-                      <Users className="h-8 w-8 text-text-tertiary" />
+                      <UsersIcon className="h-8 w-8 text-text-tertiary" />
                     </div>
                     <div>
                       <p className="font-ui-title text-base text-text-primary">
@@ -358,7 +378,7 @@ export function FriendsScreen({
         <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border-light p-4 lg:flex lg:flex-col">
           <div className="mb-4">
             <h3 className="font-ui-title flex items-center gap-2 text-base text-text-primary">
-              <Sparkles className="h-4 w-4 text-accent" />
+              <SparklesIcon className="h-4 w-4 text-accent" />
               Tóm tắt kết nối
             </h3>
           </div>
@@ -441,7 +461,7 @@ export function FriendsScreen({
 
           <div className="mt-6">
             <p className="font-ui-meta mb-3 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
-              <Tag className="h-3 w-3" />
+              <TagIcon className="h-3 w-3" />
               Gợi ý nhanh
             </p>
             <div className="space-y-2">
@@ -462,41 +482,6 @@ export function FriendsScreen({
           </div>
         </aside>
       </div>
-
-      {infoMessage &&
-        showToast &&
-        createPortal(
-          <div
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 shadow-lg">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-accent" />
-              <p className="font-ui-content flex-1 text-center text-sm text-[var(--success-text)] sm:text-left">
-                {infoMessage}
-              </p>
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {errorMessage &&
-        showToast &&
-        createPortal(
-          <div
-            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"
-            role="alert"
-          >
-            <div className="animate-toast-center-in flex max-w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 shadow-lg">
-              <X className="h-5 w-5 shrink-0 text-red-400" />
-              <p className="font-ui-content flex-1 text-center text-sm text-red-400 sm:text-left">
-                {errorMessage}
-              </p>
-            </div>
-          </div>,
-          document.body,
-        )}
 
       <UserProfileModal
         visible={profileModalOpen}

@@ -16,6 +16,7 @@ export interface AppNotification {
     | 'friend_request'
     | 'friend_accepted'
     | 'group_invite'
+    | 'group_update'
     | 'story_reaction'
     | 'story_reply';
   title: string;

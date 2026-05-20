@@ -53,6 +53,12 @@ interface WebRtcSignalPayload {
   candidate?: unknown;
 }
 
+interface CallMediaStatePayload {
+  sessionId: string;
+  callToken: string;
+  isScreenSharing?: boolean;
+}
+
 const callTimeoutRegistry = new Map<string, NodeJS.Timeout>();
 
 function registerCallTimeout(sessionId: string, task: () => Promise<void>, timeoutMs?: number): void {
@@ -110,6 +116,8 @@ async function emitCallSummaryMessage(
     endedAt?: string;
   },
 ): Promise<void> {
+  if (process.env['CALL_SUMMARY_MESSAGES_ENABLED'] !== 'true') return;
+
   if (!params.conversationId) return;
 
   let content = 'Cuoc goi da ket thuc';
@@ -254,6 +262,20 @@ function parseWebRtcSignalPayload(payload: unknown): WebRtcSignalPayload {
   if (typeof toUserId !== 'string' || toUserId.length === 0) throw new BadRequestError('toUserId is required');
   if (typeof callToken !== 'string' || callToken.length === 0) throw new BadRequestError('callToken is required');
   return { sessionId, toUserId, callToken, sdp: data['sdp'], candidate: data['candidate'] };
+}
+
+function parseCallMediaStatePayload(payload: unknown): CallMediaStatePayload {
+  if (typeof payload !== 'object' || payload === null) throw new BadRequestError('Invalid call_media_state payload');
+  const data = payload as Record<string, unknown>;
+  const sessionId = data['sessionId'];
+  const callToken = data['callToken'];
+  const isScreenSharing = data['isScreenSharing'];
+  if (typeof sessionId !== 'string' || sessionId.length === 0) throw new BadRequestError('sessionId is required');
+  if (typeof callToken !== 'string' || callToken.length === 0) throw new BadRequestError('callToken is required');
+  if (isScreenSharing !== undefined && typeof isScreenSharing !== 'boolean') {
+    throw new BadRequestError('isScreenSharing must be boolean');
+  }
+  return { sessionId, callToken, isScreenSharing };
 }
 
 function isInactiveCallSignalError(error: unknown): boolean {
@@ -482,7 +504,7 @@ async function handleWebRtcOffer(io: Server, socket: AuthSocket, payload: unknow
   const { userId } = socket;
   const input = parseWebRtcSignalPayload(payload);
   if (!input.sdp) throw new BadRequestError('sdp is required for webrtc_offer');
-  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   const sessionStatus = await CallsService.assertSignalRoute(input.sessionId, userId, input.toUserId);
   if (sessionStatus === 'connected') recordReconnectOfferAttempt();
   io.to(`user:${input.toUserId}`).emit('webrtc_offer', { sessionId: input.sessionId, fromUserId: userId, sdp: input.sdp });
@@ -492,7 +514,7 @@ async function handleWebRtcAnswer(io: Server, socket: AuthSocket, payload: unkno
   const { userId } = socket;
   const input = parseWebRtcSignalPayload(payload);
   if (!input.sdp) throw new BadRequestError('sdp is required for webrtc_answer');
-  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   await CallsService.assertSignalRoute(input.sessionId, userId, input.toUserId);
   const session = await CallsService.markSessionConnected(input.sessionId, userId);
   clearCallTimeout(session.sessionId);
@@ -504,9 +526,28 @@ async function handleWebRtcIceCandidate(io: Server, socket: AuthSocket, payload:
   const { userId } = socket;
   const input = parseWebRtcSignalPayload(payload);
   if (!input.candidate) throw new BadRequestError('candidate is required for webrtc_ice_candidate');
-  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
   await CallsService.assertSignalRoute(input.sessionId, userId, input.toUserId);
   io.to(`user:${input.toUserId}`).emit('webrtc_ice_candidate', { sessionId: input.sessionId, fromUserId: userId, candidate: input.candidate });
+}
+
+async function handleCallMediaState(io: Server, socket: AuthSocket, payload: unknown): Promise<void> {
+  const { userId } = socket;
+  const input = parseCallMediaStatePayload(payload);
+  CallsService.verifySessionTokenForUser(input.sessionId, userId, input.callToken, { allowExpired: true });
+  const participantIds = await CallsService.listParticipantIds(input.sessionId);
+  if (!participantIds.includes(userId)) {
+    throw new BadRequestError('You are not a participant of this call session');
+  }
+
+  for (const participantId of participantIds) {
+    if (participantId === userId) continue;
+    io.to(`user:${participantId}`).emit('call_media_state', {
+      sessionId: input.sessionId,
+      userId,
+      isScreenSharing: input.isScreenSharing === true,
+    });
+  }
 }
 
 /**
@@ -594,6 +635,19 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
       }
       logger.error('webrtc_ice_candidate error', err);
       socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay ICE candidate' });
+    }
+  });
+
+  socket.on('call_media_state', async (payload: unknown) => {
+    try {
+      await handleCallMediaState(io, socket, payload);
+    } catch (err) {
+      if (isInactiveCallSignalError(err)) {
+        logger.debug('Ignoring media-state update for inactive call session');
+        return;
+      }
+      logger.error('call_media_state error', err);
+      socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to relay call media state' });
     }
   });
 }

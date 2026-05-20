@@ -62,8 +62,17 @@ const handleNotificationClick = (item: typeof data.notifications[0]) => {
       router.push('/friends?tab=requests');
       break;
     case 'group_invite':
+    case 'group_update':
       // Đi đến trang cộng đồng - phần nhóm
-      router.push('/community?tab=invites');
+      if (item.action === 'group_deleted' || item.action === 'group_removed') {
+        router.push('/home');
+        break;
+      }
+      if (item.conversationId) {
+        router.push(`/chat?conversationId=${encodeURIComponent(item.conversationId)}`);
+      } else {
+        router.push('/chat');
+      }
       break;
     case 'story_reaction':
     case 'story_reply':

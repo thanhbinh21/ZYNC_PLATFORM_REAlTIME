@@ -67,6 +67,7 @@ export type NotificationType =
   | 'friend_request'
   | 'friend_accepted'
   | 'group_invite'
+  | 'group_update'
   | 'story_reaction'
   | 'story_reply'
   | 'community_post'
@@ -90,6 +91,7 @@ export interface DashboardNotificationItem {
   avatarUrl?: string;
   conversationId?: string;
   fromUserId?: string;
+  action?: string;
   /** Bài cộng đồng (notification community_post / post_*) */
   postId?: string;
 }

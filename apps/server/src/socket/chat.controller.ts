@@ -16,6 +16,7 @@ import { Types } from 'mongoose';
 import { MessagesService } from '../modules/messages/messages.service';
 import { MessageModel, MessageType } from '../modules/messages/message.model';
 import { ConversationMemberModel } from '../modules/conversations/conversation-member.model';
+import { ConversationModel } from '../modules/conversations/conversation.model';
 import { UserModel } from '../modules/users/user.model';
 import { stickerService } from '../modules/stickers/sticker.service';
 import { produceNotificationEvent } from '../modules/notifications/notifications.service';
@@ -308,12 +309,16 @@ async function handleSendMessage(
         const members = await ConversationMemberModel.find({ conversationId: conversationId as string }).lean();
         const sender = await UserModel.findById(userId).select('displayName').lean();
         const senderName = (sender?.displayName as string) ?? 'Someone';
+        const conversation = await ConversationModel.findById(conversationId as string).select('name type').lean();
+        const conversationName = typeof conversation?.name === 'string' && conversation.name.trim().length > 0
+          ? conversation.name.trim()
+          : senderName;
         const rawText = typeof content === 'string' ? content.trim() : '';
         const preview = rawText.length > 0 ? rawText.slice(0, 100) : (normalizedType === 'text' ? 'Ban co tin nhan moi' : `[${normalizedType}]`);
 
         for (const member of members) {
           if (member.userId === userId) continue;
-          await produceNotificationEvent({ userId: member.userId, type: 'new_message', title: `Tin nhắn mới từ ${senderName}`, body: preview, conversationId: conversationId as string, fromUserId: userId, data: { conversationId: conversationId as string, action: 'open_chat' }, createAt: message.createdAt });
+          await produceNotificationEvent({ userId: member.userId, type: 'new_message', title: `Tin nhắn mới từ ${senderName}`, body: preview, conversationId: conversationId as string, fromUserId: userId, data: { conversationId: conversationId as string, conversationName, action: 'open_chat' }, createAt: message.createdAt });
         }
       } catch (err) {
         logger.error('Failed to produce message notifications', err);

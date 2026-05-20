@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import type { ComponentType } from 'react';
 import { Bell, Bookmark, Check, Heart, MessageCircle, Settings, UserCheck, Users, X } from 'lucide-react';
 import type { Notification } from '@/services/notifications';
 
@@ -16,17 +17,29 @@ interface NotificationPanelProps {
   onOpenSettings: () => void;
 }
 
-const TYPE_ICONS: Record<Notification['type'], React.ElementType> = {
-  new_message: MessageCircle,
-  friend_request: Users,
-  friend_accepted: UserCheck,
-  group_invite: Users,
-  story_reaction: Check,
-  story_reply: MessageCircle,
-  post_like: Heart,
-  post_comment: MessageCircle,
-  post_bookmark: Bookmark,
-  community_post: MessageCircle,
+type NotificationIcon = ComponentType<{ className?: string }>;
+const BellIcon = Bell as unknown as NotificationIcon;
+const BookmarkIcon = Bookmark as unknown as NotificationIcon;
+const CheckIcon = Check as unknown as NotificationIcon;
+const HeartIcon = Heart as unknown as NotificationIcon;
+const MessageCircleIcon = MessageCircle as unknown as NotificationIcon;
+const SettingsIcon = Settings as unknown as NotificationIcon;
+const UserCheckIcon = UserCheck as unknown as NotificationIcon;
+const UsersIcon = Users as unknown as NotificationIcon;
+const XIcon = X as unknown as NotificationIcon;
+
+const TYPE_ICONS: Record<Notification['type'], NotificationIcon> = {
+  new_message: MessageCircleIcon,
+  friend_request: UsersIcon,
+  friend_accepted: UserCheckIcon,
+  group_invite: UsersIcon,
+  group_update: UsersIcon,
+  story_reaction: CheckIcon,
+  story_reply: MessageCircleIcon,
+  post_like: HeartIcon,
+  post_comment: MessageCircleIcon,
+  post_bookmark: BookmarkIcon,
+  community_post: MessageCircleIcon,
 };
 
 function relativeTime(dateStr: string): string {
@@ -101,10 +114,10 @@ export function NotificationPanel({
             </button>
           )}
           <button type="button" onClick={onOpenSettings} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Cài đặt thông báo">
-            <Settings className="h-4 w-4 shrink-0" aria-hidden />
+            <SettingsIcon className="h-4 w-4 shrink-0" />
           </button>
           <button type="button" onClick={onClose} className="zync-soft-button-ghost h-8 w-8 p-0" aria-label="Đóng">
-            <X className="h-4 w-4 shrink-0" aria-hidden />
+            <XIcon className="h-4 w-4 shrink-0" />
           </button>
         </div>
       </div>
@@ -138,7 +151,7 @@ export function NotificationPanel({
 
             <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-accent-strong">
               {(() => {
-                const Icon = TYPE_ICONS[notification.type] ?? Bell;
+                const Icon = TYPE_ICONS[notification.type] ?? BellIcon;
                 return <Icon className="h-3.5 w-3.5" />;
               })()}
             </span>

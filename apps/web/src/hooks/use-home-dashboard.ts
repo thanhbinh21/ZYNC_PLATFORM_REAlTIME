@@ -8,6 +8,7 @@ import {
   emitCallEnd,
   emitCallGroupInvite,
   emitCallInvite,
+  emitCallMediaState,
   emitCallReject,
   emitWebRtcAnswer,
   emitWebRtcIceCandidate,
@@ -15,6 +16,7 @@ import {
   emitForwardMessage,
   type CallIncomingPayload,
   type CallInvitedPayload,
+  type CallMediaStatePayload,
   type CallParticipantPayload,
   type CallStatusPayload,
   type WebRtcAnswerPayload,
@@ -26,6 +28,7 @@ import {
   getSocket,
   listenToCallIncoming,
   listenToCallInvited,
+  listenToCallMediaState,
   listenToCallParticipantJoined,
   listenToCallParticipantLeft,
   listenToCallStatus,
@@ -40,6 +43,7 @@ import {
   listenToReactionUpdated,
   unlistenToCallIncoming,
   unlistenToCallInvited,
+  unlistenToCallMediaState,
   unlistenToCallParticipantJoined,
   unlistenToCallParticipantLeft,
   unlistenToCallStatus,
@@ -156,9 +160,32 @@ function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string
               : 'Tin nhắn media';
 }
 
+function isVisibleChatMessage(message: Message): boolean {
+  const idempotencyKey = String(message.idempotencyKey || '');
+  if (idempotencyKey.startsWith('call-summary:')) {
+    return false;
+  }
+
+  const content = String(message.content || '').trim().toLowerCase();
+  return !(
+    content.startsWith('cuoc goi da ket thuc')
+    || content.startsWith('cuoc goi bi tu choi')
+    || content.startsWith('cuoc goi nho')
+  );
+}
+
 function formatConversationPreview(lastMessage?: Conversation['lastMessage']): string {
   if (!lastMessage?.content) {
     return 'Không có tin nhắn';
+  }
+
+  const normalizedContent = lastMessage.content.trim().toLowerCase();
+  if (
+    normalizedContent.startsWith('cuoc goi da ket thuc')
+    || normalizedContent.startsWith('cuoc goi bi tu choi')
+    || normalizedContent.startsWith('cuoc goi nho')
+  ) {
+    return 'KhÃ´ng cÃ³ tin nháº¯n';
   }
 
   const senderDisplayName = lastMessage.senderDisplayName?.trim();
@@ -268,6 +295,7 @@ export function useHomeDashboard() {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenSharingUserId, setScreenSharingUserId] = useState<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingReactionRequestsRef = useRef<Map<string, PendingReactionRequest>>(new Map());
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
@@ -437,6 +465,7 @@ export function useHomeDashboard() {
     }
 
     setIsScreenSharing(false);
+    setScreenSharingUserId(null);
   }, []);
 
   const stopRemoteMedia = useCallback(() => {
@@ -1348,6 +1377,7 @@ export function useHomeDashboard() {
           avatarUrl: notif.data?.avatarUrl,
           conversationId: notif.conversationId,
           fromUserId: notif.fromUserId,
+          action: notif.data?.action,
           postId: notif.data?.postId,
         }));
 
@@ -2257,6 +2287,7 @@ export function useHomeDashboard() {
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
         const latestCall = activeCallRef.current;
         if (latestCall && latestCall.sessionId === payload.sessionId) {
+          setScreenSharingUserId(null);
           setCallError(null);
           scheduleCallReset();
         }
@@ -2345,6 +2376,7 @@ export function useHomeDashboard() {
       if (payload.userId !== userId) {
         closePeerConnection(payload.userId);
       }
+      setScreenSharingUserId((prev) => (prev === payload.userId ? null : prev));
 
       setActiveCall((prev) => {
         if (!prev || prev.sessionId !== payload.sessionId) {
@@ -2353,7 +2385,7 @@ export function useHomeDashboard() {
 
         const nextJoined = prev.joinedParticipantIds.filter((participantId) => participantId !== payload.userId);
         const remainingPeers = nextJoined.filter((participantId) => participantId !== userId);
-        const shouldEnd = remainingPeers.length === 0;
+        const shouldEnd = !prev.isGroupCall && remainingPeers.length === 0;
 
         if (!shouldEnd) {
           return {
@@ -2380,10 +2412,24 @@ export function useHomeDashboard() {
         const remainingPeers = latestCall.joinedParticipantIds
           .filter((participantId) => participantId !== payload.userId)
           .filter((participantId) => participantId !== userId);
-        if (remainingPeers.length === 0) {
+        if (!latestCall.isGroupCall && remainingPeers.length === 0) {
           scheduleCallReset();
         }
       }
+    };
+
+    const handleCallMediaState = (payload: CallMediaStatePayload) => {
+      const current = activeCallRef.current;
+      if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      setScreenSharingUserId((prev) => {
+        if (payload.isScreenSharing) {
+          return payload.userId;
+        }
+        return prev === payload.userId ? null : prev;
+      });
     };
 
     const handleWebRtcOffer = async (payload: WebRtcOfferPayload) => {
@@ -2504,6 +2550,7 @@ export function useHomeDashboard() {
     listenToCallStatus(handleCallStatus);
     listenToCallParticipantJoined(handleCallParticipantJoined);
     listenToCallParticipantLeft(handleCallParticipantLeft);
+    listenToCallMediaState(handleCallMediaState);
     listenToWebRtcOffer(handleWebRtcOffer);
     listenToWebRtcAnswer(handleWebRtcAnswer);
     listenToWebRtcIceCandidate(handleWebRtcIceCandidate);
@@ -2515,6 +2562,7 @@ export function useHomeDashboard() {
       unlistenToCallStatus(handleCallStatus as (...args: unknown[]) => void);
       unlistenToCallParticipantJoined(handleCallParticipantJoined as (...args: unknown[]) => void);
       unlistenToCallParticipantLeft(handleCallParticipantLeft as (...args: unknown[]) => void);
+      unlistenToCallMediaState(handleCallMediaState as (...args: unknown[]) => void);
       unlistenToWebRtcOffer(handleWebRtcOffer as (...args: unknown[]) => void);
       unlistenToWebRtcAnswer(handleWebRtcAnswer as (...args: unknown[]) => void);
       unlistenToWebRtcIceCandidate(handleWebRtcIceCandidate as (...args: unknown[]) => void);
@@ -2825,6 +2873,7 @@ export function useHomeDashboard() {
     }
 
     if (isScreenSharing) {
+      const current = activeCallRef.current;
       const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
       screenShareStreamRef.current?.getTracks().forEach((track) => {
         track.onended = null;
@@ -2836,6 +2885,14 @@ export function useHomeDashboard() {
       }
       replacePeerVideoTrack(cameraTrack);
       setIsScreenSharing(false);
+      setScreenSharingUserId(null);
+      if (current?.sessionId && current.callToken) {
+        try {
+          emitCallMediaState(current.sessionId, current.callToken, { isScreenSharing: false });
+        } catch {
+          setCallError('KhÃ´ng thá»ƒ Ä‘á»“ng bá»™ tráº¡ng thÃ¡i chia sáº» mÃ n hÃ¬nh.');
+        }
+      }
       return;
     }
 
@@ -2849,8 +2906,18 @@ export function useHomeDashboard() {
       screenShareStreamRef.current = displayStream;
       replacePeerVideoTrack(displayTrack);
       setIsScreenSharing(true);
+      setScreenSharingUserId(userId);
       syncScreenSharePreview();
+      const current = activeCallRef.current;
+      if (current?.sessionId && current.callToken) {
+        try {
+          emitCallMediaState(current.sessionId, current.callToken, { isScreenSharing: true });
+        } catch {
+          setCallError('KhÃ´ng thá»ƒ Ä‘á»“ng bá»™ tráº¡ng thÃ¡i chia sáº» mÃ n hÃ¬nh.');
+        }
+      }
       displayTrack.onended = () => {
+        const latestCall = activeCallRef.current;
         const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
         screenShareStreamRef.current = null;
         if (screenShareVideoRef.current) {
@@ -2858,6 +2925,14 @@ export function useHomeDashboard() {
         }
         replacePeerVideoTrack(cameraTrack);
         setIsScreenSharing(false);
+        setScreenSharingUserId(null);
+        if (latestCall?.sessionId && latestCall.callToken) {
+          try {
+            emitCallMediaState(latestCall.sessionId, latestCall.callToken, { isScreenSharing: false });
+          } catch {
+            setCallError('KhÃ´ng thá»ƒ Ä‘á»“ng bá»™ tráº¡ng thÃ¡i chia sáº» mÃ n hÃ¬nh.');
+          }
+        }
       };
     } catch (error: unknown) {
       const message = resolveCallMediaErrorMessage(error, 'Không thể bật chia sẻ màn hình.');
@@ -2867,7 +2942,7 @@ export function useHomeDashboard() {
         setCallError(message);
       }
     }
-  }, [isScreenSharing, notifyCallBlockingIssue, replacePeerVideoTrack, syncScreenSharePreview]);
+  }, [isScreenSharing, notifyCallBlockingIssue, replacePeerVideoTrack, syncScreenSharePreview, userId]);
 
   const disbandGroupConversation = useCallback(
     async (groupId: string) => {
@@ -3380,6 +3455,7 @@ export function useHomeDashboard() {
         avatarUrl: notif.data?.avatarUrl,
         conversationId: notif.conversationId,
         fromUserId: notif.fromUserId,
+        action: notif.data?.action,
         postId: notif.data?.postId,
       }));
 
@@ -3441,7 +3517,7 @@ export function useHomeDashboard() {
     onSelectConversation: setSelectedConversationId,
     searchTargets: searchTargets(),
     onSelectSearchTarget: openConversationFromSearch,
-    messages: messageHistory.messages,
+    messages: messageHistory.messages.filter(isVisibleChatMessage),
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
     messagesHasMore: messageHistory.hasMore,
@@ -3487,6 +3563,7 @@ export function useHomeDashboard() {
     isMicMuted,
     isCameraEnabled,
     isScreenSharing,
+    screenSharingUserId,
     localVideoRef,
     screenShareVideoRef,
     remoteVideoRef,
