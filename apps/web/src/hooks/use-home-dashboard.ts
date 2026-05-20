@@ -160,17 +160,29 @@ function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string
               : 'Tin nhắn media';
 }
 
+function normalizeCallText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function isVisibleChatMessage(message: Message): boolean {
+  return !isCallSummaryMessage(message);
+}
+
+function isCallSummaryMessage(message: Message): boolean {
   const idempotencyKey = String(message.idempotencyKey || '');
   if (idempotencyKey.startsWith('call-summary:')) {
-    return false;
+    return true;
   }
 
-  const content = String(message.content || '').trim().toLowerCase();
-  return !(
-    content.startsWith('cuoc goi da ket thuc')
-    || content.startsWith('cuoc goi bi tu choi')
-    || content.startsWith('cuoc goi nho')
+  const content = normalizeCallText(String(message.content || ''));
+  return (
+    content.startsWith('cuoc goi')
+    || content.startsWith('dang trong cuoc goi')
+    || content.startsWith('dang co cuoc goi')
   );
 }
 
@@ -179,11 +191,11 @@ function formatConversationPreview(lastMessage?: Conversation['lastMessage']): s
     return 'Không có tin nhắn';
   }
 
-  const normalizedContent = lastMessage.content.trim().toLowerCase();
+  const normalizedContent = normalizeCallText(lastMessage.content);
   if (
-    normalizedContent.startsWith('cuoc goi da ket thuc')
-    || normalizedContent.startsWith('cuoc goi bi tu choi')
-    || normalizedContent.startsWith('cuoc goi nho')
+    normalizedContent.startsWith('cuoc goi')
+    || normalizedContent.startsWith('dang trong cuoc goi')
+    || normalizedContent.startsWith('dang co cuoc goi')
   ) {
     return 'Không có tin nhắn';
   }
@@ -1007,11 +1019,17 @@ export function useHomeDashboard() {
       const merged = new Map<string, Message>();
 
       prev.forEach((msg) => {
+        if (isCallSummaryMessage(msg)) {
+          return;
+        }
         const key = String(msg.idempotencyKey || msg._id);
         merged.set(key, msg);
       });
 
       messages.forEach((msg) => {
+        if (isCallSummaryMessage(msg)) {
+          return;
+        }
         const key = String(msg.idempotencyKey || msg._id);
         const existing = merged.get(key);
 
@@ -1545,6 +1563,9 @@ export function useHomeDashboard() {
     if (messages.length === 0) return;
 
     const latestMessage = messages[messages.length - 1];
+    if (isCallSummaryMessage(latestMessage)) {
+      return;
+    }
     setConversations(prev => prev.map(conv => {
       if (conv._id === latestMessage.conversationId) {
         const senderDisplayName = conv.users.find((member) => member._id === latestMessage.senderId)?.displayName;
@@ -1565,6 +1586,9 @@ export function useHomeDashboard() {
   }, [messages]);
 
   const updatePreviewConversation = (message: Message) => {
+    if (isCallSummaryMessage(message)) {
+      return;
+    }
     setConversations(prev => prev.map(conv => {
       if (conv._id === message.conversationId) {
         const senderDisplayName = conv.users.find((member) => member._id === message.senderId)?.displayName;
@@ -2261,10 +2285,12 @@ export function useHomeDashboard() {
         const nextStatus: CallUiStatus = payload.status === 'ringing'
           ? (prev.direction === 'incoming' ? 'incoming' : 'outgoing')
           : payload.status;
+        const isAwaitingAccept = prev.direction === 'incoming' && !prev.joinedParticipantIds.includes(userId);
+        const shouldKeepIncoming = isAwaitingAccept && (nextStatus === 'connecting' || nextStatus === 'connected');
 
         return {
           ...prev,
-          status: nextStatus,
+          status: shouldKeepIncoming ? 'incoming' : nextStatus,
           reason: payload.reason,
         };
       });
@@ -2304,6 +2330,10 @@ export function useHomeDashboard() {
     const handleCallParticipantJoined = async (payload: CallParticipantPayload) => {
       const current = activeCallRef.current;
       if (!current || current.sessionId !== payload.sessionId) {
+        return;
+      }
+
+      if (current.direction === 'incoming' && !current.joinedParticipantIds.includes(userId) && payload.userId !== userId) {
         return;
       }
 
@@ -2712,10 +2742,11 @@ export function useHomeDashboard() {
 
     clearCallResetTimer();
     setCallError(null);
+    setIsCameraEnabled(current.callType === 'video');
 
     try {
       try {
-        await ensureLocalMedia(current.callType === 'audio' ? false : isCameraEnabled);
+        await ensureLocalMedia(current.callType === 'audio' ? false : true);
       } catch {
         await ensureLocalMedia(false);
         setCallError('Không truy cập được camera, tiếp tục cuộc gọi với audio.');
@@ -3563,6 +3594,7 @@ export function useHomeDashboard() {
     ) as CallUiStatus,
     callPeerName,
     callParticipantNames: activeCallParticipantNames,
+    callType: activeCall?.callType ?? 'video',
     isGroupCallActive: activeCall?.isGroupCall ?? false,
     callError,
     callFriendError,

@@ -133,7 +133,25 @@ export function GlobalCallListener() {
     };
 
     const handleCallStatus = (payload: CallStatusPayload) => {
-      if (['ended', 'missed', 'rejected', 'connecting', 'connected'].includes(payload.status)) {
+      const currentUserId = resolveCurrentUserId();
+      const activeCall = callStore.activeCall;
+      const hasJoined = Boolean(
+        currentUserId
+        && activeCall
+        && activeCall.sessionId === payload.sessionId
+        && activeCall.joinedParticipantIds.includes(currentUserId),
+      );
+      const isCaller = Boolean(
+        activeCall
+        && activeCall.sessionId === payload.sessionId
+        && activeCall.direction === 'outgoing',
+      );
+      const shouldDismissForConnect = payload.status === 'connecting' || payload.status === 'connected';
+
+      if (
+        ['ended', 'missed', 'rejected'].includes(payload.status)
+        || (shouldDismissForConnect && (hasJoined || isCaller))
+      ) {
         window.dispatchEvent(new CustomEvent(WEB_IN_APP_TOAST_EVENT, {
           detail: {
             id: `call-${payload.sessionId}`,

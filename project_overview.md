@@ -307,6 +307,9 @@ npm run dev:web
   - [x] Nâng cấp UI call: Việt hóa có dấu + thêm icon điều khiển (nhận/từ chối, mic, camera, chia sẻ, kết thúc) + hỗ trợ group modal với lưới video participant <!-- done: 18/04/2026 by binhdev -->
   - [x] Group call UX hardening: active-speaker highlight theo audio RMS tren grid participant + hien thi "Dang noi" realtime <!-- done: 18/04/2026 by binhdev -->
   - [x] Hotfix Web call modal: tu dong dong banner trang thai ket thuc de tra ve doan chat (khong can F5) + thu gon modal vao khung chat, tranh che toan bo khung hoi thoai <!-- done: 18/04/2026 by binhdev -->
+  - [x] Tinh chinh UI call Web: lam ro che do goi thoai/video, nhan biet dang co cuoc goi, an thong bao call trong doan chat <!-- done: 20/05/2026 -->
+  - [x] Bo thong bao call khoi message list, chi giu toast/popup nhan-tu-choi <!-- done: 20/05/2026 -->
+  - [x] Refactor layout call Web: gom 1 container, main stage + participant strip, video object-contain <!-- done: 21/05/2026 -->
 - [x] DEV-MOBILE (Milestone A): UI/UX parity cho 1-1 call với Web (audio route, camera switch, background/foreground handling) <!-- done: 26/04/2026 by binhdev -->
 - [x] DEV-SECURITY: Bảo vệ call bằng access token ngắn hạn (ephemeral call token), chống join trái phép qua roomId đoán được <!-- done: 18/04/2026 by binhdev -->
 - [x] QC (Milestone A): E2E test 1-1 call (happy path, reject, missed, reconnect) <!-- done: 18/04/2026 by binhdev -->

@@ -43,11 +43,11 @@ type CallUiStatus = 'idle' | 'outgoing' | 'incoming' | 'connecting' | 'connected
 // ==================== ICONS ====================
 
 function PhoneIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 3a2.5 2.5 0 0 1 2.5-2.5h2.69a2.5 2.5 0 0 1 2.5 2.5v3.69a2.5 2.5 0 0 1-2.5 2.5H5a13 13 0 0 0 13 13v-3.81a2.5 2.5 0 0 1 2.5-2.5h3.69a2.5 2.5 0 0 1 2.5 2.5V21a2.5 2.5 0 0 1-2.5 2.5h-6.5A18 18 0 0 1 3.5 3Z" /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 3a2.5 2.5 0 0 1 2.5-2.5h2.69a2.5 2.5 0 0 1 2.5 2.5v3.69a2.5 2.5 0 0 1-2.5 2.5H5a13 13 0 0 0 13 13v-3.81a2.5 2.5 0 0 1 2.5-2.5h3.69a2.5 2.5 0 0 1 2.5 2.5V21a2.5 2.5 0 0 1-2.5 2.5h-6.5A18 18 0 0 1 3.5 3Z" /></svg>;
 }
 
 function VideoIcon({ className }: { className: string }) {
-  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x={1} y={5} width={15} height={14} rx={2} ry={2} /></svg>;
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x={1} y={5} width={15} height={14} rx={2} ry={2} /></svg>;
 }
 
 function MicIcon({ className }: { className: string }) {
@@ -239,6 +239,7 @@ interface ChatPanelProps {
     emojiCounts: Record<string, number>;
   }>;
   callStatus?: CallUiStatus;
+  callType?: 'audio' | 'video';
   callPeerName?: string;
   callParticipantNames?: string[];
   isGroupCallActive?: boolean;
@@ -509,6 +510,7 @@ function ChatPanel({
   onFetchReactionDetails,
   reactionUserStateByMessage = {},
   callStatus = 'idle',
+  callType = 'video',
   callPeerName,
   callParticipantNames = [],
   isGroupCallActive = false,
@@ -658,7 +660,13 @@ function ChatPanel({
   const isCallVisible = callStatus !== 'idle';
   const isTerminalCallState = callStatus === 'ended' || callStatus === 'missed' || callStatus === 'rejected';
   const isCompactCallState = isTerminalCallState || callStatus === 'incoming';
+  const shouldRenderCallOverlay = isCallVisible && callStatus !== 'incoming';
+  const isActiveCallState = callStatus === 'outgoing' || callStatus === 'incoming' || callStatus === 'connecting' || callStatus === 'connected';
+  const isAudioCallActive = isActiveCallState && callType === 'audio';
+  const isVideoCallActive = isActiveCallState && callType === 'video';
   const shouldRenderCallMedia = callStatus === 'outgoing' || callStatus === 'connecting' || callStatus === 'connected';
+  const callTypeLabel = callType === 'audio' ? 'Gọi thoại' : 'Gọi video';
+  const showCameraOffBadge = callType === 'video' && !isCameraEnabled;
   const callStatusLabel: Record<Exclude<CallUiStatus, 'idle'>, string> = {
     outgoing: 'Đang đổ chuông...',
     incoming: 'Cuộc gọi đến',
@@ -767,28 +775,17 @@ function ChatPanel({
   const sharingParticipantName = isScreenSharing
     ? 'Bạn'
     : remoteScreenShareParticipant?.displayName ?? null;
-  const joinedParticipantCount = 1 + participantVideosForTiles.length;
-  const callMediaLayout = isViewingScreenShare
-    ? 'flex flex-col gap-3 p-4'
-    : 'grid gap-3 p-4';
-  const participantGridClass = isViewingScreenShare
-    ? 'grid max-h-44 grid-flow-col auto-cols-[180px] gap-3 overflow-x-auto pb-1'
-    : joinedParticipantCount <= 1
-      ? 'grid h-full grid-cols-1 gap-3'
-      : joinedParticipantCount === 2
-        ? 'grid h-full grid-cols-1 md:grid-cols-2 gap-3'
-        : joinedParticipantCount <= 4
-          ? 'grid h-full grid-cols-1 sm:grid-cols-2 gap-3'
-          : 'grid h-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 overflow-y-auto content-start';
-  const screenShareTileClass = isCallMinimized
-    ? 'relative h-32 flex-1 overflow-hidden rounded-xl border border-accent bg-black shadow-sm'
-    : 'relative min-h-[min(58vh,560px)] flex-1 overflow-hidden rounded-xl border border-accent bg-black shadow-sm ring-2 ring-accent/30';
-  const localCallTileClass = isViewingScreenShare
-    ? 'relative h-32 w-[180px] overflow-hidden rounded-xl border border-border bg-black shadow-sm'
-    : 'relative min-h-[220px] overflow-hidden rounded-xl border border-border bg-black shadow-sm';
-  const remoteCallTileClass = isViewingScreenShare
-    ? 'relative h-32 w-[180px] overflow-hidden rounded-xl border bg-black shadow-sm'
-    : 'relative min-h-[220px] overflow-hidden rounded-xl border bg-black shadow-sm';
+  const mainStageParticipant = isGroupCallActive && !isViewingScreenShare
+    ? (participantVideosForTiles.find((participant) => participant.userId === activeSpeakerUserId)
+      ?? participantVideosForTiles[0]
+      ?? null)
+    : null;
+  const mainStageClass = `relative flex-1 min-h-0 overflow-hidden ${isCallMinimized ? 'rounded-xl' : 'rounded-2xl'} border ${isViewingScreenShare ? 'border-accent' : 'border-border'} bg-black shadow-sm`;
+  const stripContainerClass = isCallMinimized ? 'mt-3 flex-shrink-0' : 'mt-4 flex-shrink-0';
+  const stripTrackClass = 'flex gap-3 overflow-x-auto pb-2';
+  const stripTileClass = isCallMinimized
+    ? 'relative h-20 w-32 flex-shrink-0 overflow-hidden rounded-xl border border-border bg-black shadow-sm'
+    : 'relative h-24 w-40 sm:h-28 sm:w-48 flex-shrink-0 overflow-hidden rounded-xl border border-border bg-black shadow-sm';
 
   useEffect(() => {
     if (!isCallVisible || isCompactCallState) {
@@ -983,7 +980,7 @@ function ChatPanel({
         <div className="chat-header-actions flex-shrink-0">
           <button
             type="button"
-            className="chat-header-btn"
+            className={`chat-header-btn ${isAudioCallActive ? 'is-active' : ''}`}
             title={isGroupConversation ? 'Gọi hoặc tham gia thoại nhóm' : 'Gọi thoại'}
             disabled={!isCallingAvailable}
             onClick={onStartAudioCall}
@@ -992,7 +989,7 @@ function ChatPanel({
           </button>
           <button
             type="button"
-            className="chat-header-btn"
+            className={`chat-header-btn ${isVideoCallActive ? 'is-active' : ''}`}
             title={isGroupConversation ? 'Gọi hoặc tham gia video nhóm' : 'Gọi video'}
             disabled={!isCallingAvailable}
             onClick={onStartVideoCall}
@@ -1034,7 +1031,7 @@ function ChatPanel({
         </div>
       )}
 
-      {isCallVisible && (
+      {shouldRenderCallOverlay && (
         <div
           className={`absolute z-[40] flex flex-col ${
             isCallMinimized
@@ -1060,6 +1057,16 @@ function ChatPanel({
                       ? (isGroupCallActive ? `Nhóm gọi: ${callPeerName}` : `Người tham gia: ${callPeerName}`)
                       : 'Đang đồng bộ thông tin cuộc gọi'}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-text-secondary">
+                    <span className="rounded-full border border-border bg-bg-hover px-2.5 py-1">
+                      {callTypeLabel}
+                    </span>
+                    {showCameraOffBadge && (
+                      <span className="rounded-full border border-border bg-bg-hover px-2.5 py-1">
+                        Camera tắt
+                      </span>
+                    )}
+                  </div>
                   {isGroupCallActive && callParticipantNames.length > 0 && !isCallMinimized && (
                     <p className="mt-1 text-xs text-text-secondary">
                       Thành viên: {callParticipantNames.join(', ')}
@@ -1168,57 +1175,113 @@ function ChatPanel({
             </div>
 
             {shouldRenderCallMedia && (
-              <div className={`${callMediaLayout} ${isCallMinimized ? 'max-h-52 min-h-0 overflow-hidden bg-bg-primary' : isTerminalCallState ? 'max-h-[52vh]' : 'flex-1 min-h-0 bg-bg-primary'}`}>
-                {isViewingScreenShare && (
-                  <div className={screenShareTileClass}>
-                    {isScreenSharing ? (
+              <div className={`flex min-h-0 flex-col ${isCallMinimized ? 'max-h-52' : isTerminalCallState ? 'max-h-[52vh]' : 'flex-1'} bg-bg-primary p-4`}>
+                <div className={mainStageClass}>
+                  {isViewingScreenShare ? (
+                    <>
+                      {isScreenSharing ? (
+                        <video
+                          ref={screenShareVideoRef}
+                          autoPlay
+                          muted
+                          playsInline
+                          className="absolute inset-0 h-full w-full object-contain"
+                        />
+                      ) : (
+                        <video
+                          autoPlay
+                          playsInline
+                          className="absolute inset-0 h-full w-full object-contain"
+                          ref={(node) => {
+                            if (!node || !remoteScreenShareParticipant) {
+                              return;
+                            }
+                            if (node.srcObject !== remoteScreenShareParticipant.stream) {
+                              node.srcObject = remoteScreenShareParticipant.stream;
+                            }
+                          }}
+                        />
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-3 pointer-events-none">
+                        <p className="text-xs font-medium text-white drop-shadow-sm">Màn hình đang chia sẻ</p>
+                      </div>
+                    </>
+                  ) : isGroupCallActive ? (
+                    <>
+                      {mainStageParticipant ? (
+                        <video
+                          autoPlay
+                          playsInline
+                          className="absolute inset-0 h-full w-full object-contain"
+                          ref={(node) => {
+                            if (!node) {
+                              return;
+                            }
+                            if (node.srcObject !== mainStageParticipant.stream) {
+                              node.srcObject = mainStageParticipant.stream;
+                            }
+                          }}
+                        />
+                      ) : (
+                        <video
+                          autoPlay
+                          muted
+                          playsInline
+                          className="absolute inset-0 h-full w-full object-contain"
+                          ref={(node) => {
+                            if (!node) {
+                              return;
+                            }
+                            const localStream = localVideoRef.current?.srcObject;
+                            if (localStream && node.srcObject !== localStream) {
+                              node.srcObject = localStream;
+                            }
+                          }}
+                        />
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-3 pointer-events-none">
+                        <p className="text-xs font-medium text-white drop-shadow-sm">
+                          {mainStageParticipant?.displayName ?? 'Camera của bạn'}
+                          {mainStageParticipant?.userId === activeSpeakerUserId ? ' - Đang nói' : ''}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
                       <video
-                        ref={screenShareVideoRef}
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                        className="absolute inset-0 h-full w-full object-contain"
+                      />
+                      {callPeerName && (
+                        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4 pointer-events-none">
+                          <p className="text-sm font-medium text-white drop-shadow-sm">{callPeerName}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className={stripContainerClass}>
+                  <div className={stripTrackClass}>
+                    <div className={stripTileClass}>
+                      <video
+                        ref={localVideoRef}
                         autoPlay
                         muted
                         playsInline
                         className="absolute inset-0 h-full w-full object-contain"
                       />
-                    ) : (
-                      <video
-                        autoPlay
-                        playsInline
-                        className="absolute inset-0 h-full w-full object-contain"
-                        ref={(node) => {
-                          if (!node || !remoteScreenShareParticipant) {
-                            return;
-                          }
-                          if (node.srcObject !== remoteScreenShareParticipant.stream) {
-                            node.srcObject = remoteScreenShareParticipant.stream;
-                          }
-                        }}
-                      />
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-3 pointer-events-none">
-                      <p className="text-xs font-medium text-white drop-shadow-sm">Màn hình đang chia sẻ</p>
+                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-2 pointer-events-none">
+                        <p className="text-[11px] font-medium text-white drop-shadow-sm">Bạn</p>
+                      </div>
                     </div>
-                  </div>
-                )}
 
-                <div className={participantGridClass}>
-                  <div className={localCallTileClass}>
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-3 pointer-events-none">
-                      <p className="text-xs font-medium text-white drop-shadow-sm">Camera của bạn</p>
-                    </div>
-                  </div>
-
-                  {isGroupCallActive ? (
-                    participantVideosForTiles.map((participant) => (
+                    {isGroupCallActive && participantVideosForTiles.map((participant) => (
                       <div
                         key={participant.userId}
-                        className={`${remoteCallTileClass} ${
+                        className={`${stripTileClass} ${
                           activeSpeakerUserId === participant.userId
                             ? 'border-accent ring-2 ring-accent'
                             : 'border-border'
@@ -1227,7 +1290,7 @@ function ChatPanel({
                         <video
                           autoPlay
                           playsInline
-                          className="absolute inset-0 h-full w-full object-cover"
+                          className="absolute inset-0 h-full w-full object-contain"
                           ref={(node) => {
                             if (!node) {
                               return;
@@ -1237,29 +1300,15 @@ function ChatPanel({
                             }
                           }}
                         />
-                        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-3 pointer-events-none">
-                          <p className="text-xs font-medium text-white drop-shadow-sm">
+                        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-2 pointer-events-none">
+                          <p className="text-[11px] font-medium text-white drop-shadow-sm">
                             {participant.displayName}
                             {activeSpeakerUserId === participant.userId ? ' - Đang nói' : ''}
                           </p>
                         </div>
                       </div>
-                    ))
-                  ) : remoteScreenShareParticipant ? null : (
-                    <div className={`${remoteCallTileClass} border-border`}>
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                      {callPeerName && (
-                        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4 pointer-events-none">
-                          <p className="text-sm font-medium text-white drop-shadow-sm">{callPeerName}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
