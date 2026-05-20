@@ -1,4 +1,4 @@
-import { type CallHistory, MessageType, SenderInMessage } from '@zync/shared-types';
+import { type AiCatchupDigestUpdatedPayload, type CallHistory, MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 import { callStore } from '@/stores/call-store';
@@ -1023,6 +1023,32 @@ export function unlistenToUserPenaltyUpdated(cb?: unknown): void {
  * @param toConversationId Target conversation
  * @param idempotencyKey Unique key for idempotency
  */
+export function listenToAiCatchupDigestUpdated(
+  callback: (data: AiCatchupDigestUpdatedPayload) => void,
+): void {
+  if (!socket) return;
+
+  const event = 'ai_catchup_digest_updated';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
+}
+
+export function unlistenToAiCatchupDigestUpdated(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'ai_catchup_digest_updated';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
+}
+
 export function emitForwardMessage(
   originalMessageId: string,
   toConversationId: string,
@@ -1382,6 +1408,8 @@ export const socketService = {
   unlistenToMessageReacted,
   listenToUserPenaltyUpdated,
   unlistenToUserPenaltyUpdated,
+  listenToAiCatchupDigestUpdated,
+  unlistenToAiCatchupDigestUpdated,
 };
 
 export default socketService;

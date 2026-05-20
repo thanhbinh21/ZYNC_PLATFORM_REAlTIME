@@ -11,6 +11,10 @@ export interface IConversationMember extends Document {
   lastVisibleMessageRef?: string;
   lastVisibleAt?: Date;
   unreadCount?: number;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
 }
 
 const memberSchema = new Schema<IConversationMember>({
@@ -24,6 +28,10 @@ const memberSchema = new Schema<IConversationMember>({
   lastVisibleMessageRef: { type: String },
   lastVisibleAt: { type: Date },
   unreadCount: { type: Number, min: 0 },
+  aiPreferences: {
+    catchupEnabled: { type: Boolean, default: true },
+    smartSearchEnabled: { type: Boolean },
+  },
 });
 
 memberSchema.index({ conversationId: 1, userId: 1 }, { unique: true });

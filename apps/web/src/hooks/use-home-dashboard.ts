@@ -41,6 +41,7 @@ import {
   listenToMessageRecall,
   listenToReactionError,
   listenToReactionUpdated,
+  listenToAiCatchupDigestUpdated,
   unlistenToCallIncoming,
   unlistenToCallInvited,
   unlistenToCallMediaState,
@@ -56,9 +57,16 @@ import {
   unlistenToMessageRecall,
   unlistenToReactionError,
   unlistenToReactionUpdated,
+  unlistenToAiCatchupDigestUpdated,
 } from '@/services/socket';
 import { getMessageReactionDetails, type ReactionDetailsResponse } from '@/services/chat';
-import type { Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
+import type { AiCatchupDigest, AiCatchupDigestUpdatedPayload, Message, MessageReactionSummary, MessageReactionUserState } from '@zync/shared-types';
+import {
+  createAiCatchupDigest,
+  getLatestAiCatchupDigest,
+  regenerateAiCatchupDigest,
+  updateAiCatchupSettings,
+} from '@/services/ai-catchup';
 import {
   addGroupMembers,
   createGroup,
@@ -107,6 +115,10 @@ interface Conversation {
   lastMessage?: { senderId: string; senderDisplayName?: string; content: string; sentAt: string };
   activeCall?: ConversationActiveCall | null;
   unreadCounts?: Record<string, number>;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
 }
 
 interface ConversationActiveCall {
@@ -144,7 +156,9 @@ interface ConversationListItem {
   online?: boolean;
   active?: boolean;
   activeCall?: ConversationActiveCall | null;
-  haveRead: boolean
+  haveRead: boolean;
+  unreadCount: number;
+  aiCatchupEnabled: boolean;
 }
 
 interface PresenceState {
@@ -313,6 +327,8 @@ export function useHomeDashboard() {
   const [forwardLoading, setForwardLoading] = useState(false);
   const [reactionUserStateByMessage, setReactionUserStateByMessage] = useState<Record<string, MessageReactionUserState>>({});
   const [activeCall, setActiveCallState] = useState<CallSessionState | null>(callStore.activeCall);
+  const [aiCatchupByConversation, setAiCatchupByConversation] = useState<Record<string, AiCatchupDigest>>({});
+  const [aiCatchupRequestingByConversation, setAiCatchupRequestingByConversation] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     return subscribeToCallStore((call) => {
@@ -919,6 +935,177 @@ export function useHomeDashboard() {
   const resolveMessageRef = useCallback((message: Message): string => {
     return message.idempotencyKey || message._id;
   }, []);
+
+  const getConversationUnreadCount = useCallback((conversationId: string): number => {
+    const conversation = conversations.find((item) => item._id === conversationId);
+    const unreadValue = conversation?.unreadCounts?.[userId];
+    return typeof unreadValue === 'number' && unreadValue > 0 ? unreadValue : 0;
+  }, [conversations, userId]);
+
+  const getLatestLoadedMessageRef = useCallback((conversationId: string): string | undefined => {
+    if (conversationId !== selectedConversationId) {
+      return undefined;
+    }
+
+    const latestMessage = [...messageHistory.messages]
+      .reverse()
+      .find((message) => !isCallSummaryMessage(message));
+
+    return latestMessage ? resolveMessageRef(latestMessage) : undefined;
+  }, [messageHistory.messages, resolveMessageRef, selectedConversationId]);
+
+  const requestAiCatchup = useCallback(async (conversationId?: string) => {
+    const targetConversationId = conversationId ?? selectedConversationId;
+    if (!targetConversationId) {
+      return;
+    }
+
+    const targetConversation = conversations.find((item) => item._id === targetConversationId);
+    if (targetConversation?.aiPreferences?.catchupEnabled === false) {
+      return;
+    }
+
+    setAiCatchupRequestingByConversation((prev) => ({ ...prev, [targetConversationId]: true }));
+    try {
+      const digest = await createAiCatchupDigest(targetConversationId, {
+        trigger: 'manual',
+        unreadCountHint: getConversationUnreadCount(targetConversationId),
+        toMessageRef: getLatestLoadedMessageRef(targetConversationId),
+      });
+      setAiCatchupByConversation((prev) => ({ ...prev, [targetConversationId]: digest }));
+    } finally {
+      setAiCatchupRequestingByConversation((prev) => ({ ...prev, [targetConversationId]: false }));
+    }
+  }, [
+    conversations,
+    getConversationUnreadCount,
+    getLatestLoadedMessageRef,
+    selectedConversationId,
+  ]);
+
+  const regenerateAiCatchup = useCallback(async (digestId?: string) => {
+    const digest = digestId
+      ? Object.values(aiCatchupByConversation).find((item) => item._id === digestId)
+      : aiCatchupByConversation[selectedConversationId];
+    if (!digest) {
+      return;
+    }
+
+    setAiCatchupRequestingByConversation((prev) => ({ ...prev, [digest.conversationId]: true }));
+    try {
+      const nextDigest = await regenerateAiCatchupDigest(digest._id);
+      setAiCatchupByConversation((prev) => ({ ...prev, [nextDigest.conversationId]: nextDigest }));
+    } finally {
+      setAiCatchupRequestingByConversation((prev) => ({ ...prev, [digest.conversationId]: false }));
+    }
+  }, [aiCatchupByConversation, selectedConversationId]);
+
+  const toggleAiCatchupSetting = useCallback(async (conversationId: string, catchupEnabled: boolean) => {
+    const previousConversation = conversations.find((conversation) => conversation._id === conversationId);
+    setConversations((prev) => prev.map((conversation) => {
+      if (conversation._id !== conversationId) {
+        return conversation;
+      }
+
+      return {
+        ...conversation,
+        aiPreferences: {
+          ...(conversation.aiPreferences ?? { catchupEnabled: true }),
+          catchupEnabled,
+        },
+      };
+    }));
+
+    try {
+      await updateAiCatchupSettings(conversationId, catchupEnabled);
+    } catch (error) {
+      setConversations((prev) => prev.map((conversation) => {
+        if (conversation._id !== conversationId) {
+          return conversation;
+        }
+
+        return {
+          ...conversation,
+          aiPreferences: previousConversation?.aiPreferences ?? { catchupEnabled: true },
+        };
+      }));
+      throw error;
+    }
+  }, [conversations]);
+
+  useEffect(() => {
+    if (!selectedConversationId || !userId) {
+      return;
+    }
+
+    let cancelled = false;
+    getLatestAiCatchupDigest(selectedConversationId)
+      .then((digest) => {
+        if (cancelled || !digest) {
+          return;
+        }
+        setAiCatchupByConversation((prev) => ({ ...prev, [selectedConversationId]: digest }));
+      })
+      .catch((error) => {
+        console.warn('[AI Catch-up] Failed to load latest digest', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedConversationId, userId]);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token || !userId) {
+      return;
+    }
+
+    getSocket(token);
+
+    const handleAiCatchupDigestUpdated = (payload: AiCatchupDigestUpdatedPayload) => {
+      setAiCatchupRequestingByConversation((prev) => ({ ...prev, [payload.conversationId]: false }));
+      setAiCatchupByConversation((prev) => {
+        const existing = prev[payload.conversationId];
+        const fallbackDigest: AiCatchupDigest = {
+          _id: payload.digestId,
+          userId,
+          conversationId: payload.conversationId,
+          cacheKey: '',
+          fromMessageRef: '',
+          toMessageRef: '',
+          messageRefs: [],
+          messageCount: 0,
+          omittedOlderCount: 0,
+          trigger: 'manual',
+          status: payload.status,
+          summary: payload.summary,
+          inputHash: '',
+          error: payload.error,
+          createdAt: payload.updatedAt,
+          updatedAt: payload.updatedAt,
+        };
+
+        return {
+          ...prev,
+          [payload.conversationId]: existing
+            ? {
+                ...existing,
+                status: payload.status,
+                summary: payload.summary ?? existing.summary,
+                error: payload.error,
+                updatedAt: payload.updatedAt,
+              }
+            : fallbackDigest,
+        };
+      });
+    };
+
+    listenToAiCatchupDigestUpdated(handleAiCatchupDigestUpdated);
+    return () => {
+      unlistenToAiCatchupDigestUpdated(handleAiCatchupDigestUpdated);
+    };
+  }, [userId]);
 
   const applyReactionSummaryToMessage = useCallback(
     (
@@ -1814,7 +2001,9 @@ export function useHomeDashboard() {
       online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
       activeCall: conv.activeCall ?? null,
-      haveRead: unreadCounts.get(userId)? false: true
+      haveRead: unreadCounts.get(userId)? false: true,
+      unreadCount: unreadCounts.get(userId) ?? 0,
+      aiCatchupEnabled: conv.aiPreferences?.catchupEnabled !== false,
     }});
   }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
 
@@ -3637,12 +3826,20 @@ export function useHomeDashboard() {
     conversations: convertConversationsToListItems(),
     selectedConversationId,
     onSelectConversation: setSelectedConversationId,
+    aiCatchupByConversation,
+    onRequestAiCatchup: requestAiCatchup,
+    onRegenerateAiCatchup: regenerateAiCatchup,
+    onToggleAiCatchupSetting: toggleAiCatchupSetting,
     searchTargets: searchTargets(),
     onSelectSearchTarget: openConversationFromSearch,
     messages: messageHistory.messages.filter(isVisibleChatMessage),
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
     messagesHasMore: messageHistory.hasMore,
+    aiCatchupDigest: selectedConversationId ? (aiCatchupByConversation[selectedConversationId] ?? null) : null,
+    aiCatchupUnreadCount: selectedConversationId ? getConversationUnreadCount(selectedConversationId) : 0,
+    aiCatchupEnabled: selectedConversationRaw?.aiPreferences?.catchupEnabled !== false,
+    aiCatchupRequesting: selectedConversationId ? Boolean(aiCatchupRequestingByConversation[selectedConversationId]) : false,
     conversationInfo: getSelectedConversationInfo(),
     typingUsers,
     friendsForGroup,

@@ -6,6 +6,7 @@ export const KAFKA_TOPICS = {
   NOTIFICATIONS: 'notifications',
   MODERATION_ACTIONS: 'moderation-actions',   // AI-1: content moderation results
   MESSAGE_EMBEDDINGS: 'message-embeddings',    // AI-2: async embed worker
+  AI_CATCHUP_JOBS: 'ai-catchup-jobs',
   // ─── Dead Letter Queue (DLQ) Topics ────────────────────────────────────────
   // Khi worker xử lý thất bại, message sẽ được đẩy vào DLQ để xử lý lại sau
   RAW_MESSAGES_RETRY: 'raw-messages.retry',    // Retry topic (1-3 lần)
@@ -41,6 +42,7 @@ export async function connectKafka(): Promise<void> {
       { topic: KAFKA_TOPICS.NOTIFICATIONS, numPartitions: 3, replicationFactor: 1 },
       { topic: KAFKA_TOPICS.MODERATION_ACTIONS, numPartitions: 1, replicationFactor: 1 },
       { topic: KAFKA_TOPICS.MESSAGE_EMBEDDINGS, numPartitions: 3, replicationFactor: 1 },
+      { topic: KAFKA_TOPICS.AI_CATCHUP_JOBS, numPartitions: 3, replicationFactor: 1 },
       // DLQ & Retry topics
       { topic: KAFKA_TOPICS.RAW_MESSAGES_RETRY, numPartitions: 1, replicationFactor: 1 },
       { topic: KAFKA_TOPICS.RAW_MESSAGES_DLQ, numPartitions: 1, replicationFactor: 1 },

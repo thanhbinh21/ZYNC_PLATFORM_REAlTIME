@@ -127,6 +127,13 @@ export function emitNotification(
   ioInstance?.to(`user:${userId}`).emit('new_notification', notification);
 }
 
+export function emitAiCatchupDigestUpdated(
+  userId: string,
+  payload: unknown,
+): void {
+  ioInstance?.to(`user:${userId}`).emit('ai_catchup_digest_updated', payload);
+}
+
 export function initSocketGateway(httpServer: HttpServer): Server {
   const configuredCorsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001')
     .split(',')

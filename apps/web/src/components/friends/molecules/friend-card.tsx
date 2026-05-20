@@ -1,6 +1,7 @@
 "use client";
 
 import type { FriendUser } from "@/services/friends";
+import type { ReactNode } from "react";
 import { MessageSquare, MoreHorizontal, UserMinus, UserX } from "lucide-react";
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
@@ -105,7 +106,7 @@ export function FriendCard({
         {showMenu &&
           menuRect &&
           typeof document !== "undefined" &&
-          createPortal(
+          (createPortal(
             <div
               ref={menuPanelRef}
               className="zync-glass-panel-strong fixed z-[300] w-48 overflow-hidden rounded-xl bg-[var(--surface-card)]/95 p-1 shadow-2xl backdrop-blur-xl"
@@ -146,7 +147,7 @@ export function FriendCard({
               </button>
             </div>,
             document.body,
-          )}
+          ) as unknown as ReactNode)}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-0.5 text-center">

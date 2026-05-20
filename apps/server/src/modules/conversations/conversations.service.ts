@@ -33,6 +33,10 @@ interface EnrichedConversation {
   };
   activeCall: ActiveConversationCall | null;
   unreadCounts?: Record<string, number>;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
   updatedAt: Date;
   users: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
 }
@@ -42,6 +46,10 @@ interface ConversationMemberOverride {
   lastVisibleMessageRef?: string;
   lastVisibleAt?: Date;
   unreadCount?: number;
+  aiPreferences?: {
+    catchupEnabled: boolean;
+    smartSearchEnabled?: boolean;
+  };
 }
 
 interface LastVisibleMessage {
@@ -131,7 +139,7 @@ async function enrichConversationById(
   }
 
   const membersRaw = await ConversationMemberModel.find({ conversationId })
-    .select('userId lastVisibleMessageRef lastVisibleAt unreadCount')
+    .select('userId lastVisibleMessageRef lastVisibleAt unreadCount aiPreferences')
     .lean();
 
   const members = membersRaw as unknown as ConversationMemberOverride[];
@@ -206,6 +214,9 @@ async function enrichConversationById(
     lastMessage,
     activeCall,
     unreadCounts,
+    aiPreferences: viewerId
+      ? members.find((member) => member.userId === viewerId)?.aiPreferences ?? { catchupEnabled: true }
+      : undefined,
     updatedAt: conversation.updatedAt,
     users: usersNormalized,
   };

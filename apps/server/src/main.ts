@@ -13,6 +13,7 @@ import { initSocketGateway } from './socket/gateway';
 import { startMessageWorker, stopMessageWorker } from './workers/message.worker';
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
 import { startModerationWorker, stopModerationWorker } from './modules/ai/moderation/moderation.worker';
+import { startCatchupWorker, stopCatchupWorker } from './modules/ai/catchup/catchup.worker';
 import { runPgvectorMigration, isNeonAvailable } from './infrastructure/neon';
 import { logger } from './shared/logger';
 
@@ -49,6 +50,11 @@ async function bootstrap(): Promise<void> {
         logger.error('Moderation worker failed to start (non-fatal)', err);
       });
     }
+    if (process.env['AI_CATCHUP_ENABLED'] !== 'false') {
+      void startCatchupWorker().catch((err: unknown) => {
+        logger.error('AI Catch-up worker failed to start (non-fatal)', err);
+      });
+    }
   } else {
     logger.warn('Kafka bị tắt (KAFKA_ENABLED != true). Workers sẽ không chạy.');
   }
@@ -80,6 +86,7 @@ async function bootstrap(): Promise<void> {
       await stopMessageWorker();
       await stopNotificationWorker();
       await stopModerationWorker();
+      await stopCatchupWorker();
     }
     
     httpServer.close(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
@@ -10,6 +10,14 @@ import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 import { setActiveConversationId } from '@/services/active-conversation';
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<PageLoading variant="chat" mode="panel" />}>
+      <ChatPageContent />
+    </Suspense>
+  );
+}
+
+function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -17,6 +25,10 @@ export default function ChatPage() {
     conversations,
     selectedConversationId,
     onSelectConversation,
+    aiCatchupByConversation,
+    onRequestAiCatchup,
+    onRegenerateAiCatchup,
+    onToggleAiCatchupSetting,
     searchTargets,
     onSelectSearchTarget,
     friendsForGroup,
@@ -37,6 +49,10 @@ export default function ChatPage() {
     messages,
     messagesLoading,
     messagesHasMore,
+    aiCatchupDigest,
+    aiCatchupUnreadCount,
+    aiCatchupEnabled,
+    aiCatchupRequesting,
     messageStatus,
     conversationInfo,
     typingUsers,
@@ -137,6 +153,9 @@ export default function ChatPage() {
         onUnmuteConversation={onUnmuteConversation}
         isConversationPinned={isSelectedConversationPinned}
         conversationMutedUntil={selectedConversationMutedUntil}
+        aiCatchupByConversation={aiCatchupByConversation}
+        onRequestAiCatchup={onRequestAiCatchup}
+        onToggleAiCatchupSetting={onToggleAiCatchupSetting}
         isCreatingGroup={groupActionLoading}
         onLoadMore={onLoadMore}
         chatPanelProps={{
@@ -151,6 +170,12 @@ export default function ChatPage() {
           typingUsers: typingUsers,
           isLoading: messagesLoading,
           hasMoreMessages: messagesHasMore,
+          aiCatchupDigest,
+          aiCatchupUnreadCount,
+          aiCatchupEnabled,
+          aiCatchupRequesting,
+          onRequestAiCatchup: () => onRequestAiCatchup(selectedConversationId),
+          onRegenerateAiCatchup: () => onRegenerateAiCatchup(aiCatchupDigest?._id),
           onSendMessage: onSendMessage,
           onCancelPendingMessage: onCancelPendingMessage,
           onStartTyping: onStartTyping,

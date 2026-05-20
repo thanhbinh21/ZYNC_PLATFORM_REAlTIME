@@ -186,6 +186,55 @@ export interface TypingIndicatorPayload {
   isTyping: boolean;
 }
 
+export type AiCatchupDigestStatus = 'queued' | 'processing' | 'ready' | 'failed';
+export type AiCatchupDigestTrigger = 'manual' | 'auto_suggested';
+
+export interface AiCatchupSummary {
+  title: string;
+  overview: string;
+  bullets: string[];
+  mentionedUserIds: string[];
+  sourceMessageRefs: string[];
+}
+
+export interface AiCatchupFutureSignals {
+  decisions: string[];
+  questionsForUser: string[];
+  actionItems: Array<{ text: string; sourceMessageRefs: string[] }>;
+  suggestedReplies: string[];
+}
+
+export interface AiCatchupDigest {
+  _id: string;
+  userId: string;
+  conversationId: string;
+  cacheKey: string;
+  fromMessageRef: string;
+  toMessageRef: string;
+  messageRefs: string[];
+  messageCount: number;
+  omittedOlderCount: number;
+  trigger: AiCatchupDigestTrigger;
+  status: AiCatchupDigestStatus;
+  summary?: AiCatchupSummary;
+  futureSignals?: AiCatchupFutureSignals;
+  model?: string;
+  inputHash: string;
+  error?: string;
+  generatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiCatchupDigestUpdatedPayload {
+  digestId: string;
+  conversationId: string;
+  status: AiCatchupDigestStatus;
+  summary?: AiCatchupSummary;
+  error?: string;
+  updatedAt: string;
+}
+
 export interface UserOnlinePayload {
   userId: string;
   online: boolean;
@@ -224,7 +273,26 @@ export interface IStickerPack {
   updatedAt?: string;
 }
 
-// Wrapper Response chuẩn cho REST API
+// ─── AI Provider abstraction ──────────────────────────────────────────────────
+export type AIProviderType = 'gemini' | 'openrouter';
+
+export interface AIProviderResult {
+  text: string;
+  modelId: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+}
+
+export interface AIProvider {
+  readonly type: AIProviderType;
+  readonly modelId: string;
+  generateJson(prompt: string, repairRaw?: string): Promise<AIProviderResult>;
+}
+
+// ─── Wrapper Response chuẩn cho REST API ─────────────────────────────────────
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;

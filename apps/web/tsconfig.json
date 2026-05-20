@@ -20,6 +20,9 @@
       "@/*": [
         "./src/*"
       ],
+      "lucide-react": [
+        "./src/vendor/lucide-react"
+      ],
       "@zync/shared-types": [
         "../../packages/shared-types/src/index.ts"
       ]

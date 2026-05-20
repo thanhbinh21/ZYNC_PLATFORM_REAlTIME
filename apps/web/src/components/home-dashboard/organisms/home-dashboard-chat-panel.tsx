@@ -1,8 +1,8 @@
 'use client';
 
 import { type ChangeEvent, type ComponentType, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, PenLine, Heart } from 'lucide-react';
-import type { Message, MessageStatus } from '@zync/shared-types';
+import { AlertCircle, Bot, CheckCircle2, Loader2, Play, PenLine, RefreshCw, Sparkles, Heart } from 'lucide-react';
+import type { AiCatchupDigest, Message, MessageStatus } from '@zync/shared-types';
 import {
   Menu,
   MenuProvider,
@@ -31,6 +31,12 @@ type LucideIconComponent = ComponentType<{ className?: string; 'aria-hidden'?: b
 const PlayIcon = Play as unknown as LucideIconComponent;
 const PenLineIcon = PenLine as unknown as LucideIconComponent;
 const HeartIcon = Heart as unknown as LucideIconComponent;
+const AlertCircleIcon = AlertCircle as unknown as LucideIconComponent;
+const BotIcon = Bot as unknown as LucideIconComponent;
+const CheckCircleIcon = CheckCircle2 as unknown as LucideIconComponent;
+const LoaderIcon = Loader2 as unknown as LucideIconComponent;
+const RefreshIcon = RefreshCw as unknown as LucideIconComponent;
+const SparklesIcon = Sparkles as unknown as LucideIconComponent;
 
 interface SendMessageOptions {
   idempotencyKey?: string;
@@ -288,6 +294,12 @@ interface ChatPanelProps {
   error?: string | null;
   userPenaltyScore?: number;
   userMutedUntil?: Date | null;
+  aiCatchupDigest?: AiCatchupDigest | null;
+  aiCatchupUnreadCount?: number;
+  aiCatchupEnabled?: boolean;
+  aiCatchupRequesting?: boolean;
+  onRequestAiCatchup?: () => Promise<void> | void;
+  onRegenerateAiCatchup?: () => Promise<void> | void;
 }
 
 interface ConversationItem {
@@ -311,6 +323,8 @@ interface ConversationItem {
   active?: boolean;
   activeCall?: ConversationActiveCall | null;
   haveRead: boolean;
+  unreadCount: number;
+  aiCatchupEnabled: boolean;
 }
 
 interface GroupFriendOption {
@@ -343,6 +357,8 @@ interface ConversationListProps {
   conversations?: ConversationItem[];
   selectedId?: string;
   onSelectConversation?: (id: string) => void;
+  aiCatchupByConversation?: Record<string, AiCatchupDigest>;
+  onRequestAiCatchup?: (conversationId: string) => Promise<void> | void;
   searchTargets?: ConversationSearchTarget[];
   onSelectSearchTarget?: (target: ConversationSearchTarget) => void;
 }
@@ -360,6 +376,8 @@ function ConversationList({
   conversations = [],
   selectedId,
   onSelectConversation = () => {},
+  aiCatchupByConversation = {},
+  onRequestAiCatchup,
   searchTargets = [],
   onSelectSearchTarget = () => {},
 }: ConversationListProps) {
@@ -438,6 +456,15 @@ function ConversationList({
           {filteredConversations.map((item) => (
             (() => {
               const isMuted = Boolean(item.mutedUntil && new Date(item.mutedUntil) > new Date());
+              const catchupDigest = aiCatchupByConversation[item.id];
+              const shouldShowCatchup = item.aiCatchupEnabled && item.unreadCount >= 5;
+              const catchupLabel = catchupDigest?.status === 'ready'
+                ? 'AI san sang'
+                : catchupDigest?.status === 'failed'
+                  ? 'AI loi'
+                  : catchupDigest?.status === 'queued' || catchupDigest?.status === 'processing'
+                    ? 'AI dang tom tat'
+                    : 'AI tom tat';
 
               return (
             <button
@@ -478,6 +505,18 @@ function ConversationList({
                     {isActiveConversationCall(item.activeCall) && (
                       <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                         Đang gọi
+                      </span>
+                    )}
+                    {shouldShowCatchup && (
+                      <span
+                        title={catchupLabel}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void onRequestAiCatchup?.(item.id);
+                        }}
+                        className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent hover:bg-accent/15"
+                      >
+                        AI
                       </span>
                     )}
                     {item.isPinned && (
@@ -560,6 +599,12 @@ function ChatPanel({
   userPenaltyScore = 0,
   userMutedUntil = null,
   hasMoreMessages = true,
+  aiCatchupDigest = null,
+  aiCatchupUnreadCount = 0,
+  aiCatchupEnabled = true,
+  aiCatchupRequesting = false,
+  onRequestAiCatchup = () => {},
+  onRegenerateAiCatchup = () => {},
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -700,6 +745,38 @@ function ChatPanel({
     ended: 'Đã kết thúc',
     missed: 'Nhỡ cuộc gọi',
     rejected: 'Đã từ chối',
+  };
+
+  const catchupStatus = aiCatchupDigest?.status;
+  const canRequestCatchup = aiCatchupEnabled && !inputDisabled && !aiCatchupRequesting
+    && catchupStatus !== 'queued'
+    && catchupStatus !== 'processing';
+  const shouldShowCatchupCard = aiCatchupEnabled && (
+    aiCatchupUnreadCount >= 5
+    || Boolean(aiCatchupDigest)
+  );
+  const catchupStatusLabel = catchupStatus === 'ready'
+    ? 'San sang'
+    : catchupStatus === 'failed'
+      ? 'Loi'
+      : catchupStatus === 'processing'
+        ? 'Dang xu ly'
+        : catchupStatus === 'queued'
+          ? 'Dang cho'
+          : `${aiCatchupUnreadCount} tin moi`;
+
+  const handleRequestCatchup = () => {
+    if (!canRequestCatchup) {
+      return;
+    }
+    void onRequestAiCatchup();
+  };
+
+  const handleRegenerateCatchup = () => {
+    if (!canRequestCatchup) {
+      return;
+    }
+    void onRegenerateAiCatchup();
   };
 
   useEffect(() => {
@@ -1358,6 +1435,82 @@ function ChatPanel({
             <ReactionPickerProvider>
               <MenuProvider>
             <div ref={menuLayerRef} className="relative">
+            {shouldShowCatchupCard && (
+              <section className="mb-4 rounded-2xl border border-accent/20 bg-accent/5 px-4 py-3 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">
+                        {catchupStatus === 'failed' ? (
+                          <AlertCircleIcon className="h-4 w-4" aria-hidden />
+                        ) : catchupStatus === 'ready' ? (
+                          <CheckCircleIcon className="h-4 w-4" aria-hidden />
+                        ) : catchupStatus === 'queued' || catchupStatus === 'processing' ? (
+                          <LoaderIcon className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <SparklesIcon className="h-4 w-4" aria-hidden />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-text-primary">Tom tat tin moi</p>
+                        <p className="text-xs text-text-secondary">{catchupStatusLabel}</p>
+                      </div>
+                    </div>
+
+                    {aiCatchupDigest?.status === 'ready' && aiCatchupDigest.summary ? (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-sm font-semibold text-text-primary">{aiCatchupDigest.summary.title}</p>
+                        <p className="text-sm leading-relaxed text-text-secondary">{aiCatchupDigest.summary.overview}</p>
+                        {aiCatchupDigest.summary.bullets.length > 0 && (
+                          <ul className="space-y-1 text-sm text-text-secondary">
+                            {aiCatchupDigest.summary.bullets.slice(0, 6).map((bullet, index) => (
+                              <li key={`${bullet}-${index}`} className="flex gap-2">
+                                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-accent" />
+                                <span>{bullet}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <p className="text-[11px] text-text-tertiary">
+                          Nguon: {aiCatchupDigest.fromMessageRef || 'snapshot'} - {aiCatchupDigest.toMessageRef || 'latest'}
+                          {aiCatchupDigest.omittedOlderCount > 0 ? `, bo qua ${aiCatchupDigest.omittedOlderCount} tin cu hon` : ''}
+                        </p>
+                      </div>
+                    ) : aiCatchupDigest?.status === 'failed' ? (
+                      <p className="mt-2 text-sm text-red-500">{aiCatchupDigest.error || 'AI khong the tom tat luc nay.'}</p>
+                    ) : (
+                      <p className="mt-2 text-sm text-text-secondary">
+                        Tao ban tom tat rieng cho nhung tin ban chua doc trong hoi thoai nay.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 gap-2">
+                    {aiCatchupDigest?.status === 'ready' ? (
+                      <button
+                        type="button"
+                        onClick={handleRegenerateCatchup}
+                        disabled={!canRequestCatchup}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-3 py-2 text-xs font-semibold text-text-primary transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <RefreshIcon className="h-3.5 w-3.5" aria-hidden />
+                        Tao lai
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={aiCatchupDigest?.status === 'failed' ? handleRegenerateCatchup : handleRequestCatchup}
+                        disabled={!canRequestCatchup}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <BotIcon className="h-3.5 w-3.5" aria-hidden />
+                        {aiCatchupDigest?.status === 'failed' ? 'Thu lai' : 'Tom tat'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
             {/* Load More Button */}
             {messages.length > 0 && hasMoreMessages && (
               <div className="flex justify-center mb-6">
@@ -1532,6 +1685,9 @@ interface HomeDashboardChatPanelProps {
   onUnmuteConversation?: (conversationId: string) => Promise<void>;
   isConversationPinned?: boolean;
   conversationMutedUntil?: Date | null;
+  aiCatchupByConversation?: Record<string, AiCatchupDigest>;
+  onRequestAiCatchup?: (conversationId: string) => Promise<void> | void;
+  onToggleAiCatchupSetting?: (conversationId: string, catchupEnabled: boolean) => Promise<void> | void;
   friends?: GroupFriendOption[];
   onCreateGroup?: (name: string, memberIds: string[]) => Promise<{ _id: string }>;
   onUpdateGroup?: (groupId: string, payload: { name?: string; avatarUrl?: string | null }) => Promise<void>;
@@ -1988,6 +2144,9 @@ export function HomeDashboardChatPanel({
   onUnmuteConversation,
   isConversationPinned = false,
   conversationMutedUntil = null,
+  aiCatchupByConversation = {},
+  onRequestAiCatchup,
+  onToggleAiCatchupSetting,
   friends = [],
   onCreateGroup,
   onUpdateGroup,
@@ -2414,6 +2573,15 @@ export function HomeDashboardChatPanel({
   const infoTitle = isGroupConversation ? 'Thông tin nhóm' : 'Thông tin hội thoại';
   const isConversationMuted = Boolean(conversationMutedUntil && new Date(conversationMutedUntil) > new Date());
 
+  const isAiCatchupEnabled = selectedConversation?.aiCatchupEnabled !== false;
+
+  const handleToggleAiCatchup = () => {
+    if (!selectedConversationId || !onToggleAiCatchupSetting) {
+      return;
+    }
+    void onToggleAiCatchupSetting(selectedConversationId, !isAiCatchupEnabled);
+  };
+
   const allMessages = chatPanelProps.messages || [];
   const allMediaItems = allMessages.filter((m) => m.type === 'image' || m.type === 'video');
   const allFileItems = allMessages.filter((m) => String(m.type).startsWith('file/') || m.type === 'audio');
@@ -2446,6 +2614,8 @@ export function HomeDashboardChatPanel({
             conversations={visibleConversations}
             selectedId={selectedConversationId}
             onSelectConversation={onSelectConversation}
+            aiCatchupByConversation={aiCatchupByConversation}
+            onRequestAiCatchup={onRequestAiCatchup}
             searchTargets={visibleSearchTargets}
             onSelectSearchTarget={onSelectSearchTarget}
           />
@@ -2525,6 +2695,15 @@ export function HomeDashboardChatPanel({
                     : 'border-transparent bg-bg-hover text-text-primary hover:bg-bg-active'}`}
                 >
                   {isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleAiCatchup}
+                  className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isAiCatchupEnabled
+                    ? 'border-accent-light bg-accent/10 text-accent'
+                    : 'border-transparent bg-bg-hover text-text-primary hover:bg-bg-active'}`}
+                >
+                  {isAiCatchupEnabled ? 'Tat AI' : 'Bat AI'}
                 </button>
                 {isGroupConversation ? (
                   <>
