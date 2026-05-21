@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { MessageCircle, UserRound, Users, Bell } from 'lucide-react-native';
+import { Home, MessageCircle, Users, Globe, UserRound } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../../src/theme/get-app-theme';
 
@@ -11,7 +11,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      initialRouteName="chat"
+      initialRouteName="home"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.accent,
@@ -44,6 +44,13 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Trang chủ',
+          tabBarIcon: ({ color }) => <Home size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="chat"
         options={{
           title: 'Tin nhắn',
@@ -58,10 +65,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="community"
         options={{
-          title: 'Thông báo',
-          tabBarIcon: ({ color }) => <Bell size={22} color={color} />,
+          title: 'Cộng đồng',
+          tabBarIcon: ({ color }) => <Globe size={22} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -71,7 +78,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <UserRound size={22} color={color} />,
         }}
       />
+      {/* Notifications tab hidden - accessed from Home bell icon */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
-

@@ -105,7 +105,7 @@ export default function OnboardingScreen() {
     if (res.data.user) {
       updateUser(res.data.user);
     }
-    router.replace('/(tabs)/chat');
+    router.replace('/(tabs)/home');
   };
 
   const handleFinish = async () => {

@@ -9,5 +9,5 @@ export function hasCompletedOnboardingProfile(user: any | null | undefined): boo
 }
 
 export function getPostAuthRoute(user: any | null | undefined) {
-  return hasCompletedOnboardingProfile(user) ? '/(tabs)/chat' : '/(auth)/onboarding';
+  return hasCompletedOnboardingProfile(user) ? '/(tabs)/home' : '/(auth)/onboarding';
 }

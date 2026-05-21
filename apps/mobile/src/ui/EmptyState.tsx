@@ -92,7 +92,7 @@ function handleNavigate(router: ReturnType<typeof useRouter>, variant: EmptyStat
       router.push('/(tabs)/chat');
       break;
     case 'no-posts':
-      router.push('/(tabs)/chat');
+      router.push('/(tabs)/community');
       break;
     default:
       break;
