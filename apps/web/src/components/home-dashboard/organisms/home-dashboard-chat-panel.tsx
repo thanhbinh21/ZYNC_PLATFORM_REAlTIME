@@ -1534,6 +1534,7 @@ function ChatPanel({
 
       {/* Input Area */}
       <MessageInput
+        conversationId={conversationId}
         onSend={(content, type, mediaUrl, options) => {
           return onSendMessage(content, type as MessageType, mediaUrl, options);
         }}

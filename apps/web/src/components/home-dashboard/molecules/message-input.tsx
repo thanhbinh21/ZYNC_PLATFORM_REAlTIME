@@ -65,6 +65,7 @@ interface QueuedMediaSend {
 }
 
 interface MessageInputProps {
+  conversationId?: string;
   onSend: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null | undefined>;
   onCancelPendingMessage?: (idempotencyKey: string) => void;
   onStartTyping: () => void;
@@ -76,6 +77,7 @@ interface MessageInputProps {
 }
 
 export function MessageInput({
+  conversationId,
   onSend,
   onCancelPendingMessage,
   onStartTyping,
@@ -99,6 +101,7 @@ export function MessageInput({
   const uploadedMediaRef = useRef<UploadedMedia | null>(null);
   const queuedMediaSendRef = useRef<QueuedMediaSend | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const QUICK_EMOJIS = ['😀', '😂', '😍', '👍', '❤️', '🔥', '👏', '🎉'];
 
@@ -260,6 +263,30 @@ export function MessageInput({
       }
     }
   };
+
+  useEffect(() => {
+    if (!conversationId || typeof window === 'undefined') return;
+
+    const storageKey = `zync.chatDraft.${conversationId}`;
+    const applyDraft = (draft: string | null) => {
+      const value = draft?.trim();
+      if (!value) return;
+      handleInputChange(value);
+      window.sessionStorage.removeItem(storageKey);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
+
+    applyDraft(window.sessionStorage.getItem(storageKey));
+
+    const handleDraftEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId?: string; draft?: string }>).detail;
+      if (detail?.conversationId !== conversationId) return;
+      applyDraft(detail.draft ?? null);
+    };
+
+    window.addEventListener('zync:chat-draft', handleDraftEvent);
+    return () => window.removeEventListener('zync:chat-draft', handleDraftEvent);
+  }, [conversationId]);
 
   const handleSend = async () => {
     if ((input.trim() || uploadedMedia) && !isLoading && !disabled && !isSending) {
@@ -526,6 +553,7 @@ export function MessageInput({
         {/* Input Field */}
         <div className="chat-input-field-wrapper">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}

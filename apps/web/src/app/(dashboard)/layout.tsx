@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
@@ -117,6 +117,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // ── AI Assistant Box ─────────────────────────────────────────────────────────
   const aiAssistant = useAiAssistant({ defaultLimit: 10 });
+
+  const handleUseSuggestedReply = useCallback((conversationId: string, reply: string) => {
+    if (typeof window !== 'undefined') {
+      const storageKey = `zync.chatDraft.${conversationId}`;
+      window.sessionStorage.setItem(storageKey, reply);
+      window.dispatchEvent(new CustomEvent('zync:chat-draft', {
+        detail: { conversationId, draft: reply },
+      }));
+    }
+
+    router.push(`/chat?conversationId=${conversationId}`);
+    aiAssistant.closeBox();
+  }, [aiAssistant, router]);
 
   // Determine active nav from pathname
   const getActiveNavId = (): string => {
@@ -285,8 +298,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onSummarize={aiAssistant.createDigest}
             onRegenerate={aiAssistant.regenerate}
             onCreateTask={aiAssistant.createTaskFromActionItem}
+            onAcceptTask={aiAssistant.acceptTask}
             onCompleteTask={aiAssistant.completeTask}
             onDismissTask={aiAssistant.dismissTask}
+            onUseSuggestedReply={handleUseSuggestedReply}
             onOpenChat={(conversationId) => {
               router.push(`/chat?conversationId=${conversationId}`);
             }}

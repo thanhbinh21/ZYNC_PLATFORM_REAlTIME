@@ -7,6 +7,9 @@ import { emitAiAssistantItemUpdated, emitAiReminderUpdated } from '../../../sock
 import { AiAssistantItemModel } from '../assistant/assistant.model';
 import { AiReminderModel, type IAiReminder } from './reminder.model';
 import type { CreateReminderInput, UpdateReminderInput } from './reminder.schema';
+import type { IAiCatchupDigest } from '../catchup/catchup.model';
+
+type SerializedReminderStatus = 'suggested' | 'accepted' | 'done' | 'dismissed';
 
 interface SerializedReminder {
   _id: string;
@@ -17,7 +20,7 @@ interface SerializedReminder {
   title: string;
   description?: string;
   dueAt?: string;
-  status: string;
+  status: SerializedReminderStatus;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -32,7 +35,7 @@ interface SerializedAssistantTask extends SerializedReminder {
 
 type ReminderListOptions = {
   conversationId?: string;
-  status?: string;
+  status?: SerializedReminderStatus | 'active';
   limit?: number;
   skip?: number;
 };
@@ -76,6 +79,29 @@ async function assertMembership(conversationId: string, userId: string): Promise
   if (!member) {
     throw new ForbiddenError('Not allowed to manage reminders for this conversation');
   }
+}
+
+function normalizeSourceRefs(refs: string[] = []): string[] {
+  return Array.from(new Set(refs.filter(Boolean))).sort();
+}
+
+function buildDuplicateQuery(
+  userId: string,
+  input: Pick<CreateReminderInput, 'conversationId' | 'title' | 'sourceMessageRefs'>,
+): Record<string, unknown> {
+  const normalizedRefs = normalizeSourceRefs(input.sourceMessageRefs);
+  const query: Record<string, unknown> = {
+    userId,
+    conversationId: input.conversationId,
+    title: input.title,
+    status: { $in: ['suggested', 'accepted'] },
+  };
+
+  if (normalizedRefs.length > 0) {
+    query.sourceMessageRefs = { $all: normalizedRefs, $size: normalizedRefs.length };
+  }
+
+  return query;
 }
 
 export class AiReminderService {
@@ -155,16 +181,39 @@ export class AiReminderService {
     input: CreateReminderInput,
   ): Promise<SerializedReminder> {
     await assertMembership(input.conversationId, userId);
+    const normalizedSourceRefs = normalizeSourceRefs(input.sourceMessageRefs);
+    const targetStatus = input.status ?? 'accepted';
+    const existing = await AiReminderModel.findOne(buildDuplicateQuery(userId, {
+      ...input,
+      sourceMessageRefs: normalizedSourceRefs,
+    }));
+
+    if (existing) {
+      existing.status = targetStatus === 'suggested' && existing.status === 'accepted'
+        ? 'accepted'
+        : targetStatus;
+      existing.digestId = input.digestId ?? existing.digestId;
+      existing.sourceMessageRefs = normalizedSourceRefs;
+      existing.description = input.description ?? existing.description;
+      if (input.dueAt) existing.dueAt = new Date(input.dueAt);
+      existing.createdBy = input.createdBy ?? existing.createdBy;
+      await existing.save();
+
+      const serializedExisting = serialize(existing);
+      await this.syncAssistantTaskItem(existing);
+      emitAiReminderUpdated(userId, serializedExisting);
+      return serializedExisting;
+    }
 
     const reminder = await AiReminderModel.create({
       userId,
       conversationId: input.conversationId,
       digestId: input.digestId,
-      sourceMessageRefs: input.sourceMessageRefs,
+      sourceMessageRefs: normalizedSourceRefs,
       title: input.title,
       description: input.description,
       dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
-      status: 'pending',
+      status: targetStatus,
       createdBy: input.createdBy ?? 'user',
     });
 
@@ -180,7 +229,9 @@ export class AiReminderService {
   ): Promise<SerializedReminder[]> {
     const query: Record<string, unknown> = { userId };
     if (filters?.conversationId) query.conversationId = filters.conversationId;
-    if (filters?.status) query.status = filters.status;
+    if (filters?.status) {
+      query.status = filters.status === 'active' ? { $in: ['suggested', 'accepted'] } : filters.status;
+    }
 
     const reminders = await AiReminderModel.find(query)
       .sort({ dueAt: 1, createdAt: -1 })
@@ -197,7 +248,9 @@ export class AiReminderService {
     const skip = options.skip ?? 0;
     const query: Record<string, unknown> = { userId };
     if (options.conversationId) query.conversationId = options.conversationId;
-    if (options.status) query.status = options.status;
+    if (options.status) {
+      query.status = options.status === 'active' ? { $in: ['suggested', 'accepted'] } : options.status;
+    }
 
     const [reminders, total] = await Promise.all([
       AiReminderModel.find(query)
@@ -345,6 +398,21 @@ export class AiReminderService {
       sourceMessageRefs: actionItem.sourceMessageRefs,
       title: actionItem.text,
       createdBy: 'ai_suggestion',
+      status: 'accepted',
     });
+  }
+
+  static async syncSuggestedTasksFromDigest(digest: IAiCatchupDigest): Promise<void> {
+    const actionItems = digest.futureSignals?.actionItems ?? [];
+    if (actionItems.length === 0) return;
+
+    await Promise.all(actionItems.map((actionItem) => this.create(digest.userId, {
+      conversationId: digest.conversationId,
+      digestId: String(digest._id),
+      sourceMessageRefs: actionItem.sourceMessageRefs,
+      title: actionItem.text,
+      createdBy: 'ai_suggestion',
+      status: 'suggested',
+    })));
   }
 }

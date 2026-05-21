@@ -238,7 +238,7 @@ export interface AiCatchupDigestUpdatedPayload {
 }
 
 // ─── AI Reminders ──────────────────────────────────────────────────────────────
-export type AiReminderStatus = 'pending' | 'done' | 'dismissed';
+export type AiReminderStatus = 'suggested' | 'accepted' | 'done' | 'dismissed';
 export type AiReminderCreatedBy = 'ai_suggestion' | 'user';
 
 export interface AiReminder {

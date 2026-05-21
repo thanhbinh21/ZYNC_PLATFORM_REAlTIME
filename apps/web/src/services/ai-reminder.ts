@@ -14,6 +14,7 @@ export interface CreateReminderInput {
   description?: string;
   dueAt?: string;
   createdBy?: 'ai_suggestion' | 'user';
+  status?: 'suggested' | 'accepted' | 'done' | 'dismissed';
 }
 
 export async function createReminder(input: CreateReminderInput): Promise<AiReminder> {
@@ -43,7 +44,7 @@ export async function getReminder(reminderId: string): Promise<AiReminder> {
 export async function updateReminder(
   reminderId: string,
   input: {
-    status?: 'pending' | 'done' | 'dismissed';
+    status?: 'suggested' | 'accepted' | 'done' | 'dismissed';
     title?: string;
     description?: string;
     dueAt?: string | null;
@@ -71,5 +72,6 @@ export async function createReminderFromActionItem(
     sourceMessageRefs: actionItem.sourceMessageRefs,
     title: actionItem.text,
     createdBy: 'ai_suggestion',
+    status: 'accepted',
   });
 }

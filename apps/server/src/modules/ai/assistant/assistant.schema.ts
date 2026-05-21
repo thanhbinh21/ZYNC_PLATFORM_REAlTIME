@@ -43,7 +43,7 @@ export const UnreadConversationsQuerySchema = z.object({
 
 export const AssistantTaskQuerySchema = z.object({
   conversationId: z.string().trim().optional(),
-  status: z.enum(['pending', 'done', 'dismissed']).default('pending'),
+  status: z.enum(['suggested', 'accepted', 'done', 'dismissed', 'active']).default('active'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   skip: z.coerce.number().int().min(0).default(0),
 });
@@ -56,10 +56,11 @@ export const CreateAssistantTaskSchema = z.object({
   description: z.string().trim().max(1000).optional(),
   dueAt: z.string().datetime().optional(),
   createdBy: z.enum(['ai_suggestion', 'user']).optional(),
+  status: z.enum(['suggested', 'accepted', 'done', 'dismissed']).optional(),
 });
 
 export const UpdateAssistantTaskSchema = z.object({
-  status: z.enum(['pending', 'done', 'dismissed']).optional(),
+  status: z.enum(['suggested', 'accepted', 'done', 'dismissed']).optional(),
   title: z.string().trim().min(1).max(300).optional(),
   description: z.string().trim().max(1000).optional(),
   dueAt: z.string().datetime().nullable().optional(),

@@ -81,7 +81,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
 
     try {
       const result = await getAssistantTasks({
-        status: 'pending',
+        status: 'active',
         limit: 20,
         skip: reset ? 0 : taskSkipRef.current,
       });
@@ -335,6 +335,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
         sourceMessageRefs: actionItem.sourceMessageRefs,
         title: actionItem.text,
         createdBy: 'ai_suggestion',
+        status: 'accepted',
       });
       await loadTasks(true);
     } catch (err) {
@@ -354,6 +355,16 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     }
   }, []);
 
+  const acceptTask = useCallback(async (taskId: string) => {
+    try {
+      const updatedTask = await updateAssistantTask(taskId, { status: 'accepted' });
+      setTasks((prev) => prev.map((task) => (task._id === taskId ? updatedTask : task)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to accept task');
+      throw err;
+    }
+  }, []);
+
   const dismissTask = useCallback(async (taskId: string) => {
     try {
       await updateAssistantTask(taskId, { status: 'dismissed' });
@@ -366,7 +377,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
   }, []);
 
   const handleReminderUpdate = useCallback((payload: AiReminderUpdatedPayload) => {
-    if (payload.status === 'pending') {
+    if (payload.status === 'suggested' || payload.status === 'accepted') {
       void loadTasks(true);
       return;
     }
@@ -506,6 +517,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     createDigest,
     regenerate: doRegenerate,
     createTaskFromActionItem,
+    acceptTask,
     completeTask,
     dismissTask,
   };

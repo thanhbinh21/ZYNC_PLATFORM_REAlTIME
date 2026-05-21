@@ -11,6 +11,7 @@ import { UserModel } from '../../users/user.model';
 import { AiCatchupDigestModel, type IAiCatchupDigest } from './catchup.model';
 import { AiCatchupModelOutputSchema, type AiCatchupModelOutput } from './catchup.schema';
 import { AiCatchupService } from './catchup.service';
+import { AiReminderService } from '../reminders/reminder.service';
 
 const CATCHUP_WORKER_GROUP_ID = 'ai-catchup-worker-group';
 const WORKER_SESSION_TIMEOUT_MS = parseInt(process.env['AI_CATCHUP_KAFKA_SESSION_TIMEOUT_MS'] ?? '120000', 10);
@@ -346,6 +347,7 @@ async function processCatchupJob(payload: CatchupJobPayload): Promise<void> {
     digest.set('model', modelId);
     digest.omittedOlderCount = omittedOlderCount;
     digest.generatedAt = new Date();
+    await AiReminderService.syncSuggestedTasksFromDigest(digest);
 
     await AiCatchupService.markDigestReady(digest);
   } catch (err) {

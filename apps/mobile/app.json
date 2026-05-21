@@ -2,6 +2,7 @@
   "expo": {
     "name": "Zync Mobile",
     "slug": "zync-mobile",
+    "scheme": "zyncmobile",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",

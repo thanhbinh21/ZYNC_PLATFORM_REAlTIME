@@ -11,6 +11,7 @@ import { AiCatchupModelOutputSchema } from '../catchup/catchup.schema';
 import { createAIProvider } from '../providers';
 import type { AIProvider } from '../providers';
 import { AiAssistantService } from '../assistant/assistant.service';
+import { AiReminderService } from '../reminders/reminder.service';
 
 const ASSISTANT_WORKER_GROUP = 'ai-assistant-worker-group';
 const WORKER_SESSION_TIMEOUT_MS = parseInt(process.env['AI_ASSISTANT_KAFKA_SESSION_TIMEOUT_MS'] ?? '120000', 10);
@@ -357,6 +358,7 @@ async function processCatchupDigestJob(payload: AssistantJobPayload): Promise<vo
     digest.omittedOlderCount = omittedOlderCount;
     digest.generatedAt = new Date();
     await digest.save();
+    await AiReminderService.syncSuggestedTasksFromDigest(digest);
 
     // Update AIAssistantItem index
     const updatedItem = await AiAssistantService.updateItemWithDetail(payload.itemId, digest);

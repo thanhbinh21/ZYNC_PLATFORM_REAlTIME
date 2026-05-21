@@ -80,7 +80,7 @@ export default function CallScreen() {
         if (router.canGoBack()) {
            router.back();
         } else {
-           router.replace('/(tabs)/home');
+           router.replace('/(tabs)/chat');
         }
       }, 1500);
       return () => clearTimeout(timer);
@@ -98,7 +98,7 @@ export default function CallScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/(tabs)/home');
+      router.replace('/(tabs)/chat');
     }
   };
 

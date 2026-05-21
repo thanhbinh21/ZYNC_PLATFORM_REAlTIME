@@ -121,9 +121,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bgPrimary }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={theme.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ width: 36 }} />
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
           Thông báo{unreadCount > 0 ? ` (${unreadCount})` : ''}
         </Text>

@@ -123,7 +123,7 @@ export async function updateAssistantSettings(
 
 export async function getAssistantTasks(options: {
   conversationId?: string;
-  status?: 'pending' | 'done' | 'dismissed';
+  status?: 'suggested' | 'accepted' | 'done' | 'dismissed' | 'active';
   limit?: number;
   skip?: number;
 } = {}): Promise<{ tasks: AssistantTask[]; total: number }> {
@@ -146,8 +146,9 @@ export async function createAssistantTask(input: {
   sourceMessageRefs?: string[];
   title: string;
   description?: string;
-  dueAt?: string;
-  createdBy?: 'ai_suggestion' | 'user';
+    dueAt?: string;
+    createdBy?: 'ai_suggestion' | 'user';
+    status?: 'suggested' | 'accepted' | 'done' | 'dismissed';
 }): Promise<AssistantTask> {
   const { data } = await apiClient.post<ApiDataResponse<AssistantTask>>('/api/ai/assistant/tasks', input);
   return data.data;
@@ -156,7 +157,7 @@ export async function createAssistantTask(input: {
 export async function updateAssistantTask(
   taskId: string,
   input: {
-    status?: 'pending' | 'done' | 'dismissed';
+    status?: 'suggested' | 'accepted' | 'done' | 'dismissed';
     title?: string;
     description?: string;
     dueAt?: string | null;

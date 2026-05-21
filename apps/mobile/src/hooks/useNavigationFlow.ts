@@ -155,9 +155,8 @@ export function useNavigationFlow(): UseNavigationFlowReturn {
   /**
    * Di chuyển đến trang Explore với danh sách skills được lọc.
    */
-  const navigateToExploreWithSkills = useCallback((skills: string[]) => {
-    const query = skills.join(',');
-    router.push({ pathname: '/explore', params: { skills: query } });
+  const navigateToExploreWithSkills = useCallback((_skills: string[]) => {
+    router.push('/(tabs)/friends');
   }, [router]);
 
   return {

@@ -8,10 +8,11 @@ export const CreateReminderSchema = z.object({
   description: z.string().trim().max(1000).optional(),
   dueAt: z.string().datetime().optional(),
   createdBy: z.enum(['ai_suggestion', 'user']).optional(),
+  status: z.enum(['suggested', 'accepted', 'done', 'dismissed']).optional(),
 });
 
 export const UpdateReminderSchema = z.object({
-  status: z.enum(['pending', 'done', 'dismissed']).optional(),
+  status: z.enum(['suggested', 'accepted', 'done', 'dismissed']).optional(),
   title: z.string().trim().min(1).max(300).optional(),
   description: z.string().trim().max(1000).optional(),
   dueAt: z.string().datetime().nullable().optional(),

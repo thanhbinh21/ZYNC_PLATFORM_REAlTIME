@@ -86,13 +86,13 @@ const EMPTY_STATE_CONFIG: Record<EmptyStateVariant, {
 function handleNavigate(router: ReturnType<typeof useRouter>, variant: EmptyStateVariant) {
   switch (variant) {
     case 'no-friends':
-      router.push('/explore');
+      router.push('/(tabs)/friends');
       break;
     case 'no-messages':
       router.push('/(tabs)/chat');
       break;
     case 'no-posts':
-      router.push('/(tabs)/community');
+      router.push('/(tabs)/chat');
       break;
     default:
       break;

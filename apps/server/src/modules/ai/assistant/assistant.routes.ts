@@ -37,7 +37,7 @@ assistantRouter.patch(
   updateSettingsHandler,
 );
 
-// GET /api/ai/assistant/tasks?status=pending
+// GET /api/ai/assistant/tasks?status=active
 assistantRouter.get('/tasks', authenticate, listAssistantTasksHandler);
 
 // POST /api/ai/assistant/tasks
