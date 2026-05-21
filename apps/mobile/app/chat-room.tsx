@@ -2701,7 +2701,7 @@ export default function ChatRoomScreen() {
                       handleMuteConversation();
                     }}
                   >
-                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#d1fae5" />
+                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>{conversationMutedUntil ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
                   </TouchableOpacity>
 
@@ -2711,7 +2711,7 @@ export default function ChatRoomScreen() {
                       void handleToggleConversationPin();
                     }}
                   >
-                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#d1fae5" />
+                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>{isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}</Text>
                   </TouchableOpacity>
                 </View>
@@ -2724,7 +2724,7 @@ export default function ChatRoomScreen() {
                       setIsArchiveOpen(true);
                     }}
                   >
-                    <Ionicons name="images-outline" size={18} color="#d1fae5" />
+                    <Ionicons name="images-outline" size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>Ảnh/Video</Text>
                   </TouchableOpacity>
 
@@ -2735,7 +2735,7 @@ export default function ChatRoomScreen() {
                       setIsArchiveOpen(true);
                     }}
                   >
-                    <Ionicons name="document-text-outline" size={18} color="#d1fae5" />
+                    <Ionicons name="document-text-outline" size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>File</Text>
                   </TouchableOpacity>
                 </View>
@@ -2770,7 +2770,7 @@ export default function ChatRoomScreen() {
                       value={groupNameDraft}
                       onChangeText={setGroupNameDraft}
                       placeholder="Nhập tên nhóm"
-                      placeholderTextColor="#7eb5a2"
+                      placeholderTextColor="#94a3b8"
                       maxLength={100}
                       editable={!isSavingGroupInfo}
                     />
@@ -2851,6 +2851,7 @@ export default function ChatRoomScreen() {
 
                 {isGroupChat && (
                   <TouchableOpacity style={styles.leaveGroupButton} onPress={() => { void handleLeaveGroup(); }}>
+                    <Ionicons name="exit-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
                     <Text style={styles.leaveGroupText}>Rời nhóm</Text>
                   </TouchableOpacity>
                 )}
@@ -4216,15 +4217,20 @@ const styles = StyleSheet.create({
   },
   groupModalCard: {
     width: '100%',
-    borderRadius: 18,
-    backgroundColor: '#05261e',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#1d5a48',
-    padding: 18,
+    borderColor: '#e2e8f0',
+    padding: 20,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   groupModalTitle: {
-    color: colors.text,
+    color: '#0f172a',
     fontSize: 18,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 16,
@@ -4233,7 +4239,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#245948',
+    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -4244,7 +4250,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   groupAvatarPlaceholder: {
-    color: '#e2e8f0',
+    color: '#64748b',
     fontSize: 34,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4255,7 +4261,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#34d399',
+    backgroundColor: '#0f9d8e',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -4263,21 +4269,21 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1d5b4a',
-    color: '#d7f6eb',
+    borderColor: '#e2e8f0',
+    color: '#0f172a',
     fontSize: 15,
     fontFamily: 'BeVietnamPro_500Medium',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
-    backgroundColor: '#0b3b2f',
+    backgroundColor: '#f8fafc',
   },
   directInfoCard: {
     width: '100%',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#175443',
-    backgroundColor: '#072d24',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     paddingVertical: 12,
     marginBottom: 12,
@@ -4286,7 +4292,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#245948',
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -4297,19 +4303,19 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   directInfoAvatarText: {
-    color: '#d6fbee',
+    color: '#0f9d8e',
     fontSize: 24,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   directInfoName: {
-    color: '#e2fff4',
+    color: '#0f172a',
     fontSize: 16,
     fontFamily: 'BeVietnamPro_700Bold',
     maxWidth: '90%',
   },
   directInfoMeta: {
     marginTop: 2,
-    color: '#8abfab',
+    color: '#64748b',
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
   },
@@ -4318,12 +4324,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#175443',
-    backgroundColor: '#072d24',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
     padding: 10,
   },
   memberRoleTitle: {
-    color: '#d1fae5',
+    color: '#334155',
     fontSize: 13,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 8,
@@ -4337,8 +4343,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#175443',
-    backgroundColor: '#0d3a2f',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -4349,19 +4355,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   memberRoleName: {
-    color: '#e2e8f0',
+    color: '#0f172a',
     fontSize: 13,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   memberRoleMeta: {
-    color: '#8cc4b0',
+    color: '#64748b',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_500Medium',
     marginTop: 2,
   },
   memberRoleAction: {
     borderRadius: 8,
-    backgroundColor: '#1f7a60',
+    backgroundColor: '#e2f5f2',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -4371,18 +4377,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   memberRoleActionText: {
-    color: '#e6fff5',
+    color: '#0f9d8e',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   memberRemoveAction: {
     borderRadius: 8,
-    backgroundColor: '#4a1e1e',
+    backgroundColor: '#fee2e2',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   memberRemoveActionText: {
-    color: '#fecaca',
+    color: '#ef4444',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4399,18 +4405,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   groupModalCancelButton: {
-    backgroundColor: '#0f4335',
+    backgroundColor: '#f1f5f9',
   },
   groupModalSaveButton: {
-    backgroundColor: '#1f7a60',
+    backgroundColor: '#0f9d8e',
   },
   groupModalCancelText: {
-    color: '#b8ebdb',
+    color: '#475569',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   groupModalSaveText: {
-    color: '#0f172a',
+    color: '#FFFFFF',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4423,16 +4429,16 @@ const styles = StyleSheet.create({
   groupActionItem: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#0f4335',
+    backgroundColor: '#f1f5f9',
     borderWidth: 1,
-    borderColor: '#175443',
+    borderColor: '#e2e8f0',
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   groupActionText: {
-    color: '#c7f4e6',
+    color: '#334155',
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
     textAlign: 'center',
@@ -4442,13 +4448,15 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#7f1d1d',
-    backgroundColor: '#3f1212',
+    borderColor: '#fecaca',
+    backgroundColor: '#fee2e2',
     paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   leaveGroupText: {
-    color: '#ffe0e0',
+    color: '#ef4444',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
   },

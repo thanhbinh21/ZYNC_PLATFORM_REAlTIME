@@ -9,11 +9,9 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Users,
   MessageCircle,
@@ -33,8 +31,9 @@ import { useAuthStore } from '../../src/store/useAuthStore';
 import api from '../../src/services/api';
 import { useNotificationsContext } from '../../src/context/notifications-context';
 // StoryBar removed - component not available in mobile build
-import { GlassPanel } from '../../src/ui/GlassPanel';
 import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
+import { AppScreen } from '../../src/ui/AppScreen';
+import { AppCard } from '../../src/ui/AppCard';
 
 // ============================================================
 // HELPERS
@@ -102,7 +101,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon, color, loading }: StatCardProps) {
   return (
-    <GlassPanel style={styles.statCard}>
+    <AppCard style={styles.statCard}>
       <View style={[styles.statIconWrap, { backgroundColor: `${color}18` }]}>
         {icon}
       </View>
@@ -112,7 +111,7 @@ function StatCard({ label, value, icon, color, loading }: StatCardProps) {
         <Text style={styles.statValue}>{value}</Text>
       )}
       <Text style={styles.statLabel}>{label}</Text>
-    </GlassPanel>
+    </AppCard>
   );
 }
 
@@ -397,26 +396,17 @@ export default function HomeScreen() {
   // ============================================================
   if (!isAuthenticated) {
     return (
-      <LinearGradient
-        colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
-        style={styles.safeArea}
-      >
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
+      <AppScreen disableBottomSafeArea>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0f9d8e" />
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <LinearGradient
-      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
-      style={styles.safeArea}
-    >
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <AppScreen disableBottomSafeArea>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
         {/* ============================================================ */}
         {/* HEADER */}
@@ -564,13 +554,13 @@ export default function HomeScreen() {
             </View>
 
             {trendingLoading ? (
-              <GlassPanel style={styles.trendingPanel}>
+              <AppCard style={styles.trendingPanel}>
                 <View style={{ gap: 12 }}>
                   {Array.from({ length: 3 }).map((_, i) => (
                     <SkeletonCardPreset key={i} lines={2} showAvatar={false} />
                   ))}
                 </View>
-              </GlassPanel>
+              </AppCard>
             ) : trendingPosts.length === 0 ? (
               <EmptyState
                 icon={<Zap size={32} color={theme.textSecondary} />}
@@ -578,7 +568,7 @@ export default function HomeScreen() {
                 description="Hãy là người đầu tiên đăng bài!"
               />
             ) : (
-              <GlassPanel style={styles.trendingPanel}>
+              <AppCard style={styles.trendingPanel}>
                 {trendingPosts.map((post, index) => (
                   <TrendingPostItem
                     key={post._id}
@@ -588,7 +578,7 @@ export default function HomeScreen() {
                     theme={theme}
                   />
                 ))}
-              </GlassPanel>
+              </AppCard>
             )}
           </View>
 
@@ -612,13 +602,13 @@ export default function HomeScreen() {
             </View>
 
             {activitiesLoading ? (
-              <GlassPanel style={styles.activityPanel}>
+              <AppCard style={styles.activityPanel}>
                 <View style={{ gap: 12 }}>
                   {Array.from({ length: 4 }).map((_, i) => (
                     <SkeletonCardPreset key={i} lines={2} showAvatar />
                   ))}
                 </View>
-              </GlassPanel>
+              </AppCard>
             ) : activities.length === 0 ? (
               <EmptyState
                 icon={<Sparkles size={32} color={theme.textSecondary} />}
@@ -626,11 +616,11 @@ export default function HomeScreen() {
                 description="Các thông báo sẽ xuất hiện ở đây"
               />
             ) : (
-              <GlassPanel style={styles.activityPanel}>
+              <AppCard style={styles.activityPanel}>
                 {activities.slice(0, 5).map((activity) => (
                   <ActivityItem key={activity._id} activity={activity} theme={theme} />
                 ))}
-              </GlassPanel>
+              </AppCard>
             )}
           </View>
 
@@ -658,8 +648,7 @@ export default function HomeScreen() {
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
-      </SafeAreaView>
-    </LinearGradient>
+    </AppScreen>
   );
 }
 

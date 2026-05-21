@@ -22,24 +22,24 @@ export default function TabLayout() {
           marginBottom: 5,
         },
         tabBarStyle: {
-          backgroundColor: theme.bgCard,
+          backgroundColor: 'rgba(255, 255, 255, 0.85)',
           borderTopWidth: 1,
-          borderTopColor: theme.border,
-          height: 70,
-          paddingTop: 8,
-          paddingBottom: 4,
+          borderTopColor: '#E8ECEF',
+          height: 64,
+          paddingTop: 10,
+          paddingBottom: 10,
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
           shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 10 },
-          elevation: 0,
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: -4 },
+          elevation: 8,
         },
         tabBarBackground: () => (
-          <BlurView intensity={88} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
         ),
       }}
     >

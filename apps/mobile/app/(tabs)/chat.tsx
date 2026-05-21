@@ -11,7 +11,6 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +30,10 @@ import {
   SkeletonCardPreset,
 } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
+import { AppScreen } from '../../src/ui/AppScreen';
+import { AppSearchBar } from '../../src/ui/AppSearchBar';
+import { AppIconButton } from '../../src/ui/AppIconButton';
+import { Avatar } from '../../src/ui/Avatar';
 
 // ───────── Types ─────────
 interface ConversationMember {
@@ -532,49 +535,38 @@ export default function ChatScreen() {
   const s = useStyles(theme);
 
   return (
-    <LinearGradient
-      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
-      style={s.safeArea}
-    >
-      <SafeAreaView style={s.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-        <View style={s.container}>
+    <AppScreen disableBottomSafeArea>
+      <View style={s.container}>
         {/* Header */}
         <View style={s.header}>
           <View style={s.headerLeft}>
             <View style={s.logoContainer}>
-              <MessageSquare size={20} color={colors.accent} strokeWidth={2.5} />
+              <MessageSquare size={20} color="#0f9d8e" strokeWidth={2.5} />
             </View>
             <Text style={s.title}>Tin nhắn</Text>
           </View>
           <View style={s.headerRight}>
-            <TouchableOpacity 
-              style={s.actionBtn}
+            <AppIconButton 
+              icon={<Ionicons name="add-outline" size={24} color="#0f9d8e" />}
               onPress={() => router.push('/create-group')}
-            >
-              <Ionicons name="add-circle-outline" size={24} color={colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.actionBtn}>
-              <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
-            </TouchableOpacity>
+              style={{ marginRight: 8 }}
+              size={36}
+            />
+            <AppIconButton 
+              icon={<Ionicons name="settings-outline" size={20} color="#64748B" />}
+              onPress={() => {}}
+              size={36}
+            />
           </View>
         </View>
 
         {/* Search Bar */}
-        <View style={s.searchContainer}>
-          <Ionicons name="search-outline" size={20} color={theme.textTertiary} style={s.searchIcon} />
-          <TextInput
-            style={s.searchInput}
-            placeholder="Tìm kiếm cuộc trò chuyện..."
-            placeholderTextColor={theme.textTertiary}
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+          <AppSearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
+            placeholder="Tìm kiếm cuộc trò chuyện..."
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Chat List */}
@@ -710,8 +702,7 @@ export default function ChatScreen() {
           />
         )}
       </View>
-    </SafeAreaView>
-   </LinearGradient>
+    </AppScreen>
   );
 }
 

@@ -5,9 +5,10 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
@@ -22,6 +23,9 @@ import { SkeletonPostCardPreset } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
 import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
 import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
+import { AppScreen } from '../../src/ui/AppScreen';
+import { AppChip } from '../../src/ui/AppChip';
+import { AppIconButton } from '../../src/ui/AppIconButton';
 import { useAuthStore } from '../../src/store/useAuthStore';
 
 const FILTERS: { key: PostFilter; label: string }[] = [
@@ -97,39 +101,29 @@ export default function CommunityScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <AppScreen disableBottomSafeArea>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cong dong</Text>
-        <TouchableOpacity
+        <Text style={styles.headerTitle}>Cộng đồng</Text>
+        <AppIconButton
+          icon={<Pencil size={20} color="#0f9d8e" />}
           onPress={() => setShowCreate(true)}
-          style={styles.createButton}
-        >
-          <Pencil size={18} color={colors.primary} />
-        </TouchableOpacity>
+          size={40}
+        />
       </View>
 
       {/* Filter tabs */}
       <View style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            onPress={() => changeFilter(f.key)}
-            style={[
-              styles.filterTab,
-              filter === f.key && styles.filterTabActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === f.key && styles.filterTextActive,
-              ]}
-            >
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+          {FILTERS.map((f) => (
+            <AppChip
+              key={f.key}
+              label={f.label}
+              active={filter === f.key}
+              onPress={() => changeFilter(f.key)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
       {/* Post list */}
@@ -194,7 +188,7 @@ export default function CommunityScreen() {
         onClose={closeProfileSheet}
         onSendMessage={(userId) => { void navigateToChat(userId); }}
       />
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 

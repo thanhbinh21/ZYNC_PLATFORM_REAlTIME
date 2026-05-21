@@ -10,8 +10,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, Mail, MessageCircle, Search, UserPlus, Users, X, XCircle } from 'lucide-react-native';
+import { Check, Mail, MessageCircle, UserPlus, Users, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../src/theme/colors';
 import api from '../../src/services/api';
@@ -20,6 +19,12 @@ import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
 import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
 import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
+import { AppScreen } from '../../src/ui/AppScreen';
+import { AppSearchBar } from '../../src/ui/AppSearchBar';
+import { AppIconButton } from '../../src/ui/AppIconButton';
+import { Avatar } from '../../src/ui/Avatar';
+import { AppChip } from '../../src/ui/AppChip';
+import { AppCard } from '../../src/ui/AppCard';
 
 interface Friend {
   _id: string;
@@ -32,13 +37,18 @@ interface Friend {
 }
 
 interface FriendRequest {
-  _id: string;
+  _id?: string;
   id?: string;
-  senderId: { _id: string; displayName: string; avatarUrl?: string };
-  receiverId: string;
-  status: string;
+  requestId?: string;
+  userId?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  senderId?: { _id: string; displayName: string; avatarUrl?: string };
+  receiverId?: string;
+  status?: string;
   createdAt: string;
 }
+
 
 export default function FriendsScreen() {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -141,7 +151,7 @@ export default function FriendsScreen() {
   const rejectRequest = async (requestId: string) => {
     try {
       await api.put(`/friends/request/${requestId}/reject`);
-      setRequests((prev) => prev.filter((r) => r._id !== requestId));
+      setRequests((prev) => prev.filter((r) => (r.requestId || r._id || r.id) !== requestId));
     } catch (e: any) {
       Alert.alert('Lỗi', e.response?.data?.message || 'Không thể từ chối');
     }
@@ -152,47 +162,35 @@ export default function FriendsScreen() {
     : friends;
 
   return (
-    <LinearGradient
-      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
-      style={styles.safeArea}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-        <View style={styles.container}>
+    <AppScreen disableBottomSafeArea>
+      <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Danh bạ</Text>
-          <TouchableOpacity style={styles.actionBtn}>
-            <UserPlus size={22} color={colors.accent} />
-          </TouchableOpacity>
+          <AppIconButton 
+            icon={<UserPlus size={22} color="#0f9d8e" />}
+            onPress={() => {}}
+            size={40}
+          />
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Search size={18} color={colors.textMuted} style={styles.searchIcon} />
-          <TextInput 
-            style={styles.searchInput}
-            placeholder="Tìm theo @username hoặc email..."
-            placeholderTextColor={colors.textMuted}
+        <View style={{ marginBottom: 16 }}>
+          <AppSearchBar 
             value={searchQuery}
             onChangeText={handleSearch}
+            placeholder="Tìm theo @username hoặc email..."
+            onClear={() => { setSearchQuery(''); setSearchResults([]); }}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-              <XCircle size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Search Results */}
         {searchResults.length > 0 && (
-          <View style={styles.searchResultsBox}>
+          <AppCard style={{ marginBottom: 16 }}>
             <Text style={styles.listTitle}>KẾT QUẢ TÌM KIẾM</Text>
             {searchResults.map((user) => (
               <View key={user.id || user._id} style={styles.friendItem}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{(user.displayName || '?').charAt(0).toUpperCase()}</Text>
-                </View>
+                <Avatar name={user.displayName || '?'} size={44} />
                 <View style={styles.friendInfo}>
                   <Text style={styles.friendName}>{user.displayName}</Text>
                   <Text style={styles.friendStatus}>{user.username ? `@${user.username}` : (user.email || '')}</Text>
@@ -201,37 +199,26 @@ export default function FriendsScreen() {
                   style={styles.addFriendBtn}
                   onPress={() => sendFriendRequest(user.id || user._id)}
                 >
-                  <UserPlus size={16} color={colors.accent} />
+                  <UserPlus size={16} color="#0f9d8e" />
                 </TouchableOpacity>
               </View>
             ))}
-            <View style={styles.divider} />
-          </View>
+          </AppCard>
         )}
 
         {/* Tabs */}
         <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'friends' && styles.tabActive]}
+          <AppChip 
+            label={`Bạn bè (${friendCount})`} 
+            active={activeTab === 'friends'}
             onPress={() => setActiveTab('friends')}
-          >
-            <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>
-              Bạn bè ({friendCount})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'requests' && styles.tabActive]}
+            style={{ marginRight: 10 }}
+          />
+          <AppChip 
+            label={`Lời mời ${requests.length > 0 ? `(${requests.length})` : ''}`} 
+            active={activeTab === 'requests'}
             onPress={() => setActiveTab('requests')}
-          >
-            <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
-              Lời mời
-            </Text>
-            {requests.length > 0 && (
-              <View style={styles.requestBadge}>
-                <Text style={styles.badgeText}>{requests.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          />
         </View>
 
         {isLoading ? (
@@ -249,7 +236,7 @@ export default function FriendsScreen() {
             keyExtractor={(item, index) => item._id || item.id || index.toString()}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0f9d8e" colors={["#0f9d8e"]} />
             }
             renderItem={({ item }) => {
               const friendId = (item._id || item.id) as string;
@@ -259,9 +246,7 @@ export default function FriendsScreen() {
                   onPress={() => { if (friendId) void openProfileSheet(friendId); }}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{item.displayName.charAt(0).toUpperCase()}</Text>
-                  </View>
+                  <Avatar name={item.displayName} size={44} />
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{item.displayName}</Text>
                     <Text style={styles.friendStatus}>{item.status || 'Offline'}</Text>
@@ -274,7 +259,7 @@ export default function FriendsScreen() {
                     }}
                     disabled={chatLoading}
                   >
-                    <MessageCircle size={18} color={colors.accent} />
+                    <MessageCircle size={18} color="#0f9d8e" />
                   </TouchableOpacity>
                 </TouchableOpacity>
               );
@@ -288,40 +273,41 @@ export default function FriendsScreen() {
           /* Requests List */
           <FlatList
             data={requests}
-            keyExtractor={(item, index) => item._id || item.id || index.toString()}
+            keyExtractor={(item, index) => item.requestId || item._id || item.id || index.toString()}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <View style={styles.requestItem}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {(item.senderId?.displayName || '?').charAt(0).toUpperCase()}
-                  </Text>
+            renderItem={({ item }) => {
+              const reqId = item.requestId || item._id || item.id || '';
+              const name = item.displayName || item.senderId?.displayName || 'User';
+              const avatarUrl = item.avatarUrl || item.senderId?.avatarUrl;
+              return (
+                <View style={styles.requestItem}>
+                  <Avatar url={avatarUrl} name={name} size={44} />
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{name}</Text>
+                    <Text style={styles.friendStatus}>
+                      {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                    </Text>
+                  </View>
+                  <View style={styles.requestActions}>
+                    <TouchableOpacity
+                      style={styles.acceptBtn}
+                      onPress={() => acceptRequest(reqId)}
+                    >
+                      <Check size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.rejectBtn}
+                      onPress={() => rejectRequest(reqId)}
+                    >
+                      <X size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{item.senderId?.displayName || 'User'}</Text>
-                  <Text style={styles.friendStatus}>
-                    {new Date(item.createdAt).toLocaleDateString('vi-VN')}
-                  </Text>
-                </View>
-                <View style={styles.requestActions}>
-                  <TouchableOpacity
-                    style={styles.acceptBtn}
-                    onPress={() => acceptRequest(item._id)}
-                  >
-                    <Check size={18} color={colors.text} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.rejectBtn}
-                    onPress={() => rejectRequest(item._id)}
-                  >
-                    <X size={18} color={colors.error} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+              );
+            }}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Mail size={56} color={colors.textSubtle} />
+                <Mail size={56} color="#64748B" />
                 <Text style={styles.emptyText}>Không có lời mời</Text>
                 <Text style={styles.emptySubtext}>Bạn chưa nhận được lời mời kết bạn nào</Text>
               </View>
@@ -339,8 +325,7 @@ export default function FriendsScreen() {
         onClose={closeProfileSheet}
         onSendMessage={(userId) => { void navigateToChat(userId); }}
       />
-    </SafeAreaView>
-   </LinearGradient>
+    </AppScreen>
   );
 }
 

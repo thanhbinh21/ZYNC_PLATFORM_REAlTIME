@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   RefreshControl,
   Dimensions,
   Image,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Search, TrendingUp, Users, Hash } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../src/theme/get-app-theme';
 import { colors } from '../src/theme/colors';

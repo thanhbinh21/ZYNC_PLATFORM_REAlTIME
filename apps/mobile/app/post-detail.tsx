@@ -5,12 +5,12 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Image,
   Dimensions,
   Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Heart, MessageCircle, Bookmark, Share } from 'lucide-react-native';
 import { usePostDetail } from '../src/hooks/usePosts';
 import { CommentSheet } from '../src/components/CommentSheet';
