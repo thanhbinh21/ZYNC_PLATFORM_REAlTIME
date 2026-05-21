@@ -1,7 +1,7 @@
-﻿import { Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Grid3X3, MessageCircle, UserRound, Users, Globe2 } from 'lucide-react-native';
+import { MessageCircle, UserRound, Users, Bell } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../../src/theme/get-app-theme';
 
@@ -11,7 +11,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      initialRouteName="home"
+      initialRouteName="chat"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.accent,
@@ -44,13 +44,6 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Trang chủ',
-          tabBarIcon: ({ color }) => <Grid3X3 size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="chat"
         options={{
           title: 'Tin nhắn',
@@ -58,26 +51,27 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="community"
+        name="friends"
         options={{
-          title: 'Cộng đồng',
-          tabBarIcon: ({ color }) => <Globe2 size={22} color={color} />,
+          title: 'Bạn bè',
+          tabBarIcon: ({ color }) => <Users size={22} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="friends"
+        name="notifications"
         options={{
-          title: 'Danh bạ',
-          tabBarIcon: ({ color }) => <Users size={22} color={color} />,
+          title: 'Thông báo',
+          tabBarIcon: ({ color }) => <Bell size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Cá nhân',
+          title: 'Hồ sơ',
           tabBarIcon: ({ color }) => <UserRound size={22} color={color} />,
         }}
       />
     </Tabs>
   );
 }
+

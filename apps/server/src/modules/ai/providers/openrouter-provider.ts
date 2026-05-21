@@ -31,7 +31,7 @@ interface OpenRouterResponse {
  * Env vars cần thiết:
  *   OPENROUTER_API_KEY  – API key từ openrouter.ai
  *   OPENROUTER_BASE_URL – Base URL (mặc định: https://openrouter.ai/api/v1)
- *   OPENROUTER_MODEL    – Primary model (mặc định: openrouter/free)
+ *   OPENROUTER_MODEL    – Primary model (mặc định: google/gemini-2.5-flash-lite)
  *   OPENROUTER_FALLBACK_MODEL – Fallback model khi primary bị rate-limit liên tục
  *
  * Retry logic: Khi upstream trả 429, retry với exponential backoff tối đa MAX_RETRIES lần.
@@ -58,7 +58,7 @@ export class OpenRouterProvider implements AIProvider {
     maxRetries = 4,
     initialRetryDelayMs = 2_000,
   ) {
-    this.modelId = modelId ?? process.env['OPENROUTER_MODEL'] ?? 'openrouter/free';
+    this.modelId = modelId ?? process.env['OPENROUTER_MODEL'] ?? 'google/gemini-2.5-flash-lite';
     this.maxRetries = parseInt(process.env['OPENROUTER_MAX_RETRIES'] ?? String(maxRetries), 10);
     this.initialRetryDelayMs = parseInt(process.env['OPENROUTER_RETRY_DELAY_MS'] ?? String(initialRetryDelayMs), 10);
     this.fallbackModel = process.env['OPENROUTER_FALLBACK_MODEL'];

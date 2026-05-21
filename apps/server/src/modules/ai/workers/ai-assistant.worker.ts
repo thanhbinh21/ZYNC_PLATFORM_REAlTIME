@@ -13,6 +13,8 @@ import type { AIProvider } from '../providers';
 import { AiAssistantService } from '../assistant/assistant.service';
 
 const ASSISTANT_WORKER_GROUP = 'ai-assistant-worker-group';
+const WORKER_SESSION_TIMEOUT_MS = parseInt(process.env['AI_ASSISTANT_KAFKA_SESSION_TIMEOUT_MS'] ?? '120000', 10);
+const WORKER_HEARTBEAT_INTERVAL_MS = parseInt(process.env['AI_ASSISTANT_KAFKA_HEARTBEAT_INTERVAL_MS'] ?? '3000', 10);
 const MAX_RANGE_MESSAGES = 100;
 const MAX_INPUT_CHARS = 20_000;
 const CONTEXT_MESSAGE_COUNT = 5;
@@ -43,6 +45,26 @@ interface CatchupMessage {
 }
 
 let assistantConsumer: Consumer | null = null;
+
+function startHeartbeatLoop(heartbeat: () => Promise<void>): () => void {
+  let inFlight = false;
+  const timer = setInterval(() => {
+    if (inFlight) return;
+    inFlight = true;
+    heartbeat()
+      .catch((err) => {
+        logger.warn('[AI Assistant Worker] Kafka heartbeat failed', {
+          err: err instanceof Error ? err.message : String(err),
+        });
+      })
+      .finally(() => {
+        inFlight = false;
+      });
+  }, Math.max(1000, WORKER_HEARTBEAT_INTERVAL_MS));
+
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
 
 function getMessageRef(message: { _id: unknown; idempotencyKey?: string }): string {
   return message.idempotencyKey || String(message._id);
@@ -390,13 +412,17 @@ async function processCatchupDigestJob(payload: AssistantJobPayload): Promise<vo
 export async function startAssistantWorker(): Promise<void> {
   if (assistantConsumer) return;
 
-  assistantConsumer = createConsumer(ASSISTANT_WORKER_GROUP);
+  assistantConsumer = createConsumer(ASSISTANT_WORKER_GROUP, {
+    sessionTimeout: Math.max(30000, WORKER_SESSION_TIMEOUT_MS),
+    heartbeatInterval: Math.max(1000, WORKER_HEARTBEAT_INTERVAL_MS),
+  });
   await assistantConsumer.connect();
   await assistantConsumer.subscribe({ topic: KAFKA_TOPICS.AI_CATCHUP_JOBS, fromBeginning: false });
 
   await assistantConsumer.run({
-    eachMessage: async ({ message }: EachMessagePayload) => {
+    eachMessage: async ({ message, heartbeat }: EachMessagePayload) => {
       if (!message.value) return;
+      const stopHeartbeat = startHeartbeatLoop(heartbeat);
 
       try {
         const payload = JSON.parse(message.value.toString()) as AssistantJobPayload;
@@ -435,6 +461,8 @@ export async function startAssistantWorker(): Promise<void> {
         }
       } catch (err) {
         logger.error('[AI Assistant Worker] Job handling failed', err);
+      } finally {
+        stopHeartbeat();
       }
     },
   });

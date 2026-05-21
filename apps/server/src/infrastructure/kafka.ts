@@ -1,4 +1,4 @@
-import { Kafka, Partitioners, type Producer, type Consumer, type Admin, logLevel } from 'kafkajs';
+import { Kafka, Partitioners, type Producer, type Consumer, type Admin, type ConsumerConfig, logLevel } from 'kafkajs';
 import { logger } from '../shared/logger';
 
 export const KAFKA_TOPICS = {
@@ -74,9 +74,9 @@ export function getProducer(): Producer {
   return producer;
 }
 
-export function createConsumer(groupId: string): Consumer {
+export function createConsumer(groupId: string, options: Omit<ConsumerConfig, 'groupId'> = {}): Consumer {
   if (!kafka) throw new Error('Kafka not initialized. Call connectKafka() first.');
-  return kafka.consumer({ groupId });
+  return kafka.consumer({ groupId, ...options });
 }
 
 export async function produceMessage(

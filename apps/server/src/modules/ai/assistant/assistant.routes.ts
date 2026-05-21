@@ -7,6 +7,10 @@ import {
   getCatchupLatestHandler,
   regenerateCatchupHandler,
   updateSettingsHandler,
+  listAssistantTasksHandler,
+  createAssistantTaskHandler,
+  updateAssistantTaskHandler,
+  deleteAssistantTaskHandler,
 } from './assistant.controller';
 
 export const assistantRouter = Router({ mergeParams: true });
@@ -32,3 +36,15 @@ assistantRouter.patch(
   authenticate,
   updateSettingsHandler,
 );
+
+// GET /api/ai/assistant/tasks?status=pending
+assistantRouter.get('/tasks', authenticate, listAssistantTasksHandler);
+
+// POST /api/ai/assistant/tasks
+assistantRouter.post('/tasks', authenticate, createAssistantTaskHandler);
+
+// PATCH /api/ai/assistant/tasks/:taskId
+assistantRouter.patch('/tasks/:taskId', authenticate, updateAssistantTaskHandler);
+
+// DELETE /api/ai/assistant/tasks/:taskId
+assistantRouter.delete('/tasks/:taskId', authenticate, deleteAssistantTaskHandler);

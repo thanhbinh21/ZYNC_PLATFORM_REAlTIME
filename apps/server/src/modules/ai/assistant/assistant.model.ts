@@ -37,6 +37,8 @@ export interface IAiAssistantItem extends Document {
     catchupMode?: AiCatchupMode;
     actionItemCount?: number;
     messageCount?: number;
+    taskStatus?: 'pending' | 'done' | 'dismissed';
+    dueAt?: string;
   };
 
   // System
@@ -72,6 +74,8 @@ const assistantItemSchema = new Schema<IAiAssistantItem>(
       catchupMode: { type: String, enum: ['unread', 'since_last_digest', 'recent'] },
       actionItemCount: { type: Number },
       messageCount: { type: Number },
+      taskStatus: { type: String, enum: ['pending', 'done', 'dismissed'] },
+      dueAt: { type: String },
     },
     trigger: { type: String, enum: ['manual', 'auto'], default: 'manual' },
   },

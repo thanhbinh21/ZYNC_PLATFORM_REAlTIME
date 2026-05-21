@@ -6,8 +6,12 @@ import {
   UpdateCatchupSettingsSchema,
   AssistantQuerySchema,
   UnreadConversationsQuerySchema,
+  AssistantTaskQuerySchema,
+  CreateAssistantTaskSchema,
+  UpdateAssistantTaskSchema,
 } from './assistant.schema';
 import { AiAssistantService } from './assistant.service';
+import { AiReminderService } from '../reminders/reminder.service';
 
 const asyncHandler = (fn: unknown): RequestHandler => fn as RequestHandler;
 
@@ -107,6 +111,65 @@ export const updateSettingsHandler: RequestHandler = asyncHandler(
         parsed.data.catchupEnabled,
       );
       res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const listAssistantTasksHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const parsed = AssistantTaskQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const result = await AiReminderService.listForAssistant(req.userId, parsed.data);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const createAssistantTaskHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const parsed = CreateAssistantTaskSchema.safeParse(req.body);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const task = await AiReminderService.create(req.userId, parsed.data);
+      res.status(201).json({ success: true, data: task });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const updateAssistantTaskHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { taskId } = req.params;
+      if (!taskId) throw new BadRequestError('taskId is required');
+
+      const parsed = UpdateAssistantTaskSchema.safeParse(req.body);
+      if (!parsed.success) throw new BadRequestError(parsed.error.message);
+
+      const task = await AiReminderService.update(req.userId, taskId, parsed.data);
+      res.json({ success: true, data: task });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export const deleteAssistantTaskHandler: RequestHandler = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { taskId } = req.params;
+      if (!taskId) throw new BadRequestError('taskId is required');
+
+      await AiReminderService.delete(req.userId, taskId);
+      res.status(204).send();
     } catch (err) {
       next(err);
     }

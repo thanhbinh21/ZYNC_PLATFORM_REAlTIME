@@ -7,6 +7,7 @@ import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data'
 import { DashboardHeader } from '@/components/shared/DashboardHeader';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
 import { GlobalCallListener } from '@/components/home-dashboard/organisms/GlobalCallListener';
+import { MobileBottomNav } from '@/components/shared/MobileBottomNav';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
@@ -218,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={aiAssistant.openBox}
-                className="zync-soft-badge relative flex h-10 w-10 items-center justify-center p-0 text-accent hover:bg-accent/10"
+                className="zync-soft-badge relative hidden md:flex h-10 w-10 items-center justify-center p-0 text-accent hover:bg-accent/10"
                 title="Zync AI Assistant"
                 aria-label="Mở AI Assistant"
               >
@@ -236,11 +237,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
         </Suspense>
 
-        <div className="flex-1 overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4">
+        <div className="flex-1 overflow-hidden px-2 pb-[76px] md:pb-2 sm:px-4 sm:pb-4">
           <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
             {children}
           </div>
         </div>
+
+        <MobileBottomNav navItems={headerData.navItems} activeNavId={activeNavId} />
 
         {/* Export settings functions for child pages via window */}
         <script
@@ -263,23 +266,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <GlobalCallListener />
 
         {/* AI Assistant Box */}
-        <AiAssistantBox
-          isOpen={aiAssistant.isOpen}
-          activeTab={aiAssistant.activeTab}
-          conversations={aiAssistant.conversations}
-          items={aiAssistant.items}
-          total={aiAssistant.total}
-          loadingList={aiAssistant.loadingList}
-          loadingItems={aiAssistant.loadingItems}
-          onClose={aiAssistant.closeBox}
-          onTabChange={aiAssistant.setActiveTab}
-          onSummarize={aiAssistant.createDigest}
-          onRegenerate={aiAssistant.regenerate}
-          onOpenChat={(conversationId) => {
-            router.push(`/chat?conversationId=${conversationId}`);
-          }}
-          onLoadMore={aiAssistant.loadItems}
-        />
+        <div className="hidden md:block">
+          <AiAssistantBox
+            isOpen={aiAssistant.isOpen}
+            activeTab={aiAssistant.activeTab}
+            conversations={aiAssistant.conversations}
+            catchupDetailsByConversationId={aiAssistant.catchupDetailsByConversationId}
+            tasks={aiAssistant.tasks}
+            taskTotal={aiAssistant.taskTotal}
+            items={aiAssistant.items}
+            total={aiAssistant.total}
+            loadingList={aiAssistant.loadingList}
+            loadingTasks={aiAssistant.loadingTasks}
+            loadingItems={aiAssistant.loadingItems}
+            pendingTaskCount={aiAssistant.pendingTaskCount}
+            onClose={aiAssistant.closeBox}
+            onTabChange={aiAssistant.setActiveTab}
+            onSummarize={aiAssistant.createDigest}
+            onRegenerate={aiAssistant.regenerate}
+            onCreateTask={aiAssistant.createTaskFromActionItem}
+            onCompleteTask={aiAssistant.completeTask}
+            onDismissTask={aiAssistant.dismissTask}
+            onOpenChat={(conversationId) => {
+              router.push(`/chat?conversationId=${conversationId}`);
+            }}
+            onLoadMore={aiAssistant.loadItems}
+            onLoadMoreTasks={() => aiAssistant.loadTasks(false)}
+          />
+        </div>
       </main>
     </MediaViewerProvider>
   );

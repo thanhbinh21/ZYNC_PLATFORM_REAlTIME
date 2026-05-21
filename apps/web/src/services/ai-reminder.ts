@@ -13,6 +13,7 @@ export interface CreateReminderInput {
   title: string;
   description?: string;
   dueAt?: string;
+  createdBy?: 'ai_suggestion' | 'user';
 }
 
 export async function createReminder(input: CreateReminderInput): Promise<AiReminder> {
@@ -69,5 +70,6 @@ export async function createReminderFromActionItem(
     digestId,
     sourceMessageRefs: actionItem.sourceMessageRefs,
     title: actionItem.text,
+    createdBy: 'ai_suggestion',
   });
 }

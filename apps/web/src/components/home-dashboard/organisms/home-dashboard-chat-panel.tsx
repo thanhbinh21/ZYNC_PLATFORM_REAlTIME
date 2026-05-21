@@ -228,6 +228,7 @@ interface ChatPanelProps {
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
+  onBack?: () => void;
   onInfoClick?: () => void;
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
@@ -545,6 +546,7 @@ function ChatPanel({
   onStartTyping = () => {},
   onStopTyping = () => {},
   onLoadMore = async () => {},
+  onBack,
   isLoading = false,
   error = null,
   onInfoClick,
@@ -1013,6 +1015,16 @@ function ChatPanel({
       {/* Header */}
       <header className="chat-header">
         <div className="flex items-center gap-3 flex-1 min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              className="md:hidden flex h-10 w-10 items-center justify-center rounded-full text-text-primary hover:bg-bg-hover"
+              onClick={onBack}
+              aria-label="Quay lại"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+          )}
           <button
             type="button"
             className={`relative h-11 w-11 overflow-hidden rounded-full bg-gradient-to-br from-accent to-accent-hover shadow-sm flex-shrink-0 ${
@@ -2468,7 +2480,7 @@ export function HomeDashboardChatPanel({
         }}
       />
 
-      <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-border bg-bg-card shadow-lg">
+      <section className="relative flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-[2rem] border border-border bg-[var(--surface-card)] shadow-lg">
         <div className={`h-full shrink-0 border-r border-border bg-bg-card ${
           selectedConversationId 
             ? 'hidden md:block md:w-[300px]' 
@@ -2487,7 +2499,7 @@ export function HomeDashboardChatPanel({
 
         <div className={`h-full min-h-0 min-w-0 flex-1 overflow-hidden flex-col ${
           selectedConversationId 
-            ? 'flex' 
+            ? 'flex fixed md:relative inset-0 z-[60] md:z-auto bg-[var(--surface-card)] md:bg-transparent' 
             : 'hidden md:flex'
         }`}>
           <ChatPanel
@@ -2496,6 +2508,7 @@ export function HomeDashboardChatPanel({
             onLoadMore={onLoadMore}
             inputDisabled={isRemovedFromGroup}
             inputDisabledReason={isRemovedFromGroup ? 'Bạn đã bị xóa khỏi nhóm' : undefined}
+            onBack={() => onSelectConversation('')}
             onInfoClick={handleToggleInfoPanel}
             onAvatarClick={handleOpenGroupAvatarPicker}
             onNameClick={() => {

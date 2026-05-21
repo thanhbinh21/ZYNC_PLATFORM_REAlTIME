@@ -7,6 +7,7 @@ export const CreateReminderSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().trim().max(1000).optional(),
   dueAt: z.string().datetime().optional(),
+  createdBy: z.enum(['ai_suggestion', 'user']).optional(),
 });
 
 export const UpdateReminderSchema = z.object({

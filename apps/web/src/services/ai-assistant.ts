@@ -1,4 +1,4 @@
-import type { AiAssistantItem, AiCatchupDigest } from '@zync/shared-types';
+import type { AiAssistantItem, AiCatchupDigest, AiReminder } from '@zync/shared-types';
 import { apiClient } from './api';
 
 interface ApiDataResponse<T> {
@@ -38,6 +38,13 @@ interface CreateCatchupInput {
 export interface CatchupResponse {
   item: AiAssistantItem;
   detail: AiCatchupDigest | null;
+}
+
+export interface AssistantTask extends AiReminder {
+  aiItemId?: string;
+  conversationName?: string;
+  conversationAvatarUrl?: string | null;
+  conversationType?: 'direct' | 'group';
 }
 
 /** Lấy conversations có tin chưa đọc + AI state (Phase 1) */
@@ -112,4 +119,56 @@ export async function updateAssistantSettings(
     { catchupEnabled },
   );
   return data.data;
+}
+
+export async function getAssistantTasks(options: {
+  conversationId?: string;
+  status?: 'pending' | 'done' | 'dismissed';
+  limit?: number;
+  skip?: number;
+} = {}): Promise<{ tasks: AssistantTask[]; total: number }> {
+  const params = new URLSearchParams();
+  if (options.conversationId) params.set('conversationId', options.conversationId);
+  if (options.status) params.set('status', options.status);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  if (options.skip !== undefined) params.set('skip', String(options.skip));
+
+  const query = params.toString();
+  const { data } = await apiClient.get<ApiDataResponse<{ tasks: AssistantTask[]; total: number }>>(
+    `/api/ai/assistant/tasks${query ? `?${query}` : ''}`,
+  );
+  return data.data;
+}
+
+export async function createAssistantTask(input: {
+  conversationId: string;
+  digestId?: string;
+  sourceMessageRefs?: string[];
+  title: string;
+  description?: string;
+  dueAt?: string;
+  createdBy?: 'ai_suggestion' | 'user';
+}): Promise<AssistantTask> {
+  const { data } = await apiClient.post<ApiDataResponse<AssistantTask>>('/api/ai/assistant/tasks', input);
+  return data.data;
+}
+
+export async function updateAssistantTask(
+  taskId: string,
+  input: {
+    status?: 'pending' | 'done' | 'dismissed';
+    title?: string;
+    description?: string;
+    dueAt?: string | null;
+  },
+): Promise<AssistantTask> {
+  const { data } = await apiClient.patch<ApiDataResponse<AssistantTask>>(
+    `/api/ai/assistant/tasks/${taskId}`,
+    input,
+  );
+  return data.data;
+}
+
+export async function deleteAssistantTask(taskId: string): Promise<void> {
+  await apiClient.delete(`/api/ai/assistant/tasks/${taskId}`);
 }

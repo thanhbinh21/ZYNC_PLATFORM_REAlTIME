@@ -12,12 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../src/theme/get-app-theme';
-import { useNotifications } from '../src/hooks/useNotifications';
-import { useAuthStore } from '../src/store/useAuthStore';
-import type { AppNotification } from '../src/services/notifications';
-import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
+import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
+import { getAppTheme } from '../../src/theme/get-app-theme';
+import { useNotifications } from '../../src/hooks/useNotifications';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import type { AppNotification } from '../../src/services/notifications';
+import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

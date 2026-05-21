@@ -124,8 +124,6 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="chat-room" options={{ headerShown: false }} />
-            <Stack.Screen name="post-detail" options={{ headerShown: false }} />
-            <Stack.Screen name="explore" options={{ headerShown: false }} />
             <Stack.Screen name="call-screen" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           </Stack>
           <IncomingCallOverlay />

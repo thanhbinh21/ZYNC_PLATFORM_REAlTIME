@@ -271,6 +271,8 @@ export interface AiAssistantItemMetadata {
   catchupMode?: AiCatchupMode;
   actionItemCount?: number;
   messageCount?: number;
+  taskStatus?: AiReminderStatus;
+  dueAt?: string;
 }
 
 export interface AiAssistantItem {

@@ -1,9 +1,31 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Sparkles, X, Loader2, MessageSquare } from 'lucide-react';
+import { Bell, Check, Sparkles, X, Loader2, MessageSquare, Trash2 } from 'lucide-react';
 import type { AiBoxTab } from '@/hooks/use-ai-assistant';
 import { StatusBadge } from './status-badge';
+
+type CatchupDetail = {
+  _id: string;
+  futureSignals?: {
+    questionsForUser?: string[];
+    actionItems?: Array<{ text: string; sourceMessageRefs: string[] }>;
+    suggestedReplies?: string[];
+  };
+};
+
+type AssistantTask = {
+  _id: string;
+  conversationId: string;
+  title: string;
+  description?: string;
+  dueAt?: string;
+  status: 'pending' | 'done' | 'dismissed';
+  sourceMessageRefs: string[];
+  conversationName?: string;
+  conversationAvatarUrl?: string | null;
+  conversationType?: 'direct' | 'group';
+};
 
 interface AiAssistantBoxProps {
   isOpen: boolean;
@@ -29,6 +51,9 @@ interface AiAssistantBoxProps {
       messageCount?: number;
     } | null;
   }>;
+  catchupDetailsByConversationId?: Record<string, CatchupDetail>;
+  tasks?: AssistantTask[];
+  taskTotal?: number;
   items: Array<{
     _id: string;
     conversationId?: string;
@@ -47,29 +72,48 @@ interface AiAssistantBoxProps {
   }>;
   total: number;
   loadingList: boolean;
+  loadingTasks?: boolean;
   loadingItems: Set<string>;
+  pendingTaskCount?: number;
   onClose: () => void;
   onTabChange: (tab: AiBoxTab) => void;
   onSummarize: (conversationId: string) => void;
   onRegenerate: (conversationId: string) => void;
+  onCreateTask?: (
+    conversationId: string,
+    actionItem: { text: string; sourceMessageRefs: string[] },
+    digestId?: string,
+  ) => void;
+  onCompleteTask?: (taskId: string) => void;
+  onDismissTask?: (taskId: string) => void;
   onOpenChat: (conversationId: string) => void;
   onLoadMore?: () => void;
+  onLoadMoreTasks?: () => void;
 }
 
 export function AiAssistantBox({
   isOpen,
   activeTab,
   conversations,
+  catchupDetailsByConversationId = {},
+  tasks = [],
+  taskTotal = 0,
   items,
   total,
   loadingList,
+  loadingTasks = false,
   loadingItems,
+  pendingTaskCount = 0,
   onClose,
   onTabChange,
   onSummarize,
   onRegenerate,
+  onCreateTask = () => {},
+  onCompleteTask = () => {},
+  onDismissTask = () => {},
   onOpenChat,
   onLoadMore,
+  onLoadMoreTasks,
 }: AiAssistantBoxProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -159,6 +203,22 @@ export function AiAssistantBox({
               </span>
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => onTabChange('tasks')}
+            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+              activeTab === 'tasks'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Tasks
+            {pendingTaskCount > 0 && (
+              <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">
+                {pendingTaskCount > 9 ? '9+' : pendingTaskCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Tab content */}
@@ -168,13 +228,27 @@ export function AiAssistantBox({
           {activeTab === 'catchup' && (
             <CatchupTab
               conversations={conversations}
+              catchupDetailsByConversationId={catchupDetailsByConversationId}
               total={total}
               loadingList={loadingList}
               loadingItems={loadingItems}
               onSummarize={onSummarize}
               onRegenerate={onRegenerate}
+              onCreateTask={onCreateTask}
               onOpenChat={onOpenChat}
               onLoadMore={onLoadMore}
+            />
+          )}
+
+          {activeTab === 'tasks' && (
+            <TasksTab
+              tasks={tasks}
+              total={taskTotal}
+              loadingTasks={loadingTasks}
+              onCompleteTask={onCompleteTask}
+              onDismissTask={onDismissTask}
+              onOpenChat={onOpenChat}
+              onLoadMore={onLoadMoreTasks}
             />
           )}
         </div>
@@ -272,20 +346,28 @@ interface CatchupConversation {
 
 function CatchupTab({
   conversations,
+  catchupDetailsByConversationId = {},
   total,
   loadingList,
   loadingItems,
   onSummarize,
   onRegenerate,
+  onCreateTask,
   onOpenChat,
   onLoadMore,
 }: {
   conversations: CatchupConversation[];
+  catchupDetailsByConversationId?: Record<string, CatchupDetail>;
   total: number;
   loadingList: boolean;
   loadingItems: Set<string>;
   onSummarize: (id: string) => void;
   onRegenerate: (id: string) => void;
+  onCreateTask: (
+    conversationId: string,
+    actionItem: { text: string; sourceMessageRefs: string[] },
+    digestId?: string,
+  ) => void;
   onOpenChat: (id: string) => void;
   onLoadMore?: () => void;
 }) {
@@ -313,11 +395,15 @@ function CatchupTab({
   return (
     <div className="space-y-3">
       {conversations.map((conv) => {
-        const isLoading = loadingItems.has(conv.conversationId) || loadingItems.has(conv.aiItemId ?? '');
+        const isProcessing = conv.aiStatus === 'queued' || conv.aiStatus === 'processing';
+        const isLoading = isProcessing || loadingItems.has(conv.conversationId) || loadingItems.has(conv.aiItemId ?? '');
         const isReady = conv.aiStatus === 'ready';
         const catchupMode = conv.aiMetadata?.catchupMode ?? (conv.unreadCount > 0 ? 'unread' : 'recent');
         const latestMessageAt = conv.aiMetadata?.latestMessageAt ?? conv.updatedAt;
         const lastDigestAt = conv.aiMetadata?.lastDigestAt;
+        const detail = catchupDetailsByConversationId[conv.conversationId];
+        const actionItems = detail?.futureSignals?.actionItems ?? [];
+        const suggestedReplies = detail?.futureSignals?.suggestedReplies ?? [];
 
         return (
           <div
@@ -373,6 +459,39 @@ function CatchupTab({
               <p className="mt-2 text-xs text-text-secondary line-clamp-2">{conv.aiSummarySnippet}</p>
             )}
 
+            {isReady && actionItems.length > 0 && (
+              <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2 dark:border-amber-800 dark:bg-amber-950/30">
+                {actionItems.slice(0, 3).map((actionItem, index) => (
+                  <div key={`${actionItem.text}-${index}`} className="flex items-start gap-2">
+                    <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden />
+                    <p className="min-w-0 flex-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                      {actionItem.text}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onCreateTask(conv.conversationId, actionItem, detail?._id)}
+                      className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                    >
+                      Nhắc tôi
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {isReady && suggestedReplies.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {suggestedReplies.slice(0, 2).map((reply) => (
+                  <span
+                    key={reply}
+                    className="rounded-md border border-green-200 bg-green-50 px-2 py-1 text-[11px] text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300"
+                  >
+                    {reply}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="mt-3 flex items-center gap-2">
               {catchupMode ? (
@@ -387,7 +506,7 @@ function CatchupTab({
                   ) : (
                     <MessageSquare className="h-3 w-3" aria-hidden />
                   )}
-                  {conv.aiStatus === 'failed' ? 'Thử lại' : 'Tóm tắt'}
+                  {isProcessing ? 'Đang tóm tắt' : conv.aiStatus === 'failed' ? 'Thử lại' : 'Tóm tắt'}
                 </button>
               ) : (
                 <button
@@ -435,10 +554,126 @@ function CatchupTab({
   );
 }
 
+function TasksTab({
+  tasks,
+  total,
+  loadingTasks,
+  onCompleteTask,
+  onDismissTask,
+  onOpenChat,
+  onLoadMore,
+}: {
+  tasks: AssistantTask[];
+  total: number;
+  loadingTasks: boolean;
+  onCompleteTask: (taskId: string) => void;
+  onDismissTask: (taskId: string) => void;
+  onOpenChat: (conversationId: string) => void;
+  onLoadMore?: () => void;
+}) {
+  if (loadingTasks && tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
+        <p className="mt-3 text-sm text-text-secondary">Đang tải...</p>
+      </div>
+    );
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Bell className="h-14 w-14 text-text-tertiary" aria-hidden />
+        <p className="mt-3 text-sm font-semibold text-text-primary">Không có task pending</p>
+        <p className="mt-1 text-center text-xs text-text-secondary">
+          Action item từ Catch-up sẽ xuất hiện ở đây.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {tasks.map((task) => (
+        <div
+          key={task._id}
+          className="rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition hover:border-border-strong"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+              <Bell className="h-4 w-4" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-snug text-text-primary">{task.title}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-tertiary">
+                <span>{task.conversationName ?? 'Cuộc trò chuyện'}</span>
+                {task.dueAt && (
+                  <>
+                    <span>·</span>
+                    <span>{formatDueLabel(task.dueAt)}</span>
+                  </>
+                )}
+              </div>
+              {task.description && (
+                <p className="mt-2 line-clamp-2 text-xs text-text-secondary">{task.description}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onCompleteTask(task._id)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-green-700"
+            >
+              <Check className="h-3 w-3" aria-hidden />
+              Xong
+            </button>
+            <button
+              type="button"
+              onClick={() => onDismissTask(task._id)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-[var(--surface-glass-strong)]"
+            >
+              <Trash2 className="h-3 w-3" aria-hidden />
+              Bỏ qua
+            </button>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => onOpenChat(task.conversationId)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-[var(--surface-glass-strong)]"
+            >
+              Mở chat
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {tasks.length < total && (
+        <button
+          type="button"
+          onClick={onLoadMore}
+          disabled={loadingTasks}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-[var(--surface-glass)] px-4 py-3 text-sm font-medium text-text-secondary transition hover:bg-[var(--surface-glass-strong)] disabled:opacity-50"
+        >
+          {loadingTasks ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+          Tải thêm ({tasks.length}/{total})
+        </button>
+      )}
+    </div>
+  );
+}
+
 function getCatchupModeLabel(mode?: 'unread' | 'since_last_digest' | 'recent'): string {
   if (mode === 'unread') return 'Tin chưa đọc';
   if (mode === 'since_last_digest') return 'Tin mới sau tóm tắt';
   return 'Tóm tắt gần đây';
+}
+
+function formatDueLabel(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `Hạn ${date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`;
 }
 
 function formatTimeAgo(isoDate?: string): string {

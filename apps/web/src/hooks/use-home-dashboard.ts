@@ -3902,7 +3902,7 @@ export function useHomeDashboard() {
     screenShareVideoRef,
     remoteVideoRef,
     remoteParticipantVideos,
-    isCallingAvailable: isCallConversationSelected,
+    isCallingAvailable: isCallConversationSelected && (!activeCall || ['ended', 'idle', 'rejected', 'missed'].includes(activeCall.status) || activeCall.conversationId === selectedConversationId),
     onStartAudioCall: handleStartAudioCall,
     onStartVideoCall: handleStartVideoCall,
     onAcceptIncomingCall: handleAcceptIncomingCall,

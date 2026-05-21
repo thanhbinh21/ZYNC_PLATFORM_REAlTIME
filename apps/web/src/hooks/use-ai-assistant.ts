@@ -1,20 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AiAssistantItem, AiAssistantItemPayload } from '@zync/shared-types';
+import type { AiAssistantItem, AiAssistantItemPayload, AiCatchupDigest, AiReminderUpdatedPayload } from '@zync/shared-types';
 import {
   getUnreadConversations,
   createCatchupDigest,
+  getCatchupLatest,
+  getAssistantTasks,
+  createAssistantTask,
+  updateAssistantTask,
   regenerateCatchup,
+  type AssistantTask,
   type ConversationWithAiDigest,
 } from '@/services/ai-assistant';
 import {
   listenToAiAssistantItemUpdated,
   unlistenToAiAssistantItemUpdated,
+  listenToAiReminderUpdated,
+  unlistenToAiReminderUpdated,
   getRawSocket,
 } from '@/services/socket';
 
-export type AiBoxTab = 'overview' | 'catchup';
+export type AiBoxTab = 'overview' | 'catchup' | 'tasks';
+const PROCESSING_POLL_INTERVAL_MS = 5000;
 
 interface UseAiAssistantOptions {
   /** Số conversation hiển thị tối đa trong AI Box */
@@ -28,6 +36,10 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
   const [activeTab, setActiveTab] = useState<AiBoxTab>('catchup');
   /** Recent conversations + AI state for Catch-up. */
   const [conversations, setConversations] = useState<ConversationWithAiDigest[]>([]);
+  const [catchupDetailsByConversationId, setCatchupDetailsByConversationId] = useState<Record<string, AiCatchupDigest>>({});
+  const [tasks, setTasks] = useState<AssistantTask[]>([]);
+  const [taskTotal, setTaskTotal] = useState(0);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   /** Legacy AI items (dùng cho tổng hợp, không còn là nguồn chính) */
   const [items, setItems] = useState<AiAssistantItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -37,10 +49,73 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
 
   const loadingRef = useRef(false);
   const skipRef = useRef(0);
+  const taskSkipRef = useRef(0);
+
+  const hydrateCatchupDetails = useCallback(async (targets: ConversationWithAiDigest[]) => {
+    const readyTargets = targets.filter((conversation) => conversation.aiStatus === 'ready');
+    if (readyTargets.length === 0) return;
+
+    const results = await Promise.allSettled(
+      readyTargets.map((conversation) => getCatchupLatest(conversation.conversationId)),
+    );
+
+    setCatchupDetailsByConversationId((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      results.forEach((result, index) => {
+        if (result.status !== 'fulfilled' || !result.value?.detail) return;
+        const conversationId = readyTargets[index]?.conversationId;
+        if (!conversationId) return;
+        next[conversationId] = result.value.detail;
+        changed = true;
+      });
+
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const loadTasks = useCallback(async (reset = true) => {
+    setLoadingTasks(true);
+    setError(null);
+
+    try {
+      const result = await getAssistantTasks({
+        status: 'pending',
+        limit: 20,
+        skip: reset ? 0 : taskSkipRef.current,
+      });
+
+      if (reset) {
+        setTasks(result.tasks);
+        taskSkipRef.current = result.tasks.length;
+      } else {
+        setTasks((prev) => [...prev, ...result.tasks]);
+        taskSkipRef.current += result.tasks.length;
+      }
+      setTaskTotal(result.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load tasks');
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, []);
 
   // ── Socket handler ─────────────────────────────────────────────────────────────
 
   const handleSocketUpdate = useCallback((payload: AiAssistantItemPayload) => {
+    if (payload.type === 'catchup_digest' && payload.conversationId && payload.detail) {
+      setCatchupDetailsByConversationId((prev) => ({
+        ...prev,
+        [payload.conversationId!]: payload.detail as AiCatchupDigest,
+      }));
+    }
+
+    if (payload.type === 'task') {
+      void loadTasks(true);
+      return;
+    }
+
     // Cập nhật conversations state (nguồn chính cho Phase 1)
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.conversationId === payload.conversationId);
@@ -50,6 +125,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
       updated[idx] = {
         ...updated[idx],
         aiStatus: payload.status as ConversationWithAiDigest['aiStatus'],
+        aiItemId: payload.itemId ?? updated[idx].aiItemId,
         aiTitle: payload.title ?? updated[idx].aiTitle,
         aiSummarySnippet: payload.summarySnippet ?? updated[idx].aiSummarySnippet,
         aiMetadata: payload.metadata
@@ -102,10 +178,11 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
       setLoadingItems((prev) => {
         const next = new Set(prev);
         next.delete(payload.itemId);
+        if (payload.conversationId) next.delete(payload.conversationId);
         return next;
       });
     }
-  }, []);
+  }, [loadTasks]);
 
   // ── Load recent conversations for Catch-up ────────────────────────────────────
 
@@ -130,6 +207,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
           skipRef.current += defaultLimit;
         }
         setTotal(result.total);
+        void hydrateCatchupDetails(result.conversations);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load conversations');
       } finally {
@@ -137,7 +215,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
         setLoadingList(false);
       }
     },
-    [defaultLimit],
+    [defaultLimit, hydrateCatchupDetails],
   );
 
   // Alias để layout gọi được loadItems
@@ -147,6 +225,16 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
 
   const createDigest = useCallback(async (conversationId: string) => {
     setLoadingItems((prev) => new Set([...prev, conversationId]));
+    setConversations((prev) => prev.map((conversation) =>
+      conversation.conversationId === conversationId
+        ? {
+            ...conversation,
+            aiStatus: 'queued',
+            aiTitle: conversation.aiTitle ?? 'Đang tóm tắt hội thoại',
+          }
+        : conversation,
+    ));
+
     try {
       const result = await createCatchupDigest({ conversationId, trigger: 'manual' });
 
@@ -159,6 +247,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
             aiStatus: result.item.status,
             aiItemId: result.item._id,
             aiTitle: result.item.title ?? null,
+            aiSummarySnippet: result.item.summarySnippet ?? updated[idx].aiSummarySnippet,
             aiMetadata: result.item.metadata ?? updated[idx].aiMetadata,
           };
           return updated;
@@ -168,6 +257,11 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
 
       return result;
     } catch (err) {
+      setConversations((prev) => prev.map((conversation) =>
+        conversation.conversationId === conversationId
+          ? { ...conversation, aiStatus: 'failed' }
+          : conversation,
+      ));
       setError(err instanceof Error ? err.message : 'Failed to create digest');
       throw err;
     } finally {
@@ -183,6 +277,16 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
 
   const doRegenerate = useCallback(async (conversationId: string) => {
     setLoadingItems((prev) => new Set([...prev, conversationId]));
+    setConversations((prev) => prev.map((conversation) =>
+      conversation.conversationId === conversationId
+        ? {
+            ...conversation,
+            aiStatus: 'queued',
+            aiTitle: conversation.aiTitle ?? 'Đang tóm tắt hội thoại',
+          }
+        : conversation,
+    ));
+
     try {
       const result = await regenerateCatchup(conversationId);
 
@@ -195,6 +299,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
             aiStatus: result.item.status,
             aiItemId: result.item._id,
             aiTitle: result.item.title ?? null,
+            aiSummarySnippet: result.item.summarySnippet ?? updated[idx].aiSummarySnippet,
             aiMetadata: result.item.metadata ?? updated[idx].aiMetadata,
           };
           return updated;
@@ -202,6 +307,11 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
         return prev;
       });
     } catch (err) {
+      setConversations((prev) => prev.map((conversation) =>
+        conversation.conversationId === conversationId
+          ? { ...conversation, aiStatus: 'failed' }
+          : conversation,
+      ));
       setError(err instanceof Error ? err.message : 'Failed to regenerate digest');
       throw err;
     } finally {
@@ -213,12 +323,65 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     }
   }, []);
 
+  const createTaskFromActionItem = useCallback(async (
+    conversationId: string,
+    actionItem: { text: string; sourceMessageRefs: string[] },
+    digestId?: string,
+  ) => {
+    try {
+      await createAssistantTask({
+        conversationId,
+        digestId,
+        sourceMessageRefs: actionItem.sourceMessageRefs,
+        title: actionItem.text,
+        createdBy: 'ai_suggestion',
+      });
+      await loadTasks(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create task');
+      throw err;
+    }
+  }, [loadTasks]);
+
+  const completeTask = useCallback(async (taskId: string) => {
+    try {
+      await updateAssistantTask(taskId, { status: 'done' });
+      setTasks((prev) => prev.filter((task) => task._id !== taskId));
+      setTaskTotal((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to complete task');
+      throw err;
+    }
+  }, []);
+
+  const dismissTask = useCallback(async (taskId: string) => {
+    try {
+      await updateAssistantTask(taskId, { status: 'dismissed' });
+      setTasks((prev) => prev.filter((task) => task._id !== taskId));
+      setTaskTotal((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to dismiss task');
+      throw err;
+    }
+  }, []);
+
+  const handleReminderUpdate = useCallback((payload: AiReminderUpdatedPayload) => {
+    if (payload.status === 'pending') {
+      void loadTasks(true);
+      return;
+    }
+
+    setTasks((prev) => prev.filter((task) => task._id !== payload._id));
+    setTaskTotal((prev) => Math.max(0, prev - 1));
+  }, [loadTasks]);
+
   // ── Open / Close ───────────────────────────────────────────────────────────────
 
   const openBox = useCallback(() => {
     setIsOpen(true);
     void loadConversations(true);
-  }, [loadConversations]);
+    void loadTasks(true);
+  }, [loadConversations, loadTasks]);
 
   const closeBox = useCallback(() => {
     setIsOpen(false);
@@ -231,10 +394,89 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     if (!socket) return;
 
     listenToAiAssistantItemUpdated(handleSocketUpdate);
+    listenToAiReminderUpdated(handleReminderUpdate);
     return () => {
       unlistenToAiAssistantItemUpdated(handleSocketUpdate);
+      unlistenToAiReminderUpdated(handleReminderUpdate);
     };
-  }, [handleSocketUpdate]);
+  }, [handleSocketUpdate, handleReminderUpdate]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const processingConversations = conversations.filter(
+      (conversation) => conversation.aiStatus === 'queued' || conversation.aiStatus === 'processing',
+    );
+
+    if (processingConversations.length === 0) return;
+
+    const pollProcessing = async () => {
+      const results = await Promise.allSettled(
+        processingConversations.map((conversation) => getCatchupLatest(conversation.conversationId)),
+      );
+
+      setConversations((prev) => {
+        let changed = false;
+        const next = [...prev];
+
+        results.forEach((result, index) => {
+          if (result.status !== 'fulfilled' || !result.value?.item) return;
+
+          const polled = result.value;
+          const conversationId = processingConversations[index]?.conversationId;
+          const currentIndex = next.findIndex((conversation) => conversation.conversationId === conversationId);
+          if (currentIndex === -1) return;
+          if (conversationId && polled.detail) {
+            setCatchupDetailsByConversationId((prevDetails) => ({
+              ...prevDetails,
+              [conversationId]: polled.detail!,
+            }));
+          }
+
+          const current = next[currentIndex];
+          if (!current) return;
+          const updated = {
+            ...current,
+            aiStatus: polled.item.status,
+            aiItemId: polled.item._id,
+            aiTitle: polled.item.title ?? current.aiTitle,
+            aiSummarySnippet: polled.item.summarySnippet ?? current.aiSummarySnippet,
+            aiMetadata: polled.item.metadata ?? current.aiMetadata,
+          };
+          const metadataChanged = JSON.stringify(current.aiMetadata ?? null) !== JSON.stringify(updated.aiMetadata ?? null);
+          const changedForConversation =
+            current.aiStatus !== updated.aiStatus
+            || current.aiItemId !== updated.aiItemId
+            || current.aiTitle !== updated.aiTitle
+            || current.aiSummarySnippet !== updated.aiSummarySnippet
+            || metadataChanged;
+
+          if (changedForConversation) {
+            next[currentIndex] = updated;
+            changed = true;
+          }
+
+          if (polled.item.status === 'ready' || polled.item.status === 'failed') {
+            setLoadingItems((prevLoading) => {
+              const loading = new Set(prevLoading);
+              loading.delete(conversationId ?? '');
+              loading.delete(polled.item._id);
+              return loading;
+            });
+          }
+        });
+
+        return changed ? next : prev;
+      });
+    };
+
+    void pollProcessing();
+    const timer = window.setInterval(() => {
+      void pollProcessing();
+    }, PROCESSING_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(timer);
+  }, [isOpen, conversations]);
 
   // ── Badge count ───────────────────────────────────────────────────────────────
 
@@ -245,17 +487,26 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     activeTab,
     setActiveTab,
     conversations,
+    catchupDetailsByConversationId,
+    tasks,
+    taskTotal,
     items,
     total,
     loadingList,
+    loadingTasks,
     loadingItems,
     error,
     unreadDigestCount,
+    pendingTaskCount: taskTotal,
     openBox,
     closeBox,
     loadConversations,
+    loadTasks,
     loadItems,
     createDigest,
     regenerate: doRegenerate,
+    createTaskFromActionItem,
+    completeTask,
+    dismissTask,
   };
 }
