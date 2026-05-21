@@ -12,10 +12,9 @@ import {
 } from 'react-native';
 import { Check, Mail, MessageCircle, UserPlus, Users, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../src/theme/colors';
+import { lightTheme } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 import api from '../../src/services/api';
-import { useAuthStore } from '../../src/store/useAuthStore';
-import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
 import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
 import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
@@ -25,6 +24,8 @@ import { AppIconButton } from '../../src/ui/AppIconButton';
 import { Avatar } from '../../src/ui/Avatar';
 import { AppChip } from '../../src/ui/AppChip';
 import { AppCard } from '../../src/ui/AppCard';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 
 interface Friend {
   _id: string;
@@ -168,7 +169,7 @@ export default function FriendsScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Danh bạ</Text>
           <AppIconButton 
-            icon={<UserPlus size={22} color="#0f9d8e" />}
+            icon={<UserPlus size={22} color={lightTheme.accent} />}
             onPress={() => {}}
             size={40}
           />
@@ -199,7 +200,7 @@ export default function FriendsScreen() {
                   style={styles.addFriendBtn}
                   onPress={() => sendFriendRequest(user.id || user._id)}
                 >
-                  <UserPlus size={16} color="#0f9d8e" />
+                  <UserPlus size={16} color={lightTheme.accent} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -236,7 +237,7 @@ export default function FriendsScreen() {
             keyExtractor={(item, index) => item._id || item.id || index.toString()}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0f9d8e" colors={["#0f9d8e"]} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={lightTheme.accent} colors={[lightTheme.accent]} />
             }
             renderItem={({ item }) => {
               const friendId = (item._id || item.id) as string;
@@ -259,7 +260,7 @@ export default function FriendsScreen() {
                     }}
                     disabled={chatLoading}
                   >
-                    <MessageCircle size={18} color="#0f9d8e" />
+                    <MessageCircle size={18} color={lightTheme.accent} />
                   </TouchableOpacity>
                 </TouchableOpacity>
               );
@@ -345,27 +346,27 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   title: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 24,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontFamily: fonts.bold,
   },
   actionBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
     paddingHorizontal: 15,
     height: 45,
     marginBottom: 15,
@@ -375,8 +376,8 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: colors.text,
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: lightTheme.textPrimary,
+    fontFamily: fonts.regular,
     fontSize: 15,
   },
   // ─ Tabs ─
@@ -391,21 +392,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: colors.glassSoft,
+    backgroundColor: lightTheme.bgSecondary,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   tabActive: {
-    backgroundColor: colors.accentLight,
-    borderColor: colors.accent,
+    backgroundColor: lightTheme.accentLight,
+    borderColor: lightTheme.accent,
   },
   tabText: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontSize: 14,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontFamily: fonts.medium,
   },
   tabTextActive: {
-    color: colors.accent,
+    color: lightTheme.accent,
   },
   // ─ Search Results ─
   searchResultsBox: {
@@ -413,9 +414,9 @@ const styles = StyleSheet.create({
   },
   // ─ Friend Items ─
   listTitle: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontSize: 11,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
     marginBottom: 10,
     letterSpacing: 1,
@@ -427,43 +428,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: colors.glassSoft,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   avatar: {
     width: 45,
     height: 45,
     borderRadius: 18,
-    backgroundColor: colors.glassPanelStrong,
+    backgroundColor: lightTheme.bgHover,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontSize: 16,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontFamily: fonts.bold,
   },
   friendInfo: {
     flex: 1,
     marginLeft: 15,
   },
   friendName: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
   },
   friendStatus: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontSize: 13,
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   callBtn: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: colors.glassSoft,
+    backgroundColor: lightTheme.bgPrimary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -474,11 +475,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: colors.glassUltra,
+    backgroundColor: lightTheme.bgPrimary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   // ─ Request Items ─
   requestItem: {
@@ -488,9 +489,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: colors.glassSoft,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   requestActions: {
     flexDirection: 'row',
@@ -500,7 +501,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: colors.accent,
+    backgroundColor: lightTheme.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -508,14 +509,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: colors.dangerSoft,
+    backgroundColor: lightTheme.dangerSoft,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.dangerBorder,
+    borderColor: lightTheme.dangerBorder,
   },
   requestBadge: {
-    backgroundColor: colors.error,
+    backgroundColor: lightTheme.danger,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -525,13 +526,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   badgeText: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 10,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontFamily: fonts.bold,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.glassBorderSoft,
+    backgroundColor: lightTheme.divider,
     marginVertical: 10,
   },
   // ─ States ─
@@ -546,15 +547,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: lightTheme.textSecondary,
     fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
     marginTop: 16,
   },
   emptySubtext: {
-    color: colors.textMuted,
+    color: lightTheme.textTertiary,
     fontSize: 14,
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: fonts.regular,
     marginTop: 4,
   },
 });

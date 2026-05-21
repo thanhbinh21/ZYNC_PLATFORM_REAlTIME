@@ -44,7 +44,7 @@ export default function CreateGroupScreen() {
       setIsLoading(true);
       const res = await api.get('/friends');
       const friendsList = (res.data?.data || res.data?.friends || []).map((f: any) => ({
-        _id: f._id || f.userId,
+        _id: f._id || f.userId || f.id,
         displayName: f.displayName || f.username || 'User',
         avatarUrl: f.avatarUrl,
         username: f.username,
@@ -219,7 +219,7 @@ export default function CreateGroupScreen() {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item, index) => item._id?.toString() || index.toString()}
           renderItem={renderFriend}
           ListEmptyComponent={
             <Text style={styles.emptyText}>Không tìm thấy bạn bè</Text>

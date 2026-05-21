@@ -1,6 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { lightTheme } from '../theme/colors';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface AppIconButtonProps {
   icon: React.ReactNode;
@@ -18,7 +19,7 @@ export function AppIconButton({
   size = 44 
 }: AppIconButtonProps) {
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       style={[
         styles.button,
         { 
@@ -30,10 +31,10 @@ export function AppIconButton({
         style
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeScale={0.92}
     >
       {icon}
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 
@@ -42,10 +43,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E8ECEF',
+    borderColor: lightTheme.border,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },

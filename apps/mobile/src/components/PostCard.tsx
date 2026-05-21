@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Heart, MessageCircle, Bookmark } from 'lucide-react-native';
 import type { Post } from '../services/posts';
-import { colors } from '../theme/colors';
+import { lightTheme } from '../theme/colors';
 import { fonts } from '../theme/fonts';
 
 interface PostCardProps {
@@ -20,12 +20,12 @@ interface PostCardProps {
 }
 
 const POST_TYPE_LABELS: Record<string, string> = {
-  discussion: 'Thao luan',
-  question: 'Hoi dap',
-  til: 'TIL',
+  discussion: 'Thảo luận',
+  question: 'Hỏi đáp',
+  til: 'Hướng dẫn',
   showcase: 'Showcase',
-  tutorial: 'Huong dan',
-  job: 'Tuyen dung',
+  tutorial: 'Hướng dẫn',
+  job: 'Tuyển dụng',
 };
 
 function formatTimeAgo(dateString: string): string {
@@ -36,10 +36,10 @@ function formatTimeAgo(dateString: string): string {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return 'Vua xong';
-  if (minutes < 60) return `${minutes} phut truoc`;
-  if (hours < 24) return `${hours} gio truoc`;
-  return `${days} ngay truoc`;
+  if (minutes < 1) return 'Vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (hours < 24) return `${hours} giờ trước`;
+  return `${days} ngày trước`;
 }
 
 function PostCardComponent({
@@ -91,7 +91,7 @@ function PostCardComponent({
         )}
         <View style={styles.authorInfo}>
           <Text style={styles.authorName} numberOfLines={1}>
-            {post.author?.displayName || 'Nguoi dung'}
+            {post.author?.displayName || 'Người dùng'}
           </Text>
           <Text style={styles.meta}>
             {formatTimeAgo(post.createdAt)}
@@ -142,14 +142,14 @@ function PostCardComponent({
           style={styles.actionButton}
         >
           <Heart
-            size={16}
-            color={post.isLiked ? colors.danger : colors.textMuted}
-            fill={post.isLiked ? colors.danger : 'transparent'}
+            size={18}
+            color={post.isLiked ? lightTheme.danger : lightTheme.textTertiary}
+            fill={post.isLiked ? lightTheme.danger : 'transparent'}
           />
           <Text
             style={[
               styles.actionCount,
-              post.isLiked && { color: colors.danger },
+              post.isLiked && { color: lightTheme.danger },
             ]}
           >
             {post.likesCount}
@@ -161,7 +161,7 @@ function PostCardComponent({
           onPress={handlePress}
           style={styles.actionButton}
         >
-          <MessageCircle size={16} color={colors.textMuted} />
+          <MessageCircle size={18} color={lightTheme.textTertiary} />
           <Text style={styles.actionCount}>{post.commentsCount}</Text>
         </TouchableOpacity>
 
@@ -171,11 +171,11 @@ function PostCardComponent({
           style={styles.actionButton}
         >
           <Bookmark
-            size={16}
+            size={18}
             color={
-              post.isBookmarked ? colors.accentSoft : colors.textMuted
+              post.isBookmarked ? lightTheme.accent : lightTheme.textTertiary
             }
-            fill={post.isBookmarked ? colors.accentSoft : 'transparent'}
+            fill={post.isBookmarked ? lightTheme.accent : 'transparent'}
           />
         </TouchableOpacity>
       </View>
@@ -187,122 +187,124 @@ export const PostCard = memo(PostCardComponent);
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassPanel,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: colors.glassShadow,
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    borderColor: 'rgba(226, 232, 240, 0.6)',
+    backgroundColor: lightTheme.surfaceCard,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
   },
   avatarFallback: {
-    backgroundColor: colors.primary,
+    backgroundColor: lightTheme.bgHover,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: colors.text,
+    color: lightTheme.textTertiary,
     fontFamily: fonts.bold,
-    fontSize: 14,
+    fontSize: 16,
   },
   authorInfo: {
     flex: 1,
   },
   authorName: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.semiBold,
-    fontSize: 14,
+    fontSize: 16,
   },
   meta: {
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.regular,
     fontSize: 12,
-    marginTop: 1,
+    marginTop: 2,
   },
   typeTag: {
-    backgroundColor: colors.glassSoft,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    backgroundColor: 'rgba(15, 185, 129, 0.1)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   typeTagText: {
-    color: colors.primary,
-    fontFamily: fonts.medium,
+    color: lightTheme.accent,
+    fontFamily: fonts.semiBold,
     fontSize: 11,
   },
   content: {
-    marginBottom: 10,
+    marginBottom: 14,
   },
   title: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 6,
+    fontSize: 18,
+    lineHeight: 26,
+    marginBottom: 8,
   },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 6,
-    gap: 6,
+    marginBottom: 10,
+    gap: 8,
   },
   tag: {
-    backgroundColor: colors.glassUltra,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    backgroundColor: lightTheme.bgSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   tagText: {
-    color: colors.primary,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.medium,
     fontSize: 12,
   },
   body: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
   },
   media: {
     width: '100%',
-    height: 160,
-    borderRadius: 12,
-    marginBottom: 10,
+    height: 200,
+    borderRadius: 20,
+    marginBottom: 14,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
-    paddingTop: 10,
+    justifyContent: 'space-between',
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.glassBorderSoft,
+    borderTopColor: 'rgba(226, 232, 240, 0.4)',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    padding: 4,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
   },
   actionCount: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: 14,
   },
 });

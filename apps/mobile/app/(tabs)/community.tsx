@@ -13,8 +13,8 @@ import {
 import { useRouter } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
-import { colors } from '../../src/theme/colors';
+
+import { lightTheme } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 import { PostCard } from '../../src/components/PostCard';
 import { CreatePostSheet } from '../../src/components/CreatePostSheet';
@@ -29,16 +29,15 @@ import { AppIconButton } from '../../src/ui/AppIconButton';
 import { useAuthStore } from '../../src/store/useAuthStore';
 
 const FILTERS: { key: PostFilter; label: string }[] = [
-  { key: 'latest', label: 'Moi nhat' },
-  { key: 'trending', label: 'Thu hut' },
-  { key: 'question', label: 'Hoi dap' },
-  { key: 'til', label: 'TIL' },
+  { key: 'latest', label: 'Mới nhất' },
+  { key: 'trending', label: 'Thu hút' },
+  { key: 'question', label: 'Hỏi đáp' },
+  { key: 'til', label: 'Hướng dẫn' },
 ];
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
   const currentUserId = useAuthStore((s) => s.userInfo?._id) ?? '';
 
   const {
@@ -106,7 +105,7 @@ export default function CommunityScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cộng đồng</Text>
         <AppIconButton
-          icon={<Pencil size={20} color="#0f9d8e" />}
+          icon={<Pencil size={20} color={lightTheme.accent} />}
           onPress={() => setShowCreate(true)}
           size={40}
         />
@@ -145,7 +144,7 @@ export default function CommunityScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
+            tintColor={lightTheme.accent}
           />
         }
         onEndReached={loadMore}
@@ -153,7 +152,7 @@ export default function CommunityScreen() {
         ListFooterComponent={
           isLoadingMore ? (
             <ActivityIndicator
-              color={colors.primary}
+              color={lightTheme.accent}
               style={styles.loadingMore}
             />
           ) : null
@@ -204,7 +203,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   headerTitle: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 24,
   },
@@ -212,9 +211,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -229,25 +228,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassSoft,
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.bgSecondary,
   },
   filterTabActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: lightTheme.accent,
+    borderColor: lightTheme.accent,
   },
   filterText: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.medium,
     fontSize: 13,
   },
   filterTextActive: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingBottom: 140, // Increased bottom padding so the bottom tab doesn't hide content
     flexGrow: 1,
   },
   emptyState: {
@@ -257,13 +256,13 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   emptyTitle: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 18,
     marginBottom: 8,
   },
   emptySubtitle: {
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.regular,
     fontSize: 14,
     textAlign: 'center',

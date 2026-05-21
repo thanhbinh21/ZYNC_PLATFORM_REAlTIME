@@ -7,6 +7,7 @@ import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data'
 import { DashboardHeader } from '@/components/shared/DashboardHeader';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
 import { GlobalCallListener } from '@/components/home-dashboard/organisms/GlobalCallListener';
+import { ActiveCallOverlay } from '@/components/home-dashboard/organisms/ActiveCallOverlay';
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useLoginForm } from '@/hooks/use-login-form';
@@ -277,6 +278,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}
         />
         <GlobalCallListener />
+        <ActiveCallOverlay />
 
         {/* AI Assistant Box */}
         <div className="hidden md:block">

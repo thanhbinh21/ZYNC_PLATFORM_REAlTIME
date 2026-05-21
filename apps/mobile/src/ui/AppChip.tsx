@@ -1,7 +1,9 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, StyleProp, ViewStyle, View } from 'react-native';
+import { Text, StyleSheet, StyleProp, ViewStyle, View } from 'react-native';
 import { lightTheme } from '../theme/colors';
 import { fonts } from '../theme/fonts';
+import { radius } from '../theme/spacing';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface AppChipProps {
   label: string;
@@ -27,9 +29,9 @@ export function AppChip({ label, active, onPress, style, icon }: AppChipProps) {
 
   if (onPress) {
     return (
-      <TouchableOpacity style={containerStyle} onPress={onPress} activeOpacity={0.7}>
+      <AnimatedPressable style={containerStyle} onPress={onPress} activeScale={0.95}>
         {content}
-      </TouchableOpacity>
+      </AnimatedPressable>
     );
   }
 
@@ -42,23 +44,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    borderRadius: radius.pill,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: '#E8ECEF',
+    borderColor: lightTheme.border,
   },
   chipActive: {
-    backgroundColor: lightTheme.accentLight,
+    backgroundColor: lightTheme.accent,
     borderColor: lightTheme.accent,
   },
   label: {
     fontFamily: fonts.medium,
     fontSize: 14,
-    color: '#64748B',
+    color: lightTheme.textSecondary,
   },
   labelActive: {
     fontFamily: fonts.semiBold,
-    color: '#FFFFFF',
+    color: lightTheme.textOnAccent,
   },
   iconWrap: {
     marginRight: 6,

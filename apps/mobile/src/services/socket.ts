@@ -608,7 +608,7 @@ function unlistenToMessageReacted(callback?: unknown): void {
   unregisterListener('message_reacted', callback);
 }
 
-function listenToErrors(callback: (error: { message: string }) => void): void {
+function listenToErrors(callback: (error: { message: string; code?: string }) => void): void {
   registerListener('error', callback);
 }
 
@@ -673,6 +673,14 @@ export interface WebRtcIceCandidatePayload {
   sessionId: string;
   fromUserId: string;
   candidate: unknown;
+}
+
+export interface CallMediaStatePayload {
+  sessionId: string;
+  userId: string;
+  isScreenSharing?: boolean;
+  isMicMuted?: boolean;
+  isCameraOff?: boolean;
 }
 
 function emitCallInvite(targetUserId: string, conversationId?: string, callType: 'audio' | 'video' = 'video'): boolean {
@@ -788,6 +796,23 @@ function emitWebRtcIceCandidate(
   return true;
 }
 
+function emitCallMediaState(
+  sessionId: string,
+  callToken: string,
+  state: { isScreenSharing?: boolean; isMicMuted?: boolean; isCameraOff?: boolean }
+): boolean {
+  if (!socket?.connected) {
+    return false;
+  }
+
+  socket.emit('call_media_state', {
+    sessionId,
+    callToken,
+    ...state
+  });
+  return true;
+}
+
 function listenToCallInvited(callback: (data: CallInvitedPayload) => void): void {
   registerListener('call_invited', callback);
 }
@@ -852,6 +877,15 @@ function unlistenToWebRtcIceCandidate(callback?: unknown): void {
   unregisterListener('webrtc_ice_candidate', callback);
 }
 
+function listenToCallMediaState(callback: (data: CallMediaStatePayload) => void): void {
+  registerListener('call_media_state', callback);
+}
+
+function unlistenToCallMediaState(callback?: unknown): void {
+  unregisterListener('call_media_state', callback);
+}
+
+
 export const socketService = {
   connect,
   disconnect: disconnectSocket,
@@ -914,6 +948,7 @@ export const socketService = {
   emitWebRtcOffer,
   emitWebRtcAnswer,
   emitWebRtcIceCandidate,
+  emitCallMediaState,
   listenToCallInvited,
   unlistenToCallInvited,
   listenToCallIncoming,
@@ -930,6 +965,8 @@ export const socketService = {
   unlistenToWebRtcAnswer,
   listenToWebRtcIceCandidate,
   unlistenToWebRtcIceCandidate,
+  listenToCallMediaState,
+  unlistenToCallMediaState,
 };
 
 export default socketService;

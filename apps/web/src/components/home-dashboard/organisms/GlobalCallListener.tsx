@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  emitCallReject,
   getSocket,
   listenToCallIncoming,
   listenToCallStatus,
@@ -38,6 +39,12 @@ function resolveCurrentUserId(): string | null {
 
 function setIncomingCall(payload: CallIncomingPayload) {
   callStore.setActiveCall((prev) => {
+    if (prev && prev.sessionId !== payload.sessionId && !['ended', 'missed', 'rejected'].includes(prev.status)) {
+      emitCallReject(payload.sessionId, payload.callToken, 'busy');
+      callStore.showActiveCallConflict('Bạn đang trong cuộc gọi hiện tại.');
+      return prev;
+    }
+
     const currentUserId = resolveCurrentUserId();
     const participantIds = Array.from(new Set([
       ...(payload.participantIds || []),
@@ -48,9 +55,11 @@ function setIncomingCall(payload: CallIncomingPayload) {
       return {
         ...prev,
         conversationId: payload.conversationId || prev.conversationId,
+        conversationName: payload.conversationName ?? prev.conversationName ?? null,
         isGroupCall: Boolean(payload.isGroupCall),
         initiatedBy: payload.fromUserId,
         participantIds,
+        participants: participantIds.map((userId) => ({ userId })),
         joinedParticipantIds: Array.from(new Set([...prev.joinedParticipantIds, payload.fromUserId])),
         direction: 'incoming',
         status: prev.status === 'connected' || prev.status === 'connecting' ? prev.status : 'incoming',
@@ -63,15 +72,18 @@ function setIncomingCall(payload: CallIncomingPayload) {
     return {
       sessionId: payload.sessionId,
       conversationId: payload.conversationId || null,
+      conversationName: payload.conversationName ?? null,
       isGroupCall: Boolean(payload.isGroupCall),
       initiatedBy: payload.fromUserId,
       participantIds,
+      participants: participantIds.map((userId) => ({ userId })),
       joinedParticipantIds: [payload.fromUserId],
       participantDisplayNames: {},
       direction: 'incoming',
       status: 'incoming',
       callToken: payload.callToken,
       callType: payload.callType || 'video',
+      startedAt: null,
       timeoutAt: payload.timeoutAt ?? null,
     };
   });
@@ -87,6 +99,13 @@ export function GlobalCallListener() {
     const socket = getSocket(token);
 
     const handleCallIncoming = (payload: CallIncomingPayload) => {
+      const current = callStore.activeCall;
+      if (current && current.sessionId !== payload.sessionId && !['ended', 'missed', 'rejected'].includes(current.status)) {
+        emitCallReject(payload.sessionId, payload.callToken, 'busy');
+        callStore.showActiveCallConflict('Bạn đang trong cuộc gọi hiện tại.');
+        return;
+      }
+
       setIncomingCall(payload);
 
       const toastId = `call-${payload.sessionId}`;
@@ -133,6 +152,17 @@ export function GlobalCallListener() {
     };
 
     const handleCallStatus = (payload: CallStatusPayload) => {
+      callStore.setActiveCall((prev) => {
+        if (!prev || prev.sessionId !== payload.sessionId) return prev;
+        if (['ended', 'missed', 'rejected'].includes(payload.status)) return null;
+        return {
+          ...prev,
+          status: payload.status === 'ringing' ? prev.status : payload.status,
+          reason: payload.reason,
+          startedAt: payload.status === 'connected' ? (prev.startedAt ?? new Date().toISOString()) : prev.startedAt,
+        };
+      });
+
       const currentUserId = resolveCurrentUserId();
       const activeCall = callStore.activeCall;
       const hasJoined = Boolean(

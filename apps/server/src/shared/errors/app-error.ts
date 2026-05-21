@@ -25,22 +25,22 @@ export class UnauthorizedError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = 'Forbidden') {
-    super(message, 403);
+  constructor(message = 'Forbidden', code?: string) {
+    super(message, 403, code);
     this.name = 'ForbiddenError';
   }
 }
 
 export class NotFoundError extends AppError {
-  constructor(message = 'Not found') {
-    super(message, 404);
+  constructor(message = 'Not found', code?: string) {
+    super(message, 404, code);
     this.name = 'NotFoundError';
   }
 }
 
 export class ConflictError extends AppError {
-  constructor(message = 'Conflict') {
-    super(message, 409);
+  constructor(message = 'Conflict', code?: string) {
+    super(message, 409, code);
     this.name = 'ConflictError';
   }
 }

@@ -1,24 +1,26 @@
 import React from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { lightTheme } from '../theme/colors';
+import { radius } from '../theme/spacing';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface AppCardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
-  activeOpacity?: number;
+  activeScale?: number;
 }
 
-export function AppCard({ children, style, onPress, activeOpacity = 0.7 }: AppCardProps) {
+export function AppCard({ children, style, onPress, activeScale = 0.98 }: AppCardProps) {
   if (onPress) {
     return (
-      <TouchableOpacity 
+      <AnimatedPressable 
         style={[styles.card, style]} 
         onPress={onPress} 
-        activeOpacity={activeOpacity}
+        activeScale={activeScale}
       >
         {children}
-      </TouchableOpacity>
+      </AnimatedPressable>
     );
   }
 
@@ -27,15 +29,15 @@ export function AppCard({ children, style, onPress, activeOpacity = 0.7 }: AppCa
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: lightTheme.surfaceCard,
+    borderRadius: radius.large,
     borderWidth: 1,
-    borderColor: '#E8ECEF',
+    borderColor: lightTheme.border,
     padding: 16,
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 1,
   },
 });

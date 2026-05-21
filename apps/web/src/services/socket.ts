@@ -1282,7 +1282,7 @@ export function sendQuickReply(
  * Listen to socket errors
  * @param callback Handler for errors
  */
-export function listenToErrors(callback: (error: { message: string }) => void): void {
+export function listenToErrors(callback: (error: { message: string; code?: string }) => void): void {
   if (!socket) {
     console.warn('[Socket] listenToErrors called before socket init – skipping');
     return;

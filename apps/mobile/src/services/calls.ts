@@ -1,6 +1,13 @@
 import { socketService } from './socket';
+import api from './api';
+
+export async function fetchActiveCall() {
+  const response = await api.get('/calls/active');
+  return response.data?.data ?? null;
+}
 
 export const callService = {
+  fetchActiveCall,
   startCall: (targetUserId: string, conversationId?: string, callType: 'audio' | 'video' = 'video') => {
     socketService.emitCallInvite(targetUserId, conversationId, callType);
   },

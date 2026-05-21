@@ -22,6 +22,8 @@ import {
 } from './calls.metrics';
 
 const ACTIVE_SESSION_STATUSES: CallSessionStatus[] = ['ringing', 'connecting', 'connected'];
+export const ACTIVE_CALL_EXISTS_CODE = 'ACTIVE_CALL_EXISTS';
+export const GROUP_CALL_REQUIRES_PARTICIPANTS_CODE = 'GROUP_CALL_REQUIRES_PARTICIPANTS';
 export const ACTIVE_CALL_CONFLICT_MESSAGE = 'Bạn đang trong một cuộc gọi khác. Vui lòng kết thúc cuộc gọi hiện tại trước.';
 
 interface CreateOneToOneCallInput {
@@ -59,6 +61,12 @@ interface CallSessionDetail {
   endedReason: string | null;
   createdAt: string;
   reused?: boolean;
+}
+
+interface ActiveCallDetail extends CallSessionDetail {
+  conversationName: string | null;
+  callToken: string;
+  callTokenExpiresInSeconds: number;
 }
 
 interface CallTokenPayload {
@@ -230,7 +238,7 @@ function calculateCallDurationSeconds(startedAt?: Date | null, endedAt?: Date | 
 async function ensureUserNotInOtherActiveCall(userId: string, sessionId?: string): Promise<void> {
   const state = await UserCallStateModel.findOne({ userId }).lean();
   if (state?.activeCallSessionId && state.activeCallSessionId !== sessionId) {
-    throw new ConflictError(ACTIVE_CALL_CONFLICT_MESSAGE);
+    throw new ConflictError(ACTIVE_CALL_CONFLICT_MESSAGE, ACTIVE_CALL_EXISTS_CODE);
   }
 }
 
@@ -271,7 +279,15 @@ async function setConversationActiveCall(sessionId: string): Promise<void> {
 
 async function clearConversationActiveCall(sessionId: string): Promise<void> {
   const session = await CallSessionModel.findById(sessionId).select('conversationId mode').lean();
-  if (!session?.conversationId || session.mode !== 'sfu') {
+  if (!session) {
+    await ConversationModel.updateMany(
+      { 'activeCall.callSessionId': sessionId },
+      { $unset: { activeCall: 1 } },
+    );
+    return;
+  }
+
+  if (!session.conversationId || session.mode !== 'sfu') {
     return;
   }
 
@@ -292,6 +308,33 @@ async function clearJoinedUserCallStates(sessionId: string): Promise<void> {
 }
 
 export class CallsService {
+  static async getActiveCallForUser(userId: string): Promise<ActiveCallDetail | null> {
+    const state = await UserCallStateModel.findOne({ userId }).lean();
+    if (!state?.activeCallSessionId) {
+      return null;
+    }
+
+    const session = await CallSessionModel.findById(state.activeCallSessionId).lean();
+    if (!session || !ACTIVE_SESSION_STATUSES.includes(session.status)) {
+      await clearUserActiveCall(userId, state.activeCallSessionId);
+      await clearConversationActiveCall(state.activeCallSessionId);
+      return null;
+    }
+
+    const detail = await buildCallSessionDetail(state.activeCallSessionId);
+    const conversation = detail.conversationId
+      ? await ConversationModel.findById(detail.conversationId).select('name').lean()
+      : null;
+
+    const token = signEphemeralCallToken(detail.sessionId, userId);
+    return {
+      ...detail,
+      conversationName: typeof conversation?.name === 'string' ? conversation.name : null,
+      callToken: token.token,
+      callTokenExpiresInSeconds: token.expiresInSeconds,
+    };
+  }
+
   private static async cleanupExpiredRingingSessionsForPair(
     callerUserId: string,
     calleeUserId: string,
@@ -565,7 +608,7 @@ export class CallsService {
     }
 
     if (participantIds.length < 2) {
-      throw new BadRequestError('Group call requires at least 2 participants');
+      throw new BadRequestError('Group call requires at least 2 participants', GROUP_CALL_REQUIRES_PARTICIPANTS_CODE);
     }
 
     if (participantIds.length > getCallGroupMaxParticipants()) {

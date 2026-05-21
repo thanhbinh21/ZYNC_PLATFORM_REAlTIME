@@ -5,6 +5,7 @@ import {
   acceptCallSessionHandler,
   createCallSessionHandler,
   endCallSessionHandler,
+  getActiveCallHandler,
   getCallSessionHandler,
   issueCallSessionTokenHandler,
   rejectCallSessionHandler,
@@ -15,6 +16,7 @@ export const callsRouter = Router();
 
 callsRouter.use(authenticate);
 
+callsRouter.get('/active', getActiveCallHandler);
 callsRouter.post('/sessions', validateBody(CreateCallSessionSchema), createCallSessionHandler);
 callsRouter.get('/sessions/:sessionId', getCallSessionHandler);
 callsRouter.post('/sessions/:sessionId/token', issueCallSessionTokenHandler);

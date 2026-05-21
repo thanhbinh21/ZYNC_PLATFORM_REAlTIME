@@ -22,12 +22,12 @@ import { SkeletonPostCardPreset } from '../src/ui/ZyncSkeleton';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const POST_TYPE_LABELS: Record<string, string> = {
-  discussion: 'Thao luan',
-  question: 'Hoi dap',
-  til: 'TIL',
+  discussion: 'Thảo luận',
+  question: 'Hỏi đáp',
+  til: 'Hướng dẫn',
   showcase: 'Showcase',
-  tutorial: 'Huong dan',
-  job: 'Tuyen dung',
+  tutorial: 'Hướng dẫn',
+  job: 'Tuyển dụng',
 };
 
 function formatDate(dateString: string): string {

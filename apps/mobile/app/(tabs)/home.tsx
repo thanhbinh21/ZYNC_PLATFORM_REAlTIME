@@ -23,10 +23,10 @@ import {
   Zap,
   Calendar,
 } from 'lucide-react-native';
-import { colors } from '../../src/theme/colors';
-import { typography } from '../../src/theme/fonts';
+import { fonts } from '../../src/theme/fonts';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
+
+import { lightTheme } from '../../src/theme/colors';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api from '../../src/services/api';
 import { useNotificationsContext } from '../../src/context/notifications-context';
@@ -143,15 +143,15 @@ interface TrendingPostItemProps {
   post: TrendingPost;
   index: number;
   onPress: (post: TrendingPost) => void;
-  theme: ReturnType<typeof getAppTheme>;
+  theme: typeof lightTheme;
 }
 
 function TrendingPostItem({ post, index, theme }: TrendingPostItemProps) {
   return (
     <TouchableOpacity style={styles.trendingItem} activeOpacity={0.7}>
       <View style={styles.trendingLeft}>
-        <View style={[styles.trendingRank, { backgroundColor: `${theme.accent}20` }]}>
-          <Text style={[styles.trendingRankText, { color: theme.accent }]}>
+        <View style={[styles.trendingRank, { backgroundColor: lightTheme.accentLight }]}>
+          <Text style={[styles.trendingRankText, { color: lightTheme.accent }]}>
             {index + 1}
           </Text>
         </View>
@@ -161,10 +161,10 @@ function TrendingPostItem({ post, index, theme }: TrendingPostItemProps) {
         <View style={styles.trendingMeta}>
           <Text style={styles.trendingMetaText}>{post.author?.displayName || 'Không rõ'}</Text>
           <View style={styles.trendingDot} />
-          <Ionicons name="heart" size={12} color={theme.danger} />
+          <Ionicons name="heart" size={12} color={lightTheme.danger} />
           <Text style={styles.trendingMetaText}>{post.likesCount}</Text>
           <View style={styles.trendingDot} />
-          <Ionicons name="chatbubble-ellipses" size={12} color={theme.info} />
+          <Ionicons name="chatbubble-ellipses" size={12} color={lightTheme.info} />
           <Text style={styles.trendingMetaText}>{post.commentsCount}</Text>
         </View>
       </View>
@@ -177,7 +177,7 @@ function TrendingPostItem({ post, index, theme }: TrendingPostItemProps) {
 // ============================================================
 interface ActivityItemProps {
   activity: Activity;
-  theme: ReturnType<typeof getAppTheme>;
+  theme: typeof lightTheme;
 }
 
 function ActivityItem({ activity, theme }: ActivityItemProps) {
@@ -205,7 +205,7 @@ function ActivityItem({ activity, theme }: ActivityItemProps) {
         <Text style={styles.activityMessage} numberOfLines={2}>{activity.message}</Text>
         <Text style={styles.activityTime}>{formatTimeAgo(activity.createdAt)}</Text>
       </View>
-      {!activity.read && <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />}
+      {!activity.read && <View style={[styles.unreadDot, { backgroundColor: lightTheme.accent }]} />}
     </View>
   );
 }
@@ -234,8 +234,7 @@ function EmptyState({ icon, title, description }: EmptyStateProps) {
 // ============================================================
 export default function HomeScreen() {
   const router = useRouter();
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
   const userInfo = useAuthStore((s) => s.userInfo);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isHydrated = useAuthStore((s) => s.isHydrated);
@@ -470,7 +469,7 @@ export default function HomeScreen() {
                 <Ionicons name="cloud-offline-outline" size={40} color={theme.textSecondary} />
                 <Text style={styles.errorText}>{statsError}</Text>
                 <TouchableOpacity style={styles.retryButton} onPress={handleRetry} activeOpacity={0.7}>
-                  <Ionicons name="refresh-outline" size={16} color={colors.text} />
+                  <Ionicons name="refresh-outline" size={16} color={lightTheme.textPrimary} />
                   <Text style={styles.retryText}>Thử lại</Text>
                 </TouchableOpacity>
               </View>
@@ -668,27 +667,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorderSoft,
+    borderBottomColor: lightTheme.border,
   },
   headerLeft: { flex: 1, marginRight: 12 },
   headerGreeting: {
-    ...typography.caption,
-    color: colors.textSubtle,
+    fontFamily: fonts.medium,
+    color: lightTheme.textSecondary,
     fontSize: 13,
   },
   headerName: {
-    ...typography.h2,
+    fontFamily: fonts.bold,
     fontSize: 20,
-    color: colors.text,
+    color: lightTheme.textPrimary,
     marginTop: 2,
   },
   notificationBtn: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -701,12 +700,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: colors.backgroundDeep,
+    borderColor: lightTheme.bgPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 9,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -724,9 +723,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    ...typography.h2,
+    fontFamily: fonts.bold,
     fontSize: 17,
-    color: colors.text,
+    color: lightTheme.textPrimary,
   },
   seeAllBtn: {
     flexDirection: 'row',
@@ -734,9 +733,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   seeAllText: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 13,
-    color: colors.accent,
+    color: lightTheme.accent,
   },
 
   // Stats
@@ -758,15 +757,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    ...typography.h2,
+    fontFamily: fonts.bold,
     fontSize: 20,
-    color: colors.text,
+    color: lightTheme.textPrimary,
     marginTop: 8,
   },
   statLabel: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 12,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     marginTop: 4,
     textAlign: 'center',
   },
@@ -789,9 +788,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   quickLabel: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 11,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     textAlign: 'center',
   },
 
@@ -802,7 +801,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorderSoft,
+    borderBottomColor: lightTheme.border,
   },
   trendingLeft: { marginRight: 12 },
   trendingRank: {
@@ -813,14 +812,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   trendingRankText: {
-    ...typography.h2,
+    fontFamily: fonts.bold,
     fontSize: 14,
   },
   trendingContent: { flex: 1 },
   trendingTitle: {
-    ...typography.body,
+    fontFamily: fonts.regular,
     fontSize: 14,
-    color: colors.text,
+    color: lightTheme.textPrimary,
     lineHeight: 20,
   },
   trendingMeta: {
@@ -833,13 +832,13 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 2,
-    backgroundColor: colors.textSubtle,
+    backgroundColor: lightTheme.textTertiary,
     marginHorizontal: 4,
   },
   trendingMetaText: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 11,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
   },
 
   // Activity
@@ -849,10 +848,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorderSoft,
+    borderBottomColor: lightTheme.border,
   },
   activityUnread: {
-    backgroundColor: colors.glassUltra,
+    backgroundColor: lightTheme.glassBorderSoft,
   },
   activityIcon: {
     width: 36,
@@ -864,16 +863,16 @@ const styles = StyleSheet.create({
   },
   activityContent: { flex: 1 },
   activityMessage: {
-    ...typography.body,
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: lightTheme.textPrimary,
+    lineHeight: 20,
   },
   activityTime: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 11,
-    color: colors.textSubtle,
-    marginTop: 2,
+    color: lightTheme.textSecondary,
+    marginTop: 4,
   },
   unreadDot: {
     width: 8,
@@ -889,15 +888,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyTitle: {
-    ...typography.body,
-    fontSize: 14,
-    color: colors.text,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.bold,
+    fontSize: 16,
+    color: lightTheme.textPrimary,
+    marginTop: 12,
   },
   emptyDesc: {
-    ...typography.caption,
-    fontSize: 12,
-    color: colors.textSubtle,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: lightTheme.textSecondary,
+    marginTop: 4,
     textAlign: 'center',
   },
 
@@ -915,9 +915,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   loadingText: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 13,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
   },
   errorContainer: {
     alignItems: 'center',
@@ -925,15 +925,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   errorText: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 13,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     textAlign: 'center',
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.accent,
+    backgroundColor: lightTheme.surfaceCard,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
@@ -941,21 +943,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryText: {
-    ...typography.caption,
+    fontFamily: fonts.bold,
     fontSize: 13,
-    color: colors.text,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    color: lightTheme.textPrimary,
   },
 
   // About Card
   aboutCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.glassPanel,
-    borderRadius: 16,
-    padding: 14,
+    padding: 16,
+    backgroundColor: lightTheme.surfaceCard,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
   },
   aboutIcon: {
     width: 40,
@@ -967,15 +968,14 @@ const styles = StyleSheet.create({
   },
   aboutContent: { flex: 1 },
   aboutTitle: {
-    ...typography.body,
+    fontFamily: fonts.bold,
     fontSize: 15,
-    color: colors.text,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    color: lightTheme.textPrimary,
   },
   aboutDesc: {
-    ...typography.caption,
+    fontFamily: fonts.medium,
     fontSize: 12,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     marginTop: 2,
   },
 

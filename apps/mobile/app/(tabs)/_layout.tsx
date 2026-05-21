@@ -2,12 +2,11 @@ import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Home, MessageCircle, Users, Globe, UserRound } from 'lucide-react-native';
-import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
+import { lightTheme } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 export default function TabLayout() {
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
 
   return (
     <Tabs
@@ -17,7 +16,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textTertiary,
         tabBarLabelStyle: {
-          fontFamily: 'BeVietnamPro_500Medium',
+          fontFamily: fonts.medium,
           fontSize: 11,
           marginBottom: 5,
         },

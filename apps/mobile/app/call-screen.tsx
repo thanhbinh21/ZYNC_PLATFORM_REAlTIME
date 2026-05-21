@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { RTCView } from 'react-native-webrtc';
 import { useVideoCall } from '../src/hooks/useVideoCall';
 import { useAuthStore } from '../src/store/useAuthStore';
-import { colors } from '../src/theme/colors';
+import { fonts } from '../src/theme/fonts';
+import { lightTheme } from '../src/theme/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
@@ -22,6 +23,8 @@ export default function CallScreen() {
     callToken?: string;
     fromUserId?: string;
   }>();
+  const name = useLocalSearchParams().name as string | undefined;
+  const avatarUrl = useLocalSearchParams().avatarUrl as string | undefined;
 
   const userInfo = useAuthStore((s) => s.userInfo);
   const userId = String(userInfo?._id || userInfo?.id || '');
@@ -33,6 +36,7 @@ export default function CallScreen() {
     remoteStreams,
     isMicMuted,
     isCameraEnabled,
+    participantMediaStates,
     startCall,
     startGroupCall,
     acceptCall,
@@ -45,7 +49,7 @@ export default function CallScreen() {
 
   const [callDuration, setCallDuration] = useState(0);
   const [hasStartedCall, setHasStartedCall] = useState(false);
-  const remoteStreamList = Array.from(remoteStreams.entries()).filter(([_, stream]) => Boolean(stream?.toURL?.()));
+  const remoteStreamList = Array.from(remoteStreams.entries()).filter(([_, stream]) => Boolean((stream as any)?.toURL?.()));
 
   useEffect(() => {
     // Initiate outgoing call if not already active and not an incoming call pickup
@@ -116,97 +120,158 @@ export default function CallScreen() {
       case 'incoming': return 'Cuộc gọi đến...';
       case 'connecting': return 'Đang kết nối...';
       case 'connected': return formatDuration(callDuration);
-      case 'ended': return 'Cuộc gọi kết thúc';
-      case 'rejected': return 'Bị từ chối';
       case 'missed': return 'Bỏ lỡ';
+      case 'ended': return 'Kết thúc';
       default: return '';
     }
+  };
+
+  const renderTile = (stream: MediaStream | null, peerId: string, isMe: boolean) => {
+    const mediaState = isMe 
+      ? { isMicMuted, isCameraOff: !isCameraEnabled } 
+      : (participantMediaStates?.[peerId] || {});
+      
+    let displayName = isMe ? 'Bạn' : 'Người dùng';
+    let avatar = isMe ? userInfo?.avatarUrl : undefined;
+    
+    if (!isMe && activeCall?.participants) {
+      const p = activeCall.participants.find(p => p.userId === peerId);
+      if (p) {
+        if (p.displayName) displayName = p.displayName;
+        if ((p as any).avatarUrl) avatar = (p as any).avatarUrl;
+      }
+    }
+
+    if (!isMe && !activeCall?.isGroupCall && name) displayName = name;
+    if (!isMe && !activeCall?.isGroupCall && avatarUrl) avatar = avatarUrl;
+    
+    const isVideoOff = mediaState.isCameraOff || !stream || !(stream as any).toURL?.();
+
+    return (
+      <View style={StyleSheet.absoluteFill}>
+         {!isVideoOff && stream && (stream as any).toURL?.() ? (
+           <RTCView streamURL={(stream as any).toURL()} style={StyleSheet.absoluteFillObject} objectFit="cover" zOrder={isMe ? 1 : 0} />
+         ) : (
+           <View style={styles.tileAvatarFallback}>
+             {avatar ? (
+               <Image source={{uri: avatar}} style={styles.tileAvatarImage} />
+             ) : (
+               <Text style={styles.tileAvatarText}>{displayName.charAt(0).toUpperCase()}</Text>
+             )}
+           </View>
+         )}
+         <View style={styles.tileOverlay}>
+           <View style={styles.tileNameTag}>
+             {mediaState.isMicMuted && <Ionicons name="mic-off" size={14} color="#ef4444" style={{marginRight: 4}} />}
+             <Text style={styles.tileNameText} numberOfLines={1}>{displayName}</Text>
+           </View>
+         </View>
+      </View>
+    );
   };
 
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#0f172a', '#1e293b']}
+        colors={['#1e293b', '#020617']}
         style={StyleSheet.absoluteFillObject}
       />
       
-      {/* Remote Video */}
-      {activeCall?.status === 'connected' && remoteStreamList.length > 0 ? (
-        activeCall.isGroupCall ? (
-          <View style={styles.remoteGrid}>
-            {remoteStreamList.slice(0, 4).map(([peerId, stream], index) => (
-              <View
-                key={peerId || `remote-${index}`}
-                style={[
-                  styles.remoteGridItem,
-                  remoteStreamList.length === 1 && styles.remoteGridItemFull,
-                  remoteStreamList.length === 3 && index === 0 && styles.remoteGridItemWide,
-                ]}
-              >
-                <RTCView
-                  streamURL={stream.toURL()}
-                  style={StyleSheet.absoluteFillObject}
-                  objectFit="cover"
-                />
+      {/* Top Bar for minimizing */}
+      <SafeAreaView style={styles.topBarContainer} edges={['top']}>
+        <TouchableOpacity style={styles.minimizeBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-down" size={28} color="#fff" />
+        </TouchableOpacity>
+      </SafeAreaView>
+
+      {/* Call Area */}
+      {activeCall?.status === 'connected' ? (
+        <View style={styles.gridContainer}>
+          {remoteStreamList.length === 0 ? (
+            <View style={styles.singleParticipantWrapper}>
+              {renderTile(localStream, userId, true)}
+              <View style={styles.statusOverlay}>
+                <Text style={styles.waitingText}>Đang chờ người khác tham gia...</Text>
               </View>
-            ))}
-          </View>
-        ) : (
-          <RTCView
-            streamURL={remoteStream?.toURL() || ''}
-            style={StyleSheet.absoluteFillObject}
-            objectFit="cover"
-          />
-        )
+            </View>
+          ) : remoteStreamList.length === 1 ? (
+            <View style={styles.singleParticipantWrapper}>
+              {renderTile(remoteStreamList[0][1], remoteStreamList[0][0], false)}
+              {/* Local PiP */}
+              <View style={styles.localVideoContainer}>
+                {renderTile(localStream, userId, true)}
+              </View>
+            </View>
+          ) : remoteStreamList.length === 2 ? (
+            <View style={styles.splitGrid}>
+              <View style={styles.splitGridItem}>
+                {renderTile(remoteStreamList[0][1], remoteStreamList[0][0], false)}
+              </View>
+              <View style={styles.splitGridItem}>
+                {renderTile(remoteStreamList[1][1], remoteStreamList[1][0], false)}
+              </View>
+              <View style={styles.localVideoContainer}>
+                {renderTile(localStream, userId, true)}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.remoteGrid}>
+              {/* If 3-4 peers (including us), we show a 2x2 grid. We inject ourselves into the array for grid rendering */}
+              {[...remoteStreamList.slice(0, 3)].map(([peerId, stream], index) => (
+                <View
+                  key={peerId || `remote-${index}`}
+                  style={[styles.remoteGridItem]}
+                >
+                  {renderTile(stream, peerId, false)}
+                </View>
+              ))}
+              <View style={styles.remoteGridItem}>
+                 {renderTile(localStream, userId, true)}
+              </View>
+            </View>
+          )}
+        </View>
       ) : (
         <View style={styles.statusContainer}>
-          <View style={styles.avatarPlaceholder}>
-             <Ionicons name="person" size={60} color="#94a3b8" />
-          </View>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>{(name || (isGroup === 'true' ? 'Nhóm' : 'Người dùng')).charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
           <Text style={styles.nameText}>
-            {isGroup === 'true' ? 'Gọi nhóm' : 'Người dùng'}
+            {name || (isGroup === 'true' ? 'Gọi nhóm' : 'Người dùng')}
           </Text>
           <Text style={styles.statusText}>{getStatusText()}</Text>
         </View>
       )}
 
-      {/* Local Video */}
-      {localStream && isCameraEnabled && localStream.toURL() && (
-        <View style={styles.localVideoContainer}>
-          <RTCView
-            streamURL={localStream.toURL()}
-            style={styles.localVideo}
-            objectFit="cover"
-            zOrder={1}
-          />
-        </View>
-      )}
-
       {/* Controls */}
-      <SafeAreaView style={styles.controlsSafeArea}>
-        <View style={styles.controlsContainer}>
+      <SafeAreaView style={styles.controlsSafeArea} edges={['bottom']}>
+        <View style={styles.floatingControls}>
           <TouchableOpacity 
             style={[styles.controlButton, isMicMuted && styles.controlButtonActive]} 
             onPress={toggleMute}
           >
-            <Ionicons name={isMicMuted ? 'mic-off' : 'mic'} size={28} color="#fff" />
+            <Ionicons name={isMicMuted ? 'mic-off' : 'mic'} size={26} color={isMicMuted ? '#000' : '#fff'} />
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.controlButton, !isCameraEnabled && styles.controlButtonActive]} 
             onPress={toggleCamera}
           >
-            <Ionicons name={!isCameraEnabled ? 'videocam-off' : 'videocam'} size={28} color="#fff" />
+            <Ionicons name={!isCameraEnabled ? 'videocam-off' : 'videocam'} size={26} color={!isCameraEnabled ? '#000' : '#fff'} />
           </TouchableOpacity>
 
           {isCameraEnabled && (
             <TouchableOpacity style={styles.controlButton} onPress={switchCamera}>
-              <Ionicons name="camera-reverse" size={28} color="#fff" />
+              <Ionicons name="camera-reverse" size={26} color="#fff" />
             </TouchableOpacity>
           )}
 
           <TouchableOpacity style={[styles.controlButton, styles.endCallButton]} onPress={handleEndCall}>
-            <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+            <Ionicons name="call" size={26} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -223,46 +288,79 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingBottom: 60,
   },
   avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#334155',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  avatarImage: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    marginBottom: 32,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  avatarText: {
+    fontSize: 48,
+    color: '#fff',
+    fontFamily: fonts.bold,
   },
   nameText: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#fff',
-    fontFamily: 'BeVietnamPro_600SemiBold',
-    marginBottom: 8,
+    fontFamily: fonts.bold,
+    marginBottom: 12,
   },
   statusText: {
     fontSize: 16,
-    color: '#94a3b8',
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontFamily: fonts.medium,
   },
   localVideoContainer: {
     position: 'absolute',
-    top: 60,
+    bottom: 120, // Moved up to not overlap controls
     right: 20,
-    width: 100,
-    height: 150,
-    borderRadius: 12,
+    width: 110,
+    height: 160,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1e293b',
-    borderWidth: 1,
-    borderColor: '#334155',
-    elevation: 5,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
   localVideo: {
     flex: 1,
+  },
+  gridContainer: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  singleParticipantWrapper: {
+    flex: 1,
+  },
+  splitGrid: {
+    flex: 1,
+    flexDirection: 'column',
+  },
+  splitGridItem: {
+    flex: 1,
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
   },
   remoteGrid: {
     ...StyleSheet.absoluteFillObject,
@@ -278,42 +376,105 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
     overflow: 'hidden',
   },
-  remoteGridItemFull: {
-    width: '100%',
-    height: '100%',
+  statusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  remoteGridItemWide: {
-    width: '100%',
+  waitingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: fonts.medium,
+  },
+  tileAvatarFallback: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tileAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  tileAvatarText: {
+    color: '#fff',
+    fontSize: 32,
+    fontFamily: fonts.bold,
+  },
+  tileOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tileNameTag: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '80%',
+  },
+  tileNameText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: fonts.medium,
   },
   controlsSafeArea: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 30,
     left: 0,
     right: 0,
-  },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
     alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  },
+  floatingControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 40,
+    gap: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   controlButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   controlButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#fff',
   },
   endCallButton: {
     backgroundColor: '#ef4444',
+  },
+  topBarContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    zIndex: 10,
+    flexDirection: 'row',
+  },
+  minimizeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

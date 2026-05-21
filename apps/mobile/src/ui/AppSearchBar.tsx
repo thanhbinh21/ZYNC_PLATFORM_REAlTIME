@@ -3,6 +3,7 @@ import { View, TextInput, StyleSheet, StyleProp, ViewStyle, TouchableOpacity } f
 import { Search, X } from 'lucide-react-native';
 import { lightTheme } from '../theme/colors';
 import { fonts } from '../theme/fonts';
+import { radius } from '../theme/spacing';
 
 interface AppSearchBarProps {
   value: string;
@@ -49,11 +50,11 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: lightTheme.surfaceCard,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#E8ECEF',
-    paddingHorizontal: 14,
+    borderColor: lightTheme.border,
+    paddingHorizontal: 16,
     height: 48,
   },
   input: {

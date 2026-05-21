@@ -29,7 +29,8 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
 import api from '../src/services/api';
-import { colors } from '../src/theme/colors';
+import { colors, lightTheme } from '../src/theme/colors';
+import { fonts } from '../src/theme/fonts';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
@@ -40,6 +41,8 @@ import {
   SkeletonChatBubblePreset,
   SkeletonAvatarPreset,
 } from '../src/ui/ZyncSkeleton';
+import { CallHistoryBubble } from '../src/ui/CallHistoryBubble';
+import { MessagePreviewCard, parsePostPreview } from '../src/ui/MessagePreviewCard';
 
 interface MessageReadParticipant {
   userId: string;
@@ -56,7 +59,7 @@ interface Message {
   conversationId?: string;
   senderId: string | { _id: string; displayName?: string };
   content?: string;
-  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'system-recall' | `file/${string}`;
+  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'system-recall' | `file/${string}` | 'call' | 'call_history' | 'system';
   mediaUrl?: string;
   status?: 'sent' | 'delivered' | 'read';
   createdAt: string;
@@ -371,16 +374,21 @@ function dedupeMessages(messages: Message[]): Message[] {
   const merged: Message[] = [];
 
   const areSameMessage = (a: Message, b: Message) => {
-    const aId = String(a._id || '');
-    const bId = String(b._id || '');
+    const aId = String(a._id || (a as any).messageId || '');
+    const bId = String(b._id || (b as any).messageId || '');
     const aKey = String(a.idempotencyKey || '');
     const bKey = String(b.idempotencyKey || '');
+    const aRef = String((a as any).messageRef || '');
+    const bRef = String((b as any).messageRef || '');
 
     return (
       (aId && bId && aId === bId)
       || (aKey && bKey && aKey === bKey)
       || (aId && bKey && aId === bKey)
       || (aKey && bId && aKey === bId)
+      || (aRef && bRef && aRef === bRef)
+      || (aId && bRef && aId === bRef)
+      || (aRef && bId && aRef === bId)
     );
   };
 
@@ -443,11 +451,24 @@ function getSenderId(msg: Message): string {
   return String(msg.senderId || '');
 }
 
-function getSenderName(msg: Message): string {
-  if (typeof msg.senderId === 'object' && msg.senderId !== null) {
-    return msg.senderId.displayName || 'User';
+function getSenderName(msg: Message, groupMembers: Array<{ _id: string; displayName: string; avatarUrl?: string }> = []): string {
+  if (typeof msg.senderId === 'object' && msg.senderId !== null && msg.senderId.displayName) {
+    return msg.senderId.displayName;
   }
-  return '';
+  const id = typeof msg.senderId === 'string' ? msg.senderId : msg.senderId?._id;
+  const member = groupMembers.find(m => m._id === id);
+  if (member?.displayName) return member.displayName;
+  return 'Người dùng';
+}
+
+function getSenderAvatarUrl(msg: Message, groupMembers: Array<{ _id: string; displayName: string; avatarUrl?: string }> = []): string | undefined {
+  if (typeof msg.senderId === 'object' && msg.senderId !== null && 'avatarUrl' in msg.senderId && msg.senderId.avatarUrl) {
+    return msg.senderId.avatarUrl as string;
+  }
+  const id = typeof msg.senderId === 'string' ? msg.senderId : msg.senderId?._id;
+  const member = groupMembers.find(m => m._id === id);
+  if (member?.avatarUrl) return member.avatarUrl;
+  return undefined;
 }
 
 function getFileName(type: Message['type'], content?: string): string {
@@ -880,9 +901,16 @@ export default function ChatRoomScreen() {
         setGroupCreatorId(currentConversation.createdBy || currentConversation.adminIds?.[0]);
       } else {
         const users = Array.isArray(currentConversation.users) ? currentConversation.users : [];
-        const otherUser = users.find(u => u._id !== userId);
+        setGroupMembers(users);
+        const otherUser = users.find((u) => u._id !== userId);
         if (otherUser) {
           setTargetUserId(otherUser._id);
+          if (!currentConversation.name || currentConversation.name.trim().length === 0) {
+            setConversationName(otherUser.displayName || 'Người dùng');
+          }
+          if (!currentConversation.avatarUrl || currentConversation.avatarUrl.trim().length === 0) {
+            setConversationAvatarUrl(otherUser.avatarUrl || undefined);
+          }
         }
       }
 
@@ -2338,13 +2366,31 @@ export default function ChatRoomScreen() {
       const showSummaryPill = summaryTotalCount > 0;
       const showReactionTrigger = Boolean(myLastEmoji);
 
+      const isCallEvent = message.type === 'call' || message.type === 'call_history' || message.type === 'system' || (message.type === 'text' && message.content && message.content.toLowerCase().includes('cuoc goi'));
+
+      if (isCallEvent) {
+        return (
+          <CallHistoryBubble
+            type={(message.content?.toLowerCase() || '').includes('video') ? 'video' : 'audio'}
+            status={(message.content?.toLowerCase() || '').includes('nhỡ') || (message.content?.toLowerCase() || '').includes('nho') || (message.content?.toLowerCase() || '').includes('từ chối') ? 'missed' : 'completed'}
+            time={formatTime(message.createdAt)}
+            duration={(message.content?.match(/\d+s|\d+:\d+/) || [])[0]}
+            isMe={isMe}
+          />
+        );
+      }
+
       return (
         <View style={[bubbleStyles.row, isMe ? bubbleStyles.rowRight : bubbleStyles.rowLeft]}>
-          {!isMe && isGroupChat && (
+          {!isMe && (
             <View style={bubbleStyles.otherAvatar}>
-              <Text style={bubbleStyles.avatarLetter}>
-                {getSenderName(message).charAt(0).toUpperCase() || '?'}
-              </Text>
+              {getSenderAvatarUrl(message, groupMembers) ? (
+                <Image source={{ uri: getSenderAvatarUrl(message, groupMembers) }} style={bubbleStyles.otherAvatarImage} resizeMode="cover" />
+              ) : (
+                <Text style={bubbleStyles.avatarLetter}>
+                  {getSenderName(message, groupMembers).charAt(0).toUpperCase()}
+                </Text>
+              )}
             </View>
           )}
 
@@ -2360,10 +2406,14 @@ export default function ChatRoomScreen() {
             style={bubbleStyles.messagePressable}
           >
             {!isMe && isGroupChat && (
-              <Text style={bubbleStyles.senderName}>{getSenderName(message)}</Text>
+              <Text style={bubbleStyles.senderName}>{getSenderName(message, groupMembers)}</Text>
             )}
 
-            <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleOther]}>
+            <View style={[
+              bubbleStyles.bubble, 
+              isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleOther,
+              (message.type === 'image' || message.type === 'video' || message.type === 'call' || message.type === 'call_history' || message.type === 'system' || (message.type === 'text' && message.content && parsePostPreview(message.content))) && { backgroundColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0 }
+            ]}>
               {message.replyTo && message.replyTo.messageRef && (
                 <Pressable
                   onPress={() => jumpToMessage(message.replyTo?.messageRef || '')}
@@ -2386,7 +2436,11 @@ export default function ChatRoomScreen() {
                   {isMe ? 'Bạn đã thu hồi tin nhắn' : 'Tin nhắn đã được thu hồi'}
                 </Text>
               ) : message.type === 'text' && message.content ? (
-                <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
+                parsePostPreview(message.content) ? (
+                  <MessagePreviewCard content={message.content} isMe={isMe} />
+                ) : (
+                  <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
+                )
               ) : message.type === 'sticker' ? (
                 message.mediaUrl ? (
                   <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
@@ -2430,6 +2484,9 @@ export default function ChatRoomScreen() {
               {message.type !== 'text'
                 && message.type !== 'sticker'
                 && message.type !== 'system-recall'
+                && message.type !== 'call'
+                && message.type !== 'call_history'
+                && message.type !== 'system'
                 && message.content
                 && message.content.trim().length > 0 && (
                 <Text style={[bubbleStyles.msgText, bubbleStyles.mediaCaptionText, isMe && bubbleStyles.msgTextMe]}>
@@ -2528,6 +2585,24 @@ export default function ChatRoomScreen() {
   const isCurrentUserGroupCreator = Boolean(isGroupChat && userId && groupCreatorId && userId === groupCreatorId);
   const isCurrentUserGroupAdmin = Boolean(isGroupChat && userId && groupAdminIds.includes(userId));
   const canManageMemberRoles = isCurrentUserGroupCreator || isCurrentUserGroupAdmin;
+  const openCallScreen = (callType: 'audio' | 'video') => {
+    if (!conversationId) return;
+
+    if (isGroupChat && groupMembers.length < 2) {
+      openInfoDialog(
+        'Không thể gọi nhóm',
+        'Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.',
+        'error',
+      );
+      return;
+    }
+
+    let url = `/call-screen?conversationId=${conversationId}&type=${callType}&isGroup=${isGroupChat}`;
+    if (!isGroupChat && targetUserId) url += `&targetUserId=${targetUserId}`;
+    if (conversationName) url += `&name=${encodeURIComponent(conversationName)}`;
+    if (conversationAvatarUrl) url += `&avatarUrl=${encodeURIComponent(conversationAvatarUrl)}`;
+    router.push(url as any);
+  };
 
   return (
     <LinearGradient
@@ -2582,16 +2657,10 @@ export default function ChatRoomScreen() {
               </View>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.actionIcon} onPress={() => {
-                if (!conversationId) return;
-                router.push(`/call-screen?conversationId=${conversationId}&type=audio&isGroup=${isGroupChat}${!isGroupChat && targetUserId ? '&targetUserId=' + targetUserId : ''}`);
-              }}>
+              <TouchableOpacity style={styles.actionIcon} onPress={() => openCallScreen('audio')}>
                 <Ionicons name="call-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionIcon} onPress={() => {
-                if (!conversationId) return;
-                router.push(`/call-screen?conversationId=${conversationId}&type=video&isGroup=${isGroupChat}${!isGroupChat && targetUserId ? '&targetUserId=' + targetUserId : ''}`);
-              }}>
+              <TouchableOpacity style={styles.actionIcon} onPress={() => openCallScreen('video')}>
                 <Ionicons name="videocam-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
@@ -3582,20 +3651,26 @@ const bubbleStyles = StyleSheet.create({
   otherAvatar: {
     width: 32,
     height: 32,
-    borderRadius: 12,
-    backgroundColor: colors.glassPanel,
+    borderRadius: 16,
+    backgroundColor: lightTheme.bgHover,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
     marginTop: 16,
+    overflow: 'hidden',
+  },
+  otherAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
   },
   avatarLetter: {
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     fontFamily: 'BeVietnamPro_600SemiBold',
     fontSize: 13,
   },
   senderName: {
-    color: colors.textMuted,
+    color: lightTheme.textTertiary,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_500Medium',
     marginBottom: 2,
@@ -3608,12 +3683,14 @@ const bubbleStyles = StyleSheet.create({
     minWidth: 60,
   },
   bubbleMe: {
-    backgroundColor: colors.accent,
+    backgroundColor: lightTheme.accent,
     borderBottomRightRadius: 6,
   },
   bubbleOther: {
-    backgroundColor: colors.glassPanelStrong,
+    backgroundColor: lightTheme.surfaceCard,
     borderBottomLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
   },
   replyCard: {
     borderRadius: 12,
@@ -3627,17 +3704,17 @@ const bubbleStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
   replyCardOther: {
-    borderLeftColor: colors.accent,
-    backgroundColor: colors.glassPanel,
+    borderLeftColor: lightTheme.accent,
+    backgroundColor: lightTheme.bgHover,
   },
   replyLabel: {
-    fontSize: 10,
-    color: colors.accentSoft,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 11,
+    color: lightTheme.textOnAccent,
+    fontFamily: fonts.semiBold,
     marginBottom: 1,
   },
   replyLabelMe: {
-    color: 'rgba(255,255,255,0.82)',
+    color: 'rgba(255,255,255,0.8)',
   },
   replySenderName: {
     fontSize: 11,
@@ -3657,13 +3734,13 @@ const bubbleStyles = StyleSheet.create({
     color: 'rgba(255,255,255,0.82)',
   },
   msgText: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 15,
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: fonts.regular,
     lineHeight: 22,
   },
   msgTextMe: {
-    color: colors.textOnAccent,
+    color: lightTheme.textOnAccent,
   },
   mediaCaptionText: {
     marginTop: 8,
@@ -3893,22 +3970,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    height: 64,
-    backgroundColor: colors.glassPanelStrong,
+    height: 68,
+    backgroundColor: lightTheme.bgPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorder,
+    borderBottomColor: lightTheme.border,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   headerInfo: {
     flex: 1,
@@ -3917,20 +3994,20 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: colors.glassPanel,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: lightTheme.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   headerAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 14,
+    borderRadius: 22,
   },
   headerAvatarText: {
     color: colors.textSubtle,
@@ -3938,26 +4015,29 @@ const styles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_700Bold',
   },
   headerName: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
     maxWidth: 140,
   },
   headerStatus: {
-    color: colors.accent,
-    fontSize: 12,
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: lightTheme.accent,
+    fontSize: 13,
+    fontFamily: fonts.medium,
   },
   headerActions: {
     flexDirection: 'row',
     gap: 4,
   },
   actionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: lightTheme.surfaceCard,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
   },
   messageList: {
     paddingVertical: 12,
@@ -4111,19 +4191,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#ffffff',
+    backgroundColor: lightTheme.bgPrimary,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-    borderRadius: 22,
-    paddingHorizontal: 14,
+    borderColor: lightTheme.border,
+    borderRadius: 24,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     marginHorizontal: 8,
     maxHeight: 120,
   },
   textInput: {
     flex: 1,
-    color: colors.text,
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: lightTheme.textPrimary,
+    fontFamily: fonts.regular,
     fontSize: 15,
     lineHeight: 20,
     paddingVertical: 6,
@@ -4145,17 +4225,17 @@ const styles = StyleSheet.create({
   },
   composerPickerTab: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-    backgroundColor: colors.glassPanel,
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.surfaceCard,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
   composerPickerTabActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentLight,
+    borderColor: lightTheme.accent,
+    backgroundColor: lightTheme.accentLight,
   },
   composerPickerTabText: {
     color: colors.textMuted,

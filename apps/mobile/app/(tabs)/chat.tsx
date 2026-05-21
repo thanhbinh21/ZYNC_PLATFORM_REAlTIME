@@ -15,10 +15,9 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../src/theme/colors';
-import { typography } from '../../src/theme/fonts';
+import { lightTheme } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
 import api from '../../src/services/api';
 import { socketService } from '../../src/services/socket';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -169,8 +168,7 @@ function formatRelativeTime(dateStr?: string): string {
 
 export default function ChatScreen() {
   const router = useRouter();
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
   const userInfo = useAuthStore((s) => s.userInfo);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const userId = String(userInfo?._id || userInfo?.id || '');
@@ -547,7 +545,7 @@ export default function ChatScreen() {
           </View>
           <View style={s.headerRight}>
             <AppIconButton 
-              icon={<Ionicons name="add-outline" size={24} color="#0f9d8e" />}
+              icon={<Ionicons name="create-outline" size={24} color={lightTheme.accent} />}
               onPress={() => router.push('/create-group')}
               style={{ marginRight: 8 }}
               size={36}
@@ -669,7 +667,7 @@ export default function ChatScreen() {
                         </Text>
                         {pinnedSet.has(conversationItem._id) && (
                           <View style={s.pinBadge}>
-                            <Ionicons name="pin" size={10} color={theme.accentLight} />
+                            <Ionicons name="pin" size={14} color={lightTheme.textTertiary} />
                           </View>
                         )}
                       </View>
@@ -706,7 +704,7 @@ export default function ChatScreen() {
   );
 }
 
-const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
+const useStyles = (theme: typeof lightTheme) =>
   StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: 'transparent' },
     avatarImage: { width: '100%', height: '100%', borderRadius: 29 },
@@ -731,35 +729,35 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: colors.glassPanel,
+      backgroundColor: theme.surfaceCard,
       borderWidth: 1,
-      borderColor: colors.glassBorder,
+      borderColor: theme.border,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: 12,
     },
     title: {
-      color: colors.text,
+      color: theme.textPrimary,
       fontSize: 24,
-      fontFamily: 'BeVietnamPro_700Bold',
+      fontFamily: fonts.bold,
     },
     actionBtn: {
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: colors.glassPanel,
+      backgroundColor: theme.surfaceCard,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: colors.glassBorder,
+      borderColor: theme.border,
     },
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.glassPanel,
+      backgroundColor: theme.surfaceCard,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.glassBorder ?? colors.glassBorder,
+      borderColor: theme.border,
       paddingHorizontal: 15,
       height: 45,
       marginBottom: 20,
@@ -768,7 +766,7 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     searchInput: {
       flex: 1,
       color: theme.textPrimary,
-      fontFamily: 'BeVietnamPro_400Regular',
+      fontFamily: fonts.regular,
       fontSize: 15,
     },
     loadingContainer: {
@@ -778,7 +776,7 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     },
     loadingText: {
       color: theme.textTertiary,
-      fontFamily: 'BeVietnamPro_400Regular',
+      fontFamily: fonts.regular,
       marginTop: 12,
       fontSize: 14,
     },
@@ -789,26 +787,26 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
       paddingVertical: 10,
       paddingHorizontal: 10,
       borderRadius: 16,
-      backgroundColor: colors.glassSoft,
+      backgroundColor: theme.surfaceCard,
       borderWidth: 1,
-      borderColor: theme.glassBorderSoft ?? colors.glassBorderSoft,
+      borderColor: theme.border,
     },
     avatarContainer: { position: 'relative' },
     avatar: {
       width: 55,
       height: 55,
       borderRadius: 20,
-      backgroundColor: colors.glassPanelStrong,
+      backgroundColor: theme.bgHover,
       justifyContent: 'center',
       alignItems: 'center',
     },
     groupAvatar: {
-      backgroundColor: colors.glassSoft,
+      backgroundColor: theme.bgSecondary,
     },
     avatarText: {
       color: theme.textTertiary,
       fontSize: 18,
-      fontFamily: 'BeVietnamPro_700Bold',
+      fontFamily: fonts.bold,
     },
     groupBadge: {
       position: 'absolute',
@@ -845,19 +843,19 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     chatName: {
       color: theme.textPrimary,
       fontSize: 16,
-      fontFamily: 'BeVietnamPro_500Medium',
+      fontFamily: fonts.medium,
     },
-    chatNameBold: { fontFamily: 'BeVietnamPro_700Bold' },
+    chatNameBold: { fontFamily: fonts.bold },
     chatTime: {
       color: theme.textTertiary,
       fontSize: 12,
-      fontFamily: 'BeVietnamPro_400Regular',
+      fontFamily: fonts.regular,
     },
     chatTimeActive: { color: theme.accent },
     pinBadge: {
       marginTop: 3,
       borderRadius: 8,
-      backgroundColor: colors.glassSoft,
+      backgroundColor: theme.bgHover,
       paddingHorizontal: 5,
       paddingVertical: 2,
     },
@@ -869,13 +867,13 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     lastMsg: {
       color: theme.textTertiary,
       fontSize: 14,
-      fontFamily: 'BeVietnamPro_400Regular',
+      fontFamily: fonts.regular,
       flex: 1,
       marginRight: 10,
     },
     lastMsgBold: {
       color: theme.textSecondary,
-      fontFamily: 'BeVietnamPro_500Medium',
+      fontFamily: fonts.medium,
     },
     unreadBadge: {
       backgroundColor: theme.accent,
@@ -889,7 +887,7 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     unreadText: {
       color: theme.textOnAccent,
       fontSize: 11,
-      fontFamily: 'BeVietnamPro_700Bold',
+      fontFamily: fonts.bold,
     },
     emptyContainer: {
       flex: 1,
@@ -899,13 +897,13 @@ const useStyles = (theme: ReturnType<typeof getAppTheme>) =>
     emptyTitle: {
       color: theme.textTertiary,
       fontSize: 16,
-      fontFamily: 'BeVietnamPro_600SemiBold',
+      fontFamily: fonts.semiBold,
       marginTop: 16,
     },
     emptySubtext: {
       color: theme.textTertiary,
       fontSize: 14,
-      fontFamily: 'BeVietnamPro_400Regular',
+      fontFamily: fonts.regular,
       marginTop: 4,
     },
   });

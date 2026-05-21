@@ -22,6 +22,11 @@ export interface CreateGroupPayload {
   name: string;
   memberIds: string[];
   avatarUrl?: string;
+  category?: string;
+  tags?: string[];
+  description?: string;
+  rules?: string;
+  isPublic?: boolean;
 }
 
 export interface AddGroupMembersPayload {

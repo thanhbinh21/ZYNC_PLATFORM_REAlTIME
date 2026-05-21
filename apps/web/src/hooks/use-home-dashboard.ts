@@ -373,11 +373,34 @@ export function useHomeDashboard() {
     callType?: CallMediaType;
   } | null>(null);
 
+  const clearConversationActiveCallState = useCallback((sessionId: string, conversationId?: string | null) => {
+    if (!sessionId && !conversationId) {
+      return;
+    }
+
+    setConversations((prev) => prev.map((conversation) => {
+      if (conversationId && conversation._id !== conversationId) {
+        return conversation;
+      }
+
+      if (!conversationId && conversation.activeCall?.callSessionId !== sessionId) {
+        return conversation;
+      }
+
+      if (sessionId && conversation.activeCall?.callSessionId && conversation.activeCall.callSessionId !== sessionId) {
+        return conversation;
+      }
+
+      return {
+        ...conversation,
+        activeCall: null,
+      };
+    }));
+  }, []);
+
   const notifyCallBlockingIssue = useCallback((message: string) => {
     setCallError(message);
-    if (typeof window !== 'undefined') {
-      window.alert(message);
-    }
+    callStore.showActiveCallConflict(message);
   }, []);
 
   const resolvePeerInfo = useCallback((peerUserId: string): { displayName: string; conversationId?: string } => {
@@ -2446,15 +2469,21 @@ export function useHomeDashboard() {
       setActiveCall({
         sessionId: payload.sessionId,
         conversationId: payload.conversationId ?? pendingOutgoing?.conversationId ?? null,
+        conversationName: conversations.find((conversation) => conversation._id === (payload.conversationId ?? pendingOutgoing?.conversationId))?.name ?? null,
         isGroupCall,
         initiatedBy: pendingOutgoing?.initiatedBy ?? userId,
         participantIds,
+        participants: participantIds.map((participantId) => ({
+          userId: participantId,
+          displayName: participantDisplayNames[participantId],
+        })),
         joinedParticipantIds: [userId],
         participantDisplayNames,
         direction: 'outgoing',
         status: 'outgoing',
         callToken: payload.callToken,
         callType: payload.callType ?? pendingOutgoing?.callType ?? 'video',
+        startedAt: null,
       });
     };
 
@@ -2488,9 +2517,14 @@ export function useHomeDashboard() {
           return {
             ...prev,
             conversationId: payload.conversationId ?? prev.conversationId ?? peerInfo.conversationId ?? null,
+            conversationName: payload.conversationName ?? prev.conversationName ?? null,
             isGroupCall,
             initiatedBy: payload.fromUserId,
             participantIds,
+            participants: participantIds.map((participantId) => ({
+              userId: participantId,
+              displayName: (participantDisplayNames[participantId] ?? prev.participantDisplayNames[participantId]),
+            })),
             participantDisplayNames: {
               ...participantDisplayNames,
               ...prev.participantDisplayNames,
@@ -2510,15 +2544,21 @@ export function useHomeDashboard() {
       setActiveCall({
         sessionId: payload.sessionId,
         conversationId: payload.conversationId ?? peerInfo.conversationId ?? null,
+        conversationName: payload.conversationName ?? null,
         isGroupCall,
         initiatedBy: payload.fromUserId,
         participantIds,
+        participants: participantIds.map((participantId) => ({
+          userId: participantId,
+          displayName: participantDisplayNames[participantId],
+        })),
         joinedParticipantIds: [payload.fromUserId],
         participantDisplayNames,
         direction: 'incoming',
         status: 'incoming',
         callToken: payload.callToken,
         callType: payload.callType ?? 'video',
+        startedAt: null,
       });
 
       if (payload.conversationId) {
@@ -2550,6 +2590,7 @@ export function useHomeDashboard() {
           ...prev,
           status: shouldKeepIncoming ? 'incoming' : nextStatus,
           reason: payload.reason,
+          startedAt: payload.status === 'connected' ? (prev.startedAt ?? new Date().toISOString()) : prev.startedAt,
         };
       });
 
@@ -2578,10 +2619,14 @@ export function useHomeDashboard() {
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
         const latestCall = activeCallRef.current;
         if (latestCall && latestCall.sessionId === payload.sessionId) {
+          clearConversationActiveCallState(payload.sessionId, latestCall.conversationId);
           setScreenSharingUserId(null);
           setCallError(null);
           scheduleCallReset();
+          return;
         }
+
+        clearConversationActiveCallState(payload.sessionId);
       }
     };
 
@@ -2700,6 +2745,7 @@ export function useHomeDashboard() {
       const latestCall = activeCallRef.current;
       if (latestCall && latestCall.sessionId === payload.sessionId) {
         if (payload.userId === userId) {
+          clearConversationActiveCallState(payload.sessionId, latestCall.conversationId);
           scheduleCallReset(500);
           return;
         }
@@ -2801,7 +2847,17 @@ export function useHomeDashboard() {
       }
     };
 
-    const handleSocketError = (payload: { message: string }) => {
+    const handleSocketError = (payload: { message: string; code?: string }) => {
+      if (payload.code === 'ACTIVE_CALL_EXISTS') {
+        notifyCallBlockingIssue(payload.message || ACTIVE_CALL_CONFLICT_MESSAGE);
+        return;
+      }
+
+      if (payload.code === 'GROUP_CALL_REQUIRES_PARTICIPANTS') {
+        setCallFriendError('Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.');
+        return;
+      }
+
       if (!payload.message.toLowerCase().includes('call')) {
         return;
       }
@@ -2865,12 +2921,15 @@ export function useHomeDashboard() {
     };
   }, [
     closePeerConnection,
+    clearConversationActiveCallState,
+    conversations,
     createOfferForPeer,
     clearCallResetTimer,
     ensureLocalMedia,
     ensurePeerConnection,
     flushPendingRemoteCandidates,
     isCameraEnabled,
+    notifyCallBlockingIssue,
     resolveParticipantDisplayNames,
     resolvePeerInfo,
     resetCallUi,
@@ -2891,14 +2950,12 @@ export function useHomeDashboard() {
     }
 
     const currentCall = activeCallRef.current;
-    const selectedActiveCallId = selectedConversation.activeCall?.callSessionId;
     if (
       currentCall
       && currentCall.sessionId
       && currentCall.status !== 'ended'
       && currentCall.status !== 'missed'
       && currentCall.status !== 'rejected'
-      && currentCall.sessionId !== selectedActiveCallId
     ) {
       notifyCallBlockingIssue(ACTIVE_CALL_CONFLICT_MESSAGE);
       return;
@@ -2920,6 +2977,11 @@ export function useHomeDashboard() {
     const participantIds = Array.from(new Set(selectedConversation.users.map((member) => member._id)));
     if (!participantIds.includes(userId)) {
       participantIds.push(userId);
+    }
+
+    if (selectedConversation.type === 'group' && participantIds.length < 2) {
+      setCallFriendError('Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.');
+      return;
     }
 
     let isGroupCall = selectedConversation.type === 'group';
@@ -2956,15 +3018,21 @@ export function useHomeDashboard() {
     setActiveCall({
       sessionId: '',
       conversationId: selectedConversation._id,
+      conversationName: selectedConversation.name ?? null,
       isGroupCall,
       initiatedBy: userId,
       participantIds,
+      participants: participantIds.map((participantId) => ({
+        userId: participantId,
+        displayName: participantDisplayNames[participantId],
+      })),
       joinedParticipantIds: [userId],
       participantDisplayNames,
       direction: 'outgoing',
       status: 'outgoing',
       callToken: '',
       callType,
+      startedAt: null,
     });
 
     try {
@@ -3106,9 +3174,10 @@ export function useHomeDashboard() {
         reason: 'rejected',
       };
     });
+    clearConversationActiveCallState(current.sessionId, current.conversationId);
     setCallError(null);
     scheduleCallReset(1200);
-  }, [scheduleCallReset]);
+  }, [clearConversationActiveCallState, scheduleCallReset]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

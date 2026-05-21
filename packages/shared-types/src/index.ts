@@ -42,7 +42,7 @@ export interface Conversation {
 }
 
 // Kiểu dữ liệu Message
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history' | 'call' | 'system';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export interface MessageReactionSummary {
