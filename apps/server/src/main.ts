@@ -14,6 +14,7 @@ import { startMessageWorker, stopMessageWorker } from './workers/message.worker'
 import { startNotificationWorker, stopNotificationWorker } from './workers/notification.worker';
 import { startCatchupWorker, stopCatchupWorker } from './modules/ai/catchup/catchup.worker';
 import { startAssistantWorker, stopAssistantWorker } from './modules/ai/workers/ai-assistant.worker';
+import { startMessageEmbeddingWorker, stopMessageEmbeddingWorker } from './modules/ai/embeddings/message-embedding.worker';
 import { runPgvectorMigration, isNeonAvailable } from './infrastructure/neon';
 import { logger } from './shared/logger';
 
@@ -64,6 +65,11 @@ async function bootstrap(): Promise<void> {
     void startNotificationWorker().catch((err: unknown) => {
       logger.error('Notification worker failed', err);
     });
+    if (isNeonAvailable()) {
+      void startMessageEmbeddingWorker().catch((err: unknown) => {
+        logger.error('Message embedding worker failed to start (non-fatal)', err);
+      });
+    }
     // AI Catchup + AI Assistant Box
     if (process.env['AI_CATCHUP_ENABLED'] !== 'false') {
       void startCatchupWorker().catch((err: unknown) => {
@@ -104,6 +110,7 @@ async function bootstrap(): Promise<void> {
     if (process.env['KAFKA_ENABLED'] === 'true') {
       await stopMessageWorker();
       await stopNotificationWorker();
+      await stopMessageEmbeddingWorker();
       await stopCatchupWorker();
       await stopAssistantWorker();
     }

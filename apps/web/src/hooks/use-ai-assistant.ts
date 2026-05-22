@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AiAssistantItem, AiAssistantItemPayload, AiCatchupDigest, AiReminderUpdatedPayload } from '@zync/shared-types';
+import type {
+  AiAssistantItem,
+  AiAssistantItemPayload,
+  AiAssistantSearchPerson,
+  AiAssistantSearchResult,
+  AiCatchupDigest,
+  AiGroupNote,
+  AiReminderUpdatedPayload,
+} from '@zync/shared-types';
 import {
   getUnreadConversations,
   createCatchupDigest,
@@ -10,6 +18,12 @@ import {
   createAssistantTask,
   updateAssistantTask,
   regenerateCatchup,
+  searchAssistantMessages,
+  listGroupNotes,
+  createGroupNote,
+  updateGroupNote,
+  deleteGroupNote,
+  regenerateGroupNote,
   type AssistantTask,
   type ConversationWithAiDigest,
 } from '@/services/ai-assistant';
@@ -21,8 +35,9 @@ import {
   getRawSocket,
 } from '@/services/socket';
 
-export type AiBoxTab = 'overview' | 'catchup' | 'tasks';
+export type AiBoxTab = 'overview' | 'catchup' | 'tasks' | 'search' | 'notes';
 const PROCESSING_POLL_INTERVAL_MS = 5000;
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface UseAiAssistantOptions {
   /** Số conversation hiển thị tối đa trong AI Box */
@@ -40,6 +55,16 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
   const [tasks, setTasks] = useState<AssistantTask[]>([]);
   const [taskTotal, setTaskTotal] = useState(0);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [notes, setNotes] = useState<AiGroupNote[]>([]);
+  const [noteTotal, setNoteTotal] = useState(0);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<'semantic' | 'hybrid' | 'keyword_fallback' | 'saved'>('saved');
+  const [searchAnswer, setSearchAnswer] = useState<string | undefined>();
+  const [searchPeople, setSearchPeople] = useState<AiAssistantSearchPerson[]>([]);
+  const [searchResults, setSearchResults] = useState<AiAssistantSearchResult[]>([]);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [loadingSearch, setLoadingSearch] = useState(false);
   /** Legacy AI items (dùng cho tổng hợp, không còn là nguồn chính) */
   const [items, setItems] = useState<AiAssistantItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -50,6 +75,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
   const loadingRef = useRef(false);
   const skipRef = useRef(0);
   const taskSkipRef = useRef(0);
+  const searchRequestSeqRef = useRef(0);
 
   const hydrateCatchupDetails = useCallback(async (targets: ConversationWithAiDigest[]) => {
     const readyTargets = targets.filter((conversation) => conversation.aiStatus === 'ready');
@@ -101,6 +127,114 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     }
   }, []);
 
+  const loadSearchResults = useCallback(async (
+    query: string = searchQuery,
+    options: { hydrateQuery?: boolean } = {},
+  ) => {
+    const requestSeq = searchRequestSeqRef.current + 1;
+    searchRequestSeqRef.current = requestSeq;
+    setLoadingSearch(true);
+    setError(null);
+
+    try {
+      const result = await searchAssistantMessages({
+        q: query,
+        limit: 20,
+      });
+
+      if (searchRequestSeqRef.current !== requestSeq) return;
+      setSearchMode(result.mode);
+      setSearchAnswer(result.answer);
+      setSearchPeople(result.people ?? []);
+      setSearchResults(result.results);
+      setSearchTotal(result.total);
+      if (options.hydrateQuery && !query.trim() && result.query) {
+        setSearchQuery(result.query);
+      }
+    } catch (err) {
+      if (searchRequestSeqRef.current !== requestSeq) return;
+      setError(err instanceof Error ? err.message : 'Failed to search messages');
+    } finally {
+      if (searchRequestSeqRef.current === requestSeq) {
+        setLoadingSearch(false);
+      }
+    }
+  }, [searchQuery]);
+
+  const loadNotes = useCallback(async () => {
+    setLoadingNotes(true);
+    setError(null);
+    try {
+      const result = await listGroupNotes({ limit: 30, status: 'all' });
+      setNotes(result.notes);
+      setNoteTotal(result.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notes');
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, []);
+
+  const createNote = useCallback(async (conversationId: string) => {
+    setLoadingItems((prev) => new Set([...prev, conversationId]));
+    try {
+      const result = await createGroupNote(conversationId);
+      setNotes((prev) => [result.detail, ...prev.filter((note) => note._id !== result.detail._id)]);
+      setNoteTotal((prev) => Math.max(prev, prev + (notes.some((note) => note._id === result.detail._id) ? 0 : 1)));
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create note');
+      throw err;
+    } finally {
+      setLoadingItems((prev) => {
+        const next = new Set(prev);
+        next.delete(conversationId);
+        return next;
+      });
+    }
+  }, [notes]);
+
+  const toggleNotePin = useCallback(async (noteId: string, pinned: boolean) => {
+    try {
+      const updated = await updateGroupNote(noteId, { pinned });
+      setNotes((prev) => prev
+        .map((note) => (note._id === noteId ? updated : note))
+        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update note');
+      throw err;
+    }
+  }, []);
+
+  const removeNote = useCallback(async (noteId: string) => {
+    try {
+      await deleteGroupNote(noteId);
+      setNotes((prev) => prev.filter((note) => note._id !== noteId));
+      setNoteTotal((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete note');
+      throw err;
+    }
+  }, []);
+
+  const regenerateNote = useCallback(async (noteId: string) => {
+    setLoadingItems((prev) => new Set([...prev, noteId]));
+    try {
+      const result = await regenerateGroupNote(noteId);
+      setNotes((prev) => prev.map((note) => (note._id === noteId ? result.detail : note)));
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to regenerate note');
+      throw err;
+    } finally {
+      setLoadingItems((prev) => {
+        const next = new Set(prev);
+        next.delete(noteId);
+        return next;
+      });
+    }
+  }, []);
+
   // ── Socket handler ─────────────────────────────────────────────────────────────
 
   const handleSocketUpdate = useCallback((payload: AiAssistantItemPayload) => {
@@ -113,6 +247,35 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
 
     if (payload.type === 'task') {
       void loadTasks(true);
+      return;
+    }
+
+    if (payload.type === 'group_note') {
+      if (payload.metadata?.deleted && payload.metadata.noteId) {
+        setNotes((prev) => prev.filter((note) => note._id !== payload.metadata?.noteId));
+        return;
+      }
+      if (payload.detail) {
+        const detail = payload.detail as AiGroupNote;
+        setNotes((prev) => {
+          const exists = prev.some((note) => note._id === detail._id);
+          const next = exists
+            ? prev.map((note) => (note._id === detail._id ? { ...note, ...detail } : note))
+            : [detail, ...prev];
+          return next.sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        });
+      } else {
+        void loadNotes();
+      }
+      if (payload.status === 'ready' || payload.status === 'failed') {
+        setLoadingItems((prev) => {
+          const next = new Set(prev);
+          next.delete(payload.itemId);
+          if (payload.conversationId) next.delete(payload.conversationId);
+          if (payload.metadata?.noteId) next.delete(payload.metadata.noteId);
+          return next;
+        });
+      }
       return;
     }
 
@@ -182,7 +345,7 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
         return next;
       });
     }
-  }, [loadTasks]);
+  }, [loadNotes, loadTasks]);
 
   // ── Load recent conversations for Catch-up ────────────────────────────────────
 
@@ -392,7 +555,9 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     setIsOpen(true);
     void loadConversations(true);
     void loadTasks(true);
-  }, [loadConversations, loadTasks]);
+    void loadNotes();
+    void loadSearchResults('', { hydrateQuery: true });
+  }, [loadConversations, loadNotes, loadSearchResults, loadTasks]);
 
   const closeBox = useCallback(() => {
     setIsOpen(false);
@@ -489,6 +654,21 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     return () => window.clearInterval(timer);
   }, [isOpen, conversations]);
 
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'search') return;
+
+    const timer = window.setTimeout(() => {
+      void loadSearchResults(searchQuery);
+    }, searchQuery.trim() ? SEARCH_DEBOUNCE_MS : 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTab, isOpen, loadSearchResults, searchQuery]);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'notes') return;
+    void loadNotes();
+  }, [activeTab, isOpen, loadNotes]);
+
   // ── Badge count ───────────────────────────────────────────────────────────────
 
   const unreadDigestCount = conversations.filter((c) => c.unreadCount > 0).length;
@@ -501,10 +681,21 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     catchupDetailsByConversationId,
     tasks,
     taskTotal,
+    notes,
+    noteTotal,
+    searchQuery,
+    searchMode,
+    searchAnswer,
+    searchPeople,
+    setSearchQuery,
+    searchResults,
+    searchTotal,
     items,
     total,
     loadingList,
     loadingTasks,
+    loadingNotes,
+    loadingSearch,
     loadingItems,
     error,
     unreadDigestCount,
@@ -513,6 +704,12 @@ export function useAiAssistant(options: UseAiAssistantOptions = {}) {
     closeBox,
     loadConversations,
     loadTasks,
+    loadNotes,
+    createNote,
+    toggleNotePin,
+    removeNote,
+    regenerateNote,
+    loadSearchResults,
     loadItems,
     createDigest,
     regenerate: doRegenerate,

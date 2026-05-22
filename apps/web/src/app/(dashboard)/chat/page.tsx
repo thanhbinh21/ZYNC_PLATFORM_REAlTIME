@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { HomeDashboardChatPanel } from '@/components/home-dashboard/organisms/home-dashboard-chat-panel';
@@ -20,6 +20,7 @@ export default function ChatPage() {
 function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [targetMessageRef, setTargetMessageRef] = useState<string | null>(null);
   const {
     loading,
     conversations,
@@ -112,8 +113,10 @@ function ChatPageContent() {
   useEffect(() => {
     const conversationId =
       searchParams.get('conversationId') ?? searchParams.get('conversation');
+    const messageRef = searchParams.get('messageRef') ?? searchParams.get('messageId');
     if (!conversationId) return;
 
+    setTargetMessageRef(messageRef);
     onSelectConversation(conversationId);
     router.replace('/chat');
   }, [searchParams, onSelectConversation, router]);
@@ -165,6 +168,8 @@ function ChatPageContent() {
           participantAvatarUrl: conversationInfo?.participantAvatarUrl,
           isOnline: conversationInfo?.isOnline,
           messages: messages,
+          targetMessageRef,
+          onTargetMessageConsumed: () => setTargetMessageRef(null),
           messageStatus: messageStatus,
           typingUsers: typingUsers,
           isLoading: messagesLoading,

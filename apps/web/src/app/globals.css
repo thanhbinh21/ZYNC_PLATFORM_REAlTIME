@@ -2583,6 +2583,13 @@ body.story-viewer-open {
   margin-bottom: 8px;
 }
 
+.zync-message-jump-highlight {
+  border-radius: 16px;
+  outline: 2px solid color-mix(in srgb, var(--accent, #0ea5e9) 70%, transparent);
+  outline-offset: 4px;
+  transition: outline-color 0.25s ease, outline-offset 0.25s ease;
+}
+
 /* General transitions */
 * {
   transition-timing-function: ease;

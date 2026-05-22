@@ -289,10 +289,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             catchupDetailsByConversationId={aiAssistant.catchupDetailsByConversationId}
             tasks={aiAssistant.tasks}
             taskTotal={aiAssistant.taskTotal}
+            notes={aiAssistant.notes}
+            noteTotal={aiAssistant.noteTotal}
+            searchQuery={aiAssistant.searchQuery}
+            searchMode={aiAssistant.searchMode}
+            searchAnswer={aiAssistant.searchAnswer}
+            searchPeople={aiAssistant.searchPeople}
+            searchResults={aiAssistant.searchResults}
+            searchTotal={aiAssistant.searchTotal}
+            searchError={aiAssistant.error}
             items={aiAssistant.items}
             total={aiAssistant.total}
             loadingList={aiAssistant.loadingList}
             loadingTasks={aiAssistant.loadingTasks}
+            loadingNotes={aiAssistant.loadingNotes}
+            loadingSearch={aiAssistant.loadingSearch}
             loadingItems={aiAssistant.loadingItems}
             pendingTaskCount={aiAssistant.pendingTaskCount}
             onClose={aiAssistant.closeBox}
@@ -303,7 +314,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onAcceptTask={aiAssistant.acceptTask}
             onCompleteTask={aiAssistant.completeTask}
             onDismissTask={aiAssistant.dismissTask}
+            onCreateNote={aiAssistant.createNote}
+            onToggleNotePin={aiAssistant.toggleNotePin}
+            onDeleteNote={aiAssistant.removeNote}
+            onRegenerateNote={aiAssistant.regenerateNote}
             onUseSuggestedReply={handleUseSuggestedReply}
+            onSearchQueryChange={aiAssistant.setSearchQuery}
+            onOpenSearchResult={(conversationId, messageRef) => {
+              router.push(`/chat?conversationId=${encodeURIComponent(conversationId)}&messageRef=${encodeURIComponent(messageRef)}`);
+              aiAssistant.closeBox();
+            }}
             onOpenChat={(conversationId) => {
               router.push(`/chat?conversationId=${conversationId}`);
             }}

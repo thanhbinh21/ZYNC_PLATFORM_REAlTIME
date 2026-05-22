@@ -5,7 +5,7 @@ import { logger } from '../shared/logger';
 export const AI_MODELS = {
   PRIMARY: process.env['AI_MODEL_PRIMARY'] ?? 'gemini-2.5-pro',
   FALLBACK: process.env['AI_MODEL_FALLBACK'] ?? 'gemini-2.5-flash',
-  EMBEDDING: process.env['AI_EMBEDDING_MODEL'] ?? 'text-embedding-004',
+  EMBEDDING: process.env['AI_EMBEDDING_MODEL'] ?? 'gemini-embedding-001',
 } as const;
 
 // ─── Singleton Gemini client ──────────────────────────────────────────────────

@@ -47,7 +47,7 @@ export async function runPgvectorMigration(): Promise<void> {
       message_id    TEXT          NOT NULL,          -- ref to MongoDB ObjectId (string)
       conversation_id TEXT        NOT NULL,
       content_text  TEXT          NOT NULL,
-      embedding     vector(768)   NOT NULL,           -- text-embedding-004 output
+      embedding     vector(768)   NOT NULL,           -- Gemini embedding output normalized to 768 dims
       created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     )
   `;
@@ -64,6 +64,18 @@ export async function runPgvectorMigration(): Promise<void> {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_message_embeddings_conv
     ON message_embeddings (conversation_id, created_at DESC)
+  `;
+
+  await sql`
+    DELETE FROM message_embeddings a
+    USING message_embeddings b
+    WHERE a.message_id = b.message_id
+      AND a.ctid < b.ctid
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_message_embeddings_message_id_unique
+    ON message_embeddings (message_id)
   `;
 
   // 5. moderation_vectors – optional; stores embedding of flagged content

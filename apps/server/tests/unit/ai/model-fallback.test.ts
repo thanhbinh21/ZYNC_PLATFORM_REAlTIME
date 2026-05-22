@@ -15,7 +15,7 @@ jest.mock('../../../src/infrastructure/gemini', () => ({
   AI_MODELS: {
     PRIMARY: 'gemini-2.5-pro',
     FALLBACK: 'gemini-2.5-flash',
-    EMBEDDING: 'text-embedding-004',
+    EMBEDDING: 'gemini-embedding-001',
   },
   isAIEnabled: jest.fn().mockReturnValue(true),
 }));

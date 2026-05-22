@@ -5,7 +5,6 @@ export const AiItemTypeSchema = z.enum([
   'task',
   'search_result',
   'group_note',
-  'call_summary',
 ]);
 
 export const AiItemStatusSchema = z.enum([
@@ -48,6 +47,29 @@ export const AssistantTaskQuerySchema = z.object({
   skip: z.coerce.number().int().min(0).default(0),
 });
 
+export const AssistantSearchQuerySchema = z.object({
+  q: z.string().trim().max(300).optional().default(''),
+  conversationId: z.string().trim().optional(),
+  limit: z.coerce.number().int().min(1).max(20).default(20),
+});
+
+export const AssistantNotesQuerySchema = z.object({
+  conversationId: z.string().trim().optional(),
+  status: z.enum(['queued', 'processing', 'ready', 'failed', 'all']).default('all'),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  skip: z.coerce.number().int().min(0).default(0),
+});
+
+export const CreateGroupNoteSchema = z.object({
+  fromLatestNote: z.coerce.boolean().optional().default(true),
+});
+
+export const UpdateGroupNoteSchema = z.object({
+  pinned: z.boolean().optional(),
+  title: z.string().trim().min(1).max(160).optional(),
+  content: z.string().trim().min(1).max(4000).optional(),
+});
+
 export const CreateAssistantTaskSchema = z.object({
   conversationId: z.string().trim().min(1),
   digestId: z.string().trim().optional(),
@@ -68,3 +90,7 @@ export const UpdateAssistantTaskSchema = z.object({
 
 export type CreateCatchupDigestInput = z.infer<typeof CreateCatchupDigestSchema>;
 export type AssistantQueryInput = z.infer<typeof AssistantQuerySchema>;
+export type AssistantSearchQueryInput = z.infer<typeof AssistantSearchQuerySchema>;
+export type AssistantNotesQueryInput = z.infer<typeof AssistantNotesQuerySchema>;
+export type CreateGroupNoteInput = z.infer<typeof CreateGroupNoteSchema>;
+export type UpdateGroupNoteInput = z.infer<typeof UpdateGroupNoteSchema>;

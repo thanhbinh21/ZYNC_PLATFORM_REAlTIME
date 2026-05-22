@@ -1,7 +1,8 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useRef } from 'react';
-import { Bell, Check, CheckCircle2, Sparkles, X, Loader2, MessageSquare, Reply, Trash2 } from 'lucide-react';
+import { Bell, Check, CheckCircle2, Loader2, MessageSquare, Reply, Search, Sparkles, Trash2, Users, X } from 'lucide-react';
+import type { AiAssistantSearchPerson, AiAssistantSearchResult, AiGroupNote } from '@zync/shared-types';
 import type { AiBoxTab } from '@/hooks/use-ai-assistant';
 import { StatusBadge } from './status-badge';
 
@@ -54,6 +55,15 @@ interface AiAssistantBoxProps {
   catchupDetailsByConversationId?: Record<string, CatchupDetail>;
   tasks?: AssistantTask[];
   taskTotal?: number;
+  notes?: AiGroupNote[];
+  noteTotal?: number;
+  searchQuery?: string;
+  searchMode?: 'semantic' | 'hybrid' | 'keyword_fallback' | 'saved';
+  searchAnswer?: string;
+  searchPeople?: AiAssistantSearchPerson[];
+  searchResults?: AiAssistantSearchResult[];
+  searchTotal?: number;
+  searchError?: string | null;
   items: Array<{
     _id: string;
     conversationId?: string;
@@ -73,6 +83,8 @@ interface AiAssistantBoxProps {
   total: number;
   loadingList: boolean;
   loadingTasks?: boolean;
+  loadingNotes?: boolean;
+  loadingSearch?: boolean;
   loadingItems: Set<string>;
   pendingTaskCount?: number;
   onClose: () => void;
@@ -87,7 +99,13 @@ interface AiAssistantBoxProps {
   onCompleteTask?: (taskId: string) => void;
   onDismissTask?: (taskId: string) => void;
   onAcceptTask?: (taskId: string) => void;
+  onCreateNote?: (conversationId: string) => void;
+  onToggleNotePin?: (noteId: string, pinned: boolean) => void;
+  onDeleteNote?: (noteId: string) => void;
+  onRegenerateNote?: (noteId: string) => void;
   onUseSuggestedReply?: (conversationId: string, reply: string) => void;
+  onSearchQueryChange?: (query: string) => void;
+  onOpenSearchResult?: (conversationId: string, messageRef: string) => void;
   onOpenChat: (conversationId: string) => void;
   onLoadMore?: () => void;
   onLoadMoreTasks?: () => void;
@@ -100,10 +118,21 @@ export function AiAssistantBox({
   catchupDetailsByConversationId = {},
   tasks = [],
   taskTotal = 0,
+  notes = [],
+  noteTotal = 0,
+  searchQuery = '',
+  searchMode = 'saved',
+  searchAnswer,
+  searchPeople = [],
+  searchResults = [],
+  searchTotal = 0,
+  searchError = null,
   items,
   total,
   loadingList,
   loadingTasks = false,
+  loadingNotes = false,
+  loadingSearch = false,
   loadingItems,
   pendingTaskCount = 0,
   onClose,
@@ -114,7 +143,13 @@ export function AiAssistantBox({
   onCompleteTask = () => {},
   onDismissTask = () => {},
   onAcceptTask = () => {},
+  onCreateNote = () => {},
+  onToggleNotePin = () => {},
+  onDeleteNote = () => {},
+  onRegenerateNote = () => {},
   onUseSuggestedReply = () => {},
+  onSearchQueryChange = () => {},
+  onOpenSearchResult = () => {},
   onOpenChat,
   onLoadMore,
   onLoadMoreTasks,
@@ -155,7 +190,7 @@ export function AiAssistantBox({
       {/* Side panel */}
       <aside
         ref={panelRef}
-        className="fixed bottom-0 right-0 top-0 z-50 flex w-full flex-col bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out md:w-[min(90vw,460px)]"
+        className="fixed bottom-0 right-0 top-0 z-50 flex w-full flex-col bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out md:w-[min(92vw,480px)]"
         style={{ transform: 'translateX(0)' }}
         role="dialog"
         aria-label="Zync AI Assistant"
@@ -179,11 +214,11 @@ export function AiAssistantBox({
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-border px-4">
+        <div className="flex overflow-x-auto border-b border-border px-3">
           <button
             type="button"
             onClick={() => onTabChange('overview')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition ${
               activeTab === 'overview'
                 ? 'border-accent text-accent'
                 : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -194,7 +229,7 @@ export function AiAssistantBox({
           <button
             type="button"
             onClick={() => onTabChange('catchup')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition ${
               activeTab === 'catchup'
                 ? 'border-accent text-accent'
                 : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -210,7 +245,7 @@ export function AiAssistantBox({
           <button
             type="button"
             onClick={() => onTabChange('tasks')}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition ${
               activeTab === 'tasks'
                 ? 'border-accent text-accent'
                 : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -222,6 +257,28 @@ export function AiAssistantBox({
                 {pendingTaskCount > 9 ? '9+' : pendingTaskCount}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange('notes')}
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition ${
+              activeTab === 'notes'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Notes
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange('search')}
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-semibold transition ${
+              activeTab === 'search'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Search
           </button>
         </div>
 
@@ -257,6 +314,37 @@ export function AiAssistantBox({
               onLoadMore={onLoadMoreTasks}
             />
           )}
+
+          {activeTab === 'notes' && (
+            <NotesTab
+              conversations={conversations}
+              notes={notes}
+              total={noteTotal}
+              loadingNotes={loadingNotes}
+              loadingItems={loadingItems}
+              onCreateNote={onCreateNote}
+              onTogglePin={onToggleNotePin}
+              onDeleteNote={onDeleteNote}
+              onRegenerateNote={onRegenerateNote}
+              onOpenChat={onOpenChat}
+              onOpenSource={onOpenSearchResult}
+            />
+          )}
+
+          {activeTab === 'search' && (
+            <SearchTab
+              query={searchQuery}
+              mode={searchMode}
+              answer={searchAnswer}
+              people={searchPeople}
+              results={searchResults}
+              total={searchTotal}
+              error={searchError}
+              loadingSearch={loadingSearch}
+              onQueryChange={onSearchQueryChange}
+              onOpenResult={onOpenSearchResult}
+            />
+          )}
         </div>
       </aside>
     </>
@@ -277,9 +365,9 @@ function OverviewTab({
   const notStartedCount = items.filter((i) => i.status === 'not_started').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <p className="mb-3 font-ui-title text-sm font-semibold text-text-primary">Trạng thái AI</p>
+        <p className="mb-2 font-ui-title text-sm font-semibold text-text-primary">Trạng thái AI</p>
         <div className="grid grid-cols-3 gap-3">
           <StatCard label="Đã tóm tắt" value={readyCount} color="text-green-600" />
           <StatCard label="Đang xử lý" value={processingCount} color="text-blue-500" />
@@ -287,20 +375,20 @@ function OverviewTab({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-[var(--surface-glass)] p-4">
+      <div className="rounded-xl border border-border bg-[var(--surface-glass)] p-4">
         <p className="mb-2 font-ui-title text-sm font-semibold text-text-primary">AI Assistant Box</p>
         <p className="text-sm text-text-secondary">
-          Tóm tắt nhanh các cuộc trò chuyện chưa đọc, gợi ý trả lời và nhắc nhở việc cần làm — tất cả ở một nơi.
+          Tóm tắt hội thoại, tạo task, tìm semantic trong tin nhắn và lưu ghi chú nhóm có nguồn kiểm chứng.
         </p>
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-semibold text-text-primary">Các tính năng sắp tới</p>
+        <p className="mb-2 text-sm font-semibold text-text-primary">Đang hoạt động</p>
         <ul className="space-y-2">
+          <FeatureItem label="Catch-up theo conversation" phase="Phase 1" done />
           <FeatureItem label="Tasks & Action Items" phase="Phase 2" done />
-          <FeatureItem label="Smart Search" phase="Phase 3" />
-          <FeatureItem label="Group Notes" phase="Phase 4" />
-          <FeatureItem label="Call Summary" phase="Phase 5" />
+          <FeatureItem label="Semantic Search + Sources" phase="Phase 3" done />
+          <FeatureItem label="Group Notes" phase="Phase 4" done />
         </ul>
       </div>
     </div>
@@ -309,8 +397,8 @@ function OverviewTab({
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-border bg-[var(--surface-glass)] p-3">
-      <span className={`font-ui-title text-2xl font-bold ${color}`}>{value}</span>
+    <div className="flex min-h-[70px] flex-col items-center justify-center rounded-xl border border-border bg-[var(--surface-glass)] p-3">
+      <span className={`font-ui-title text-xl font-bold ${color}`}>{value}</span>
       <span className="mt-1 text-xs text-text-tertiary">{label}</span>
     </div>
   );
@@ -320,7 +408,7 @@ function FeatureItem({ label, phase, done = false }: { label: string; phase: str
   return (
     <li className="flex items-center gap-2 text-sm">
       <span className={`h-2 w-2 shrink-0 rounded-full ${done ? 'bg-green-500' : 'bg-gray-400'}`} aria-hidden />
-      <span className={done ? 'text-text-secondary line-through' : 'text-text-primary'}>{label}</span>
+      <span className={done ? 'text-text-secondary' : 'text-text-primary'}>{label}</span>
       <span className="ml-auto text-[11px] text-text-tertiary">{phase}</span>
     </li>
   );
@@ -418,7 +506,7 @@ function CatchupTab({
         return (
           <div
             key={conv.conversationId}
-            className="rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition hover:border-border-strong"
+            className="rounded-xl border border-border bg-[var(--surface-card)] p-3 transition hover:border-border-strong"
           >
             {/* Header row */}
             <div className="flex items-start gap-3">
@@ -470,21 +558,21 @@ function CatchupTab({
             )}
 
             {isReady && actionItems.length > 0 && (
-              <div className="mt-3 space-y-2 rounded-lg border border-sky-200 bg-sky-50/80 p-3 dark:border-sky-800 dark:bg-sky-950/30">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-sky-700 dark:text-sky-300">
                   <Bell className="h-3.5 w-3.5" aria-hidden />
                   Action items
                 </div>
                 {actionItems.slice(0, 3).map((actionItem, index) => (
-                  <div key={`${actionItem.text}-${index}`} className="flex items-start gap-2 rounded-md bg-white/80 p-2 dark:bg-sky-950/40">
+                  <div key={`${actionItem.text}-${index}`} className="flex items-start gap-2 py-1.5">
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" aria-hidden />
-                    <p className="min-w-0 flex-1 text-xs font-medium leading-relaxed text-sky-950 dark:text-sky-100">
+                    <p className="min-w-0 flex-1 text-xs font-medium leading-relaxed text-text-secondary">
                       {actionItem.text}
                     </p>
                     <button
                       type="button"
                       onClick={() => onCreateTask(conv.conversationId, actionItem, detail?._id)}
-                      className="shrink-0 rounded-md border border-sky-300 bg-sky-100 px-2 py-1 text-[11px] font-bold text-sky-800 transition hover:bg-sky-200 dark:border-sky-700 dark:bg-sky-900 dark:text-sky-100"
+                      className="shrink-0 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100"
                     >
                       Nhắc tôi
                     </button>
@@ -494,21 +582,23 @@ function CatchupTab({
             )}
 
             {isReady && suggestedReplies.length > 0 && (
-              <div className="mt-3 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/90 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-200">
                   <Reply className="h-3.5 w-3.5" aria-hidden />
                   Suggested replies
                 </div>
-                {suggestedReplies.slice(0, 2).map((reply) => (
+                <div className="flex flex-wrap gap-2">
+                {suggestedReplies.slice(0, 3).map((reply) => (
                   <button
                     key={reply}
                     type="button"
                     onClick={() => onUseSuggestedReply(conv.conversationId, reply)}
-                    className="block w-full rounded-md border border-emerald-300 bg-white px-3 py-2 text-left text-xs font-semibold leading-relaxed text-emerald-950 shadow-sm transition hover:border-emerald-500 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-50 dark:hover:bg-emerald-900"
+                    className="max-w-full rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-left text-xs font-semibold leading-relaxed text-emerald-900 transition hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
                   >
                     {reply}
                   </button>
                 ))}
+                </div>
               </div>
             )}
 
@@ -714,10 +804,400 @@ function TasksTab({
   );
 }
 
+function NotesTab({
+  conversations,
+  notes,
+  total,
+  loadingNotes,
+  loadingItems,
+  onCreateNote,
+  onTogglePin,
+  onDeleteNote,
+  onRegenerateNote,
+  onOpenChat,
+  onOpenSource,
+}: {
+  conversations: AiAssistantBoxProps['conversations'];
+  notes: AiGroupNote[];
+  total: number;
+  loadingNotes: boolean;
+  loadingItems: Set<string>;
+  onCreateNote: (conversationId: string) => void;
+  onTogglePin: (noteId: string, pinned: boolean) => void;
+  onDeleteNote: (noteId: string) => void;
+  onRegenerateNote: (noteId: string) => void;
+  onOpenChat: (conversationId: string) => void;
+  onOpenSource: (conversationId: string, messageRef: string) => void;
+}) {
+  const createTargets = conversations.slice(0, 6);
+
+  if (loadingNotes && notes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
+        <p className="mt-3 text-sm text-text-secondary">Đang tải ghi chú...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {createTargets.length > 0 && (
+        <div className="rounded-xl border border-border bg-[var(--surface-card)] p-3">
+          <p className="mb-2 text-xs font-semibold text-text-secondary">Tạo ghi chú cho conversation</p>
+          <div className="flex flex-wrap gap-2">
+            {createTargets.map((conversation) => {
+              const loading = loadingItems.has(conversation.conversationId);
+              return (
+                <button
+                  key={conversation.conversationId}
+                  type="button"
+                  onClick={() => onCreateNote(conversation.conversationId)}
+                  disabled={loading}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-[var(--surface-glass-strong)] disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <MessageSquare className="h-3 w-3" aria-hidden />}
+                  <span className="truncate">{conversation.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {notes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <MessageSquare className="h-14 w-14 text-text-tertiary" aria-hidden />
+          <p className="mt-3 text-sm font-semibold text-text-primary">Chưa có ghi chú nhóm</p>
+          <p className="mt-1 text-center text-xs text-text-secondary">
+            Chọn một conversation ở trên để tạo ghi chú từ tin nhắn gần nhất.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between text-xs text-text-tertiary">
+            <span>Ghi chú đã lưu</span>
+            <span>{total} ghi chú</span>
+          </div>
+          <div className="space-y-2">
+            {notes.map((note) => {
+              const sourceRef = note.sourceMessageRefs[0] ?? note.toMessageRef;
+              const loading = loadingItems.has(note._id);
+              return (
+                <div
+                  key={note._id}
+                  className="rounded-xl border border-border bg-[var(--surface-card)] p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-text-primary">
+                          {note.title || 'Ghi chú nhóm'}
+                        </p>
+                        {note.pinned && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+                            Ghim
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-text-tertiary">
+                        {note.conversationName ?? 'Cuộc trò chuyện'} · {formatSearchTimestamp(note.generatedAt ?? note.updatedAt)}
+                      </p>
+                    </div>
+                    <StatusBadge status={note.status} />
+                  </div>
+
+                  {note.content && (
+                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-text-secondary">
+                      {note.content}
+                    </p>
+                  )}
+
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-text-tertiary">
+                    <span>{note.messageCount} tin</span>
+                    <span>·</span>
+                    <span>{note.decisions.length} quyết định</span>
+                    <span>·</span>
+                    <span>{note.openQuestions.length} câu hỏi mở</span>
+                    {note.actionItems.length > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>{note.actionItems.length} việc cần làm</span>
+                      </>
+                    )}
+                  </div>
+
+                  {note.status === 'failed' && note.error && (
+                    <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-200">
+                      {note.error}
+                    </p>
+                  )}
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenChat(note.conversationId)}
+                      className="rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-[var(--surface-glass-strong)]"
+                    >
+                      Mở chat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSource(note.conversationId, sourceRef)}
+                      className="rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-[var(--surface-glass-strong)]"
+                    >
+                      Xem nguồn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onTogglePin(note._id, !note.pinned)}
+                      className="rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-[var(--surface-glass-strong)]"
+                    >
+                      {note.pinned ? 'Bỏ ghim' : 'Ghim'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRegenerateNote(note._id)}
+                      disabled={loading}
+                      className="rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-[var(--surface-glass-strong)] disabled:opacity-50"
+                    >
+                      {loading ? 'Đang tạo...' : 'Tạo lại'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteNote(note._id)}
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SearchTab({
+  query,
+  mode,
+  answer,
+  people,
+  results,
+  total,
+  error,
+  loadingSearch,
+  onQueryChange,
+  onOpenResult,
+}: {
+  query: string;
+  mode: 'semantic' | 'hybrid' | 'keyword_fallback' | 'saved';
+  answer?: string;
+  people: AiAssistantSearchPerson[];
+  results: AiAssistantSearchResult[];
+  total: number;
+  error?: string | null;
+  loadingSearch: boolean;
+  onQueryChange: (query: string) => void;
+  onOpenResult: (conversationId: string, messageRef: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="sticky top-0 z-10 -mx-4 bg-[var(--surface-card)] px-4 pb-3">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-[var(--surface-glass)] px-3 py-2 focus-within:border-accent/60">
+          <Search className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden />
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Tìm trong tin nhắn"
+            className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
+          />
+          {loadingSearch && <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden />}
+        </div>
+      </div>
+
+      {loadingSearch && results.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
+          <p className="mt-3 text-sm text-text-secondary">Đang tìm...</p>
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+          {error}
+        </div>
+      ) : results.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Search className="h-14 w-14 text-text-tertiary" aria-hidden />
+          <p className="mt-3 text-sm font-semibold text-text-primary">
+            {query.trim() ? 'Không có kết quả phù hợp' : 'Chưa có tìm kiếm gần đây'}
+          </p>
+          <p className="mt-1 text-center text-xs text-text-secondary">
+            Nhập từ khóa hoặc câu hỏi để tìm ngữ nghĩa trong hội thoại.
+          </p>
+        </div>
+      ) : (
+        <>
+          {answer && (
+            <div className="rounded-xl border border-accent/20 bg-accent/10 px-3 py-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold uppercase text-accent">AI answer</span>
+                <span className="rounded-full bg-[var(--surface-card)] px-2 py-0.5 text-[10px] font-semibold text-text-tertiary">
+                  {getSearchModeLabel(mode)}
+                </span>
+              </div>
+              <p className="text-sm font-medium text-text-primary">{answer}</p>
+            </div>
+          )}
+          {people.length > 0 && (
+            <div className="rounded-xl border border-border bg-[var(--surface-card)] p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold text-text-primary">
+                <Users className="h-4 w-4 text-accent" aria-hidden />
+                Người liên quan nhất
+              </div>
+              <div className="space-y-2">
+                {people.slice(0, 3).map((person) => (
+                  <div key={`${person.senderId}:${person.evidenceMessageRefs.join(',')}`} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-text-primary">{person.senderName}</p>
+                      <p className="line-clamp-2 text-xs text-text-secondary">{person.reason}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-bold text-accent">{Math.round(person.score * 100)}%</p>
+                      <p className="text-[10px] text-text-tertiary">{person.count} nguồn</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-xs text-text-tertiary">
+            <span>{query.trim() ? `Kết quả cho "${query}"` : 'Tìm kiếm gần đây'}</span>
+            <span>{total} kết quả</span>
+          </div>
+
+          <div className="space-y-2">
+            {results.map((result) => (
+              <button
+                key={result.itemId ?? `${result.conversationId}:${result.messageRef}`}
+                type="button"
+                onClick={() => onOpenResult(result.conversationId, result.messageRef)}
+                className="w-full rounded-xl border border-border bg-[var(--surface-card)] p-3 text-left transition hover:border-accent/50 hover:bg-[var(--surface-glass)]"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-glass)] text-xs font-bold text-text-secondary">
+                    {result.conversationName.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-text-primary">
+                        {result.senderName} · {result.conversationName}
+                      </p>
+                      {typeof result.score === 'number' && (
+                        <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent">
+                          {Math.round(result.score * 100)}%
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-text-secondary" title={result.messageRef}>
+                      {highlightSearchTerms(result.messageSnippet || result.snippet, query)}
+                    </p>
+                    {result.matchReason && (
+                      <p className="mt-1 line-clamp-2 text-[11px] text-text-tertiary">
+                        {result.matchReason}
+                      </p>
+                    )}
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-text-tertiary">
+                      <span>{formatSearchTimestamp(result.timestamp)}</span>
+                      <span className="font-semibold text-accent">Xem tin nhắn</span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function getCatchupModeLabel(mode?: 'unread' | 'since_last_digest' | 'recent'): string {
   if (mode === 'unread') return 'Tin chưa đọc';
   if (mode === 'since_last_digest') return 'Tin mới sau tóm tắt';
   return 'Tóm tắt gần đây';
+}
+
+function formatSearchTimestamp(isoDate?: string): string {
+  if (!isoDate) return '';
+  const date = new Date(isoDate);
+  if (!Number.isFinite(date.getTime())) return '';
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getSearchModeLabel(mode: 'semantic' | 'hybrid' | 'keyword_fallback' | 'saved'): string {
+  if (mode === 'semantic') return 'Semantic';
+  if (mode === 'hybrid') return 'Semantic + keyword';
+  if (mode === 'keyword_fallback') return 'Keyword fallback';
+  return 'Đã lưu';
+}
+
+function highlightSearchTerms(text: string, query: string) {
+  const source = text || '';
+  const terms = Array.from(new Set(
+    query
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((term) => term.length >= 3),
+  ));
+
+  if (terms.length === 0) return source;
+
+  const escapedTerms = terms.map(termToVietnameseRegex);
+  const regex = new RegExp(`(${escapedTerms.join('|')})`, 'ig');
+  const parts = source.split(regex);
+
+  return parts.map((part, index) => {
+    const normalizedPart = part
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase();
+    const isMatch = terms.includes(normalizedPart);
+
+    return isMatch ? (
+      <mark key={`${part}-${index}`} className="rounded bg-yellow-200 px-0.5 text-yellow-950 dark:bg-yellow-700 dark:text-yellow-50">
+        {part}
+      </mark>
+    ) : part;
+  });
+}
+
+function termToVietnameseRegex(term: string): string {
+  const classes: Record<string, string> = {
+    a: '[aáàảãạăắằẳẵặâấầẩẫậ]',
+    e: '[eéèẻẽẹêếềểễệ]',
+    i: '[iíìỉĩị]',
+    o: '[oóòỏõọôốồổỗộơớờởỡợ]',
+    u: '[uúùủũụưứừửữự]',
+    y: '[yýỳỷỹỵ]',
+    d: '[dđ]',
+  };
+
+  return term
+    .split('')
+    .map((char) => classes[char] ?? char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('');
 }
 
 function formatDueLabel(isoDate: string): string {

@@ -221,6 +221,8 @@ interface ChatPanelProps {
   isGroupConversation?: boolean;
   isOnline?: boolean;
   messages?: Message[];
+  targetMessageRef?: string | null;
+  onTargetMessageConsumed?: () => void;
   messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
   onSendMessage?: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null | undefined>;
@@ -539,6 +541,8 @@ function ChatPanel({
   isGroupConversation = false,
   isOnline = false,
   messages = [],
+  targetMessageRef = null,
+  onTargetMessageConsumed,
   messageStatus = {},
   typingUsers = [],
   onSendMessage = async () => null,
@@ -605,6 +609,7 @@ function ChatPanel({
   const onLoadMoreRef = useRef(onLoadMore);
   const jumpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isJumpingRef = useRef(false);
+  const lastExternalJumpRef = useRef<string | null>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
   const [jumpStatus, setJumpStatus] = useState<string | null>(null);
@@ -932,6 +937,10 @@ function ChatPanel({
       const element = messageRowRefs.current[targetMessageId];
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('zync-message-jump-highlight');
+        window.setTimeout(() => {
+          element.classList.remove('zync-message-jump-highlight');
+        }, 1800);
       }
     };
 
@@ -1009,6 +1018,22 @@ function ChatPanel({
       isJumpingRef.current = false;
     }
   }, [scrollToMessageElement, showJumpStatus]);
+
+  useEffect(() => {
+    if (!targetMessageRef || isLoading) {
+      return;
+    }
+
+    const jumpKey = `${conversationId}:${targetMessageRef}`;
+    if (lastExternalJumpRef.current === jumpKey) {
+      return;
+    }
+    lastExternalJumpRef.current = jumpKey;
+
+    void handleJumpToMessage(targetMessageRef).finally(() => {
+      onTargetMessageConsumed?.();
+    });
+  }, [conversationId, handleJumpToMessage, isLoading, onTargetMessageConsumed, targetMessageRef]);
 
   return (
     <article className="relative mx-auto flex h-full w-full max-w-[1440px] min-h-0 min-w-0 flex-col overflow-hidden chat-page-bg">
