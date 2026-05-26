@@ -1,8 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import type { AiAssistantItem, AiItemStatus } from '@zync/shared-types';
+import type { AiItemStatus } from '@zync/shared-types';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 interface StatusBadgeProps {
   status: AiItemStatus;
@@ -21,7 +20,7 @@ export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
   const config = STATUS_CONFIG[status];
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium ${config.colorClass} ${className}`}>
-      {config.spinner && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
+      {config.spinner && <ButtonSpinner size="xs" tone="muted" />}
       {config.label}
     </span>
   );

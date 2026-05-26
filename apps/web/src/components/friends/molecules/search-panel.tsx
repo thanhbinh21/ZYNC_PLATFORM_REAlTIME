@@ -2,6 +2,7 @@ import type { FriendUser } from '@/services/friends';
 import { Search, UserPlus, UserX, X } from 'lucide-react';
 import { useState } from 'react';
 import { FriendsAvatar } from '../atoms/friends-avatar';
+import { AppLoader } from '@/components/shared/loading-system';
 
 interface SearchPanelProps {
   searchKeyword: string;
@@ -107,9 +108,7 @@ export function SearchPanel({
       </p>
 
       {isSearchLoading && (
-        <div className="flex items-center justify-center py-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)]/30 border-t-[var(--accent)]" />
-        </div>
+        <AppLoader layout="bare" size="md" tone="teal" message="Đang tìm kiếm..." className="py-8" />
       )}
 
       {showResults && (

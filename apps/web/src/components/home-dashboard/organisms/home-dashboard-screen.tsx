@@ -73,7 +73,7 @@ export function HomeDashboardScreen({
           <div className="flex items-center gap-4 lg:gap-6">
             <div className="flex items-center gap-3">
               <span className="relative block h-10 w-10 overflow-hidden rounded-2xl bg-white ring-1 ring-border shadow-sm">
-                <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
+                <Image src="/favicon.svg" alt="Logo Zync" fill className="object-contain p-1" sizes="40px" priority />
               </span>
               <div className="hidden sm:block">
                 <p className="font-ui-brand text-xl leading-none text-text-primary">{data.brand}</p>

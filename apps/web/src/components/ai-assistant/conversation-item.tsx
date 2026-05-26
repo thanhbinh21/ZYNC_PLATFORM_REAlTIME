@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Loader2, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { StatusBadge } from './status-badge';
 import { DigestPreview } from './digest-preview';
 import type { AiAssistantItem } from '@zync/shared-types';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 interface ConversationItemProps {
   /** Tên conversation */
@@ -155,7 +156,7 @@ export function ConversationItem({
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              <ButtonSpinner size="xs" tone="light" />
             ) : (
               <MessageSquare className="h-3 w-3" aria-hidden />
             )}
@@ -172,7 +173,7 @@ export function ConversationItem({
             className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {regenerating ? (
-              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              <ButtonSpinner size="xs" tone="muted" />
             ) : null}
             Tạo lại
           </button>

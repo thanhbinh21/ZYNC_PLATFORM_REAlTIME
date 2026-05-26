@@ -8,7 +8,6 @@ import {
   UserPlus,
   MessageCircle,
   Check,
-  Loader2,
   Search,
   TrendingUp,
   Tag,
@@ -29,6 +28,7 @@ import { fetchTrendingPosts, type Post } from '@/services/posts';
 import { useNavigationFlow } from '@/hooks/use-navigation-flow';
 import { UserProfileModal } from '@/components/shared/UserProfileModal';
 import { fetchFriends, fetchFriendRequests } from '@/services/friends';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 const DEV_ROLE_LABELS: Record<string, string> = {
   developer: 'Developer',
@@ -148,7 +148,7 @@ function UserCard({
                 className="zync-soft-button-secondary flex items-center gap-1.5 px-3 py-1.5 text-xs"
               >
                 {isLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <ButtonSpinner size="xs" tone="muted" />
                 ) : (
                   <UserPlus className="h-3 w-3" />
                 )}

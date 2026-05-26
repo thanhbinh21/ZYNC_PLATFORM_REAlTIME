@@ -5,10 +5,10 @@ import {
   X,
   MessageCircle,
   UserPlus,
-  Loader2,
   Check,
 } from 'lucide-react';
 import type { UserProfileSummary } from '@/hooks/use-navigation-flow';
+import { ButtonSpinner, PageSkeleton } from './loading-system';
 
 interface UserProfileModalProps {
   visible: boolean;
@@ -160,19 +160,7 @@ export function UserProfileModal({
 
         {/* Loading state */}
         {loading && (
-          <div className="space-y-4 py-2">
-            <div className="mx-auto h-20 w-20 animate-pulse rounded-full bg-bg-hover" />
-            <div className="mx-auto h-5 w-40 animate-pulse rounded bg-bg-hover" />
-            <div className="mx-auto h-4 w-56 animate-pulse rounded bg-bg-hover" />
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              <div className="h-16 animate-pulse rounded-xl bg-bg-hover" />
-              <div className="h-16 animate-pulse rounded-xl bg-bg-hover" />
-              <div className="h-16 animate-pulse rounded-xl bg-bg-hover" />
-            </div>
-            <div className="flex items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-accent" />
-            </div>
-          </div>
+          <PageSkeleton rows={4} className="border-0 bg-transparent shadow-none" />
         )}
 
         {/* Content */}
@@ -261,7 +249,7 @@ export function UserProfileModal({
                         cursor: 'not-allowed',
                       }}
                     >
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <ButtonSpinner size="sm" tone="muted" />
                       Đang gửi...
                     </button>
                   ) : friendRequestSent ? (

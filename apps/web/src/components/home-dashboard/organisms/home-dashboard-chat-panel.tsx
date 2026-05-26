@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, type ComponentType, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Bot, CheckCircle2, ListChecks, HelpCircle, Bell, MessageSquare, Loader2, Play, PenLine, RefreshCw, Sparkles, Heart, Phone, Video } from 'lucide-react';
+import { AlertCircle, Bot, CheckCircle2, ListChecks, HelpCircle, Bell, MessageSquare, Play, PenLine, RefreshCw, Sparkles, Heart, Phone, Video } from 'lucide-react';
 import type { AiCatchupDigest, Message, MessageStatus } from '@zync/shared-types';
 import {
   Menu,
@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useMediaViewer } from '@/context/media-viewer-context';
 import { showSystemToast } from '@/components/notifications/InAppNotificationToasts';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 type LucideIconComponent = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
 const PlayIcon = Play as unknown as LucideIconComponent;
@@ -34,7 +35,6 @@ const HeartIcon = Heart as unknown as LucideIconComponent;
 const AlertCircleIcon = AlertCircle as unknown as LucideIconComponent;
 const BotIcon = Bot as unknown as LucideIconComponent;
 const CheckCircleIcon = CheckCircle2 as unknown as LucideIconComponent;
-const LoaderIcon = Loader2 as unknown as LucideIconComponent;
 const RefreshIcon = RefreshCw as unknown as LucideIconComponent;
 const SparklesIcon = Sparkles as unknown as LucideIconComponent;
 const PhoneIcon = Phone as unknown as LucideIconComponent;
@@ -1452,10 +1452,7 @@ function ChatPanel({
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
-                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
+                      <ButtonSpinner size="sm" tone="muted" />
                       Đang tải...
                     </span>
                   ) : (

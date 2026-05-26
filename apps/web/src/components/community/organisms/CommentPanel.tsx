@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Heart, Loader2, CornerDownRight } from 'lucide-react';
+import { X, Send, Heart, CornerDownRight } from 'lucide-react';
 import { fetchComments, addComment, type Comment, type Post } from '@/services/posts';
+import { AppLoader, ButtonSpinner } from '@/components/shared/loading-system';
 
 interface CommentPanelProps {
   post: Post;
@@ -170,10 +171,7 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
         {/* Comments list */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {loading ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-text-tertiary" />
-              <p className="font-ui-content text-sm text-text-tertiary">Đang tải bình luận...</p>
-            </div>
+            <AppLoader layout="bare" size="md" tone="teal" message="Đang tải bình luận..." className="py-12" />
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-3 py-12">
               <p className="font-ui-content text-sm text-red-400">{error}</p>
@@ -341,7 +339,7 @@ export function CommentPanel({ post, onClose, onCommentAdded }: CommentPanelProp
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-[var(--bg-primary)] shadow-sm transition hover:scale-[1.03] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <ButtonSpinner size="sm" tone="light" />
                 ) : (
                   <Send className="h-4 w-4" />
                 )}

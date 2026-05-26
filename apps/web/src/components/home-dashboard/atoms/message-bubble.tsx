@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { MessageStatus, MessageReplyTo, MessageReadParticipantWithTime } from '@zync/shared-types';
 import { useMediaViewer } from '@/context/media-viewer-context';
 import { GetFileIcon } from './file-type-icons';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 function ReplyIcon({ className }: { className: string }) {
   return (
@@ -239,7 +240,7 @@ export function MessageBubble({
               />
               {isPendingLocalMedia && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                  <div className="h-9 w-9 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
+                  <ButtonSpinner size="md" tone="light" />
                 </div>
               )}
             </div>

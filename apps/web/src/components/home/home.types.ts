@@ -1,6 +1,8 @@
+export type HomeFeatureIcon = 'chat' | 'community' | 'knowledge' | 'ai' | 'realtime' | 'safety';
+
 export interface HomeFeatureItem {
   id: string;
-  icon: 'shield' | 'bolt' | 'devices';
+  icon: HomeFeatureIcon;
   title: string;
   description: string;
 }
@@ -16,6 +18,12 @@ export interface HomeNavItem {
   id: string;
   label: string;
   href: string;
+}
+
+export interface HomeUseCaseItem {
+  id: string;
+  title: string;
+  description: string;
 }
 
 export interface HomeFooterLink {
@@ -36,9 +44,14 @@ export interface HomeMockData {
   navAuthLabel: string;
   navPrimaryLabel: string;
   features: HomeFeatureItem[];
-  globalTitle: string;
-  globalSubtitle: string;
   metrics: HomeMetricItem[];
+  benefits: string[];
+  useCases: HomeUseCaseItem[];
+  communityTitle: string;
+  communitySubtitle: string;
+  aiTitle: string;
+  aiSubtitle: string;
+  aiHighlights: string[];
   ctaBlockTitle: string;
   ctaBlockSubtitle: string;
   ctaBlockButton: string;

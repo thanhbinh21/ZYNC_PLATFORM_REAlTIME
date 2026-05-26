@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { generateUploadSignature, verifyUpload } from '@/services/chat';
 import type { Message, MessageType } from '@zync/shared-types';
 import { StickerPicker } from './sticker-picker';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 function PaperclipIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
@@ -604,7 +605,7 @@ export function MessageInput({
 
           {uploading && (
             <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/20 backdrop-blur-[2px]">
-              <div className="h-8 w-8 rounded-full border-[3px] border-white/30 border-t-white animate-spin shadow-lg" />
+              <ButtonSpinner size="md" tone="light" className="shadow-lg" />
             </div>
           )}
 
@@ -632,10 +633,7 @@ export function MessageInput({
 
       {uploadedMedia && queuedMediaSend && uploading && (
         <p className="mt-2 mx-3 flex items-center gap-2 text-xs text-[#929292]">
-          <svg className="h-3.5 w-3.5 animate-spin text-accent" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
+          <ButtonSpinner size="xs" tone="muted" />
           Đang tải media...
         </p>
       )}

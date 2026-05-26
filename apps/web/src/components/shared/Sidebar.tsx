@@ -31,7 +31,7 @@ export function Sidebar({
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3 px-1">
                 <span className="relative block h-9 w-9 overflow-hidden rounded-xl bg-accent ring-1 ring-border-light">
-                  <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="36px" priority />
+                  <Image src="/favicon.svg" alt="Logo Zync" fill className="object-contain p-1" sizes="36px" priority />
                 </span>
                 <p className="font-ui-brand text-3xl leading-none text-accent">{data.brand}</p>
               </div>
@@ -101,7 +101,7 @@ export function Sidebar({
       <aside className="hidden h-full w-[260px] md:w-[80px] lg:w-[260px] flex-col overflow-y-auto rounded-3xl border border-border bg-bg-sidebar px-4 md:px-2 lg:px-4 py-6 shadow-md md:flex transition-all duration-300">
         <div className="flex items-center gap-3 px-2 md:justify-center lg:justify-start">
           <span className="relative block h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-accent ring-1 ring-border-light">
-            <Image src="/logo.png" alt="Logo Zync" fill className="object-cover" sizes="40px" priority />
+            <Image src="/favicon.svg" alt="Logo Zync" fill className="object-contain p-1" sizes="40px" priority />
           </span>
           <p className="font-ui-brand text-4xl leading-none text-accent md:max-lg:hidden">{data.brand}</p>
         </div>

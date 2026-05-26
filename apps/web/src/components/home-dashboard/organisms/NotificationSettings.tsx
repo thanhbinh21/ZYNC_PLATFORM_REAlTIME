@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { NotificationPreferences } from '@/services/notifications';
+import { AppLoader } from '@/components/shared/loading-system';
 
 interface NotificationSettingsProps {
   preferences: NotificationPreferences | null;
@@ -51,9 +52,7 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
         ref={panelRef}
         className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[1.6rem] p-4 zync-notification-panel"
       >
-        <div className="flex justify-center py-6">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-accent" />
-        </div>
+        <AppLoader layout="bare" size="sm" tone="teal" message="Đang tải..." className="py-6" />
       </div>
     );
   }

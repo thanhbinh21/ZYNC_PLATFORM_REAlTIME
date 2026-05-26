@@ -1,10 +1,11 @@
 ﻿'use client';
 
 import { useEffect, useRef } from 'react';
-import { Bell, Check, CheckCircle2, Loader2, MessageSquare, Reply, Search, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { Bell, Check, CheckCircle2, MessageSquare, Reply, Search, Sparkles, Trash2, Users, X } from 'lucide-react';
 import type { AiAssistantSearchPerson, AiAssistantSearchResult, AiGroupNote } from '@zync/shared-types';
 import type { AiBoxTab } from '@/hooks/use-ai-assistant';
 import { StatusBadge } from './status-badge';
+import { AppLoader, ButtonSpinner } from '@/components/shared/loading-system';
 
 type CatchupDetail = {
   _id: string;
@@ -469,10 +470,7 @@ function CatchupTab({
 }) {
   if (loadingList && conversations.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
-        <p className="mt-3 text-sm text-text-secondary">Đang tải...</p>
-      </div>
+      <AppLoader layout="bare" size="md" tone="teal" message="Đang tải catch-up..." className="py-12" />
     );
   }
 
@@ -612,7 +610,7 @@ function CatchupTab({
                   className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    <ButtonSpinner size="xs" tone="light" />
                   ) : (
                     <MessageSquare className="h-3 w-3" aria-hidden />
                   )}
@@ -626,7 +624,7 @@ function CatchupTab({
                   className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    <ButtonSpinner size="xs" tone="muted" />
                   ) : null}
                   Tạo lại
                 </button>
@@ -655,7 +653,7 @@ function CatchupTab({
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-[var(--surface-glass)] px-4 py-3 text-sm font-medium text-text-secondary transition hover:bg-[var(--surface-glass-strong)] disabled:opacity-50"
         >
           {loadingList ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            <ButtonSpinner size="sm" tone="muted" />
           ) : null}
           Tải thêm ({conversations.length}/{total})
         </button>
@@ -685,10 +683,7 @@ function TasksTab({
 }) {
   if (loadingTasks && tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
-        <p className="mt-3 text-sm text-text-secondary">Đang tải...</p>
-      </div>
+      <AppLoader layout="bare" size="md" tone="teal" message="Đang tải task..." className="py-12" />
     );
   }
 
@@ -796,7 +791,7 @@ function TasksTab({
           disabled={loadingTasks}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-[var(--surface-glass)] px-4 py-3 text-sm font-medium text-text-secondary transition hover:bg-[var(--surface-glass-strong)] disabled:opacity-50"
         >
-          {loadingTasks ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+          {loadingTasks ? <ButtonSpinner size="sm" tone="muted" /> : null}
           Tải thêm ({tasks.length}/{total})
         </button>
       )}
@@ -833,10 +828,7 @@ function NotesTab({
 
   if (loadingNotes && notes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
-        <p className="mt-3 text-sm text-text-secondary">Đang tải ghi chú...</p>
-      </div>
+      <AppLoader layout="bare" size="md" tone="teal" message="Đang tải ghi chú..." className="py-12" />
     );
   }
 
@@ -856,7 +848,7 @@ function NotesTab({
                   disabled={loading}
                   className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-[var(--surface-glass)] px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-[var(--surface-glass-strong)] disabled:opacity-50"
                 >
-                  {loading ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <MessageSquare className="h-3 w-3" aria-hidden />}
+                  {loading ? <ButtonSpinner size="xs" tone="muted" /> : <MessageSquare className="h-3 w-3" aria-hidden />}
                   <span className="truncate">{conversation.name}</span>
                 </button>
               );
@@ -1015,15 +1007,12 @@ function SearchTab({
             placeholder="Tìm trong tin nhắn"
             className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
           />
-          {loadingSearch && <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden />}
+          {loadingSearch && <ButtonSpinner size="sm" tone="muted" />}
         </div>
       </div>
 
       {loadingSearch && results.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
-          <p className="mt-3 text-sm text-text-secondary">Đang tìm...</p>
-        </div>
+        <AppLoader layout="bare" size="md" tone="teal" message="Đang tìm..." className="py-12" />
       ) : error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
           {error}

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import type { Message } from '@zync/shared-types';
-import { v4 as uuidv4 } from 'uuid';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 // ─── Icons ───
 function CloseIcon({ className }: { className: string }) {
@@ -19,15 +19,6 @@ function SearchIcon({ className }: { className: string }) {
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
-function LoadingSpinner({ className }: { className: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={`${className} animate-spin`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" className="opacity-25" />
-      <path d="M12 2a10 10 0 0 1 10 10" className="opacity-75" />
     </svg>
   );
 }
@@ -172,7 +163,7 @@ export function ForwardMessageModal({
               disabled={!selectedConversationId || isLoading}
               className="flex-1 rounded-lg bg-[#2de3b3] hover:bg-[#25d09a] disabled:opacity-50 disabled:cursor-not-allowed text-[#05382e] py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
             >
-              {isLoading && <LoadingSpinner className="h-4 w-4" />}
+              {isLoading && <ButtonSpinner size="sm" tone="teal" />}
               {isLoading ? 'Đang gửi...' : 'Chuyển tiếp'}
             </button>
           </div>

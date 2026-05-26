@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 interface HomeCtaProps {
   label: string;
@@ -9,12 +10,13 @@ interface HomeCtaProps {
 export function HomeCta({ label, href, variant }: HomeCtaProps) {
   const className =
     variant === 'primary'
-      ? 'zync-soft-button min-w-[11rem]'
-      : 'zync-soft-button-secondary min-w-[11rem]';
+      ? 'inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#0F766E] px-6 text-sm font-bold text-white shadow-[0_20px_45px_-22px_rgba(15,118,110,0.9)] transition hover:-translate-y-0.5 hover:bg-[#0B5F59]'
+      : 'inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/70 px-6 text-sm font-bold text-[#082F49] shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-teal-200 hover:text-[#0F766E]';
 
   return (
     <Link href={href} className={className}>
-      {label}
+      <span>{label}</span>
+      {variant === 'primary' ? <ArrowRight size={17} strokeWidth={2.4} aria-hidden /> : null}
     </Link>
   );
 }
