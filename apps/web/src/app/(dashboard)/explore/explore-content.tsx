@@ -1,22 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Zap,
-  Server,
-  Cloud,
-  Bot,
-  Smartphone,
-  Briefcase,
-  Globe,
-  FolderOpen,
   Users,
   UserCheck,
   UserPlus,
   MessageCircle,
   Check,
-  Loader2,
   Search,
   TrendingUp,
   Tag,
@@ -25,29 +16,19 @@ import {
   Eye,
   Link2,
   Sparkles,
+  Plus,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import {
-  fetchExploreChannels,
   fetchDiscoverUsers,
-  joinPublicChannel,
   type DiscoverUser,
 } from '@/services/explore';
 import { fetchTrendingPosts, type Post } from '@/services/posts';
-import type { GroupConversation } from '@/services/groups';
 import { useNavigationFlow } from '@/hooks/use-navigation-flow';
 import { UserProfileModal } from '@/components/shared/UserProfileModal';
 import { fetchFriends, fetchFriendRequests } from '@/services/friends';
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  frontend: Zap,
-  backend: Server,
-  devops: Cloud,
-  'ai-ml': Bot,
-  mobile: Smartphone,
-  career: Briefcase,
-  general: Globe,
-  other: FolderOpen,
-};
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 const DEV_ROLE_LABELS: Record<string, string> = {
   developer: 'Developer',
@@ -57,68 +38,15 @@ const DEV_ROLE_LABELS: Record<string, string> = {
   other: 'Khác',
 };
 
-function ChannelCard({
-  channel,
-  onJoin,
-  joining,
-}: {
-  channel: GroupConversation;
-  onJoin: (id: string) => void;
-  joining: boolean;
-}) {
-  const ch = channel as unknown as Record<string, unknown>;
-  const category = ch['category'] as string | undefined;
-  const description = ch['description'] as string | undefined;
-  const memberCount = ch['memberCount'] as number | undefined;
-  const tags = ch['tags'] as string[] | undefined;
-  const CategoryIcon = category ? (CATEGORY_ICONS[category] ?? FolderOpen) : FolderOpen;
+const SECTION_TABS = [
+  { id: 'developers' as const, label: 'Nhà phát triển', Icon: Users },
+  { id: 'posts' as const, label: 'Thịnh hành', Icon: TrendingUp },
+];
 
-  return (
-    <div className="zync-soft-card rounded-[1.6rem] p-4 transition hover:shadow-md">
-      <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-accent-light">
-          {channel.avatarUrl ? (
-            <img src={channel.avatarUrl} alt={channel.name ?? 'Channel'} className="h-full w-full rounded-2xl object-cover" />
-          ) : (
-            <CategoryIcon className="h-6 w-6 text-accent" />
-          )}
-        </div>
+const POPULAR_TAGS = ['react', 'nodejs', 'typescript', 'python', 'devops', 'ai-ml', 'docker', 'nextjs', 'rust', 'golang'];
 
-        <div className="min-w-0 flex-1">
-          <p className="font-ui-title text-sm text-text-primary">{channel.name ?? 'Channel'}</p>
-          {category && (
-            <span className="mt-0.5 inline-block rounded-full bg-bg-hover px-2 py-0.5 text-xs text-text-tertiary">{category}</span>
-          )}
-        </div>
-
-        <button
-          onClick={() => onJoin(channel._id)}
-          disabled={joining}
-          className="zync-soft-button flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs"
-        >
-          {joining ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
-          Tham gia
-        </button>
-      </div>
-
-      {description && (
-        <p className="font-ui-content mt-2.5 line-clamp-2 text-sm leading-relaxed text-text-secondary">{description}</p>
-      )}
-
-      <div className="mt-3 flex items-center justify-between">
-        <div className="flex flex-wrap gap-1">
-          {(tags ?? []).slice(0, 3).map((tag) => (
-            <span key={tag} className="rounded-full border border-border px-2 py-0.5 text-xs text-text-tertiary">#{tag}</span>
-          ))}
-        </div>
-        <span className="flex items-center gap-1 text-xs text-text-tertiary">
-          <Users className="h-3 w-3" />
-          {memberCount ?? channel.users.length} thành viên
-        </span>
-      </div>
-    </div>
-  );
-}
+const VALID_TABS = ['developers', 'posts'] as const;
+type TabId = typeof VALID_TABS[number];
 
 function UserCard({
   user,
@@ -146,7 +74,7 @@ function UserCard({
   return (
     <div className="zync-soft-card rounded-[1.6rem] p-4 transition hover:shadow-md">
       <div className="flex items-start gap-3">
-        <div 
+        <div
           className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong cursor-pointer hover:opacity-80 transition"
           onClick={() => onOpenProfile?.(user.id)}
         >
@@ -220,7 +148,7 @@ function UserCard({
                 className="zync-soft-button-secondary flex items-center gap-1.5 px-3 py-1.5 text-xs"
               >
                 {isLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <ButtonSpinner size="xs" tone="muted" />
                 ) : (
                   <UserPlus className="h-3 w-3" />
                 )}
@@ -234,60 +162,99 @@ function UserCard({
   );
 }
 
-function TrendingPostRow({ post, rank }: { post: Post; rank: number }) {
+function TrendingPostRow({ post, rank, onClick }: { post: Post; rank: number; onClick: () => void }) {
   return (
-    <div className="flex items-start gap-3 rounded-[1.2rem] border border-border-light p-3 transition hover:bg-bg-hover">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-start gap-3 rounded-[1.2rem] border border-border-light p-3 text-left transition hover:border-accent/40 hover:bg-accent/5"
+    >
       <span className="font-ui-title min-w-[1.5rem] text-xl leading-none text-accent-strong">{rank}</span>
       <div className="min-w-0 flex-1">
         <p className="font-ui-title line-clamp-2 text-sm leading-snug text-text-primary">{post.title}</p>
-        <div className="mt-1 flex items-center gap-3 text-xs text-text-tertiary">
+        {(post.tags ?? []).length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {post.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="rounded-full border border-border px-1.5 py-0.5 text-xs text-text-tertiary">#{tag}</span>
+            ))}
+          </div>
+        )}
+        <div className="mt-1.5 flex items-center gap-3 text-xs text-text-tertiary">
           <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{post.likesCount}</span>
           <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{post.commentsCount}</span>
           <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{post.viewsCount}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function DeveloperSkeleton() {
+  return (
+    <div className="zync-soft-card rounded-[1.6rem] p-4">
+      <div className="flex gap-3">
+        <div className="h-12 w-12 animate-pulse rounded-full bg-bg-hover shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-2/3 animate-pulse rounded bg-bg-hover" />
+          <div className="h-3 w-1/3 animate-pulse rounded bg-bg-hover" />
+          <div className="flex gap-1">
+            <div className="h-5 w-16 animate-pulse rounded-full bg-bg-hover" />
+            <div className="h-5 w-12 animate-pulse rounded-full bg-bg-hover" />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const SECTION_TABS = [
-  { id: 'channels' as const, label: 'Kênh', Icon: FolderOpen },
-  { id: 'developers' as const, label: 'Nhà phát triển', Icon: Users },
-  { id: 'posts' as const, label: 'Thịnh hành', Icon: TrendingUp },
-];
-
-const POPULAR_TAGS = ['react', 'nodejs', 'typescript', 'python', 'devops', 'ai-ml', 'docker', 'nextjs', 'rust', 'golang'];
+function PostSkeleton() {
+  return (
+    <div className="flex items-start gap-3 rounded-[1.2rem] border border-border-light p-3">
+      <div className="h-6 w-6 animate-pulse rounded bg-bg-hover" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-4 w-full animate-pulse rounded bg-bg-hover" />
+        <div className="h-3 w-2/3 animate-pulse rounded bg-bg-hover" />
+        <div className="flex gap-3">
+          <div className="h-3 w-10 animate-pulse rounded bg-bg-hover" />
+          <div className="h-3 w-10 animate-pulse rounded bg-bg-hover" />
+          <div className="h-3 w-10 animate-pulse rounded bg-bg-hover" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ExploreContent() {
   const searchParams = useSearchParams();
-  const [channels, setChannels] = useState<GroupConversation[]>([]);
+  const router = useRouter();
   const [users, setUsers] = useState<DiscoverUser[]>([]);
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [joiningChannelId, setJoiningChannelId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [activeSection, setActiveSection] = useState<'channels' | 'developers' | 'posts'>('channels');
-  const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set());
+  const [activeSection, setActiveSection] = useState<TabId>(() => {
+    const tab = searchParams.get('tab');
+    return (VALID_TABS.includes(tab as TabId) ? tab : 'developers') as TabId;
+  });
   const [sentRequestIds, setSentRequestIds] = useState<Set<string>>(new Set());
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [friendRequestLoading, setFriendRequestLoading] = useState(false);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
-  // Doc skills filter tu URL params (tu onboarding)
   const skillsFromUrl = searchParams.get('skills');
   const suggestedSkills = skillsFromUrl ? skillsFromUrl.split(',').filter(Boolean) : [];
 
-  const { 
-    navigateToChat, 
-    sendFriendRequest, 
-    profileModalOpen, 
-    profileModalUserId, 
-    profileModalUser, 
-    profileModalLoading, 
-    openProfileModal, 
-    closeProfileModal 
+  const {
+    navigateToChat,
+    sendFriendRequest,
+    profileModalOpen,
+    profileModalUserId,
+    profileModalUser,
+    profileModalLoading,
+    openProfileModal,
+    closeProfileModal,
   } = useNavigationFlow();
 
-  // Lay current user tu localStorage (duoc set boi auth flow)
   const currentUserId = (() => {
     if (typeof window === 'undefined') return undefined;
     try {
@@ -296,25 +263,40 @@ export default function ExploreContent() {
         const user = JSON.parse(stored);
         return user._id || user.id;
       }
-    } catch {/* ignore */}
+    } catch { /* ignore */ }
     return undefined;
   })();
 
+  const handleTabChange = useCallback((tab: TabId) => {
+    setActiveSection(tab);
+    setSearch('');
+    setActiveTag(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    params.delete('skills');
+    router.replace(`/explore?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const [channelData, userData, postData, friendsData, requestsData] = await Promise.allSettled([
-        fetchExploreChannels(),
+      const [userData, postData, friendsData, requestsData] = await Promise.allSettled([
         fetchDiscoverUsers(),
-        fetchTrendingPosts(10),
+        fetchTrendingPosts(20),
         fetchFriends(),
         fetchFriendRequests(),
       ]);
-      if (channelData.status === 'fulfilled') setChannels(channelData.value);
       if (userData.status === 'fulfilled') setUsers(userData.value);
       if (postData.status === 'fulfilled') setTrendingPosts(postData.value);
       if (friendsData.status === 'fulfilled') setFriendIds(new Set(friendsData.value.friends.map((f) => f.id)));
       if (requestsData.status === 'fulfilled') setSentRequestIds(new Set(requestsData.value.outgoing.map((r) => r.userId)));
+
+      if (userData.status === 'rejected' || postData.status === 'rejected') {
+        setLoadError('Không thể tải dữ liệu. Vui lòng thử lại.');
+      }
+    } catch {
+      setLoadError('Không thể tải dữ liệu. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -322,21 +304,10 @@ export default function ExploreContent() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleJoinChannel = async (channelId: string) => {
-    setJoiningChannelId(channelId);
-    try {
-      await joinPublicChannel(channelId);
-      setJoinedIds((prev) => new Set([...prev, channelId]));
-    } catch {/* ignore */} finally {
-      setJoiningChannelId(null);
-    }
-  };
-
   const handleSendFriendRequest = async (userId: string) => {
     const user = users.find((u) => u.id === userId);
     if (!user) return;
 
-    // Neu da la ban thi navigate to chat
     if (friendIds.has(userId)) {
       await navigateToChat(userId);
       return;
@@ -346,33 +317,56 @@ export default function ExploreContent() {
     try {
       await sendFriendRequest(userId);
       setSentRequestIds((prev) => new Set([...prev, userId]));
-    } catch {/* ignore */} finally {
+    } catch { /* ignore */ } finally {
       setFriendRequestLoading(false);
     }
   };
 
-  const filteredChannels = channels.filter((c) =>
-    !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()),
-  );
+  const handleTagClick = (tag: string) => {
+    if (activeTag === tag) {
+      setActiveTag(null);
+      setSearch('');
+    } else {
+      setActiveTag(tag);
+      setSearch(tag);
+    }
+  };
+
+  const handlePostClick = (postId: string) => {
+    router.push(`/community?post=${postId}`);
+  };
+
   const filteredUsers = users.filter((u) => {
     const matchesSearch = !search || u.displayName.toLowerCase().includes(search.toLowerCase()) ||
       (u.skills ?? []).some((s) => s.toLowerCase().includes(search.toLowerCase()));
-    // Neu co skills tu onboarding thi loc theo skills
     if (suggestedSkills.length > 0) {
       const userSkillsLower = (u.skills ?? []).map((s) => s.toLowerCase());
       return matchesSearch && suggestedSkills.some((skill) => userSkillsLower.includes(skill.toLowerCase()));
     }
     return matchesSearch;
   });
-  const filteredPosts = trendingPosts.filter((p) =>
-    !search || p.title.toLowerCase().includes(search.toLowerCase()),
-  );
+
+  const filteredPosts = trendingPosts.filter((p) => {
+    const titleMatch = !search || p.title.toLowerCase().includes(search.toLowerCase());
+    const tagMatch = activeTag ? (p.tags ?? []).includes(activeTag) : true;
+    return titleMatch && tagMatch;
+  });
+
+  const searchPlaceholder = (() => {
+    if (search) return search;
+    switch (activeSection) {
+      case 'developers': return 'Tìm nhà phát triển...';
+      case 'posts': return 'Tìm bài viết...';
+    }
+  })();
+
+  const isSearching = search.length > 0 || activeTag !== null;
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header + Search */}
       <div className="border-b border-border-light px-4 py-4 sm:px-6">
-        {/* Banner goi y skills tu onboarding */}
+        {/* Banner gợi ý skills từ onboarding */}
         {suggestedSkills.length > 0 && (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-[1.2rem] border border-accent/30 bg-accent/5 p-3">
             <div className="flex items-center gap-2">
@@ -398,7 +392,7 @@ export default function ExploreContent() {
               <Search className="h-5 w-5 text-accent" />
               Khám phá
             </h2>
-            <p className="font-ui-content mt-0.5 text-xs text-text-secondary">Tìm kênh, người dùng và bài viết nổi bật</p>
+            <p className="font-ui-content mt-0.5 text-xs text-text-secondary">Tìm nhà phát triển và bài viết nổi bật</p>
           </div>
         </div>
 
@@ -407,7 +401,7 @@ export default function ExploreContent() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="    Tìm kênh, người dùng, bài viết..."
+            placeholder={`  ${searchPlaceholder}`}
             className="zync-soft-input w-full pl-9"
           />
         </div>
@@ -416,7 +410,7 @@ export default function ExploreContent() {
           {SECTION_TABS.map(({ id, label, Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveSection(id)}
+              onClick={() => handleTabChange(id)}
               className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
                 activeSection === id ? 'bg-accent text-[var(--bg-primary)] shadow-sm' : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
               }`}
@@ -430,57 +424,51 @@ export default function ExploreContent() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        {/* Error state */}
+        {loadError && (
+          <div className="mb-4 flex flex-col items-center justify-center gap-3 rounded-[1.2rem] border border-red-500/20 bg-red-500/5 p-6 text-center">
+            <p className="font-ui-content text-sm text-red-400">{loadError}</p>
+            <button
+              onClick={loadData}
+              className="zync-soft-button flex items-center gap-2 px-4 py-2 text-sm"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Thử lại
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="zync-soft-card rounded-[1.6rem] p-4">
-                <div className="flex gap-3">
-                  <div className="h-12 w-12 animate-pulse rounded-2xl bg-bg-hover" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-1/2 animate-pulse rounded bg-bg-hover" />
-                    <div className="h-3 w-1/3 animate-pulse rounded bg-bg-hover" />
-                  </div>
-                </div>
+              <div key={i}>
+                {activeSection === 'developers' && <DeveloperSkeleton key={i} />}
+                {activeSection === 'posts' && <PostSkeleton key={i} />}
               </div>
             ))}
           </div>
-        ) : activeSection === 'channels' ? (
-          filteredChannels.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
-                <FolderOpen className="h-6 w-6 text-text-tertiary" />
-              </div>
-              <div>
-                <p className="font-ui-title text-sm text-text-primary">
-                  {search ? 'Không tìm thấy kênh' : 'Chưa có kênh công khai'}
-                </p>
-                <p className="font-ui-content mt-1 text-xs text-text-secondary">
-                  {search ? 'Thử từ khóa khác' : 'Hãy tạo kênh đầu tiên!'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {filteredChannels.map((channel) => (
-                <ChannelCard
-                  key={channel._id}
-                  channel={channel}
-                  onJoin={joinedIds.has(channel._id) ? () => {} : handleJoinChannel}
-                  joining={joiningChannelId === channel._id}
-                />
-              ))}
-            </div>
-          )
         ) : activeSection === 'developers' ? (
           filteredUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
-                <Users className="h-6 w-6 text-text-tertiary" />
+            <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                <Users className="h-7 w-7 text-text-tertiary" />
               </div>
               <div>
-                <p className="font-ui-title text-sm text-text-primary">Chưa có nhà phát triển nổi bật</p>
-                <p className="font-ui-content mt-1 text-xs text-text-secondary">Hãy hoàn thiện hồ sơ để xuất hiện ở đây!</p>
+                <p className="font-ui-title text-base text-text-primary">
+                  {isSearching ? 'Không tìm thấy developer phù hợp' : 'Chưa có nhà phát triển nổi bật'}
+                </p>
+                <p className="font-ui-content mt-1 text-sm text-text-secondary">
+                  {isSearching ? 'Thử từ khóa hoặc tag khác' : 'Hãy hoàn thiện hồ sơ để xuất hiện ở đây!'}
+                </p>
               </div>
+              {isSearching && (
+                <button
+                  onClick={() => { setSearch(''); setActiveTag(null); }}
+                  className="zync-soft-button text-sm"
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -500,18 +488,48 @@ export default function ExploreContent() {
           )
         ) : (
           filteredPosts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
-                <TrendingUp className="h-6 w-6 text-text-tertiary" />
+            <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-bg-hover">
+                <TrendingUp className="h-7 w-7 text-text-tertiary" />
               </div>
               <div>
-                <p className="font-ui-title text-sm text-text-primary">Chưa có bài viết thịnh hành</p>
-                <p className="font-ui-content mt-1 text-xs text-text-secondary">Hãy chia sẻ bài viết đầu tiên trong cộng đồng!</p>
+                <p className="font-ui-title text-base text-text-primary">
+                  {isSearching ? 'Không tìm thấy bài viết phù hợp' : 'Chưa có bài viết thịnh hành'}
+                </p>
+                <p className="font-ui-content mt-1 text-sm text-text-secondary">
+                  {isSearching
+                    ? 'Thử từ khóa hoặc tag khác'
+                    : 'Hãy chia sẻ bài viết đầu tiên trong cộng đồng!'}
+                </p>
               </div>
+              {!isSearching && (
+                <button
+                  onClick={() => router.push('/community?create=true')}
+                  className="zync-soft-button flex items-center gap-2 px-4 py-2 text-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Viết bài viết
+                </button>
+              )}
+              {isSearching && (
+                <button
+                  onClick={() => { setSearch(''); setActiveTag(null); }}
+                  className="zync-soft-button text-sm"
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredPosts.map((post, i) => <TrendingPostRow key={post._id} post={post} rank={i + 1} />)}
+              {filteredPosts.map((post, i) => (
+                <TrendingPostRow
+                  key={post._id}
+                  post={post}
+                  rank={i + 1}
+                  onClick={() => handlePostClick(post._id)}
+                />
+              ))}
             </div>
           )
         )}
@@ -528,13 +546,26 @@ export default function ExploreContent() {
             {POPULAR_TAGS.map((tag) => (
               <button
                 key={tag}
-                onClick={() => setSearch(tag)}
-                className="rounded-full border border-border bg-bg-hover px-3 py-1 text-xs text-text-secondary transition hover:border-accent hover:text-accent"
+                onClick={() => handleTagClick(tag)}
+                className={`rounded-full border px-3 py-1 text-xs transition ${
+                  activeTag === tag
+                    ? 'border-accent bg-accent text-[var(--bg-primary)]'
+                    : 'border-border bg-bg-hover text-text-secondary hover:border-accent hover:text-accent'
+                }`}
               >
                 #{tag}
               </button>
             ))}
           </div>
+          {activeTag && (
+            <button
+              onClick={() => { setActiveTag(null); setSearch(''); }}
+              className="mt-2 flex items-center gap-1 text-xs text-text-tertiary hover:text-accent transition"
+            >
+              <X className="h-3 w-3" />
+              Xóa lọc tag
+            </button>
+          )}
         </div>
       )}
 

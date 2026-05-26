@@ -4,8 +4,7 @@ export type AiItemType =
   | 'catchup_digest'
   | 'task'
   | 'search_result'
-  | 'group_note'
-  | 'call_summary';
+  | 'group_note';
 
 export type AiItemStatus =
   | 'not_started'
@@ -37,6 +36,25 @@ export interface IAiAssistantItem extends Document {
     catchupMode?: AiCatchupMode;
     actionItemCount?: number;
     messageCount?: number;
+    taskStatus?: 'suggested' | 'accepted' | 'done' | 'dismissed';
+    dueAt?: string;
+    searchQuery?: string;
+    searchHash?: string;
+    searchRank?: number;
+    similarity?: number;
+    messageId?: string;
+    messageRef?: string;
+    messageCreatedAt?: string;
+    senderId?: string;
+    senderName?: string;
+    source?: 'semantic' | 'keyword';
+    matchReason?: string;
+    conversationName?: string;
+    conversationType?: 'direct' | 'group';
+    noteId?: string;
+    pinned?: boolean;
+    decisionCount?: number;
+    openQuestionCount?: number;
   };
 
   // System
@@ -51,7 +69,7 @@ const assistantItemSchema = new Schema<IAiAssistantItem>(
     type: {
       type: String,
       required: true,
-      enum: ['catchup_digest', 'task', 'search_result', 'group_note', 'call_summary'],
+      enum: ['catchup_digest', 'task', 'search_result', 'group_note'],
       index: true,
     },
     conversationId: { type: String, index: true },
@@ -72,6 +90,25 @@ const assistantItemSchema = new Schema<IAiAssistantItem>(
       catchupMode: { type: String, enum: ['unread', 'since_last_digest', 'recent'] },
       actionItemCount: { type: Number },
       messageCount: { type: Number },
+      taskStatus: { type: String, enum: ['suggested', 'accepted', 'done', 'dismissed'] },
+      dueAt: { type: String },
+      searchQuery: { type: String, maxlength: 300 },
+      searchHash: { type: String, index: true },
+      searchRank: { type: Number },
+      similarity: { type: Number },
+      messageId: { type: String },
+      messageRef: { type: String },
+      messageCreatedAt: { type: String },
+      senderId: { type: String },
+      senderName: { type: String, maxlength: 120 },
+      source: { type: String, enum: ['semantic', 'keyword'] },
+      matchReason: { type: String, maxlength: 200 },
+      conversationName: { type: String, maxlength: 120 },
+      conversationType: { type: String, enum: ['direct', 'group'] },
+      noteId: { type: String },
+      pinned: { type: Boolean },
+      decisionCount: { type: Number },
+      openQuestionCount: { type: Number },
     },
     trigger: { type: String, enum: ['manual', 'auto'], default: 'manual' },
   },

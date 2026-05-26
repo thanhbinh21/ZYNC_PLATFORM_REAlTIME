@@ -48,7 +48,12 @@ export async function insertMessageEmbedding(params: {
   await sql`
     INSERT INTO message_embeddings (message_id, conversation_id, content_text, embedding)
     VALUES (${messageId}, ${conversationId}, ${contentText}, ${vectorLiteral}::vector)
-    ON CONFLICT DO NOTHING
+    ON CONFLICT (message_id)
+    DO UPDATE SET
+      conversation_id = EXCLUDED.conversation_id,
+      content_text = EXCLUDED.content_text,
+      embedding = EXCLUDED.embedding,
+      created_at = NOW()
   `;
 
   logger.debug('[NeonVector] Inserted message embedding', { messageId });
@@ -90,6 +95,66 @@ export async function searchSimilarMessages(params: {
   `;
 
   return rows as MessageEmbeddingRecord[];
+}
+
+/**
+ * Semantic search across multiple conversations.
+ */
+export async function searchSimilarMessagesInConversations(params: {
+  queryEmbedding: EmbeddingVector;
+  conversationIds: string[];
+  topK?: number;
+  minSimilarity?: number;
+}): Promise<MessageEmbeddingRecord[]> {
+  const sql = getNeonClient();
+  const { queryEmbedding, conversationIds, topK = 20, minSimilarity = 0.4 } = params;
+  const scopedConversationIds = conversationIds
+    .map((conversationId) => conversationId.trim())
+    .filter(Boolean);
+
+  if (scopedConversationIds.length === 0) {
+    return [];
+  }
+
+  const vectorLiteral = `[${queryEmbedding.join(',')}]`;
+  const conversationList = scopedConversationIds.join(',');
+
+  const rows = await sql`
+    SELECT
+      id,
+      message_id        AS "messageId",
+      conversation_id   AS "conversationId",
+      content_text      AS "contentText",
+      created_at        AS "createdAt",
+      1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
+    FROM message_embeddings
+    WHERE conversation_id = ANY(string_to_array(${conversationList}, ','))
+      AND 1 - (embedding <=> ${vectorLiteral}::vector) >= ${minSimilarity}
+    ORDER BY embedding <=> ${vectorLiteral}::vector
+    LIMIT ${topK}
+  `;
+
+  return rows as MessageEmbeddingRecord[];
+}
+
+export async function countMessageEmbeddings(conversationIds?: string[]): Promise<number> {
+  const sql = getNeonClient();
+  const scopedConversationIds = conversationIds
+    ?.map((conversationId) => conversationId.trim())
+    .filter(Boolean);
+
+  if (scopedConversationIds && scopedConversationIds.length > 0) {
+    const conversationList = scopedConversationIds.join(',');
+    const rows = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM message_embeddings
+      WHERE conversation_id = ANY(string_to_array(${conversationList}, ','))
+    `;
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM message_embeddings`;
+  return Number(rows[0]?.count ?? 0);
 }
 
 /**

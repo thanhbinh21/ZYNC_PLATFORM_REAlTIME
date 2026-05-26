@@ -1,6 +1,6 @@
 import { Schema, model, type Document } from 'mongoose';
 
-export type AiReminderStatus = 'pending' | 'done' | 'dismissed';
+export type AiReminderStatus = 'suggested' | 'accepted' | 'done' | 'dismissed';
 export type AiReminderCreatedBy = 'ai_suggestion' | 'user';
 
 export interface IAiReminder extends Document {
@@ -28,8 +28,8 @@ const reminderSchema = new Schema<IAiReminder>(
     dueAt: { type: Date },
     status: {
       type: String,
-      enum: ['pending', 'done', 'dismissed'],
-      default: 'pending',
+      enum: ['suggested', 'accepted', 'done', 'dismissed'],
+      default: 'accepted',
       index: true,
     },
     createdBy: {

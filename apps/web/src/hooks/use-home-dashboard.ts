@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
+import { showSystemToast } from '@/components/notifications/InAppNotificationToasts';
 import { fetchFriends, type FriendUser } from '@/services/friends';
 import { getAccessToken } from '@/utils/auth-token';
 import {
@@ -178,6 +180,35 @@ interface ConversationSearchTarget {
   conversationId?: string;
 }
 
+type ApiErrorPayload = {
+  error?: string;
+  code?: string;
+};
+
+function resolveDirectConversationErrorMessage(err: unknown): string {
+  const axiosError = err as AxiosError<ApiErrorPayload>;
+  const status = axiosError.response?.status;
+  const payload = axiosError.response?.data;
+
+  if (payload?.code === 'DIRECT_MESSAGE_BLOCKED') {
+    return 'Không thể nhắn tin vì một trong hai tài khoản đã chặn người còn lại.';
+  }
+
+  if (payload?.code === 'DIRECT_MESSAGE_FRIENDS_ONLY') {
+    return 'Người này chỉ nhận tin nhắn từ bạn bè.';
+  }
+
+  if (payload?.code === 'DIRECT_MESSAGE_USER_DEACTIVATED') {
+    return 'Không thể nhắn tin vì tài khoản này đã ngừng hoạt động.';
+  }
+
+  if (status === 429) {
+    return 'Bạn đang mở quá nhiều cuộc trò chuyện với người chưa kết bạn. Vui lòng thử lại sau.';
+  }
+
+  return payload?.error || 'Không thể mở cuộc trò chuyện. Vui lòng thử lại.';
+}
+
 function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string {
   return message.content && message.content.trim().length > 0
     ? message.content
@@ -317,6 +348,7 @@ interface CallParticipantVideo {
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceState>>({});
@@ -373,11 +405,34 @@ export function useHomeDashboard() {
     callType?: CallMediaType;
   } | null>(null);
 
+  const clearConversationActiveCallState = useCallback((sessionId: string, conversationId?: string | null) => {
+    if (!sessionId && !conversationId) {
+      return;
+    }
+
+    setConversations((prev) => prev.map((conversation) => {
+      if (conversationId && conversation._id !== conversationId) {
+        return conversation;
+      }
+
+      if (!conversationId && conversation.activeCall?.callSessionId !== sessionId) {
+        return conversation;
+      }
+
+      if (sessionId && conversation.activeCall?.callSessionId && conversation.activeCall.callSessionId !== sessionId) {
+        return conversation;
+      }
+
+      return {
+        ...conversation,
+        activeCall: null,
+      };
+    }));
+  }, []);
+
   const notifyCallBlockingIssue = useCallback((message: string) => {
     setCallError(message);
-    if (typeof window !== 'undefined') {
-      window.alert(message);
-    }
+    callStore.showActiveCallConflict(message);
   }, []);
 
   const resolvePeerInfo = useCallback((peerUserId: string): { displayName: string; conversationId?: string } => {
@@ -1504,12 +1559,14 @@ export function useHomeDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [meRes, requestsRes, convosRes, prefs, notifRes, friendsRes] = await Promise.all([
+        setError(null);
+        const [meRes, requestsRes, convosRes, prefs, notifRes, unreadNotifCount, friendsRes] = await Promise.all([
           apiClient.get('/api/users/me'),
           apiClient.get('/api/friends/requests'),
           apiClient.get('/api/conversations'),
           fetchPreferences(),
           fetchNotifications(undefined, 10),
+          fetchUnreadCount(),
           fetchFriends(),
         ]);
 
@@ -1577,6 +1634,8 @@ export function useHomeDashboard() {
 
           if (conv.lastMessage && conv.lastMessage?.content) {
             const sender = conv.users?.find((u: any) => u._id === conv.lastMessage?.senderId);
+            const otherUser = conv.users?.find((u: any) => u._id !== user._id);
+            const avatarUrl = conv.type === 'group' ? conv.avatarUrl : otherUser?.avatarUrl;
 
             let title = sender?.displayName || 'Người dùng';
             let messageStr = conv.lastMessage.content || 'Tin nhắn media';
@@ -1587,12 +1646,11 @@ export function useHomeDashboard() {
             }
 
             let initials = 'U';
-            if (sender?.displayName) {
-              const parts = sender.displayName.split(' ');
-              initials = parts.length > 1
-                ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-                : parts[0].substring(0, 2).toUpperCase();
-            }
+            const nameToInitials = conv.type === 'group' ? (conv.name || 'Nhóm') : (otherUser?.displayName || 'Người dùng');
+            const parts = nameToInitials.split(' ');
+            initials = parts.length > 1
+              ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+              : parts[0].substring(0, 2).toUpperCase();
 
             const tones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
 
@@ -1603,6 +1661,7 @@ export function useHomeDashboard() {
               message: messageStr,
               timeLabel: new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
               initials,
+              avatarUrl,
               toneClass: tones[index % tones.length],
               isUnread: unreadForMe > 0,
             });
@@ -1635,9 +1694,7 @@ export function useHomeDashboard() {
             ? `${friendNameParts[0][0]}${friendNameParts[friendNameParts.length - 1][0]}`.toUpperCase()
             : friend.displayName.substring(0, 2).toUpperCase();
 
-          // Random activity for demo - in real app this would come from API
-          const actions: DashboardFriendActivityItem['action'][] = ['online', 'posted', 'reacted'];
-          const randomAction = actions[idx % actions.length];
+          const action: DashboardFriendActivityItem['action'] = friend.status === 'online' ? 'online' : 'offline';
 
           return {
             id: `friend-act-${friend.id}`,
@@ -1646,13 +1703,13 @@ export function useHomeDashboard() {
             userAvatar: friend.avatarUrl,
             initials: friendInitials,
             toneClass: friendTones[idx % friendTones.length],
-            action: randomAction,
-            target: randomAction === 'posted' ? 'bài viết mới' : randomAction === 'reacted' ? 'tin nhắn của bạn' : undefined,
-            timeLabel: `${Math.floor(Math.random() * 60) + 1} phút trước`,
+            action,
+            target: friend.username ? `@${friend.username}` : undefined,
+            timeLabel: friend.status === 'online' ? 'Đang hoạt động' : 'Ngoại tuyến',
           };
         });
 
-        const unreadNotificationCount = dashboardNotifications.filter(n => !n.isRead).length;
+        const unreadNotificationCount = unreadNotifCount;
 
         const userInitials = user.displayName.split(' ').length > 1
           ? `${user.displayName.split(' ')[0][0]}${user.displayName.split(' ').slice(-1)[0][0]}`.toUpperCase()
@@ -1689,6 +1746,13 @@ export function useHomeDashboard() {
               badge: '',
               icon: 'group'
             },
+            {
+              id: 'stat-4',
+              value: unreadNotificationCount.toString().padStart(2, '0'),
+              label: 'Thông báo chưa đọc',
+              badge: unreadNotificationCount > 0 ? unreadNotificationCount.toString() : '',
+              icon: 'bell'
+            },
           ],
           activities: activities.slice(0, 5),
           notifications: dashboardNotifications,
@@ -1697,6 +1761,7 @@ export function useHomeDashboard() {
         }));
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
+        setError('Không thể tải dữ liệu trang chủ. Vui lòng thử lại.');
       } finally {
         setLoading(false);
       }
@@ -2211,9 +2276,22 @@ export function useHomeDashboard() {
       return;
     }
 
-    const response = await apiClient.post('/api/conversations/direct', { targetUserId: target.id });
-    const directConversation = response.data?.data as Conversation | undefined;
-    if (!directConversation?._id) {
+    let directConversation: Conversation | undefined;
+    try {
+      const response = await apiClient.post('/api/conversations/direct', { targetUserId: target.id });
+      directConversation = response.data?.data as Conversation | undefined;
+      if (!directConversation?._id) {
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to open direct conversation', error);
+      showSystemToast({
+        id: 'direct-message-error',
+        type: 'new_message',
+        title: 'Không thể nhắn tin',
+        body: resolveDirectConversationErrorMessage(error),
+        variant: 'error',
+      });
       return;
     }
 
@@ -2446,15 +2524,21 @@ export function useHomeDashboard() {
       setActiveCall({
         sessionId: payload.sessionId,
         conversationId: payload.conversationId ?? pendingOutgoing?.conversationId ?? null,
+        conversationName: conversations.find((conversation) => conversation._id === (payload.conversationId ?? pendingOutgoing?.conversationId))?.name ?? null,
         isGroupCall,
         initiatedBy: pendingOutgoing?.initiatedBy ?? userId,
         participantIds,
+        participants: participantIds.map((participantId) => ({
+          userId: participantId,
+          displayName: participantDisplayNames[participantId],
+        })),
         joinedParticipantIds: [userId],
         participantDisplayNames,
         direction: 'outgoing',
         status: 'outgoing',
         callToken: payload.callToken,
         callType: payload.callType ?? pendingOutgoing?.callType ?? 'video',
+        startedAt: null,
       });
     };
 
@@ -2488,9 +2572,14 @@ export function useHomeDashboard() {
           return {
             ...prev,
             conversationId: payload.conversationId ?? prev.conversationId ?? peerInfo.conversationId ?? null,
+            conversationName: payload.conversationName ?? prev.conversationName ?? null,
             isGroupCall,
             initiatedBy: payload.fromUserId,
             participantIds,
+            participants: participantIds.map((participantId) => ({
+              userId: participantId,
+              displayName: (participantDisplayNames[participantId] ?? prev.participantDisplayNames[participantId]),
+            })),
             participantDisplayNames: {
               ...participantDisplayNames,
               ...prev.participantDisplayNames,
@@ -2510,15 +2599,21 @@ export function useHomeDashboard() {
       setActiveCall({
         sessionId: payload.sessionId,
         conversationId: payload.conversationId ?? peerInfo.conversationId ?? null,
+        conversationName: payload.conversationName ?? null,
         isGroupCall,
         initiatedBy: payload.fromUserId,
         participantIds,
+        participants: participantIds.map((participantId) => ({
+          userId: participantId,
+          displayName: participantDisplayNames[participantId],
+        })),
         joinedParticipantIds: [payload.fromUserId],
         participantDisplayNames,
         direction: 'incoming',
         status: 'incoming',
         callToken: payload.callToken,
         callType: payload.callType ?? 'video',
+        startedAt: null,
       });
 
       if (payload.conversationId) {
@@ -2550,6 +2645,7 @@ export function useHomeDashboard() {
           ...prev,
           status: shouldKeepIncoming ? 'incoming' : nextStatus,
           reason: payload.reason,
+          startedAt: payload.status === 'connected' ? (prev.startedAt ?? new Date().toISOString()) : prev.startedAt,
         };
       });
 
@@ -2578,10 +2674,14 @@ export function useHomeDashboard() {
       if (payload.status === 'ended' || payload.status === 'rejected' || payload.status === 'missed') {
         const latestCall = activeCallRef.current;
         if (latestCall && latestCall.sessionId === payload.sessionId) {
+          clearConversationActiveCallState(payload.sessionId, latestCall.conversationId);
           setScreenSharingUserId(null);
           setCallError(null);
           scheduleCallReset();
+          return;
         }
+
+        clearConversationActiveCallState(payload.sessionId);
       }
     };
 
@@ -2700,6 +2800,7 @@ export function useHomeDashboard() {
       const latestCall = activeCallRef.current;
       if (latestCall && latestCall.sessionId === payload.sessionId) {
         if (payload.userId === userId) {
+          clearConversationActiveCallState(payload.sessionId, latestCall.conversationId);
           scheduleCallReset(500);
           return;
         }
@@ -2801,7 +2902,17 @@ export function useHomeDashboard() {
       }
     };
 
-    const handleSocketError = (payload: { message: string }) => {
+    const handleSocketError = (payload: { message: string; code?: string }) => {
+      if (payload.code === 'ACTIVE_CALL_EXISTS') {
+        notifyCallBlockingIssue(payload.message || ACTIVE_CALL_CONFLICT_MESSAGE);
+        return;
+      }
+
+      if (payload.code === 'GROUP_CALL_REQUIRES_PARTICIPANTS') {
+        setCallFriendError('Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.');
+        return;
+      }
+
       if (!payload.message.toLowerCase().includes('call')) {
         return;
       }
@@ -2865,12 +2976,15 @@ export function useHomeDashboard() {
     };
   }, [
     closePeerConnection,
+    clearConversationActiveCallState,
+    conversations,
     createOfferForPeer,
     clearCallResetTimer,
     ensureLocalMedia,
     ensurePeerConnection,
     flushPendingRemoteCandidates,
     isCameraEnabled,
+    notifyCallBlockingIssue,
     resolveParticipantDisplayNames,
     resolvePeerInfo,
     resetCallUi,
@@ -2891,14 +3005,12 @@ export function useHomeDashboard() {
     }
 
     const currentCall = activeCallRef.current;
-    const selectedActiveCallId = selectedConversation.activeCall?.callSessionId;
     if (
       currentCall
       && currentCall.sessionId
       && currentCall.status !== 'ended'
       && currentCall.status !== 'missed'
       && currentCall.status !== 'rejected'
-      && currentCall.sessionId !== selectedActiveCallId
     ) {
       notifyCallBlockingIssue(ACTIVE_CALL_CONFLICT_MESSAGE);
       return;
@@ -2920,6 +3032,11 @@ export function useHomeDashboard() {
     const participantIds = Array.from(new Set(selectedConversation.users.map((member) => member._id)));
     if (!participantIds.includes(userId)) {
       participantIds.push(userId);
+    }
+
+    if (selectedConversation.type === 'group' && participantIds.length < 2) {
+      setCallFriendError('Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.');
+      return;
     }
 
     let isGroupCall = selectedConversation.type === 'group';
@@ -2956,15 +3073,21 @@ export function useHomeDashboard() {
     setActiveCall({
       sessionId: '',
       conversationId: selectedConversation._id,
+      conversationName: selectedConversation.name ?? null,
       isGroupCall,
       initiatedBy: userId,
       participantIds,
+      participants: participantIds.map((participantId) => ({
+        userId: participantId,
+        displayName: participantDisplayNames[participantId],
+      })),
       joinedParticipantIds: [userId],
       participantDisplayNames,
       direction: 'outgoing',
       status: 'outgoing',
       callToken: '',
       callType,
+      startedAt: null,
     });
 
     try {
@@ -3106,9 +3229,10 @@ export function useHomeDashboard() {
         reason: 'rejected',
       };
     });
+    clearConversationActiveCallState(current.sessionId, current.conversationId);
     setCallError(null);
     scheduleCallReset(1200);
-  }, [scheduleCallReset]);
+  }, [clearConversationActiveCallState, scheduleCallReset]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3764,7 +3888,10 @@ export function useHomeDashboard() {
   // Refresh notifications
   const refreshNotifications = useCallback(async () => {
     try {
-      const notifRes = await fetchNotifications(undefined, 10);
+      const [notifRes, unreadNotifCount] = await Promise.all([
+        fetchNotifications(undefined, 10),
+        fetchUnreadCount(),
+      ]);
       const notificationTones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
       const dashboardNotifications: DashboardNotificationItem[] = notifRes.notifications.slice(0, 8).map((notif: Notification, idx: number) => ({
         id: notif._id,
@@ -3785,7 +3912,16 @@ export function useHomeDashboard() {
       setData(prev => ({
         ...prev,
         notifications: dashboardNotifications,
-        unreadNotificationCount: dashboardNotifications.filter(n => !n.isRead).length,
+        unreadNotificationCount: unreadNotifCount,
+        stats: prev.stats.map((stat) => (
+          stat.id === 'stat-4'
+            ? {
+              ...stat,
+              value: unreadNotifCount.toString().padStart(2, '0'),
+              badge: unreadNotifCount > 0 ? unreadNotifCount.toString() : '',
+            }
+            : stat
+        )),
       }));
     } catch (error) {
       console.error('Failed to refresh notifications', error);
@@ -3834,6 +3970,7 @@ export function useHomeDashboard() {
   return {
     data,
     loading,
+    error,
     userId,
     conversations: convertConversationsToListItems(),
     selectedConversationId,
@@ -3902,7 +4039,7 @@ export function useHomeDashboard() {
     screenShareVideoRef,
     remoteVideoRef,
     remoteParticipantVideos,
-    isCallingAvailable: isCallConversationSelected,
+    isCallingAvailable: isCallConversationSelected && (!activeCall || ['ended', 'idle', 'rejected', 'missed'].includes(activeCall.status) || activeCall.conversationId === selectedConversationId),
     onStartAudioCall: handleStartAudioCall,
     onStartVideoCall: handleStartVideoCall,
     onAcceptIncomingCall: handleAcceptIncomingCall,

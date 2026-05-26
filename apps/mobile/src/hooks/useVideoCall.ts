@@ -10,6 +10,7 @@ import { socketService } from '../services/socket';
 import { callService } from '../services/calls';
 import { useKeepAwake } from 'expo-keep-awake';
 import { AppState, AppStateStatus } from 'react-native';
+import { useActiveCallStore } from '../store/useActiveCallStore';
 
 export type CallUiStatus =
   | 'idle'
@@ -30,15 +31,23 @@ export interface ActiveCallState {
   direction: 'incoming' | 'outgoing';
   status: CallUiStatus;
   callToken: string;
+  conversationName?: string | null;
+  callType?: 'audio' | 'video';
+  participants?: Array<{ userId: string; displayName?: string; status?: string }>;
+  startedAt?: string | null;
   reason?: string;
 }
 
 export function useVideoCall(userId: string) {
   const [activeCall, setActiveCall] = useState<ActiveCallState | null>(null);
+  const globalActiveCall = useActiveCallStore((s) => s.activeCall);
+  const setGlobalActiveCall = useActiveCallStore((s) => s.setActiveCall);
+  const showActiveCallConflict = useActiveCallStore((s) => s.showConflict);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [participantMediaStates, setParticipantMediaStates] = useState<Record<string, { isMicMuted?: boolean, isCameraOff?: boolean }>>({});
   const [socketReadyVersion, setSocketReadyVersion] = useState(0);
 
   const activeCallRef = useRef<ActiveCallState | null>(null);
@@ -47,13 +56,50 @@ export function useVideoCall(userId: string) {
   const sentOfferKeysRef = useRef<Set<string>>(new Set());
   const processingOfferKeysRef = useRef<Set<string>>(new Set());
   const answeredOfferKeysRef = useRef<Set<string>>(new Set());
+  const negotiatedPeerKeysRef = useRef<Set<string>>(new Set());
   const pendingIceCandidatesRef = useRef<Map<string, unknown[]>>(new Map());
 
   useKeepAwake();
 
   useEffect(() => {
     activeCallRef.current = activeCall;
-  }, [activeCall]);
+    if (!activeCall || activeCall.status === 'idle') {
+      setGlobalActiveCall(null);
+      return;
+    }
+    setGlobalActiveCall({
+      sessionId: activeCall.sessionId,
+      conversationId: activeCall.conversationId,
+      conversationName: activeCall.conversationName,
+      callType: activeCall.callType ?? 'video',
+      isGroupCall: activeCall.isGroupCall,
+      participants: activeCall.participants ?? activeCall.participantIds.map((participantId) => ({ userId: participantId })),
+      participantIds: activeCall.participantIds,
+      startedAt: activeCall.startedAt,
+      status: activeCall.status,
+      callToken: activeCall.callToken,
+      initiatedBy: activeCall.initiatedBy,
+    });
+  }, [activeCall, setGlobalActiveCall]);
+
+  useEffect(() => {
+    if (!activeCall && globalActiveCall) {
+      setActiveCall({
+        sessionId: globalActiveCall.sessionId,
+        conversationId: globalActiveCall.conversationId ?? undefined,
+        conversationName: globalActiveCall.conversationName,
+        isGroupCall: globalActiveCall.isGroupCall,
+        initiatedBy: globalActiveCall.initiatedBy ?? userId,
+        participantIds: globalActiveCall.participantIds,
+        participants: globalActiveCall.participants,
+        direction: globalActiveCall.initiatedBy === userId ? 'outgoing' : 'incoming',
+        status: globalActiveCall.status === 'ringing' ? 'outgoing' : globalActiveCall.status,
+        callToken: globalActiveCall.callToken,
+        callType: globalActiveCall.callType,
+        startedAt: globalActiveCall.startedAt,
+      });
+    }
+  }, [activeCall, globalActiveCall, userId]);
 
   useEffect(() => {
     localStreamRef.current = localStream;
@@ -138,6 +184,12 @@ export function useVideoCall(userId: string) {
       ?? (pc as unknown as { pendingRemoteDescription?: unknown }).pendingRemoteDescription,
   ), []);
 
+  const hasLocalDescription = useCallback((pc: RTCPeerConnection) => Boolean(
+    (pc as unknown as { localDescription?: unknown; currentLocalDescription?: unknown; pendingLocalDescription?: unknown }).localDescription
+      ?? (pc as unknown as { currentLocalDescription?: unknown }).currentLocalDescription
+      ?? (pc as unknown as { pendingLocalDescription?: unknown }).pendingLocalDescription,
+  ), []);
+
   const getIceServers = useCallback(() => {
     const stunServers = {
       urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'],
@@ -167,7 +219,13 @@ export function useVideoCall(userId: string) {
     pc.close();
     peerConnectionsRef.current.delete(peerUserId);
     pendingIceCandidatesRef.current.delete(peerUserId);
-  }, []);
+    const sessionId = activeCallRef.current?.sessionId;
+    if (sessionId) {
+      const peerKey = getPeerKey(sessionId, peerUserId);
+      sentOfferKeysRef.current.delete(peerKey);
+      negotiatedPeerKeysRef.current.delete(peerKey);
+    }
+  }, [getPeerKey]);
 
   const closeAllPeerConnections = useCallback(() => {
     for (const [, pc] of peerConnectionsRef.current) {
@@ -187,6 +245,7 @@ export function useVideoCall(userId: string) {
     sentOfferKeysRef.current.clear();
     processingOfferKeysRef.current.clear();
     answeredOfferKeysRef.current.clear();
+    negotiatedPeerKeysRef.current.clear();
     pendingIceCandidatesRef.current.clear();
 
     setRemoteStreams((prev) => {
@@ -199,6 +258,7 @@ export function useVideoCall(userId: string) {
     setActiveCall(null);
     setIsMicMuted(false);
     setIsCameraEnabled(true);
+    setParticipantMediaStates({});
   }, [closeAllPeerConnections]);
 
   const initLocalStream = useCallback(async (videoEnabled = true) => {
@@ -299,7 +359,18 @@ export function useVideoCall(userId: string) {
     }
   }, [hasRemoteDescription]);
 
+  // "Polite peer" pattern: the peer with the HIGHER id is the "impolite" offerer.
+  // The peer with the LOWER id is "polite" and will rollback on glare.
+  const isPolite = useCallback((peerUserId: string) => userId < peerUserId, [userId]);
+
   const createOfferForPeer = useCallback(async (peerUserId: string, callState: ActiveCallState) => {
+    // Only the impolite peer (higher userId) should initiate offers.
+    // The polite peer waits for the other side to send an offer.
+    if (isPolite(peerUserId)) {
+      console.log('[Call] Polite peer skipping offer creation, waiting for offer from', peerUserId);
+      return;
+    }
+
     const offerKey = getPeerKey(callState.sessionId, peerUserId);
     if (sentOfferKeysRef.current.has(offerKey)) {
       return;
@@ -307,6 +378,15 @@ export function useVideoCall(userId: string) {
 
     const pc = createPeerConnection(peerUserId, callState);
     const signalingState = getSignalingState(pc);
+    if (
+      negotiatedPeerKeysRef.current.has(offerKey)
+      || (signalingState === 'stable' && hasLocalDescription(pc) && hasRemoteDescription(pc))
+    ) {
+      negotiatedPeerKeysRef.current.add(offerKey);
+      console.log('[Call] Skip creating offer because peer is already negotiated:', peerUserId);
+      return;
+    }
+
     if (signalingState !== 'stable') {
       console.warn('[Call] Skip creating offer because peer connection is not stable:', signalingState);
       return;
@@ -319,24 +399,37 @@ export function useVideoCall(userId: string) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      callService.sendWebRtcOffer(callState.sessionId, peerUserId, callState.callToken, offer);
+      callService.sendWebRtcOffer(callState.sessionId, peerUserId, callState.callToken, { sdp: offer.sdp, type: offer.type });
     } catch (error) {
       sentOfferKeysRef.current.delete(offerKey);
       console.error('[Call] Failed to create WebRTC offer', error);
     }
-  }, [attachLocalTracks, createPeerConnection, getPeerKey, getSignalingState]);
+  }, [attachLocalTracks, createPeerConnection, getPeerKey, getSignalingState, hasLocalDescription, hasRemoteDescription, isPolite]);
 
   const startCall = useCallback(async (targetUserId: string, type: 'audio' | 'video' = 'video', conversationId?: string) => {
+    if (activeCallRef.current) {
+      showActiveCallConflict('Bạn đang trong cuộc gọi hiện tại.');
+      return;
+    }
     await initLocalStream(type === 'video');
     callService.startCall(targetUserId, conversationId, type);
-  }, [initLocalStream]);
+  }, [initLocalStream, showActiveCallConflict]);
 
   const startGroupCall = useCallback(async (conversationId: string, type: 'audio' | 'video' = 'video') => {
+    if (activeCallRef.current) {
+      showActiveCallConflict('Bạn đang trong cuộc gọi hiện tại.');
+      return;
+    }
     await initLocalStream(type === 'video');
     callService.startGroupCall(conversationId, type);
-  }, [initLocalStream]);
+  }, [initLocalStream, showActiveCallConflict]);
 
   const acceptCall = useCallback(async (sessionId: string, callToken: string, callerId: string, type: 'audio' | 'video' = 'video') => {
+    const current = activeCallRef.current;
+    if (current && current.sessionId !== sessionId) {
+      showActiveCallConflict('Bạn đang trong cuộc gọi hiện tại.');
+      return;
+    }
     await initLocalStream(type === 'video');
     callService.acceptCall(sessionId, callToken);
 
@@ -353,9 +446,11 @@ export function useVideoCall(userId: string) {
         isGroupCall: false,
         direction: 'incoming',
         status: 'connecting',
+        callType: type,
+        startedAt: new Date().toISOString(),
       };
     });
-  }, [initLocalStream, userId]);
+  }, [initLocalStream, showActiveCallConflict, userId]);
 
   const rejectCall = useCallback((sessionId: string, callToken: string) => {
     callService.rejectCall(sessionId, callToken);
@@ -374,42 +469,59 @@ export function useVideoCall(userId: string) {
     const onCallIncoming = (data: {
       sessionId: string;
       conversationId?: string;
+      conversationName?: string;
       isGroupCall?: boolean;
       fromUserId: string;
       participantIds?: string[];
+      participants?: Array<{ userId: string; displayName?: string; status?: string }>;
+      callType?: 'audio' | 'video';
       callToken: string;
     }) => {
-      if (activeCallRef.current) return;
+      if (activeCallRef.current && activeCallRef.current.sessionId !== data.sessionId) {
+        showActiveCallConflict('Bạn đang trong cuộc gọi hiện tại.');
+        callService.rejectCall(data.sessionId, data.callToken, 'busy');
+        return;
+      }
 
       setActiveCall({
         sessionId: data.sessionId,
         conversationId: data.conversationId,
+        conversationName: data.conversationName,
         isGroupCall: Boolean(data.isGroupCall),
         initiatedBy: data.fromUserId,
         participantIds: data.participantIds || [data.fromUserId, userId],
+        participants: data.participants,
         direction: 'incoming',
         status: 'incoming',
         callToken: data.callToken,
+        callType: data.callType ?? 'video',
       });
     };
 
     const onCallInvited = (data: {
       sessionId: string;
       conversationId?: string;
+      conversationName?: string;
       isGroupCall?: boolean;
       targetUserId?: string;
       participantIds?: string[];
+      participants?: Array<{ userId: string; displayName?: string; status?: string }>;
+      callType?: 'audio' | 'video';
       callToken: string;
     }) => {
       setActiveCall({
         sessionId: data.sessionId,
         conversationId: data.conversationId,
+        conversationName: data.conversationName,
         isGroupCall: Boolean(data.isGroupCall),
         initiatedBy: userId,
         participantIds: data.participantIds || [data.targetUserId || '', userId].filter(Boolean),
+        participants: data.participants,
         direction: 'outgoing',
         status: 'outgoing',
         callToken: data.callToken,
+        callType: data.callType ?? 'video',
+        startedAt: new Date().toISOString(),
       });
     };
 
@@ -421,14 +533,19 @@ export function useVideoCall(userId: string) {
       const currentCall = activeCallRef.current;
       if (!currentCall || currentCall.sessionId !== data.sessionId) return;
 
-      setActiveCall((prev) => (prev ? { ...prev, status: data.status, reason: data.reason } : null));
+      setActiveCall((prev) => (prev ? {
+        ...prev,
+        status: data.status,
+        reason: data.reason,
+        startedAt: data.status === 'connected' ? (prev.startedAt ?? new Date().toISOString()) : prev.startedAt,
+      } : null));
 
       if (data.status === 'connecting' || data.status === 'connected') {
+        // Both sides attempt to create offers. The polite peer guard inside
+        // createOfferForPeer will skip if this peer should wait instead.
         const peers = currentCall.participantIds.filter((id) => id && id !== userId);
-        if (currentCall.direction === 'outgoing' || currentCall.initiatedBy === userId) {
-          for (const peerId of peers) {
-            await createOfferForPeer(peerId, currentCall);
-          }
+        for (const peerId of peers) {
+          await createOfferForPeer(peerId, currentCall);
         }
       } else if (data.status === 'ended' || data.status === 'missed' || data.status === 'rejected') {
         setTimeout(() => resetCall(), 1500);
@@ -457,7 +574,7 @@ export function useVideoCall(userId: string) {
         return prev;
       });
 
-      if (data.userId !== userId && currentCall.initiatedBy === userId) {
+      if (data.userId !== userId) {
         await createOfferForPeer(data.userId, currentCall);
       }
     };
@@ -508,8 +625,46 @@ export function useVideoCall(userId: string) {
 
       const pc = createPeerConnection(data.fromUserId, currentCall);
       const signalingState = getSignalingState(pc);
-      if (signalingState !== 'stable') {
-        console.warn('[Call] Skip duplicated or out-of-order WebRTC offer:', signalingState);
+
+      // Glare handling: both sides sent offers simultaneously.
+      if (signalingState === 'have-local-offer') {
+        if (isPolite(data.fromUserId)) {
+          // We are polite → rollback our offer and accept theirs
+          console.log('[Call] Polite peer rolling back local offer to accept incoming offer from', data.fromUserId);
+          try {
+            await pc.setLocalDescription({ type: 'rollback' } as any);
+            // Clear our sent offer key so we can re-offer later if needed
+            const ourOfferKey = getPeerKey(currentCall.sessionId, data.fromUserId);
+            sentOfferKeysRef.current.delete(ourOfferKey);
+          } catch (rollbackError) {
+            console.error('[Call] Failed to rollback local offer, closing and recreating PC', rollbackError);
+            // If rollback fails, close and recreate the peer connection
+            closePeerConnection(data.fromUserId);
+            const newPc = createPeerConnection(data.fromUserId, currentCall);
+            attachLocalTracks(newPc);
+            processingOfferKeysRef.current.add(offerKey);
+            try {
+              await newPc.setRemoteDescription(new RTCSessionDescription(data.sdp as any));
+              await flushPendingIceCandidates(data.fromUserId, newPc);
+              const answer = await newPc.createAnswer();
+              await newPc.setLocalDescription(answer);
+              answeredOfferKeysRef.current.add(offerKey);
+              negotiatedPeerKeysRef.current.add(getPeerKey(currentCall.sessionId, data.fromUserId));
+              callService.sendWebRtcAnswer(currentCall.sessionId, data.fromUserId, currentCall.callToken, { sdp: answer.sdp, type: answer.type });
+            } catch (error) {
+              console.error('[Call] Failed to handle WebRTC offer after PC recreation', error);
+            } finally {
+              processingOfferKeysRef.current.delete(offerKey);
+            }
+            return;
+          }
+        } else {
+          // We are impolite → ignore their offer, our offer wins
+          console.log('[Call] Impolite peer ignoring incoming offer during glare from', data.fromUserId);
+          return;
+        }
+      } else if (signalingState !== 'stable') {
+        console.warn('[Call] Skip WebRTC offer in unexpected state:', signalingState);
         return;
       }
 
@@ -529,7 +684,8 @@ export function useVideoCall(userId: string) {
         await pc.setLocalDescription(answer);
 
         answeredOfferKeysRef.current.add(offerKey);
-        callService.sendWebRtcAnswer(currentCall.sessionId, data.fromUserId, currentCall.callToken, answer);
+        negotiatedPeerKeysRef.current.add(getPeerKey(currentCall.sessionId, data.fromUserId));
+        callService.sendWebRtcAnswer(currentCall.sessionId, data.fromUserId, currentCall.callToken, { sdp: answer.sdp, type: answer.type });
       } catch (error) {
         console.error('[Call] Failed to handle WebRTC offer', error);
       } finally {
@@ -555,9 +711,11 @@ export function useVideoCall(userId: string) {
 
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(data.sdp as any));
+        negotiatedPeerKeysRef.current.add(getPeerKey(currentCall.sessionId, data.fromUserId));
         await flushPendingIceCandidates(data.fromUserId, pc);
       } catch (error) {
-        console.error('[Call] Failed to apply WebRTC answer', error);
+        console.warn('[Call] Ignored stale WebRTC answer; will wait for a fresh offer if needed', error);
+        sentOfferKeysRef.current.delete(getPeerKey(currentCall.sessionId, data.fromUserId));
       }
     };
 
@@ -584,6 +742,30 @@ export function useVideoCall(userId: string) {
       }
     };
 
+    const onSocketError = (data: { message: string; code?: string }) => {
+      if (data.code === 'ACTIVE_CALL_EXISTS') {
+        showActiveCallConflict(data.message || 'Bạn đang trong cuộc gọi hiện tại.');
+        return;
+      }
+
+      if (data.code === 'GROUP_CALL_REQUIRES_PARTICIPANTS') {
+        showActiveCallConflict('Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.');
+      }
+    };
+    
+    const onCallMediaState = (data: { sessionId: string; userId: string; isMicMuted?: boolean; isCameraOff?: boolean }) => {
+      if (activeCallRef.current && activeCallRef.current.sessionId === data.sessionId) {
+        setParticipantMediaStates((prev) => ({
+          ...prev,
+          [data.userId]: {
+            ...prev[data.userId],
+            isMicMuted: data.isMicMuted ?? prev[data.userId]?.isMicMuted,
+            isCameraOff: data.isCameraOff ?? prev[data.userId]?.isCameraOff,
+          }
+        }));
+      }
+    };
+
     socketService.listenToCallIncoming(onCallIncoming as any);
     socketService.listenToCallInvited(onCallInvited as any);
     socketService.listenToCallStatus(onCallStatus as any);
@@ -592,6 +774,8 @@ export function useVideoCall(userId: string) {
     socketService.listenToWebRtcOffer(onWebRtcOffer as any);
     socketService.listenToWebRtcAnswer(onWebRtcAnswer as any);
     socketService.listenToWebRtcIceCandidate(onWebRtcIceCandidate as any);
+    socketService.listenToCallMediaState(onCallMediaState as any);
+    socketService.listenToErrors(onSocketError);
 
     return () => {
       socketService.unlistenToCallIncoming(onCallIncoming);
@@ -602,6 +786,8 @@ export function useVideoCall(userId: string) {
       socketService.unlistenToWebRtcOffer(onWebRtcOffer);
       socketService.unlistenToWebRtcAnswer(onWebRtcAnswer);
       socketService.unlistenToWebRtcIceCandidate(onWebRtcIceCandidate);
+      socketService.unlistenToCallMediaState(onCallMediaState);
+      socketService.unlistenToErrors(onSocketError);
     };
   }, [
     attachLocalTracks,
@@ -609,11 +795,13 @@ export function useVideoCall(userId: string) {
     createOfferForPeer,
     createPeerConnection,
     flushPendingIceCandidates,
+    getPeerKey,
     getSdpFingerprint,
     getSignalingState,
     hasRemoteDescription,
     queueIceCandidate,
     resetCall,
+    showActiveCallConflict,
     socketReadyVersion,
     userId,
   ]);
@@ -625,6 +813,7 @@ export function useVideoCall(userId: string) {
     remoteStreams,
     isMicMuted,
     isCameraEnabled,
+    participantMediaStates,
     startCall,
     startGroupCall,
     acceptCall,
@@ -634,8 +823,15 @@ export function useVideoCall(userId: string) {
       if (localStreamRef.current) {
         const audioTrack = localStreamRef.current.getAudioTracks()[0];
         if (audioTrack) {
+          const nextMuted = audioTrack.enabled; // If enabled is true, we are muting it
           audioTrack.enabled = !audioTrack.enabled;
-          setIsMicMuted(!audioTrack.enabled);
+          setIsMicMuted(nextMuted);
+          
+          if (activeCallRef.current?.sessionId && activeCallRef.current?.callToken) {
+            socketService.emitCallMediaState(activeCallRef.current.sessionId, activeCallRef.current.callToken, {
+              isMicMuted: nextMuted
+            });
+          }
         }
       }
     }, []),
@@ -643,8 +839,15 @@ export function useVideoCall(userId: string) {
       if (localStreamRef.current) {
         const videoTrack = localStreamRef.current.getVideoTracks()[0];
         if (videoTrack) {
-          videoTrack.enabled = !videoTrack.enabled;
-          setIsCameraEnabled(videoTrack.enabled);
+          const nextEnabled = !videoTrack.enabled;
+          videoTrack.enabled = nextEnabled;
+          setIsCameraEnabled(nextEnabled);
+          
+          if (activeCallRef.current?.sessionId && activeCallRef.current?.callToken) {
+            socketService.emitCallMediaState(activeCallRef.current.sessionId, activeCallRef.current.callToken, {
+              isCameraOff: !nextEnabled
+            });
+          }
         }
       }
     }, []),

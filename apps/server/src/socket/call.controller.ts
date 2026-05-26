@@ -3,12 +3,32 @@ import { CallsService } from '../modules/calls/calls.service';
 import { MessagesService } from '../modules/messages/messages.service';
 import { UserModel } from '../modules/users/user.model';
 import { ConversationModel } from '../modules/conversations/conversation.model';
-import { BadRequestError } from '../shared/errors';
+import { AppError, BadRequestError } from '../shared/errors';
 import { recordReconnectOfferAttempt } from '../modules/calls/calls.metrics';
 import { logger } from '../shared/logger';
 
 interface AuthSocket extends Socket {
   userId: string;
+}
+
+function emitSocketError(socket: Socket, error: unknown, fallbackMessage: string): void {
+  socket.emit('error', {
+    message: error instanceof Error ? error.message : fallbackMessage,
+    code: error instanceof AppError ? error.code : undefined,
+  });
+}
+
+function logSocketError(eventName: string, error: unknown): void {
+  if (error instanceof AppError && error.statusCode < 500) {
+    logger.warn(`${eventName} rejected`, {
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+    });
+    return;
+  }
+
+  logger.error(`${eventName} error`, error);
 }
 
 interface CallInvitePayload {
@@ -57,6 +77,8 @@ interface CallMediaStatePayload {
   sessionId: string;
   callToken: string;
   isScreenSharing?: boolean;
+  isMicMuted?: boolean;
+  isCameraOff?: boolean;
 }
 
 const callTimeoutRegistry = new Map<string, NodeJS.Timeout>();
@@ -330,12 +352,22 @@ function parseCallMediaStatePayload(payload: unknown): CallMediaStatePayload {
   const sessionId = data['sessionId'];
   const callToken = data['callToken'];
   const isScreenSharing = data['isScreenSharing'];
+  const isMicMuted = data['isMicMuted'];
+  const isCameraOff = data['isCameraOff'];
+  
   if (typeof sessionId !== 'string' || sessionId.length === 0) throw new BadRequestError('sessionId is required');
   if (typeof callToken !== 'string' || callToken.length === 0) throw new BadRequestError('callToken is required');
   if (isScreenSharing !== undefined && typeof isScreenSharing !== 'boolean') {
     throw new BadRequestError('isScreenSharing must be boolean');
   }
-  return { sessionId, callToken, isScreenSharing };
+  if (isMicMuted !== undefined && typeof isMicMuted !== 'boolean') {
+    throw new BadRequestError('isMicMuted must be boolean');
+  }
+  if (isCameraOff !== undefined && typeof isCameraOff !== 'boolean') {
+    throw new BadRequestError('isCameraOff must be boolean');
+  }
+  
+  return { sessionId, callToken, isScreenSharing, isMicMuted, isCameraOff };
 }
 
 function isInactiveCallSignalError(error: unknown): boolean {
@@ -632,7 +664,9 @@ async function handleCallMediaState(io: Server, socket: AuthSocket, payload: unk
     io.to(`user:${participantId}`).emit('call_media_state', {
       sessionId: input.sessionId,
       userId,
-      isScreenSharing: input.isScreenSharing === true,
+      isScreenSharing: input.isScreenSharing,
+      isMicMuted: input.isMicMuted,
+      isCameraOff: input.isCameraOff,
     });
   }
 }
@@ -645,8 +679,8 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
     try {
       await handleCallInvite(io, socket, payload);
     } catch (err) {
-      logger.error('call_invite error', err);
-      socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to invite call' });
+      logSocketError('call_invite', err);
+      emitSocketError(socket, err, 'Failed to invite call');
     }
   });
 
@@ -654,8 +688,8 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
     try {
       await handleCallGroupInvite(io, socket, payload);
     } catch (err) {
-      logger.error('call_group_invite error', err);
-      socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to invite group call' });
+      logSocketError('call_group_invite', err);
+      emitSocketError(socket, err, 'Failed to invite group call');
     }
   });
 
@@ -663,8 +697,8 @@ export function registerCallController(io: Server, socket: AuthSocket): void {
     try {
       await handleCallAccept(io, socket, payload);
     } catch (err) {
-      logger.error('call_accept error', err);
-      socket.emit('error', { message: err instanceof Error ? err.message : 'Failed to accept call' });
+      logSocketError('call_accept', err);
+      emitSocketError(socket, err, 'Failed to accept call');
     }
   });
 

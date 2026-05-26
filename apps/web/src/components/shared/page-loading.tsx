@@ -10,6 +10,7 @@ import {
   SkeletonHomePage,
   SkeletonSettingsPage,
 } from './ZyncPageSkeleton';
+import { AppLoader, PageSkeleton } from './loading-system';
 
 export type PageLoadingVariant =
   | 'generic'
@@ -85,7 +86,7 @@ export function PageLoading({
     );
   }
 
-  /* Legacy generic card (backward-compatible) */
+  /* Generic loader card */
   const containerClassName = [
     mode === 'panel'
       ? 'flex h-full w-full items-center justify-center px-4 text-text-primary bg-[var(--surface-card)]'
@@ -95,21 +96,13 @@ export function PageLoading({
     .filter(Boolean)
     .join(' ');
 
-  const cardClassName = [
-    'zync-soft-card zync-soft-card-elevated flex w-full flex-col gap-4 rounded-[1.8rem] p-6 zync-reveal-up',
-    mode === 'panel' ? 'max-w-sm' : 'max-w-md',
-  ].join(' ');
-
   return (
     <div className={containerClassName} role="status" aria-live="polite" aria-busy="true">
-      <div className={cardClassName}>
-        <div className="h-3.5 w-36 animate-pulse rounded-full bg-bg-hover" />
-        <div className="space-y-3">
-          <div className="h-10 w-full animate-pulse rounded-xl bg-bg-hover" />
-          <div className="h-10 w-full animate-pulse rounded-xl bg-bg-hover" />
-        </div>
-        <div className="h-11 w-full animate-pulse rounded-xl bg-accent-light/50" />
-      </div>
+      {mode === 'panel' ? (
+        <PageSkeleton className="max-w-md" rows={3} />
+      ) : (
+        <AppLoader message="Đang tải ZYNC..." description="Chuẩn bị dữ liệu và giao diện." />
+      )}
     </div>
   );
 }

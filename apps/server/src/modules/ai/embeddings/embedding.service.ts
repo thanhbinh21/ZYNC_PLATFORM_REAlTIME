@@ -1,5 +1,5 @@
 /**
- * Embedding Service – wraps Gemini `text-embedding-004`
+ * Embedding Service – wraps Gemini embeddings.
  *
  * Produces 768-dimension float vectors for semantic search and RAG context.
  * Uses the Gemini embedding API via @google/generative-ai.
@@ -10,6 +10,8 @@ import { getRedis } from '../../../infrastructure/redis';
 import { logger } from '../../../shared/logger';
 
 const EMBEDDING_CACHE_TTL = 30 * 60; // 30 minutes
+const EMBEDDING_DIMENSIONS = 768;
+const FALLBACK_EMBEDDING_MODELS = ['gemini-embedding-001', 'text-embedding-004', 'embedding-001'];
 
 export type EmbeddingVector = number[]; // 768 floats
 
@@ -24,30 +26,64 @@ export async function embedText(
   text: string,
   taskType: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY' | 'SEMANTIC_SIMILARITY' = 'RETRIEVAL_DOCUMENT',
 ): Promise<EmbeddingVector> {
-  const cacheKey = buildCacheKey(text, taskType);
+  const normalizedText = text.trim();
+  const candidateModels = getEmbeddingModelCandidates();
+  const cacheKey = buildCacheKey(normalizedText, taskType, candidateModels[0] ?? AI_MODELS.EMBEDDING);
 
   // ── Cache hit ──────────────────────────────────────────────────────────────
   const cached = await tryGetCache(cacheKey);
   if (cached) return cached;
 
-  // ── Gemini API call ────────────────────────────────────────────────────────
   const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({ model: AI_MODELS.EMBEDDING });
+  let lastError: unknown;
 
-  const result = await model.embedContent({
-    content: { parts: [{ text }], role: 'user' },
-  });
+  for (const modelId of candidateModels) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelId });
+      const result = await model.embedContent({
+        content: { parts: [{ text: normalizedText }], role: 'user' },
+        taskType,
+        outputDimensionality: EMBEDDING_DIMENSIONS,
+      } as unknown as Parameters<typeof model.embedContent>[0]);
 
-  const vector = result.embedding.values;
+      const vector = normalizeEmbeddingDimensions(result.embedding.values);
+      await trySetCache(cacheKey, vector);
 
-  if (vector.length !== 768) {
-    logger.warn('[EmbeddingService] Unexpected embedding dimension', { dimension: vector.length });
+      if (modelId !== AI_MODELS.EMBEDDING) {
+        logger.warn('[EmbeddingService] Used fallback embedding model', {
+          configuredModel: AI_MODELS.EMBEDDING,
+          modelId,
+        });
+      }
+
+      return vector;
+    } catch (err) {
+      lastError = err;
+      logger.warn('[EmbeddingService] Embedding model failed', {
+        modelId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
-  // ── Cache result ───────────────────────────────────────────────────────────
-  await trySetCache(cacheKey, vector);
+  throw lastError instanceof Error ? lastError : new Error('Embedding provider failed');
+}
 
-  return vector;
+function normalizeEmbeddingDimensions(vector: EmbeddingVector): EmbeddingVector {
+  if (vector.length === EMBEDDING_DIMENSIONS) {
+    return vector;
+  }
+
+  logger.warn('[EmbeddingService] Normalizing embedding dimension for pgvector schema', {
+    dimension: vector.length,
+    targetDimension: EMBEDDING_DIMENSIONS,
+  });
+
+  if (vector.length > EMBEDDING_DIMENSIONS) {
+    return vector.slice(0, EMBEDDING_DIMENSIONS);
+  }
+
+  return [...vector, ...Array(EMBEDDING_DIMENSIONS - vector.length).fill(0)];
 }
 
 /**
@@ -77,10 +113,17 @@ export async function embedBatch(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildCacheKey(text: string, taskType: string): string {
+function getEmbeddingModelCandidates(): string[] {
+  return Array.from(new Set([
+    AI_MODELS.EMBEDDING,
+    ...FALLBACK_EMBEDDING_MODELS,
+  ].filter(Boolean)));
+}
+
+function buildCacheKey(text: string, taskType: string, modelId: string): string {
   // Simple key using first 200 chars + task type (good enough for cache hit)
   const slug = text.slice(0, 200).replace(/\s+/g, '_');
-  return `embed:${taskType}:${slug}`;
+  return `embed:${modelId}:${taskType}:${EMBEDDING_DIMENSIONS}:${slug}`;
 }
 
 async function tryGetCache(key: string): Promise<EmbeddingVector | null> {

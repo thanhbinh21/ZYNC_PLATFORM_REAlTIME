@@ -42,7 +42,7 @@ export interface Conversation {
 }
 
 // Kiểu dữ liệu Message
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history';
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history' | 'call' | 'system';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 
 export interface MessageReactionSummary {
@@ -238,7 +238,7 @@ export interface AiCatchupDigestUpdatedPayload {
 }
 
 // ─── AI Reminders ──────────────────────────────────────────────────────────────
-export type AiReminderStatus = 'pending' | 'done' | 'dismissed';
+export type AiReminderStatus = 'suggested' | 'accepted' | 'done' | 'dismissed';
 export type AiReminderCreatedBy = 'ai_suggestion' | 'user';
 
 export interface AiReminder {
@@ -261,7 +261,7 @@ export interface AiReminderUpdatedPayload extends Omit<AiReminder, 'status'> {
 }
 
 // ─── AI Assistant Box ────────────────────────────────────────────────────────────
-export type AiItemType = 'catchup_digest' | 'task' | 'search_result' | 'group_note' | 'call_summary';
+export type AiItemType = 'catchup_digest' | 'task' | 'search_result' | 'group_note';
 export type AiItemStatus = 'not_started' | 'queued' | 'processing' | 'ready' | 'failed';
 
 export interface AiAssistantItemMetadata {
@@ -271,6 +271,26 @@ export interface AiAssistantItemMetadata {
   catchupMode?: AiCatchupMode;
   actionItemCount?: number;
   messageCount?: number;
+  taskStatus?: AiReminderStatus;
+  dueAt?: string;
+  searchQuery?: string;
+  searchHash?: string;
+  searchRank?: number;
+  similarity?: number;
+  messageId?: string;
+  messageRef?: string;
+  messageCreatedAt?: string;
+  senderId?: string;
+  senderName?: string;
+  source?: 'semantic' | 'keyword';
+  matchReason?: string;
+  conversationName?: string;
+  conversationType?: ConversationType;
+  noteId?: string;
+  pinned?: boolean;
+  decisionCount?: number;
+  openQuestionCount?: number;
+  deleted?: boolean;
 }
 
 export interface AiAssistantItem {
@@ -298,6 +318,68 @@ export interface AiAssistantItemPayload {
   metadata?: AiAssistantItemMetadata;
   detail?: unknown;
   error?: string;
+  updatedAt: string;
+}
+
+export interface AiAssistantSearchResult {
+  itemId?: string;
+  conversationId: string;
+  conversationName: string;
+  conversationAvatarUrl?: string | null;
+  conversationType?: ConversationType;
+  messageId: string;
+  messageRef: string;
+  senderId: string;
+  senderName: string;
+  snippet: string;
+  messageSnippet: string;
+  createdAt: string;
+  timestamp: string;
+  score: number;
+  similarity?: number;
+  source?: 'semantic' | 'keyword';
+  matchReason?: string;
+}
+
+export interface AiAssistantSearchPerson {
+  senderId: string;
+  senderName: string;
+  conversationIds: string[];
+  conversationNames: string[];
+  count: number;
+  score: number;
+  reason: string;
+  evidenceMessageRefs: string[];
+}
+
+export interface AiGroupNoteEvidenceItem {
+  text: string;
+  sourceMessageRefs: string[];
+}
+
+export interface AiGroupNote {
+  _id: string;
+  userId: string;
+  conversationId: string;
+  conversationName?: string;
+  conversationAvatarUrl?: string | null;
+  conversationType?: ConversationType;
+  title?: string;
+  content?: string;
+  decisions: AiGroupNoteEvidenceItem[];
+  openQuestions: AiGroupNoteEvidenceItem[];
+  actionItems: AiGroupNoteEvidenceItem[];
+  sourceMessageRefs: string[];
+  fromMessageRef: string;
+  toMessageRef: string;
+  messageRefs: string[];
+  messageCount: number;
+  pinned: boolean;
+  status: AiItemStatus;
+  model?: string;
+  error?: string;
+  generatedAt?: string;
+  createdAt: string;
   updatedAt: string;
 }
 

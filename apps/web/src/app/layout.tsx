@@ -20,8 +20,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Zync – Real-time Messaging',
-  description: 'Modern real-time messaging platform',
+  title: 'ZYNC - Developer Community Workspace',
+  description: 'Real-time chat, community knowledge sharing, and AI support for developers.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

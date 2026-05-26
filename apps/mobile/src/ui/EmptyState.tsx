@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   Animated,
   StyleSheet,
   ViewStyle,
@@ -10,8 +9,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAppPreferencesStore } from '../store/useAppPreferencesStore';
-import { getAppTheme } from '../theme/get-app-theme';
+import { lightTheme } from '../theme/colors';
+import { fonts } from '../theme/fonts';
+import { AppButton } from './AppButton';
 
 /* ============================================================
  * Types
@@ -29,7 +29,6 @@ export interface EmptyStateProps {
   description?: string;
   action?: EmptyStateAction;
   style?: StyleProp<ViewStyle>;
-  className?: never;
 }
 
 /* ============================================================
@@ -86,7 +85,7 @@ const EMPTY_STATE_CONFIG: Record<EmptyStateVariant, {
 function handleNavigate(router: ReturnType<typeof useRouter>, variant: EmptyStateVariant) {
   switch (variant) {
     case 'no-friends':
-      router.push('/explore');
+      router.push('/(tabs)/friends');
       break;
     case 'no-messages':
       router.push('/(tabs)/chat');
@@ -109,9 +108,8 @@ export function EmptyState({
   action,
   style,
 }: EmptyStateProps) {
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
   const router = useRouter();
+  const theme = lightTheme;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(12)).current;
@@ -167,7 +165,7 @@ export function EmptyState({
           name={config.icon}
           size={32}
           color={theme.textSecondary}
-          style={{ opacity: 0.5 }}
+          style={{ opacity: 0.8 }}
         />
       </View>
 
@@ -181,16 +179,9 @@ export function EmptyState({
       </View>
 
       {displayActionLabel && (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={displayActionClick}
-          style={[
-            styles.actionButton,
-            { backgroundColor: theme.accent },
-          ]}
-        >
-          <Text style={styles.actionButtonText}>{displayActionLabel}</Text>
-        </TouchableOpacity>
+        <View style={styles.actionContainer}>
+          <AppButton label={displayActionLabel} onPress={displayActionClick} />
+        </View>
       )}
     </Animated.View>
   );
@@ -220,25 +211,18 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: fonts.bold,
     textAlign: 'center',
   },
   description: {
     fontSize: 14,
+    fontFamily: fonts.regular,
     textAlign: 'center',
     maxWidth: 240,
     lineHeight: 20,
   },
-  actionButton: {
-    marginTop: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  actionContainer: {
+    marginTop: 8,
   },
 });
 

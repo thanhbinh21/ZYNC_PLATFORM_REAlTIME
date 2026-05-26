@@ -1,4 +1,4 @@
-import { type AiCatchupDigestUpdatedPayload, type AiAssistantItemPayload, type CallHistory, MessageType, SenderInMessage } from '@zync/shared-types';
+import { type AiCatchupDigestUpdatedPayload, type AiAssistantItemPayload, type AiReminderUpdatedPayload, type CallHistory, MessageType, SenderInMessage } from '@zync/shared-types';
 import { io, type Socket } from 'socket.io-client';
 import Cookies from 'js-cookie';
 import { callStore } from '@/stores/call-store';
@@ -1002,6 +1002,32 @@ export function unlistenToAiAssistantItemUpdated(cb?: unknown): void {
   listenerRegistry.delete(event);
 }
 
+export function listenToAiReminderUpdated(
+  callback: (data: AiReminderUpdatedPayload) => void,
+): void {
+  if (!socket) return;
+
+  const event = 'ai_reminder_updated';
+  listenerRegistry.delete(event);
+  listenerRegistry.set(event, callback as (...args: unknown[]) => void);
+  socket.off(event);
+  socket.on(event, callback);
+}
+
+export function unlistenToAiReminderUpdated(cb?: unknown): void {
+  if (!socket) return;
+
+  const event = 'ai_reminder_updated';
+  const registeredCb = listenerRegistry.get(event) as ((...args: unknown[]) => void) | undefined;
+  const toRemove = cb ?? registeredCb;
+  if (toRemove) {
+    socket.off(event, toRemove as any);
+  } else {
+    socket.off(event);
+  }
+  listenerRegistry.delete(event);
+}
+
 export function emitForwardMessage(
   originalMessageId: string,
   toConversationId: string,
@@ -1256,7 +1282,7 @@ export function sendQuickReply(
  * Listen to socket errors
  * @param callback Handler for errors
  */
-export function listenToErrors(callback: (error: { message: string }) => void): void {
+export function listenToErrors(callback: (error: { message: string; code?: string }) => void): void {
   if (!socket) {
     console.warn('[Socket] listenToErrors called before socket init – skipping');
     return;

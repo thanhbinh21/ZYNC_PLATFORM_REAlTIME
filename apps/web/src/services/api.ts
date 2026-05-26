@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
+import { clearAccessToken } from '@/utils/auth-token';
 
 function resolveApiBaseUrl(): string {
   const explicitUrl = process.env['NEXT_PUBLIC_API_URL'];
@@ -35,6 +36,20 @@ function resolveApiBaseUrl(): string {
 const apiBaseUrl = resolveApiBaseUrl();
 
 const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
+const AUTH_ROUTE = '/auth';
+
+function shouldRedirectToAuth(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !window.location.pathname.startsWith(AUTH_ROUTE);
+}
+
+function handleAuthFailure(): void {
+  clearAccessToken();
+  if (typeof window === 'undefined') return;
+  if (shouldRedirectToAuth()) {
+    window.location.replace(AUTH_ROUTE);
+  }
+}
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
@@ -54,8 +69,16 @@ apiClient.interceptors.response.use(
   (res) => res,
   async (error: unknown) => {
     const err = error as AxiosError & { config?: InternalAxiosRequestConfig & { _retry?: boolean } };
-    if (err.response?.status === 401 && !err.config?._retry) {
-      if (err.config) err.config._retry = true;
+    const requestConfig = err.config;
+    const isRefreshRequest = requestConfig?.url?.includes('/auth/refresh');
+
+    if (err.response?.status === 401 && isRefreshRequest) {
+      handleAuthFailure();
+      return Promise.reject(error);
+    }
+
+    if (err.response?.status === 401 && !requestConfig?._retry) {
+      if (requestConfig) requestConfig._retry = true;
       try {
         const { data } = await axios.post<{ accessToken: string }>(
           `${apiBaseUrl}/api/auth/refresh`,
@@ -68,10 +91,9 @@ apiClient.interceptors.response.use(
           sameSite: 'strict',
           maxAge: 15 * 60,
         });
-        return apiClient(err.config ?? { url: '/' });
+        return apiClient(requestConfig ?? { url: '/' });
       } catch {
-        Cookies.remove(ACCESS_TOKEN_COOKIE_KEY);
-        Cookies.remove('refreshToken');
+        handleAuthFailure();
         return Promise.reject(error);
       }
     }

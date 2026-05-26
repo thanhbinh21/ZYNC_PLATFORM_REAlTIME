@@ -1,10 +1,12 @@
+import { Types } from 'mongoose';
 import { ConversationMemberModel } from './conversation-member.model';
 import { ConversationModel } from './conversation.model';
 import { UserModel } from '../users/user.model';
-import { ensureAcceptedFriendship } from '../friends/friends.service';
+import { FriendshipModel } from '../friends/friendship.model';
 import { MessageModel } from '../messages/message.model';
 import { CallSessionModel } from '../calls/calls.model';
-import { BadRequestError, NotFoundError } from '../../shared/errors';
+import { getRedis } from '../../infrastructure/redis';
+import { BadRequestError, ForbiddenError, NotFoundError, TooManyRequestsError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 
 const ACTIVE_CALL_SESSION_STATUSES = ['ringing', 'connecting', 'connected'] as const;
@@ -60,6 +62,32 @@ interface LastVisibleMessage {
   sentAt: Date;
 }
 
+type DirectMessageRelationship = {
+  isAcceptedFriend: boolean;
+  isBlocked: boolean;
+};
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function allowDirectMessageNonFriends(): boolean {
+  return process.env['ALLOW_DIRECT_MESSAGE_NON_FRIENDS'] !== 'false';
+}
+
+function getNonFriendDirectMessageWindowSeconds(): number {
+  return parsePositiveInt(process.env['NON_FRIEND_DIRECT_MESSAGE_WINDOW_SECONDS'], 60 * 60);
+}
+
+function getNonFriendDirectMessageMax(): number {
+  return parsePositiveInt(process.env['NON_FRIEND_DIRECT_MESSAGE_MAX'], 10);
+}
+
 function normalizeUnreadCounts(unreadCounts: unknown): Record<string, number> {
   if (!unreadCounts) {
     return {};
@@ -90,6 +118,83 @@ function getMessagePreview(content: unknown, type: unknown): string {
   if (type === 'audio') return 'Da gui am thanh';
   if (type === 'sticker') return 'Da gui sticker';
   return 'Tin nhan media';
+}
+
+async function getDirectMessageRelationship(
+  userId: string,
+  targetUserId: string,
+): Promise<DirectMessageRelationship> {
+  const [forward, reverse] = await Promise.all([
+    FriendshipModel.findOne({ userId, friendId: targetUserId }).select('status').lean(),
+    FriendshipModel.findOne({ userId: targetUserId, friendId: userId }).select('status').lean(),
+  ]);
+
+  return {
+    isAcceptedFriend: forward?.status === 'accepted' || reverse?.status === 'accepted',
+    isBlocked: forward?.status === 'blocked' || reverse?.status === 'blocked',
+  };
+}
+
+async function findExistingDirectConversation(
+  userId: string,
+  targetUserId: string,
+): Promise<EnrichedConversation | null> {
+  const existingMembers = await ConversationMemberModel.find({ userId: { $in: [userId, targetUserId] } })
+    .select('conversationId userId')
+    .lean();
+
+  const conversationIdMap: Record<string, Set<string>> = {};
+  for (const member of existingMembers) {
+    const conversationId = member.conversationId.toString();
+    if (!conversationIdMap[conversationId]) {
+      conversationIdMap[conversationId] = new Set();
+    }
+    conversationIdMap[conversationId].add(member.userId);
+  }
+
+  for (const [convId, memberSet] of Object.entries(conversationIdMap)) {
+    if (memberSet.size === 2 && memberSet.has(userId) && memberSet.has(targetUserId)) {
+      const conversation = await ConversationModel.findById(convId).select('type').lean();
+      if (conversation?.type === 'direct') {
+        const enriched = await enrichConversationById(convId, userId);
+        if (enriched) {
+          logger.debug(`Found existing 1-1 conversation: ${convId}`);
+          return enriched;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+async function enforceNonFriendDirectMessageRateLimit(userId: string): Promise<void> {
+  try {
+    const redis = getRedis();
+    const key = `dm_rl:non_friend:${userId}`;
+    const windowSeconds = getNonFriendDirectMessageWindowSeconds();
+    const maxRequests = getNonFriendDirectMessageMax();
+    const result = await redis.multi().incr(key).ttl(key).exec();
+    const count = Number(result?.[0]?.[1] ?? 0);
+    const ttl = Number(result?.[1]?.[1] ?? -1);
+
+    if (ttl < 0) {
+      await redis.expire(key, windowSeconds);
+    }
+
+    if (count > maxRequests) {
+      const retryAfterMinutes = Math.ceil(windowSeconds / 60);
+      throw new TooManyRequestsError(
+        `Non-friend direct message rate limit exceeded. Try again in ${retryAfterMinutes} minutes.`,
+      );
+    }
+  } catch (error) {
+    if (error instanceof TooManyRequestsError) {
+      throw error;
+    }
+
+    logger.warn('Non-friend direct message rate limiter failed open', error);
+  }
 }
 
 export async function resolveActiveCallForConversation(
@@ -260,40 +365,51 @@ export class ConversationsService {
         throw new BadRequestError('Missing user id');
       }
 
+      if (!Types.ObjectId.isValid(targetUserId)) {
+        throw new BadRequestError('Invalid target user id');
+      }
+
       if (userId === targetUserId) {
         throw new BadRequestError('Cannot create conversation with yourself');
       }
 
-      const targetExists = await UserModel.exists({ _id: targetUserId });
-      if (!targetExists) {
+      const [currentUser, targetUser] = await Promise.all([
+        UserModel.findById(userId).select('isDeactivated').lean(),
+        UserModel.findById(targetUserId).select('isDeactivated allowMessagesFrom').lean(),
+      ]);
+
+      if (!currentUser) {
+        throw new NotFoundError('User not found');
+      }
+
+      if (!targetUser) {
         throw new NotFoundError('Target user not found');
       }
 
-      await ensureAcceptedFriendship(userId, targetUserId, 'Only friends can open direct conversation');
-
-      const existingMembers = await ConversationMemberModel.find({ userId: { $in: [userId, targetUserId] } })
-        .select('conversationId userId')
-        .lean();
-
-      const conversationIdMap: Record<string, Set<string>> = {};
-      for (const member of existingMembers) {
-        if (!conversationIdMap[member.conversationId.toString()]) {
-          conversationIdMap[member.conversationId.toString()] = new Set();
-        }
-        conversationIdMap[member.conversationId.toString()].add(member.userId);
+      if (currentUser.isDeactivated === true || targetUser.isDeactivated === true) {
+        throw new ForbiddenError('User account is deactivated', 'DIRECT_MESSAGE_USER_DEACTIVATED');
       }
 
-      for (const [convId, memberSet] of Object.entries(conversationIdMap)) {
-        if (memberSet.size === 2 && memberSet.has(userId) && memberSet.has(targetUserId)) {
-          const conversation = await ConversationModel.findById(convId).select('type').lean();
-          if (conversation?.type === 'direct') {
-            const enriched = await enrichConversationById(convId, userId);
-            if (enriched) {
-              logger.debug(`Found existing 1-1 conversation: ${convId}`);
-              return enriched;
-            }
-          }
-        }
+      const relationship = await getDirectMessageRelationship(userId, targetUserId);
+      if (relationship.isBlocked) {
+        throw new ForbiddenError('Direct message is blocked', 'DIRECT_MESSAGE_BLOCKED');
+      }
+
+      if (!allowDirectMessageNonFriends() && !relationship.isAcceptedFriend) {
+        throw new ForbiddenError('Only friends can open direct conversation', 'DIRECT_MESSAGE_FRIENDS_ONLY');
+      }
+
+      if (targetUser.allowMessagesFrom === 'friends_only' && !relationship.isAcceptedFriend) {
+        throw new ForbiddenError('This user only accepts messages from friends', 'DIRECT_MESSAGE_FRIENDS_ONLY');
+      }
+
+      const existingConversation = await findExistingDirectConversation(userId, targetUserId);
+      if (existingConversation) {
+        return existingConversation;
+      }
+
+      if (!relationship.isAcceptedFriend) {
+        await enforceNonFriendDirectMessageRateLimit(userId);
       }
 
       const newConversation = await ConversationModel.create({

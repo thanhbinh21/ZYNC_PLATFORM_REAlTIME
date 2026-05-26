@@ -29,7 +29,8 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { socketService } from '../src/services/socket';
 import api from '../src/services/api';
-import { colors } from '../src/theme/colors';
+import { colors, lightTheme } from '../src/theme/colors';
+import { fonts } from '../src/theme/fonts';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
@@ -40,6 +41,8 @@ import {
   SkeletonChatBubblePreset,
   SkeletonAvatarPreset,
 } from '../src/ui/ZyncSkeleton';
+import { CallHistoryBubble } from '../src/ui/CallHistoryBubble';
+import { MessagePreviewCard, parsePostPreview } from '../src/ui/MessagePreviewCard';
 
 interface MessageReadParticipant {
   userId: string;
@@ -56,7 +59,7 @@ interface Message {
   conversationId?: string;
   senderId: string | { _id: string; displayName?: string };
   content?: string;
-  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'system-recall' | `file/${string}`;
+  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'system-recall' | `file/${string}` | 'call' | 'call_history' | 'system';
   mediaUrl?: string;
   status?: 'sent' | 'delivered' | 'read';
   createdAt: string;
@@ -371,16 +374,21 @@ function dedupeMessages(messages: Message[]): Message[] {
   const merged: Message[] = [];
 
   const areSameMessage = (a: Message, b: Message) => {
-    const aId = String(a._id || '');
-    const bId = String(b._id || '');
+    const aId = String(a._id || (a as any).messageId || '');
+    const bId = String(b._id || (b as any).messageId || '');
     const aKey = String(a.idempotencyKey || '');
     const bKey = String(b.idempotencyKey || '');
+    const aRef = String((a as any).messageRef || '');
+    const bRef = String((b as any).messageRef || '');
 
     return (
       (aId && bId && aId === bId)
       || (aKey && bKey && aKey === bKey)
       || (aId && bKey && aId === bKey)
       || (aKey && bId && aKey === bId)
+      || (aRef && bRef && aRef === bRef)
+      || (aId && bRef && aId === bRef)
+      || (aRef && bId && aRef === bId)
     );
   };
 
@@ -443,11 +451,24 @@ function getSenderId(msg: Message): string {
   return String(msg.senderId || '');
 }
 
-function getSenderName(msg: Message): string {
-  if (typeof msg.senderId === 'object' && msg.senderId !== null) {
-    return msg.senderId.displayName || 'User';
+function getSenderName(msg: Message, groupMembers: Array<{ _id: string; displayName: string; avatarUrl?: string }> = []): string {
+  if (typeof msg.senderId === 'object' && msg.senderId !== null && msg.senderId.displayName) {
+    return msg.senderId.displayName;
   }
-  return '';
+  const id = typeof msg.senderId === 'string' ? msg.senderId : msg.senderId?._id;
+  const member = groupMembers.find(m => m._id === id);
+  if (member?.displayName) return member.displayName;
+  return 'Người dùng';
+}
+
+function getSenderAvatarUrl(msg: Message, groupMembers: Array<{ _id: string; displayName: string; avatarUrl?: string }> = []): string | undefined {
+  if (typeof msg.senderId === 'object' && msg.senderId !== null && 'avatarUrl' in msg.senderId && msg.senderId.avatarUrl) {
+    return msg.senderId.avatarUrl as string;
+  }
+  const id = typeof msg.senderId === 'string' ? msg.senderId : msg.senderId?._id;
+  const member = groupMembers.find(m => m._id === id);
+  if (member?.avatarUrl) return member.avatarUrl;
+  return undefined;
 }
 
 function getFileName(type: Message['type'], content?: string): string {
@@ -922,9 +943,17 @@ export default function ChatRoomScreen() {
         setGroupAdminIds(Array.isArray(currentConversation.adminIds) ? currentConversation.adminIds : []);
         setGroupCreatorId(currentConversation.createdBy || currentConversation.adminIds?.[0]);
       } else {
-        const otherUser = users.find(u => u._id !== userId);
+        const users = Array.isArray(currentConversation.users) ? currentConversation.users : [];
+        setGroupMembers(users);
+        const otherUser = users.find((u) => u._id !== userId);
         if (otherUser) {
           setTargetUserId(otherUser._id);
+          if (!currentConversation.name || currentConversation.name.trim().length === 0) {
+            setConversationName(otherUser.displayName || 'Người dùng');
+          }
+          if (!currentConversation.avatarUrl || currentConversation.avatarUrl.trim().length === 0) {
+            setConversationAvatarUrl(otherUser.avatarUrl || undefined);
+          }
         }
       }
 
@@ -2380,13 +2409,31 @@ export default function ChatRoomScreen() {
       const showSummaryPill = summaryTotalCount > 0;
       const showReactionTrigger = Boolean(myLastEmoji);
 
+      const isCallEvent = message.type === 'call' || message.type === 'call_history' || message.type === 'system' || (message.type === 'text' && message.content && message.content.toLowerCase().includes('cuoc goi'));
+
+      if (isCallEvent) {
+        return (
+          <CallHistoryBubble
+            type={(message.content?.toLowerCase() || '').includes('video') ? 'video' : 'audio'}
+            status={(message.content?.toLowerCase() || '').includes('nhỡ') || (message.content?.toLowerCase() || '').includes('nho') || (message.content?.toLowerCase() || '').includes('từ chối') ? 'missed' : 'completed'}
+            time={formatTime(message.createdAt)}
+            duration={(message.content?.match(/\d+s|\d+:\d+/) || [])[0]}
+            isMe={isMe}
+          />
+        );
+      }
+
       return (
         <View style={[bubbleStyles.row, isMe ? bubbleStyles.rowRight : bubbleStyles.rowLeft]}>
-          {!isMe && isGroupChat && (
+          {!isMe && (
             <View style={bubbleStyles.otherAvatar}>
-              <Text style={bubbleStyles.avatarLetter}>
-                {getSenderName(message).charAt(0).toUpperCase() || '?'}
-              </Text>
+              {getSenderAvatarUrl(message, groupMembers) ? (
+                <Image source={{ uri: getSenderAvatarUrl(message, groupMembers) }} style={bubbleStyles.otherAvatarImage} resizeMode="cover" />
+              ) : (
+                <Text style={bubbleStyles.avatarLetter}>
+                  {getSenderName(message, groupMembers).charAt(0).toUpperCase()}
+                </Text>
+              )}
             </View>
           )}
 
@@ -2402,10 +2449,14 @@ export default function ChatRoomScreen() {
             style={bubbleStyles.messagePressable}
           >
             {!isMe && isGroupChat && (
-              <Text style={bubbleStyles.senderName}>{getSenderName(message)}</Text>
+              <Text style={bubbleStyles.senderName}>{getSenderName(message, groupMembers)}</Text>
             )}
 
-            <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleOther]}>
+            <View style={[
+              bubbleStyles.bubble, 
+              isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleOther,
+              (message.type === 'image' || message.type === 'video' || message.type === 'call' || message.type === 'call_history' || message.type === 'system' || (message.type === 'text' && message.content && parsePostPreview(message.content))) && { backgroundColor: 'transparent', paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0 }
+            ]}>
               {message.replyTo && message.replyTo.messageRef && (
                 <Pressable
                   onPress={() => jumpToMessage(message.replyTo?.messageRef || '')}
@@ -2428,7 +2479,11 @@ export default function ChatRoomScreen() {
                   {isMe ? 'Bạn đã thu hồi tin nhắn' : 'Tin nhắn đã được thu hồi'}
                 </Text>
               ) : message.type === 'text' && message.content ? (
-                <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
+                parsePostPreview(message.content) ? (
+                  <MessagePreviewCard content={message.content} isMe={isMe} />
+                ) : (
+                  <Text style={[bubbleStyles.msgText, isMe && bubbleStyles.msgTextMe]}>{message.content}</Text>
+                )
               ) : message.type === 'sticker' ? (
                 message.mediaUrl ? (
                   <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
@@ -2472,6 +2527,9 @@ export default function ChatRoomScreen() {
               {message.type !== 'text'
                 && message.type !== 'sticker'
                 && message.type !== 'system-recall'
+                && message.type !== 'call'
+                && message.type !== 'call_history'
+                && message.type !== 'system'
                 && message.content
                 && message.content.trim().length > 0 && (
                 <Text style={[bubbleStyles.msgText, bubbleStyles.mediaCaptionText, isMe && bubbleStyles.msgTextMe]}>
@@ -2570,6 +2628,24 @@ export default function ChatRoomScreen() {
   const isCurrentUserGroupCreator = Boolean(isGroupChat && userId && groupCreatorId && userId === groupCreatorId);
   const isCurrentUserGroupAdmin = Boolean(isGroupChat && userId && groupAdminIds.includes(userId));
   const canManageMemberRoles = isCurrentUserGroupCreator || isCurrentUserGroupAdmin;
+  const openCallScreen = (callType: 'audio' | 'video') => {
+    if (!conversationId) return;
+
+    if (isGroupChat && groupMembers.length < 2) {
+      openInfoDialog(
+        'Không thể gọi nhóm',
+        'Nhóm cần ít nhất 2 thành viên để bắt đầu cuộc gọi.',
+        'error',
+      );
+      return;
+    }
+
+    let url = `/call-screen?conversationId=${conversationId}&type=${callType}&isGroup=${isGroupChat}`;
+    if (!isGroupChat && targetUserId) url += `&targetUserId=${targetUserId}`;
+    if (conversationName) url += `&name=${encodeURIComponent(conversationName)}`;
+    if (conversationAvatarUrl) url += `&avatarUrl=${encodeURIComponent(conversationAvatarUrl)}`;
+    router.push(url as any);
+  };
 
   return (
     <LinearGradient
@@ -2624,16 +2700,10 @@ export default function ChatRoomScreen() {
               </View>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.actionIcon} onPress={() => {
-                if (!conversationId) return;
-                router.push(`/call-screen?conversationId=${conversationId}&type=audio&isGroup=${isGroupChat}${!isGroupChat && targetUserId ? '&targetUserId=' + targetUserId : ''}`);
-              }}>
+              <TouchableOpacity style={styles.actionIcon} onPress={() => openCallScreen('audio')}>
                 <Ionicons name="call-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionIcon} onPress={() => {
-                if (!conversationId) return;
-                router.push(`/call-screen?conversationId=${conversationId}&type=video&isGroup=${isGroupChat}${!isGroupChat && targetUserId ? '&targetUserId=' + targetUserId : ''}`);
-              }}>
+              <TouchableOpacity style={styles.actionIcon} onPress={() => openCallScreen('video')}>
                 <Ionicons name="videocam-outline" size={22} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
@@ -2743,7 +2813,7 @@ export default function ChatRoomScreen() {
                       handleMuteConversation();
                     }}
                   >
-                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#d1fae5" />
+                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>{conversationMutedUntil ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
                   </TouchableOpacity>
 
@@ -2753,7 +2823,7 @@ export default function ChatRoomScreen() {
                       void handleToggleConversationPin();
                     }}
                   >
-                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#d1fae5" />
+                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>{isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}</Text>
                   </TouchableOpacity>
                 </View>
@@ -2766,7 +2836,7 @@ export default function ChatRoomScreen() {
                       setIsArchiveOpen(true);
                     }}
                   >
-                    <Ionicons name="images-outline" size={18} color="#d1fae5" />
+                    <Ionicons name="images-outline" size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>Ảnh/Video</Text>
                   </TouchableOpacity>
 
@@ -2777,7 +2847,7 @@ export default function ChatRoomScreen() {
                       setIsArchiveOpen(true);
                     }}
                   >
-                    <Ionicons name="document-text-outline" size={18} color="#d1fae5" />
+                    <Ionicons name="document-text-outline" size={18} color="#0f9d8e" />
                     <Text style={styles.groupActionText}>File</Text>
                   </TouchableOpacity>
                 </View>
@@ -2812,7 +2882,7 @@ export default function ChatRoomScreen() {
                       value={groupNameDraft}
                       onChangeText={setGroupNameDraft}
                       placeholder="Nhập tên nhóm"
-                      placeholderTextColor="#7eb5a2"
+                      placeholderTextColor="#94a3b8"
                       maxLength={100}
                       editable={!isSavingGroupInfo}
                     />
@@ -2893,6 +2963,7 @@ export default function ChatRoomScreen() {
 
                 {isGroupChat && (
                   <TouchableOpacity style={styles.leaveGroupButton} onPress={() => { void handleLeaveGroup(); }}>
+                    <Ionicons name="exit-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
                     <Text style={styles.leaveGroupText}>Rời nhóm</Text>
                   </TouchableOpacity>
                 )}
@@ -3684,20 +3755,26 @@ const bubbleStyles = StyleSheet.create({
   otherAvatar: {
     width: 32,
     height: 32,
-    borderRadius: 12,
-    backgroundColor: colors.glassPanel,
+    borderRadius: 16,
+    backgroundColor: lightTheme.bgHover,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
     marginTop: 16,
+    overflow: 'hidden',
+  },
+  otherAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
   },
   avatarLetter: {
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     fontFamily: 'BeVietnamPro_600SemiBold',
     fontSize: 13,
   },
   senderName: {
-    color: colors.textMuted,
+    color: lightTheme.textTertiary,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_500Medium',
     marginBottom: 2,
@@ -3710,12 +3787,14 @@ const bubbleStyles = StyleSheet.create({
     minWidth: 60,
   },
   bubbleMe: {
-    backgroundColor: colors.accent,
+    backgroundColor: lightTheme.accent,
     borderBottomRightRadius: 6,
   },
   bubbleOther: {
-    backgroundColor: colors.glassPanelStrong,
+    backgroundColor: lightTheme.surfaceCard,
     borderBottomLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
   },
   replyCard: {
     borderRadius: 12,
@@ -3729,17 +3808,17 @@ const bubbleStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
   replyCardOther: {
-    borderLeftColor: colors.accent,
-    backgroundColor: colors.glassPanel,
+    borderLeftColor: lightTheme.accent,
+    backgroundColor: lightTheme.bgHover,
   },
   replyLabel: {
-    fontSize: 10,
-    color: colors.accentSoft,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontSize: 11,
+    color: lightTheme.textOnAccent,
+    fontFamily: fonts.semiBold,
     marginBottom: 1,
   },
   replyLabelMe: {
-    color: 'rgba(255,255,255,0.82)',
+    color: 'rgba(255,255,255,0.8)',
   },
   replySenderName: {
     fontSize: 11,
@@ -3759,13 +3838,13 @@ const bubbleStyles = StyleSheet.create({
     color: 'rgba(255,255,255,0.82)',
   },
   msgText: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 15,
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: fonts.regular,
     lineHeight: 22,
   },
   msgTextMe: {
-    color: colors.textOnAccent,
+    color: lightTheme.textOnAccent,
   },
   mediaCaptionText: {
     marginTop: 8,
@@ -3995,22 +4074,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    height: 64,
-    backgroundColor: colors.glassPanelStrong,
+    height: 68,
+    backgroundColor: lightTheme.bgPrimary,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorder,
+    borderBottomColor: lightTheme.border,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   headerInfo: {
     flex: 1,
@@ -4019,20 +4098,20 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: colors.glassPanel,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: lightTheme.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
   },
   headerAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 14,
+    borderRadius: 22,
   },
   headerAvatarText: {
     color: colors.textSubtle,
@@ -4040,26 +4119,29 @@ const styles = StyleSheet.create({
     fontFamily: 'BeVietnamPro_700Bold',
   },
   headerName: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
     maxWidth: 140,
   },
   headerStatus: {
-    color: colors.accent,
-    fontSize: 12,
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: lightTheme.accent,
+    fontSize: 13,
+    fontFamily: fonts.medium,
   },
   headerActions: {
     flexDirection: 'row',
     gap: 4,
   },
   actionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: lightTheme.surfaceCard,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
   },
   messageList: {
     paddingVertical: 12,
@@ -4213,19 +4295,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#ffffff',
+    backgroundColor: lightTheme.bgPrimary,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-    borderRadius: 22,
-    paddingHorizontal: 14,
+    borderColor: lightTheme.border,
+    borderRadius: 24,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     marginHorizontal: 8,
     maxHeight: 120,
   },
   textInput: {
     flex: 1,
-    color: colors.text,
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: lightTheme.textPrimary,
+    fontFamily: fonts.regular,
     fontSize: 15,
     lineHeight: 20,
     paddingVertical: 6,
@@ -4247,17 +4329,17 @@ const styles = StyleSheet.create({
   },
   composerPickerTab: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-    backgroundColor: colors.glassPanel,
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.surfaceCard,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
   composerPickerTabActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentLight,
+    borderColor: lightTheme.accent,
+    backgroundColor: lightTheme.accentLight,
   },
   composerPickerTabText: {
     color: colors.textMuted,
@@ -4319,15 +4401,20 @@ const styles = StyleSheet.create({
   },
   groupModalCard: {
     width: '100%',
-    borderRadius: 18,
-    backgroundColor: '#05261e',
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#1d5a48',
-    padding: 18,
+    borderColor: '#e2e8f0',
+    padding: 20,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
   },
   groupModalTitle: {
-    color: colors.text,
+    color: '#0f172a',
     fontSize: 18,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 16,
@@ -4336,7 +4423,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#245948',
+    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -4347,7 +4434,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   groupAvatarPlaceholder: {
-    color: '#e2e8f0',
+    color: '#64748b',
     fontSize: 34,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4358,7 +4445,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#34d399',
+    backgroundColor: '#0f9d8e',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -4366,21 +4453,21 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1d5b4a',
-    color: '#d7f6eb',
+    borderColor: '#e2e8f0',
+    color: '#0f172a',
     fontSize: 15,
     fontFamily: 'BeVietnamPro_500Medium',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
-    backgroundColor: '#0b3b2f',
+    backgroundColor: '#f8fafc',
   },
   directInfoCard: {
     width: '100%',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#175443',
-    backgroundColor: '#072d24',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     paddingVertical: 12,
     marginBottom: 12,
@@ -4389,7 +4476,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#245948',
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -4400,19 +4487,19 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   directInfoAvatarText: {
-    color: '#d6fbee',
+    color: '#0f9d8e',
     fontSize: 24,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   directInfoName: {
-    color: '#e2fff4',
+    color: '#0f172a',
     fontSize: 16,
     fontFamily: 'BeVietnamPro_700Bold',
     maxWidth: '90%',
   },
   directInfoMeta: {
     marginTop: 2,
-    color: '#8abfab',
+    color: '#64748b',
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
   },
@@ -4421,12 +4508,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#175443',
-    backgroundColor: '#072d24',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
     padding: 10,
   },
   memberRoleTitle: {
-    color: '#d1fae5',
+    color: '#334155',
     fontSize: 13,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 8,
@@ -4440,8 +4527,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#175443',
-    backgroundColor: '#0d3a2f',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -4452,19 +4539,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   memberRoleName: {
-    color: '#e2e8f0',
+    color: '#0f172a',
     fontSize: 13,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   memberRoleMeta: {
-    color: '#8cc4b0',
+    color: '#64748b',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_500Medium',
     marginTop: 2,
   },
   memberRoleAction: {
     borderRadius: 8,
-    backgroundColor: '#1f7a60',
+    backgroundColor: '#e2f5f2',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -4474,18 +4561,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   memberRoleActionText: {
-    color: '#e6fff5',
+    color: '#0f9d8e',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   memberRemoveAction: {
     borderRadius: 8,
-    backgroundColor: '#4a1e1e',
+    backgroundColor: '#fee2e2',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   memberRemoveActionText: {
-    color: '#fecaca',
+    color: '#ef4444',
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4502,18 +4589,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   groupModalCancelButton: {
-    backgroundColor: '#0f4335',
+    backgroundColor: '#f1f5f9',
   },
   groupModalSaveButton: {
-    backgroundColor: '#1f7a60',
+    backgroundColor: '#0f9d8e',
   },
   groupModalCancelText: {
-    color: '#b8ebdb',
+    color: '#475569',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   groupModalSaveText: {
-    color: '#0f172a',
+    color: '#FFFFFF',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4526,16 +4613,16 @@ const styles = StyleSheet.create({
   groupActionItem: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#0f4335',
+    backgroundColor: '#f1f5f9',
     borderWidth: 1,
-    borderColor: '#175443',
+    borderColor: '#e2e8f0',
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   groupActionText: {
-    color: '#c7f4e6',
+    color: '#334155',
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
     textAlign: 'center',
@@ -4545,13 +4632,15 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#7f1d1d',
-    backgroundColor: '#3f1212',
+    borderColor: '#fecaca',
+    backgroundColor: '#fee2e2',
     paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   leaveGroupText: {
-    color: '#ffe0e0',
+    color: '#ef4444',
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
   },

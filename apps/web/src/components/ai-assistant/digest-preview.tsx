@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Bot, RefreshCw, MessageSquare, Bell } from 'lucide-react';
 import { StatusBadge, DigestStatusDot } from './status-badge';
 import type { AiAssistantItem } from '@zync/shared-types';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 interface DigestPreviewProps {
   item: AiAssistantItem;
@@ -117,7 +118,7 @@ export function DigestPreview({
             disabled={regenerating}
             className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCw className={`h-3 w-3 ${regenerating ? 'animate-spin' : ''}`} aria-hidden />
+            {regenerating ? <ButtonSpinner size="xs" tone="muted" /> : <RefreshCw className="h-3 w-3" aria-hidden />}
             Tạo lại
           </button>
         )}

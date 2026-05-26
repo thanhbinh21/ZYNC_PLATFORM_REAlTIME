@@ -10,11 +10,10 @@ import {
   Dimensions,
   Image,
   FlatList,
-  Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Search, TrendingUp, Users, Hash } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
 import { getAppTheme } from '../src/theme/get-app-theme';
 import { colors } from '../src/theme/colors';
@@ -24,16 +23,13 @@ import { DeveloperCard } from '../src/components/DeveloperCard';
 import { useExplore } from '../src/hooks/useExplore';
 import { fetchTrendingPosts, type Post } from '../src/services/posts';
 import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
-import { useNavigationFlow } from '../src/hooks/useNavigationFlow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) {
+export default function ExploreScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ skills?: string }>();
   const mode = useAppPreferencesStore((s) => s.theme);
   const theme = getAppTheme(mode);
-  const { navigateToChat, sendFriendRequest } = useNavigationFlow();
 
   const {
     channels,
@@ -47,9 +43,7 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
     handleJoinChannel,
   } = useExplore();
 
-  const [searchQuery, setSearchQuery] = useState(
-    typeof params.skills === 'string' ? params.skills.split(',').filter(Boolean).join(' ') : ''
-  );
+  const [searchQuery, setSearchQuery] = useState('');
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [isLoadingTrending, setIsLoadingTrending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -115,13 +109,11 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
     !isLoadingChannels && !isLoadingUsers && channels.length === 0 && users.length === 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      {showHeader && (
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Khám phá</Text>
-        </View>
-      )}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Kham pha</Text>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -139,7 +131,7 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
           <Search size={18} color={colors.textSubtle} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kênh, người dùng..."
+            placeholder="Tim kenh, nguoi dung..."
             placeholderTextColor={colors.textSubtle}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -160,9 +152,9 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
         {/* Empty state */}
         {hasContent && !searchQuery && (
           <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Chưa có nội dung nào</Text>
+            <Text style={styles.emptyTitle}>Chua co noi dung nao</Text>
             <Text style={styles.emptySubtitle}>
-              Danh sách kênh và người dùng sẽ xuất hiện ở đây
+              Danh sach kenh va nguoi dung se xuat hien o day
             </Text>
           </View>
         )}
@@ -172,7 +164,7 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Hash size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Kênh phổ biến</Text>
+              <Text style={styles.sectionTitle}>Kenh pho bien</Text>
             </View>
             {filteredChannels.map((channel) => (
               <ChannelCard
@@ -190,7 +182,7 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <TrendingUp size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Bài viết nổi bật</Text>
+              <Text style={styles.sectionTitle}>Bai viet noi bat</Text>
             </View>
             <ScrollView
               horizontal
@@ -232,10 +224,10 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
                   </Text>
                   <View style={styles.trendingStats}>
                     <Text style={styles.trendingStat}>
-                      {post.likesCount} thích
+                      {post.likesCount} thich
                     </Text>
                     <Text style={styles.trendingStat}>
-                      {post.commentsCount} bình luận
+                      {post.commentsCount} binh luan
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -249,22 +241,17 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Users size={18} color={colors.primary} />
-              <Text style={styles.sectionTitle}>Developer nổi bật</Text>
+              <Text style={styles.sectionTitle}>Developer noi bat</Text>
             </View>
             {filteredUsers.map((user) => (
               <DeveloperCard
                 key={user.id}
                 user={user}
                 onMessage={(userId) => {
-                  void navigateToChat(userId);
+                  // Navigate to chat with user
                 }}
                 onAddFriend={(userId) => {
-                  void sendFriendRequest(userId).then((ok) => {
-                    Alert.alert(
-                      ok ? 'Thông báo' : 'Lỗi',
-                      ok ? 'Đã gửi lời mời kết bạn.' : 'Không thể gửi lời mời kết bạn lúc này.'
-                    );
-                  });
+                  // Send friend request
                 }}
               />
             ))}
@@ -276,23 +263,15 @@ export function ExploreContent({ showHeader = true }: { showHeader?: boolean }) 
           filteredChannels.length === 0 &&
           filteredUsers.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Không tìm thấy kết quả</Text>
+              <Text style={styles.emptyTitle}>Khong tim thay ket qua</Text>
               <Text style={styles.emptySubtitle}>
-                Thử từ khóa tìm kiếm khác
+                Thuử tu kho tim kiem khac
               </Text>
             </View>
           )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-    </View>
-  );
-}
-
-export default function ExploreScreen() {
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <ExploreContent />
     </SafeAreaView>
   );
 }

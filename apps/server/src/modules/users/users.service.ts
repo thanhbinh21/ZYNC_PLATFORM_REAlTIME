@@ -229,16 +229,18 @@ export interface AccountSettings {
   toastNotifications: boolean;
   allowSearchProfile: boolean;
   allowFriendRequest: boolean;
+  allowMessagesFrom: 'everyone' | 'friends_only';
   showOnlineStatus: boolean;
 }
 
-type AccountSettingsFields = Pick<IUser, 'toastNotifications' | 'allowSearchProfile' | 'allowFriendRequest' | 'showOnlineStatus'>;
+type AccountSettingsFields = Pick<IUser, 'toastNotifications' | 'allowSearchProfile' | 'allowFriendRequest' | 'allowMessagesFrom' | 'showOnlineStatus'>;
 
 function extractAccountSettings(user: AccountSettingsFields): AccountSettings {
   return {
     toastNotifications: user.toastNotifications ?? true,
     allowSearchProfile: user.allowSearchProfile ?? true,
     allowFriendRequest: user.allowFriendRequest ?? true,
+    allowMessagesFrom: user.allowMessagesFrom ?? 'everyone',
     showOnlineStatus: user.showOnlineStatus ?? true,
   };
 }
@@ -274,7 +276,7 @@ async function broadcastPresenceVisibility(userId: string, showOnlineStatus: boo
 
 export async function getAccountSettings(userId: string): Promise<AccountSettings> {
   const user = await UserModel.findById(userId)
-    .select('toastNotifications allowSearchProfile allowFriendRequest showOnlineStatus')
+    .select('toastNotifications allowSearchProfile allowFriendRequest allowMessagesFrom showOnlineStatus')
     .lean();
   if (!user) throw new NotFoundError('User not found');
   return extractAccountSettings(user as unknown as AccountSettingsFields);
@@ -295,7 +297,7 @@ export async function updateAccountSettings(
     userId,
     { $set: dto },
     { new: true, runValidators: true },
-  ).select('toastNotifications allowSearchProfile allowFriendRequest showOnlineStatus');
+  ).select('toastNotifications allowSearchProfile allowFriendRequest allowMessagesFrom showOnlineStatus');
 
   if (!updated) throw new NotFoundError('User not found');
 

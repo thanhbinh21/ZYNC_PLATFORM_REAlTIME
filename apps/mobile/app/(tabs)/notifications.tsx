@@ -12,12 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppPreferencesStore } from '../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../src/theme/get-app-theme';
-import { useNotifications } from '../src/hooks/useNotifications';
-import { useAuthStore } from '../src/store/useAuthStore';
-import type { AppNotification } from '../src/services/notifications';
-import { SkeletonCardPreset } from '../src/ui/ZyncSkeleton';
+import { lightTheme } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
+import { useNotifications } from '../../src/hooks/useNotifications';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import type { AppNotification } from '../../src/services/notifications';
+import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -34,8 +34,7 @@ function timeAgo(dateStr: string): string {
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const {
     notifications,
@@ -121,9 +120,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.bgPrimary }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={theme.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ width: 36 }} />
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
           Thông báo{unreadCount > 0 ? ` (${unreadCount})` : ''}
         </Text>
@@ -145,7 +142,7 @@ export default function NotificationsScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={theme.accent}
-            colors={[theme.accent]}
+            colors={[lightTheme.accent]}
           />
         }
         onEndReached={loadMore}
@@ -201,37 +198,57 @@ const styles = StyleSheet.create({
   markAllBtn: { paddingHorizontal: 10, paddingVertical: 4 },
   markAllText: {
     fontSize: 13,
-    fontWeight: '600',
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
   },
   item: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: lightTheme.border,
+  },
+  readItem: {
+    opacity: 0.7,
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: lightTheme.surfaceCard,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
+  },
+  content: {
+    flex: 1,
+  },
+  message: {
+    color: lightTheme.textPrimary,
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    lineHeight: 22,
+  },
+  time: {
+    color: lightTheme.textSecondary,
+    fontSize: 12,
+    marginTop: 6,
+    fontFamily: fonts.regular,
   },
   itemContent: { flex: 1 },
   itemTitle: {
     fontSize: 14,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontFamily: fonts.medium,
   },
-  itemTitleBold: { fontWeight: '700', fontFamily: 'BeVietnamPro_700Bold' },
+  itemTitleBold: { fontFamily: fonts.bold },
   itemBody: {
     fontSize: 13,
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   itemTime: {
     fontSize: 11,
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: fonts.regular,
     marginTop: 4,
   },
   unreadDot: {
@@ -241,12 +258,37 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 80,
-    gap: 12,
   },
   emptyText: {
-    fontSize: 15,
-    fontFamily: 'BeVietnamPro_400Regular',
+    color: lightTheme.textSecondary,
+    fontSize: 16,
+    marginTop: 16,
+    fontFamily: fonts.semiBold,
+  },
+  emptySub: {
+    color: lightTheme.textTertiary,
+    fontSize: 14,
+    marginTop: 8,
+    fontFamily: fonts.regular,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 20,
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: lightTheme.textTertiary,
+    fontSize: 14,
+    fontFamily: fonts.regular,
   },
 });

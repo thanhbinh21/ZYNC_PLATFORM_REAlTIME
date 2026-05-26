@@ -21,6 +21,7 @@ import {
   registerPushToken,
 } from '../src/services/push-notifications';
 import { IncomingCallOverlay } from '../src/components/IncomingCallOverlay';
+import { ActiveCallBar } from '../src/components/ActiveCallBar';
 import { ToastProvider } from '../src/components/Toast';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -98,7 +99,7 @@ export default function RootLayout() {
         return;
       }
 
-      router.push('/notifications');
+      router.push('/(tabs)/notifications');
     });
 
     return () => {
@@ -121,14 +122,19 @@ export default function RootLayout() {
       <ToastProvider>
         <NotificationsProvider>
           <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="chat-room" options={{ headerShown: false }} />
+            <Stack.Screen name="call-screen" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="settings" options={{ headerShown: false }} />
+            <Stack.Screen name="group-info" options={{ headerShown: false }} />
+            <Stack.Screen name="create-group" options={{ headerShown: false }} />
             <Stack.Screen name="post-detail" options={{ headerShown: false }} />
             <Stack.Screen name="explore" options={{ headerShown: false }} />
-            <Stack.Screen name="call-screen" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
           </Stack>
           <IncomingCallOverlay />
+          <ActiveCallBar />
         </NotificationsProvider>
       </ToastProvider>
     </GestureHandlerRootView>

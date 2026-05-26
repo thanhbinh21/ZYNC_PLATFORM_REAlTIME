@@ -1,13 +1,12 @@
-﻿import { Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Grid3X3, MessageCircle, UserRound, Users, Globe2 } from 'lucide-react-native';
-import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
+import { Home, MessageCircle, Users, Globe, UserRound } from 'lucide-react-native';
+import { lightTheme } from '../../src/theme/colors';
+import { fonts } from '../../src/theme/fonts';
 
 export default function TabLayout() {
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
 
   return (
     <Tabs
@@ -17,29 +16,29 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.accent,
         tabBarInactiveTintColor: theme.textTertiary,
         tabBarLabelStyle: {
-          fontFamily: 'BeVietnamPro_500Medium',
+          fontFamily: fonts.medium,
           fontSize: 11,
           marginBottom: 5,
         },
         tabBarStyle: {
-          backgroundColor: theme.bgCard,
+          backgroundColor: 'rgba(255, 255, 255, 0.85)',
           borderTopWidth: 1,
-          borderTopColor: theme.border,
-          height: 70,
-          paddingTop: 8,
-          paddingBottom: 4,
+          borderTopColor: '#E8ECEF',
+          height: 64,
+          paddingTop: 10,
+          paddingBottom: 10,
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
           shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 10 },
-          elevation: 0,
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: -4 },
+          elevation: 8,
         },
         tabBarBackground: () => (
-          <BlurView intensity={88} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
         ),
       }}
     >
@@ -47,7 +46,7 @@ export default function TabLayout() {
         name="home"
         options={{
           title: 'Trang chủ',
-          tabBarIcon: ({ color }) => <Grid3X3 size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Home size={22} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -58,24 +57,31 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="community"
+        name="friends"
         options={{
-          title: 'Cộng đồng',
-          tabBarIcon: ({ color }) => <Globe2 size={22} color={color} />,
+          title: 'Bạn bè',
+          tabBarIcon: ({ color }) => <Users size={22} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="friends"
+        name="community"
         options={{
-          title: 'Danh bạ',
-          tabBarIcon: ({ color }) => <Users size={22} color={color} />,
+          title: 'Cộng đồng',
+          tabBarIcon: ({ color }) => <Globe size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Cá nhân',
+          title: 'Hồ sơ',
           tabBarIcon: ({ color }) => <UserRound size={22} color={color} />,
+        }}
+      />
+      {/* Notifications tab hidden - accessed from Home bell icon */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

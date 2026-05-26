@@ -53,6 +53,23 @@ function EmptyLikeIcon({ className }: { className: string }) {
   );
 }
 
+function PhoneMiniIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function VideoMiniIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="m22 8-6 4 6 4V8Z" />
+      <rect x="2" y="6" width="14" height="12" rx="2" ry="2" />
+    </svg>
+  );
+}
+
 const QUICK_REACTIONS = ['👍', '❤️', '🤣', '😳', '😭', '😡'];
 const DEFAULT_MENU_REACTIONS = ['❤️', '👍', '😆', '😢', '😡'];
 const PICKER_HIDE_DELAY_MS = 700;
@@ -178,7 +195,7 @@ function ReactionDetailsContent({
   return (
     <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
       <div
-        className="reaction-details-modal w-full max-w-xl rounded-2xl border p-4 shadow-2xl"
+        className="reaction-details-modal w-full max-w-xl rounded-2xl border border-border bg-surface-card-strong p-5 shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -248,7 +265,7 @@ function StatusDetailsContent({
   return (
     <div className="absolute inset-0 z-[92] flex items-center justify-center bg-black/55 px-4" onClick={onClose}>
       <div
-        className="reaction-details-modal w-full max-w-lg rounded-2xl border p-4 shadow-2xl"
+        className="reaction-details-modal w-full max-w-lg rounded-2xl border border-border bg-surface-card-strong p-5 shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -774,10 +791,14 @@ export function MessageItem({
             <span>{dateSeparatorText}</span>
           </div>
         )}
-        <div className="inline-flex max-w-[90%] items-center gap-3 rounded-2xl border border-border bg-bg-card px-4 py-2.5 text-sm text-text-primary shadow-sm">
-          <span className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-accent-light text-accent">
-            {message.callHistory?.callType === 'audio' ? '☎' : '▣'}
-          </span>
+        <div className="chat-call-bubble">
+          <div className="chat-call-bubble-icon">
+            {message.callHistory?.callType === 'audio' ? (
+              <PhoneMiniIcon className="h-4 w-4" />
+            ) : (
+              <VideoMiniIcon className="h-4 w-4" />
+            )}
+          </div>
           <span className="min-w-0 text-left">
             <span className="block truncate font-semibold">{title}</span>
             <span className="block text-xs text-text-secondary">{detail}</span>
@@ -797,13 +818,13 @@ export function MessageItem({
 
     return (
       <div className="my-3 flex flex-col items-center gap-1.5">
-        <div className="inline-flex max-w-[90%] items-center gap-2 rounded-full border border-[#2a6252] bg-[#12392f] px-3 py-1.5 text-sm text-[#d6f8ec]">
-          <span className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#1d4b3d] text-[10px] font-semibold text-[#a6e3cf]">
+        <div className="chat-lifecycle-bubble">
+          <div className="chat-lifecycle-bubble-initials">
             {initialsFromNotice(message.content)}
-          </span>
+          </div>
           <span className="truncate">{message.content}</span>
         </div>
-        <span className="rounded-full bg-[#17483a] px-2 py-0.5 text-[11px] text-[#9fd8c4]">{timeStr}</span>
+        <span className="chat-lifecycle-bubble-time">{timeStr}</span>
       </div>
     );
   }
@@ -811,7 +832,9 @@ export function MessageItem({
   return (
     <div
       ref={messageRef}
-      className={`group relative mb-2 flex flex-row items-start hover:z-20 ${
+      className={`group relative flex flex-row items-start hover:z-20 ${
+        isConsecutive ? 'mb-1' : 'mb-3'
+      } ${
         isMenuOpenForThisMessage || isPickerOpenForThisMessage ? 'z-30' : 'z-0'
       } ${
         isSender ? 'justify-end' : 'justify-start'
@@ -826,7 +849,7 @@ export function MessageItem({
       )}
 
       {/* ── Bubble column ── */}
-      <div className="relative order-2 max-w-[75%] lg:max-w-[65%]">
+      <div className="relative order-2">
         {!isRecalled && (
           <div
             className={`absolute top-1/2 z-30 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 ${
@@ -1131,7 +1154,7 @@ export function ReactionPicker({
 
   return (
     <div
-      className={`absolute z-[120] flex items-center gap-1 rounded-full border border-border-light bg-bg-card px-2 py-1 shadow-lg ${
+      className={`chat-reaction-picker absolute z-[120] ${
         pickerPlacement === 'top' ? 'origin-bottom' : 'origin-top'
       }`}
       style={{ top: `${coords.top}px`, left: `${coords.left}px` }}
@@ -1144,7 +1167,7 @@ export function ReactionPicker({
           key={emoji}
           type="button"
           onClick={() => handleForPicker.handleReactionClick(emoji, 'picker-select')}
-          className="rounded-full px-1.5 py-0.5 text-base reaction-menu-item transition-transform hover:scale-125"
+          className="chat-reaction-picker-item"
         >
           {emoji}
         </button>
@@ -1153,7 +1176,7 @@ export function ReactionPicker({
         <button
           type="button"
           onClick={handleForPicker.handleRemoveMineReactions}
-          className="rounded-full px-2 py-0.5 text-xs text-red-500 transition-opacity hover:opacity-80"
+          className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-400 transition-opacity hover:opacity-80"
         >
           Xóa
         </button>
@@ -1283,7 +1306,7 @@ export function Menu({
   return (
     <div
       ref={menuRef}
-      className={`message-context-menu absolute z-[120] rounded-xl shadow-xl ${
+      className={`chat-context-menu absolute z-[120] ${
         menuPlacement === 'top' ? 'origin-bottom' : 'origin-top'
       } ${
         isSender ? 'text-right' : 'text-left'
@@ -1291,7 +1314,7 @@ export function Menu({
       style={{ top: `${coords.top}px`, left: `${coords.left}px`, minWidth: '160px' }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-1 border-b border-border-light px-3 py-2">
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border-light">
         {menuReactions.map((emoji) => (
           <button
             key={emoji}
@@ -1307,7 +1330,7 @@ export function Menu({
         <>
           <button
             onClick={handleDeleteForMeClick}
-            className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
+            className="chat-context-menu-item border-b border-border-light"
           >
             <TrashIcon className="h-4 w-4 flex-shrink-0" />
             <span>Xóa chỗ tôi</span>
@@ -1315,7 +1338,7 @@ export function Menu({
           {canRecall && (
             <button
               onClick={handleRecallClick}
-              className="message-menu-button flex w-full items-center gap-3 border-b px-3 py-2 text-left text-sm transition-colors"
+              className="chat-context-menu-item border-b border-border-light"
             >
               <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
               <span>Thu hồi</span>
@@ -1323,14 +1346,14 @@ export function Menu({
           )}
           <button
             onClick={handleForwardClick}
-            className="message-menu-button flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors"
+            className="chat-context-menu-item border-b border-border-light"
           >
             <ForwardIcon className="h-4 w-4 flex-shrink-0" />
             <span>Chuyển tiếp</span>
           </button>
           <button
             onClick={handleReplyClick}
-            className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
+            className="chat-context-menu-item"
           >
             <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
             <span>Trả lời</span>
@@ -1340,7 +1363,7 @@ export function Menu({
         <>
           <button
             onClick={handleReplyClick}
-            className="message-menu-button flex w-full items-center gap-3 border-t px-3 py-2 text-left text-sm transition-colors"
+            className="chat-context-menu-item"
           >
             <ArrowUturnLeftIcon className="h-4 w-4 flex-shrink-0" />
             <span>Trả lời</span>

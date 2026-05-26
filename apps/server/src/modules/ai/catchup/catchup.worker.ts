@@ -11,8 +11,11 @@ import { UserModel } from '../../users/user.model';
 import { AiCatchupDigestModel, type IAiCatchupDigest } from './catchup.model';
 import { AiCatchupModelOutputSchema, type AiCatchupModelOutput } from './catchup.schema';
 import { AiCatchupService } from './catchup.service';
+import { AiReminderService } from '../reminders/reminder.service';
 
 const CATCHUP_WORKER_GROUP_ID = 'ai-catchup-worker-group';
+const WORKER_SESSION_TIMEOUT_MS = parseInt(process.env['AI_CATCHUP_KAFKA_SESSION_TIMEOUT_MS'] ?? '120000', 10);
+const WORKER_HEARTBEAT_INTERVAL_MS = parseInt(process.env['AI_CATCHUP_KAFKA_HEARTBEAT_INTERVAL_MS'] ?? '3000', 10);
 const MAX_RANGE_MESSAGES = 100;
 const MAX_INPUT_CHARS = 20_000;
 const CONTEXT_MESSAGE_COUNT = 5;
@@ -53,6 +56,26 @@ interface PromptMessage {
 }
 
 let catchupConsumer: Consumer | null = null;
+
+function startHeartbeatLoop(heartbeat: () => Promise<void>): () => void {
+  let inFlight = false;
+  const timer = setInterval(() => {
+    if (inFlight) return;
+    inFlight = true;
+    heartbeat()
+      .catch((err) => {
+        logger.warn('[AI Catch-up Worker] Kafka heartbeat failed', {
+          err: err instanceof Error ? err.message : String(err),
+        });
+      })
+      .finally(() => {
+        inFlight = false;
+      });
+  }, Math.max(1000, WORKER_HEARTBEAT_INTERVAL_MS));
+
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
 
 function buildMessageRefsQuery(refs: string[]): Record<string, unknown>[] {
   const objectIds = refs
@@ -324,6 +347,7 @@ async function processCatchupJob(payload: CatchupJobPayload): Promise<void> {
     digest.set('model', modelId);
     digest.omittedOlderCount = omittedOlderCount;
     digest.generatedAt = new Date();
+    await AiReminderService.syncSuggestedTasksFromDigest(digest);
 
     await AiCatchupService.markDigestReady(digest);
   } catch (err) {
@@ -338,13 +362,17 @@ async function processCatchupJob(payload: CatchupJobPayload): Promise<void> {
 }
 
 export async function startCatchupWorker(): Promise<void> {
-  catchupConsumer = createConsumer(CATCHUP_WORKER_GROUP_ID);
+  catchupConsumer = createConsumer(CATCHUP_WORKER_GROUP_ID, {
+    sessionTimeout: Math.max(30000, WORKER_SESSION_TIMEOUT_MS),
+    heartbeatInterval: Math.max(1000, WORKER_HEARTBEAT_INTERVAL_MS),
+  });
   await catchupConsumer.connect();
   await catchupConsumer.subscribe({ topic: KAFKA_TOPICS.AI_CATCHUP_JOBS, fromBeginning: false });
 
   await catchupConsumer.run({
-    eachMessage: async ({ message }: EachMessagePayload) => {
+    eachMessage: async ({ message, heartbeat }: EachMessagePayload) => {
       if (!message.value) return;
+      const stopHeartbeat = startHeartbeatLoop(heartbeat);
 
       try {
         const payload = JSON.parse(message.value.toString()) as CatchupJobPayload;
@@ -364,6 +392,8 @@ export async function startCatchupWorker(): Promise<void> {
         await processCatchupJob(payload);
       } catch (err) {
         logger.error('[AI Catch-up Worker] Job handling failed', err);
+      } finally {
+        stopHeartbeat();
       }
     },
   });

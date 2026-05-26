@@ -9,25 +9,25 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Heart, MessageCircle, Bookmark, Share } from 'lucide-react-native';
 import { usePostDetail } from '../src/hooks/usePosts';
 import { CommentSheet } from '../src/components/CommentSheet';
 import { likePost, bookmarkPost } from '../src/services/posts';
 import { colors } from '../src/theme/colors';
 import { fonts } from '../src/theme/fonts';
-import { SkeletonCardPreset, SkeletonPostCardPreset } from '../src/ui/ZyncSkeleton';
+import { SkeletonPostCardPreset } from '../src/ui/ZyncSkeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const POST_TYPE_LABELS: Record<string, string> = {
-  discussion: 'Thao luan',
-  question: 'Hoi dap',
-  til: 'TIL',
+  discussion: 'Thảo luận',
+  question: 'Hỏi đáp',
+  til: 'Hướng dẫn',
   showcase: 'Showcase',
-  tutorial: 'Huong dan',
-  job: 'Tuyen dung',
+  tutorial: 'Hướng dẫn',
+  job: 'Tuyển dụng',
 };
 
 function formatDate(dateString: string): string {
@@ -102,10 +102,6 @@ export default function PostDetailScreen() {
     // Placeholder share — open URL if post has share link
   }, []);
 
-  const handleSubmitComment = useCallback(async (content: string): Promise<void> => {
-    await handleAddComment(content);
-  }, [handleAddComment]);
-
   if (isLoadingPost) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -121,7 +117,7 @@ export default function PostDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorState}>
           <Text style={styles.errorText}>
-            {error || 'Không tìm thấy bài viết'}
+            {error || 'Khong tim thay bai viet'}
           </Text>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backLinkText}>Quay lai</Text>
@@ -278,7 +274,7 @@ export default function PostDetailScreen() {
           {isLoadingComments ? (
             <View style={{ gap: 12, paddingVertical: 16 }}>
               {Array.from({ length: 3 }).map((_, i) => (
-                <SkeletonCardPreset key={i} lines={1} showAvatar />
+                <SkeletonPostCardPreset key={i} />
               ))}
             </View>
           ) : comments.length === 0 ? (
@@ -347,7 +343,7 @@ export default function PostDetailScreen() {
         comments={comments}
         isLoading={isLoadingComments}
         onClose={() => setShowCommentSheet(false)}
-        onSubmit={handleSubmitComment}
+        onSubmit={async (content: string) => { await handleAddComment(content); }}
       />
     </SafeAreaView>
   );

@@ -22,6 +22,20 @@ export async function createCallSessionHandler(
   }
 }
 
+export async function getActiveCallHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req as AuthRequest;
+    const session = await CallsService.getActiveCallForUser(userId);
+    res.json({ success: true, data: session });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getCallSessionHandler(
   req: Request,
   res: Response,

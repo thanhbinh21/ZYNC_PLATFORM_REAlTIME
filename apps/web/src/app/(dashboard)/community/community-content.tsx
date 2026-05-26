@@ -18,7 +18,6 @@ import {
   TrendingUp,
   Tag,
   X,
-  Loader2,
   Globe,
   Star,
   ImagePlus,
@@ -44,6 +43,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { UserProfileModal } from '@/components/shared/UserProfileModal';
 import { useNavigationFlow } from '@/hooks/use-navigation-flow';
 import type { Comment } from '@/services/posts';
+import { ButtonSpinner, PageSkeleton } from '@/components/shared/loading-system';
 
 interface PostTypeConfig {
   label: string;
@@ -287,7 +287,7 @@ function CreatePostForm({ onClose, onSuccess }: CreatePostFormProps) {
           <div className="flex justify-end gap-3 border-t border-border pt-4">
             <button type="button" onClick={onClose} className="zync-soft-button-secondary px-5 py-2.5 text-sm">Hủy</button>
             <button type="submit" disabled={submitting || !title.trim() || !content.trim()} className="zync-soft-button flex items-center gap-2 px-6 py-2.5 text-sm">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+              {submitting ? <ButtonSpinner size="sm" tone="light" /> : <Rocket className="h-4 w-4" />}
               {submitting ? 'Đang đăng...' : 'Đăng bài'}
             </button>
           </div>
@@ -660,17 +660,7 @@ export default function CommunityContent() {
             {loading ? (
               <div className="space-y-4">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="zync-soft-card rounded-[1.6rem] p-5">
-                    <div className="flex gap-3">
-                      <div className="h-10 w-10 animate-pulse rounded-full bg-bg-hover" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 w-1/3 animate-pulse rounded bg-bg-hover" />
-                        <div className="h-3 w-1/2 animate-pulse rounded bg-bg-hover" />
-                      </div>
-                    </div>
-                    <div className="mt-3 h-5 w-3/4 animate-pulse rounded bg-bg-hover" />
-                    <div className="mt-2 h-4 w-full animate-pulse rounded bg-bg-hover" />
-                  </div>
+                  <PageSkeleton key={i} rows={2} />
                 ))}
               </div>
             ) : posts.length === 0 ? (

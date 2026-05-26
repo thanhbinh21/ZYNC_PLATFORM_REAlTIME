@@ -18,6 +18,7 @@ import { useNavigationFlow } from "@/hooks/use-navigation-flow";
 import type { FriendUser } from "@/services/friends";
 import { FriendsAvatar } from "../atoms/friends-avatar";
 import { showSystemToast } from "@/components/notifications/InAppNotificationToasts";
+import { ButtonSpinner } from "@/components/shared/loading-system";
 
 type FriendsIcon = ComponentType<{ className?: string }>;
 const BellIcon = Bell as unknown as FriendsIcon;
@@ -312,7 +313,7 @@ export function FriendsScreen({
                       >
                         {isLoadingMore ? (
                           <span className="inline-flex items-center justify-center gap-2">
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-text-tertiary/30 border-t-text-tertiary" />
+                            <ButtonSpinner size="sm" tone="muted" />
                             Đang tải...
                           </span>
                         ) : (

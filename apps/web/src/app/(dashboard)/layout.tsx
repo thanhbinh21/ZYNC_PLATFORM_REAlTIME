@@ -1,18 +1,20 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
 import { DashboardHeader } from '@/components/shared/DashboardHeader';
 import { NotificationHub } from '@/components/home-dashboard/organisms/NotificationHub';
 import { GlobalCallListener } from '@/components/home-dashboard/organisms/GlobalCallListener';
+import { ActiveCallOverlay } from '@/components/home-dashboard/organisms/ActiveCallOverlay';
+import { MobileBottomNav } from '@/components/shared/MobileBottomNav';
 import { PageLoading } from '@/components/shared/page-loading';
 import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
 import type { Notification } from '@/services/notifications';
 import { MediaViewerProvider } from '@/context/media-viewer-context';
-import { getAccessToken } from '@/utils/auth-token';
+import { clearAccessToken, getAccessToken } from '@/utils/auth-token';
 import { getSocket } from '@/services/socket';
 import { useAiAssistant } from '@/hooks/use-ai-assistant';
 import { AiAssistantBox } from '@/components/ai-assistant/ai-assistant-box';
@@ -68,6 +70,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth guard: load profile once via module store (persists across page navigations)
   useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      clearAccessToken();
+      profileStore.setProfile(null);
+      setProfile(null);
+      setIsReady(true);
+      router.replace('/auth');
+      return;
+    }
+
     if (profileStore.isReady || profileStore.isLoading) {
       setProfile(profileStore.profile);
       setIsReady(profileStore.isReady);
@@ -76,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     profileStore.load().then(() => {
       setProfile(profileStore.profile);
       setIsReady(profileStore.isReady);
-      if (!profileStore.profile?.onboardingCompleted) {
+      if (profileStore.profile && !profileStore.profile.onboardingCompleted) {
         router.push('/onboarding');
       }
     });
@@ -116,6 +128,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // ── AI Assistant Box ─────────────────────────────────────────────────────────
   const aiAssistant = useAiAssistant({ defaultLimit: 10 });
+
+  const handleUseSuggestedReply = useCallback((conversationId: string, reply: string) => {
+    if (typeof window !== 'undefined') {
+      const storageKey = `zync.chatDraft.${conversationId}`;
+      window.sessionStorage.setItem(storageKey, reply);
+      window.dispatchEvent(new CustomEvent('zync:chat-draft', {
+        detail: { conversationId, draft: reply },
+      }));
+    }
+
+    router.push(`/chat?conversationId=${conversationId}`);
+    aiAssistant.closeBox();
+  }, [aiAssistant, router]);
 
   // Determine active nav from pathname
   const getActiveNavId = (): string => {
@@ -218,11 +243,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={aiAssistant.openBox}
-                className="zync-soft-badge relative flex h-10 w-10 items-center justify-center p-0 text-accent hover:bg-accent/10"
+                className="relative hidden md:inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary hover:bg-accent/10 transition"
                 title="Zync AI Assistant"
                 aria-label="Mở AI Assistant"
               >
-                <Sparkles className="h-5 w-5" />
+                <Sparkles className="h-4 w-4 text-accent" />
                 {aiAssistant.unreadDigestCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                     {aiAssistant.unreadDigestCount > 9 ? '9+' : aiAssistant.unreadDigestCount}
@@ -236,11 +261,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
         </Suspense>
 
-        <div className="flex-1 overflow-hidden px-2 pb-2 sm:px-4 sm:pb-4">
+        <div className="flex-1 overflow-hidden px-2 pb-[76px] md:pb-2 sm:px-4 sm:pb-4">
           <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
             {children}
           </div>
         </div>
+
+        <MobileBottomNav navItems={headerData.navItems} activeNavId={activeNavId} />
 
         {/* Export settings functions for child pages via window */}
         <script
@@ -261,25 +288,59 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}
         />
         <GlobalCallListener />
+        <ActiveCallOverlay />
 
         {/* AI Assistant Box */}
-        <AiAssistantBox
-          isOpen={aiAssistant.isOpen}
-          activeTab={aiAssistant.activeTab}
-          conversations={aiAssistant.conversations}
-          items={aiAssistant.items}
-          total={aiAssistant.total}
-          loadingList={aiAssistant.loadingList}
-          loadingItems={aiAssistant.loadingItems}
-          onClose={aiAssistant.closeBox}
-          onTabChange={aiAssistant.setActiveTab}
-          onSummarize={aiAssistant.createDigest}
-          onRegenerate={aiAssistant.regenerate}
-          onOpenChat={(conversationId) => {
-            router.push(`/chat?conversationId=${conversationId}`);
-          }}
-          onLoadMore={aiAssistant.loadItems}
-        />
+        <div className="hidden md:block">
+          <AiAssistantBox
+            isOpen={aiAssistant.isOpen}
+            activeTab={aiAssistant.activeTab}
+            conversations={aiAssistant.conversations}
+            catchupDetailsByConversationId={aiAssistant.catchupDetailsByConversationId}
+            tasks={aiAssistant.tasks}
+            taskTotal={aiAssistant.taskTotal}
+            notes={aiAssistant.notes}
+            noteTotal={aiAssistant.noteTotal}
+            searchQuery={aiAssistant.searchQuery}
+            searchMode={aiAssistant.searchMode}
+            searchAnswer={aiAssistant.searchAnswer}
+            searchPeople={aiAssistant.searchPeople}
+            searchResults={aiAssistant.searchResults}
+            searchTotal={aiAssistant.searchTotal}
+            searchError={aiAssistant.error}
+            items={aiAssistant.items}
+            total={aiAssistant.total}
+            loadingList={aiAssistant.loadingList}
+            loadingTasks={aiAssistant.loadingTasks}
+            loadingNotes={aiAssistant.loadingNotes}
+            loadingSearch={aiAssistant.loadingSearch}
+            loadingItems={aiAssistant.loadingItems}
+            pendingTaskCount={aiAssistant.pendingTaskCount}
+            onClose={aiAssistant.closeBox}
+            onTabChange={aiAssistant.setActiveTab}
+            onSummarize={aiAssistant.createDigest}
+            onRegenerate={aiAssistant.regenerate}
+            onCreateTask={aiAssistant.createTaskFromActionItem}
+            onAcceptTask={aiAssistant.acceptTask}
+            onCompleteTask={aiAssistant.completeTask}
+            onDismissTask={aiAssistant.dismissTask}
+            onCreateNote={aiAssistant.createNote}
+            onToggleNotePin={aiAssistant.toggleNotePin}
+            onDeleteNote={aiAssistant.removeNote}
+            onRegenerateNote={aiAssistant.regenerateNote}
+            onUseSuggestedReply={handleUseSuggestedReply}
+            onSearchQueryChange={aiAssistant.setSearchQuery}
+            onOpenSearchResult={(conversationId, messageRef) => {
+              router.push(`/chat?conversationId=${encodeURIComponent(conversationId)}&messageRef=${encodeURIComponent(messageRef)}`);
+              aiAssistant.closeBox();
+            }}
+            onOpenChat={(conversationId) => {
+              router.push(`/chat?conversationId=${conversationId}`);
+            }}
+            onLoadMore={aiAssistant.loadItems}
+            onLoadMoreTasks={() => aiAssistant.loadTasks(false)}
+          />
+        </div>
       </main>
     </MediaViewerProvider>
   );

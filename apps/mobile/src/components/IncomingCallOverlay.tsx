@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { socketService } from '../services/socket';
 import { useAuthStore } from '../store/useAuthStore';
+import { useActiveCallStore } from '../store/useActiveCallStore';
 
 interface IncomingCallData {
   sessionId: string;
@@ -21,6 +22,8 @@ interface IncomingCallData {
 export function IncomingCallOverlay() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const activeCall = useActiveCallStore((s) => s.activeCall);
+  const showConflict = useActiveCallStore((s) => s.showConflict);
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
   const [socketReadyVersion, setSocketReadyVersion] = useState(0);
   const slideAnim = React.useRef(new Animated.Value(-150)).current;
@@ -57,6 +60,12 @@ export function IncomingCallOverlay() {
     if (!socket || !isAuthenticated) return;
 
     const onCallIncoming = (data: any) => {
+      if (activeCall && activeCall.sessionId !== data.sessionId) {
+        socketService.emitCallReject(data.sessionId, data.callToken, 'busy');
+        showConflict('Bạn đang trong cuộc gọi hiện tại.');
+        return;
+      }
+
       setIncomingCall({
         sessionId: data.sessionId,
         conversationId: data.conversationId,
@@ -96,7 +105,7 @@ export function IncomingCallOverlay() {
       socketService.unlistenToCallIncoming(onCallIncoming);
       socketService.unlistenToCallStatus(onCallStatus);
     };
-  }, [isAuthenticated, slideAnim, socketReadyVersion]);
+  }, [activeCall, isAuthenticated, showConflict, slideAnim, socketReadyVersion]);
 
   const closeOverlay = () => {
     Animated.timing(slideAnim, {

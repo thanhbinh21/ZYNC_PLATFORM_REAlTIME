@@ -7,13 +7,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
+  Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
 import { useAppPreferencesStore } from '../../src/store/useAppPreferencesStore';
-import { getAppTheme } from '../../src/theme/get-app-theme';
-import { colors } from '../../src/theme/colors';
+
+import { lightTheme } from '../../src/theme/colors';
 import { fonts } from '../../src/theme/fonts';
 import { PostCard } from '../../src/components/PostCard';
 import { CreatePostSheet } from '../../src/components/CreatePostSheet';
@@ -22,22 +23,21 @@ import { SkeletonPostCardPreset } from '../../src/ui/ZyncSkeleton';
 import { EmptyState } from '../../src/ui/EmptyState';
 import { ProfileBottomSheet } from '../../src/components/ProfileBottomSheet';
 import { useNavigationFlow } from '../../src/hooks/useNavigationFlow';
+import { AppScreen } from '../../src/ui/AppScreen';
+import { AppChip } from '../../src/ui/AppChip';
+import { AppIconButton } from '../../src/ui/AppIconButton';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import { ExploreContent } from '../explore';
 
 const FILTERS: { key: PostFilter; label: string }[] = [
   { key: 'latest', label: 'Mới nhất' },
   { key: 'trending', label: 'Thu hút' },
   { key: 'question', label: 'Hỏi đáp' },
-  { key: 'til', label: 'TIL' },
+  { key: 'til', label: 'Hướng dẫn' },
 ];
-
-type CommunityTab = 'posts' | 'discover';
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const mode = useAppPreferencesStore((s) => s.theme);
-  const theme = getAppTheme(mode);
+  const theme = lightTheme;
   const currentUserId = useAuthStore((s) => s.userInfo?._id) ?? '';
 
   const {
@@ -67,7 +67,6 @@ export default function CommunityScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<CommunityTab>('posts');
 
   useEffect(() => {
     loadPosts();
@@ -101,65 +100,29 @@ export default function CommunityScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <AppScreen disableBottomSafeArea>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cộng đồng</Text>
-        {activeTab === 'posts' && (
-          <TouchableOpacity
-            onPress={() => setShowCreate(true)}
-            style={styles.createButton}
-          >
-            <Pencil size={18} color={colors.primary} />
-          </TouchableOpacity>
-        )}
+        <AppIconButton
+          icon={<Pencil size={20} color={lightTheme.accent} />}
+          onPress={() => setShowCreate(true)}
+          size={40}
+        />
       </View>
-
-      <View style={styles.mainTabRow}>
-        <TouchableOpacity
-          onPress={() => setActiveTab('posts')}
-          style={[styles.mainTab, activeTab === 'posts' && styles.mainTabActive]}
-        >
-          <Text style={[styles.mainTabText, activeTab === 'posts' && styles.mainTabTextActive]}>
-            Bài viết
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setActiveTab('discover')}
-          style={[styles.mainTab, activeTab === 'discover' && styles.mainTabActive]}
-        >
-          <Text style={[styles.mainTabText, activeTab === 'discover' && styles.mainTabTextActive]}>
-            Khám phá
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'discover' ? (
-        <ExploreContent showHeader={false} />
-      ) : (
-      <>
 
       {/* Filter tabs */}
       <View style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            onPress={() => changeFilter(f.key)}
-            style={[
-              styles.filterTab,
-              filter === f.key && styles.filterTabActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === f.key && styles.filterTextActive,
-              ]}
-            >
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+          {FILTERS.map((f) => (
+            <AppChip
+              key={f.key}
+              label={f.label}
+              active={filter === f.key}
+              onPress={() => changeFilter(f.key)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
       {/* Post list */}
@@ -181,19 +144,15 @@ export default function CommunityScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
+            tintColor={lightTheme.accent}
           />
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={7}
-        removeClippedSubviews
         ListFooterComponent={
           isLoadingMore ? (
             <ActivityIndicator
-              color={colors.primary}
+              color={lightTheme.accent}
               style={styles.loadingMore}
             />
           ) : null
@@ -228,9 +187,7 @@ export default function CommunityScreen() {
         onClose={closeProfileSheet}
         onSendMessage={(userId) => { void navigateToChat(userId); }}
       />
-      </>
-      )}
-    </SafeAreaView>
+    </AppScreen>
   );
 }
 
@@ -246,7 +203,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   headerTitle: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 24,
   },
@@ -254,40 +211,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceCard,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  mainTabRow: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 4,
-    borderRadius: 14,
-    backgroundColor: colors.glassSoft,
-    borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-  },
-  mainTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    paddingVertical: 9,
-  },
-  mainTabActive: {
-    backgroundColor: colors.primary,
-  },
-  mainTabText: {
-    color: colors.textMuted,
-    fontFamily: fonts.medium,
-    fontSize: 13,
-  },
-  mainTabTextActive: {
-    color: colors.textOnAccent,
-    fontFamily: fonts.bold,
   },
   filterRow: {
     flexDirection: 'row',
@@ -300,25 +228,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassSoft,
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.bgSecondary,
   },
   filterTabActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: lightTheme.accent,
+    borderColor: lightTheme.accent,
   },
   filterText: {
-    color: colors.textMuted,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.medium,
     fontSize: 13,
   },
   filterTextActive: {
-    color: colors.textOnAccent,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingBottom: 140, // Increased bottom padding so the bottom tab doesn't hide content
     flexGrow: 1,
   },
   emptyState: {
@@ -328,13 +256,13 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   emptyTitle: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 18,
     marginBottom: 8,
   },
   emptySubtitle: {
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     fontFamily: fonts.regular,
     fontSize: 14,
     textAlign: 'center',

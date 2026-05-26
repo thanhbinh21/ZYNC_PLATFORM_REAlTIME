@@ -18,6 +18,7 @@ import {
   deleteReminderHandler,
 } from './reminders/reminder.controller';
 import { assistantRouter } from './assistant/assistant.routes';
+import { searchAssistantMessagesHandler } from './assistant/assistant.controller';
 
 export const aiRouter = Router();
 
@@ -82,6 +83,9 @@ aiRouter.get('/reminders/:reminderId', authenticate, getReminderHandler);
 aiRouter.patch('/reminders/:reminderId', authenticate, updateReminderHandler);
 
 aiRouter.delete('/reminders/:reminderId', authenticate, deleteReminderHandler);
+
+// GET /api/ai/search/messages?q=...
+aiRouter.get('/search/messages', authenticate, searchAssistantMessagesHandler);
 
 // ─── AI Assistant Box ────────────────────────────────────────────────────────────
 aiRouter.use('/assistant', assistantRouter);

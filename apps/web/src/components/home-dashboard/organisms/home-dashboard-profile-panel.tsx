@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { KeyRound, Loader2, X } from 'lucide-react';
+import { KeyRound, X } from 'lucide-react';
 import type { DashboardIconName } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
 import { updateMyProfile, fetchFriendsCount, type MeUser } from '@/services/users';
 import { uploadFile } from '@/services/upload';
 import type { FriendUser } from '@/services/friends';
 import { changePassword } from '@/services/auth';
+import { ButtonSpinner, PageSkeleton } from '@/components/shared/loading-system';
 
 interface HomeDashboardProfilePanelProps {
   profile: MeUser | null;
@@ -125,9 +126,7 @@ export function HomeDashboardProfilePanel({
   if (loading) {
     return (
       <section className="rounded-2xl border border-border bg-bg-card shadow-sm p-5">
-        <div className="h-44 animate-pulse rounded-3xl bg-[var(--bg-hover)]" />
-        <div className="mt-5 h-24 animate-pulse rounded-2xl bg-[var(--bg-hover)]" />
-        <div className="mt-4 h-40 animate-pulse rounded-2xl bg-[var(--bg-hover)]" />
+        <PageSkeleton rows={5} className="border-0 bg-transparent shadow-none" />
       </section>
     );
   }
@@ -690,7 +689,7 @@ export function HomeDashboardProfilePanel({
                 disabled={passwordSubmitting}
                 className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-[var(--bg-primary)] hover:brightness-110 disabled:opacity-60"
               >
-                {passwordSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {passwordSubmitting ? <ButtonSpinner size="sm" tone="light" /> : null}
                 Xác nhận
               </button>
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { type ChangeEvent, type ComponentType, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Bot, CheckCircle2, ListChecks, HelpCircle, Bell, MessageSquare, Loader2, Play, PenLine, RefreshCw, Sparkles, Heart, Phone, Video } from 'lucide-react';
+import { AlertCircle, Bot, CheckCircle2, ListChecks, HelpCircle, Bell, MessageSquare, Play, PenLine, RefreshCw, Sparkles, Heart, Phone, Video } from 'lucide-react';
 import type { AiCatchupDigest, Message, MessageStatus } from '@zync/shared-types';
 import {
   Menu,
@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useMediaViewer } from '@/context/media-viewer-context';
 import { showSystemToast } from '@/components/notifications/InAppNotificationToasts';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 type LucideIconComponent = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
 const PlayIcon = Play as unknown as LucideIconComponent;
@@ -34,7 +35,6 @@ const HeartIcon = Heart as unknown as LucideIconComponent;
 const AlertCircleIcon = AlertCircle as unknown as LucideIconComponent;
 const BotIcon = Bot as unknown as LucideIconComponent;
 const CheckCircleIcon = CheckCircle2 as unknown as LucideIconComponent;
-const LoaderIcon = Loader2 as unknown as LucideIconComponent;
 const RefreshIcon = RefreshCw as unknown as LucideIconComponent;
 const SparklesIcon = Sparkles as unknown as LucideIconComponent;
 const PhoneIcon = Phone as unknown as LucideIconComponent;
@@ -97,9 +97,9 @@ function CloseIcon({ className }: { className: string }) {
   return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>;
 }
 
-function SearchIcon() {
+function SearchIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="11" cy="11" r="6" />
       <path d="m16 16 4 4" strokeLinecap="round" />
     </svg>
@@ -221,6 +221,8 @@ interface ChatPanelProps {
   isGroupConversation?: boolean;
   isOnline?: boolean;
   messages?: Message[];
+  targetMessageRef?: string | null;
+  onTargetMessageConsumed?: () => void;
   messageStatus?: Record<string, string>;
   typingUsers?: Array<{ userId: string; displayName: string }>;
   onSendMessage?: (content: string, type: MessageType, mediaUrl?: string, options?: SendMessageOptions) => Promise<string | null | undefined>;
@@ -228,6 +230,7 @@ interface ChatPanelProps {
   onStartTyping?: () => void;
   onStopTyping?: () => void;
   onLoadMore?: () => Promise<void>;
+  onBack?: () => void;
   onInfoClick?: () => void;
   onDeleteMessageForMe?: (messageId: string, idempotencyKey: string) => void;
   onRecallMessage?: (messageId: string, idempotencyKey: string) => void;
@@ -396,6 +399,7 @@ function ConversationList({
   };
 
   const [query, setQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredConversations = normalizedQuery
     ? conversations.filter((item) => {
@@ -404,23 +408,31 @@ function ConversationList({
     : conversations;
 
   return (
-    <aside className="h-full min-h-0 overflow-y-auto border-r border-border bg-bg-card p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Trò chuyện</p>
-          <h2 className="font-ui-title mt-1 text-xl text-text-primary">Tin nhắn</h2>
+    <aside className="chat-sidebar">
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Trò chuyện</p>
+            <h2 className="font-ui-title mt-1 text-xl text-text-primary">Tin nhắn</h2>
+          </div>
         </div>
       </div>
 
       {/* Search */}
-      <label className="mb-4 flex h-11 items-center gap-2 rounded-2xl border border-border-light bg-bg-hover px-3 text-text-secondary transition focus-within:border-accent focus-within:bg-bg-card">
-        <SearchIcon />
+      <label className={`mb-4 flex h-11 w-full items-center gap-2 rounded-full border border-border-light bg-bg-hover px-[16px] text-text-tertiary transition duration-200 focus-within:border-emerald-500/50 focus-within:bg-bg-card focus-within:shadow-[0_0_0_3px_rgba(16,185,129,0.15)] ${
+        !query && !isSearchFocused ? 'justify-center cursor-text' : 'justify-start'
+      }`}>
+        <SearchIcon className="shrink-0 h-4 w-4" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
           placeholder="Tìm cuộc hội thoại..."
-          className="w-full bg-transparent text-[15px] font-medium text-text-primary outline-none placeholder:text-text-tertiary"
+          className={`bg-transparent text-[15px] font-medium text-text-primary outline-none placeholder:text-text-tertiary transition-all duration-200 ${
+            !query && !isSearchFocused ? 'w-[195px] text-center' : 'w-full text-left'
+          }`}
         />
       </label>
 
@@ -460,11 +472,7 @@ function ConversationList({
             <button
               key={item.id}
               onClick={() => onSelectConversation(item.id)}
-              className={`w-full rounded-2xl border px-3 py-3 text-left transition active:scale-[0.99] ${
-                selectedId === item.id
-                  ? 'border-accent bg-accent/8 text-text-primary'
-                  : 'border-transparent hover:border-border-light hover:bg-bg-hover'
-              }`}
+              className={`chat-conv-item w-full px-3 py-3 ${selectedId === item.id ? 'active' : ''}`}
             >
               <div className="flex items-center gap-3">
                 <div className="relative h-12 w-12 flex-shrink-0 rounded-2xl bg-accent text-white">
@@ -493,7 +501,7 @@ function ConversationList({
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className={`truncate text-[13.5px] font-medium text-text-primary ${item.haveRead? 'opacity-60': ''}`}>{item.preview}</p>
                     {isActiveConversationCall(item.activeCall) && (
-                      <span className="shrink-0 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      <span className="shrink-0 rounded-full bg-accent-light px-2 py-0.5 text-[11px] font-semibold text-accent">
                         Đang gọi
                       </span>
                     )}
@@ -538,6 +546,8 @@ function ChatPanel({
   isGroupConversation = false,
   isOnline = false,
   messages = [],
+  targetMessageRef = null,
+  onTargetMessageConsumed,
   messageStatus = {},
   typingUsers = [],
   onSendMessage = async () => null,
@@ -545,6 +555,7 @@ function ChatPanel({
   onStartTyping = () => {},
   onStopTyping = () => {},
   onLoadMore = async () => {},
+  onBack,
   isLoading = false,
   error = null,
   onInfoClick,
@@ -603,6 +614,7 @@ function ChatPanel({
   const onLoadMoreRef = useRef(onLoadMore);
   const jumpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isJumpingRef = useRef(false);
+  const lastExternalJumpRef = useRef<string | null>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [replyingTo, setReplyingTo] = useState<Message['replyTo'] | null>(null);
   const [jumpStatus, setJumpStatus] = useState<string | null>(null);
@@ -930,6 +942,10 @@ function ChatPanel({
       const element = messageRowRefs.current[targetMessageId];
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('zync-message-jump-highlight');
+        window.setTimeout(() => {
+          element.classList.remove('zync-message-jump-highlight');
+        }, 1800);
       }
     };
 
@@ -1008,11 +1024,37 @@ function ChatPanel({
     }
   }, [scrollToMessageElement, showJumpStatus]);
 
+  useEffect(() => {
+    if (!targetMessageRef || isLoading) {
+      return;
+    }
+
+    const jumpKey = `${conversationId}:${targetMessageRef}`;
+    if (lastExternalJumpRef.current === jumpKey) {
+      return;
+    }
+    lastExternalJumpRef.current = jumpKey;
+
+    void handleJumpToMessage(targetMessageRef).finally(() => {
+      onTargetMessageConsumed?.();
+    });
+  }, [conversationId, handleJumpToMessage, isLoading, onTargetMessageConsumed, targetMessageRef]);
+
   return (
-    <article className="relative mx-auto flex h-full w-full max-w-[1440px] min-h-0 min-w-0 flex-col overflow-hidden chat-page-bg">
+    <article className="relative mx-auto flex h-full w-full max-w-[1440px] min-h-0 min-w-0 flex-col overflow-hidden chat-room-surface">
       {/* Header */}
       <header className="chat-header">
         <div className="flex items-center gap-3 flex-1 min-w-0">
+          {onBack && (
+            <button
+              type="button"
+              className="md:hidden flex h-10 w-10 items-center justify-center rounded-full text-text-primary hover:bg-bg-hover"
+              onClick={onBack}
+              aria-label="Quay lại"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+          )}
           <button
             type="button"
             className={`relative h-11 w-11 overflow-hidden rounded-full bg-gradient-to-br from-accent to-accent-hover shadow-sm flex-shrink-0 ${
@@ -1051,8 +1093,8 @@ function ChatPanel({
         {/* Header Action Buttons */}
         <div className="chat-header-actions flex-shrink-0">
           {isConversationActiveCall && (
-            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="hidden items-center gap-1.5 rounded-full border border-accent bg-accent-light px-3 py-1 text-xs font-semibold text-accent sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
               Đang gọi
             </span>
           )}
@@ -1086,7 +1128,7 @@ function ChatPanel({
       </header>
       
       {jumpStatus && (
-        <div className="bg-bg-hover/90 border-b border-border px-5 py-2.5 text-sm text-text-secondary backdrop-blur-sm flex items-center justify-between">
+        <div className="chat-jump-status">
           <div className="flex items-center gap-2">
             <svg className="h-4 w-4 animate-pulse text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="17 11 12 6 7 11"/>
@@ -1411,14 +1453,11 @@ function ChatPanel({
                 <button
                   onClick={onLoadMore}
                   disabled={isLoading}
-                  className="zync-glass-subtle rounded-xl px-5 py-2.5 text-sm font-medium text-text-secondary hover:text-accent transition-all hover:shadow-sm"
+                  className="chat-load-more-btn"
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
-                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
+                      <ButtonSpinner size="sm" tone="muted" />
                       Đang tải...
                     </span>
                   ) : (
@@ -1430,23 +1469,21 @@ function ChatPanel({
 
             {/* Empty State */}
             {messages.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-5 text-center py-16">
-                {/* Animated Icon */}
+              <div className="chat-empty-state">
+                {/* Icon */}
                 <div className="relative">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-bg-hover shadow-inner">
-                    <svg className="h-10 w-10 text-accent/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <div className="chat-empty-icon">
+                    <svg className="h-10 w-10 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
                   </div>
-                  {/* Decorative ring */}
-                  <div className="absolute -inset-3 rounded-full border border-dashed border-accent/20 animate-pulse" />
                 </div>
 
                 {/* Text */}
                 <div className="space-y-1">
-                  <p className="font-semibold text-lg text-text-primary">Bat dau cuoc tro chuyen</p>
-                  <p className="text-sm text-text-tertiary max-w-[220px]">
-                    Nhắn tin ngay để bắt đầu trò chuyện với <span className="font-medium text-accent">{participantName}</span>
+                  <p className="chat-empty-title">Bắt đầu cuộc trò chuyện</p>
+                  <p className="chat-empty-desc">
+                    Nhắn tin ngay để bắt đầu trò chuyện với <span className="font-semibold text-accent">{participantName}</span>
                   </p>
                 </div>
 
@@ -1475,7 +1512,7 @@ function ChatPanel({
                     ref={(node) => {
                       messageRowRefs.current[message._id] = node;
                     }}
-                    className={String(message.senderId) === String(currentUserId) ? 'message-bubble-own' : 'message-bubble-other'}
+                    className={`chat-message-row ${String(message.senderId) === String(currentUserId) ? 'own' : 'other'}`}
                   >
                     <MessageItem
                       message={message}
@@ -1522,6 +1559,7 @@ function ChatPanel({
 
       {/* Input Area */}
       <MessageInput
+        conversationId={conversationId}
         onSend={(content, type, mediaUrl, options) => {
           return onSendMessage(content, type as MessageType, mediaUrl, options);
         }}
@@ -1562,6 +1600,7 @@ interface HomeDashboardChatPanelProps {
   onDisbandGroup?: (groupId: string) => Promise<void>;
   onLeaveGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
+  initialCreateGroupOpen?: boolean;
   onLoadMore?: () => Promise<void>;
   chatPanelProps?: Partial<ChatPanelProps>;
 }
@@ -2021,6 +2060,7 @@ export function HomeDashboardChatPanel({
   onDisbandGroup,
   onLeaveGroup,
   isCreatingGroup = false,
+  initialCreateGroupOpen = false,
   onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
@@ -2188,12 +2228,22 @@ export function HomeDashboardChatPanel({
     });
   };
 
-  const openCreateGroupModal = () => {
+  const openCreateGroupModal = useCallback(() => {
     setGroupName('');
     setGroupQuery('');
     setSelectedFriendIds([]);
     setIsCreateGroupOpen(true);
-  };
+  }, []);
+
+  const initialCreateGroupOpenRef = useRef(false);
+  useEffect(() => {
+    if (!initialCreateGroupOpen || initialCreateGroupOpenRef.current) {
+      return;
+    }
+
+    initialCreateGroupOpenRef.current = true;
+    openCreateGroupModal();
+  }, [initialCreateGroupOpen, openCreateGroupModal]);
 
   const handleCreateGroup = async () => {
     if (!onCreateGroup) {
@@ -2468,11 +2518,11 @@ export function HomeDashboardChatPanel({
         }}
       />
 
-      <section className="flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-3xl border border-border bg-bg-card shadow-lg">
-        <div className={`h-full shrink-0 border-r border-border bg-bg-card ${
-          selectedConversationId 
-            ? 'hidden md:block md:w-[300px]' 
-            : 'block w-full md:w-[300px]'
+      <section className="relative flex h-full w-full min-h-0 min-w-0 flex-1 overflow-hidden rounded-[2rem] border border-border bg-surface-card shadow-lg">
+        <div className={`h-full shrink-0 border-r border-border-light bg-bg-card ${
+          selectedConversationId
+            ? 'hidden md:block md:w-[320px]'
+            : 'block w-full md:w-[320px]'
         }`}>
           <ConversationList
             conversations={visibleConversations}
@@ -2487,7 +2537,7 @@ export function HomeDashboardChatPanel({
 
         <div className={`h-full min-h-0 min-w-0 flex-1 overflow-hidden flex-col ${
           selectedConversationId 
-            ? 'flex' 
+            ? 'flex fixed md:relative inset-0 z-[60] md:z-auto bg-[var(--surface-card)] md:bg-transparent' 
             : 'hidden md:flex'
         }`}>
           <ChatPanel
@@ -2496,6 +2546,7 @@ export function HomeDashboardChatPanel({
             onLoadMore={onLoadMore}
             inputDisabled={isRemovedFromGroup}
             inputDisabledReason={isRemovedFromGroup ? 'Bạn đã bị xóa khỏi nhóm' : undefined}
+            onBack={() => onSelectConversation('')}
             onInfoClick={handleToggleInfoPanel}
             onAvatarClick={handleOpenGroupAvatarPicker}
             onNameClick={() => {

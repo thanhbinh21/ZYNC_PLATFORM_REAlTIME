@@ -6,6 +6,7 @@ import { ConversationMemberModel } from '../conversations/conversation-member.mo
 import { BadRequestError } from '../../shared/errors';
 import { logger } from '../../shared/logger';
 import { produceMessage, KAFKA_TOPICS } from '../../infrastructure/kafka';
+import { isNeonAvailable } from '../../infrastructure/neon';
 import { getRedis } from '../../infrastructure/redis';
 import { v4 as uuidv4 } from 'uuid';
 import { MessageReactionsService } from './message-reaction.service';
@@ -76,6 +77,38 @@ export class MessagesService {
     return '';
   }
 
+  private static shouldIndexForSmartSearch(content: string | undefined, type: MessageType): boolean {
+    const text = content?.trim() ?? '';
+    if (!text) return false;
+    return type === 'text' || type === 'call_history' || type.startsWith('file/');
+  }
+
+  private static async enqueueMessageEmbedding(message: {
+    _id: unknown;
+    conversationId: string;
+    content?: string;
+    type: MessageType;
+  }): Promise<void> {
+    if (!isNeonAvailable() || !this.shouldIndexForSmartSearch(message.content, message.type)) {
+      return;
+    }
+
+    try {
+      await produceMessage(KAFKA_TOPICS.MESSAGE_EMBEDDINGS, String(message._id), {
+        messageId: String(message._id),
+        conversationId: message.conversationId,
+        contentText: message.content?.trim() ?? '',
+        type: message.type,
+        requestedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.debug('[SmartSearch] Failed to enqueue message embedding', {
+        messageId: String(message._id),
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   static getCallHistoryPreview(callHistory: ICallHistory): string {
     const callTypeLabel = callHistory.callType === 'audio' ? 'Cuoc goi thoai' : 'Cuoc goi video';
     if (callHistory.status === 'missed') return `${callTypeLabel} bi nho`;
@@ -130,6 +163,8 @@ export class MessagesService {
         await ConversationsService.incrementUnreadCount(conversationId, member.userId);
       }
     }
+
+    await this.enqueueMessageEmbedding(message);
 
     return message.toObject() as unknown as IMessage;
   }
@@ -368,6 +403,8 @@ export class MessagesService {
     } catch (err) {
       logger.warn('[InsertMetadata] Failed to increment unread counts', err);
     }
+
+    await this.enqueueMessageEmbedding(savedMessage);
 
     // Step 6: Apply any pending reactions queued before this message reached MongoDB
     try {

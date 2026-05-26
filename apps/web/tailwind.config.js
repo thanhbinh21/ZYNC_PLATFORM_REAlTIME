@@ -32,12 +32,24 @@ module.exports = {
         border: {
           DEFAULT: 'var(--border)',
           light: 'var(--border-light)',
+          mint: 'var(--border-mint)',
         },
         surface: {
           DEFAULT: 'var(--surface-card)',
           strong: 'var(--surface-card-strong)',
           muted: 'var(--surface-muted)',
+          tint: 'var(--surface-tint)',
+          panel: 'var(--surface-panel)',
           glass: 'var(--surface-glass)',
+        },
+        status: {
+          bg: 'var(--status-bg)',
+          border: 'var(--status-border)',
+          text: 'var(--status-text)',
+        },
+        icon: {
+          block: 'var(--icon-block-bg)',
+          text: 'var(--icon-block-text)',
         },
         story: {
           bg: '#041f18',
@@ -72,11 +84,14 @@ module.exports = {
         sm: 'var(--shadow-sm)',
         md: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
+        soft: 'var(--shadow-soft)',
+        'soft-hover': 'var(--shadow-soft-hover)',
       },
       borderRadius: {
         sm: 'var(--radius-sm)',
         md: 'var(--radius-md)',
         lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
       },
       animation: {
         // Ring & glow

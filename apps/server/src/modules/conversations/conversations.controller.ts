@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../../shared/middleware/auth.middleware';
 import { ConversationsService } from './conversations.service';
 import { logger } from '../../shared/logger';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../shared/errors';
+import { BadRequestError, ForbiddenError, NotFoundError, TooManyRequestsError } from '../../shared/errors';
 
 export const listConversationsHandler = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -45,15 +45,19 @@ export const getOrCreateDirectConversationHandler = async (req: Request, res: Re
   } catch (error) {
     logger.error('Error in getOrCreateDirectConversationHandler', error);
     if (error instanceof BadRequestError) {
-      res.status(400).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: error.message, code: error.code });
       return;
     }
     if (error instanceof ForbiddenError) {
-      res.status(403).json({ success: false, error: error.message });
+      res.status(403).json({ success: false, error: error.message, code: error.code });
       return;
     }
     if (error instanceof NotFoundError) {
-      res.status(404).json({ success: false, error: error.message });
+      res.status(404).json({ success: false, error: error.message, code: error.code });
+      return;
+    }
+    if (error instanceof TooManyRequestsError) {
+      res.status(429).json({ success: false, error: error.message, code: error.code });
       return;
     }
     res.status(500).json({ success: false, error: 'Internal server error' });

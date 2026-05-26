@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { MessageStatus, MessageReplyTo, MessageReadParticipantWithTime } from '@zync/shared-types';
 import { useMediaViewer } from '@/context/media-viewer-context';
 import { GetFileIcon } from './file-type-icons';
+import { ButtonSpinner } from '@/components/shared/loading-system';
 
 function ReplyIcon({ className }: { className: string }) {
   return (
@@ -159,13 +160,13 @@ export function MessageBubble({
         )}
 
         {/* Bubble Wrapper with Relative Positioning */}
-        <div className="chat-bubble-wrapper w-full">
+        <div className="chat-bubble-wrapper">
           {/* Reply Quote */}
           {replyTo?.messageRef && (
             <button
               type="button"
               onClick={() => onJumpToMessage?.(replyTo.messageRef)}
-              className="chat-reply-quote mb-2 w-full max-w-[240px] text-left block"
+              className="chat-reply-quote max-w-[240px] text-left block"
               title="Đi đến tin nhắn gốc"
             >
               <div className="flex items-center gap-1.5 mb-0.5">
@@ -239,7 +240,7 @@ export function MessageBubble({
               />
               {isPendingLocalMedia && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-                  <div className="h-9 w-9 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
+                  <ButtonSpinner size="md" tone="light" />
                 </div>
               )}
             </div>
@@ -269,9 +270,9 @@ export function MessageBubble({
               href={mediaUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-3 rounded-lg border border-[#e4e6eb] bg-[#f0f2f5] px-3 py-2.5 text-sm text-[#050505] shadow-sm transition-all hover:bg-[#e4e6eb]"
+              className="inline-flex items-center gap-3 rounded-2xl border border-border-light bg-surface-muted px-3 py-2.5 text-sm text-text-primary shadow-sm transition-all hover:border-accent hover:bg-bg-hover"
             >
-              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+              <div className="flex-shrink-0 flex items-center justify-center w-8 h-8">
                 <GetFileIcon extension={(type as string).split('.').pop() || ''} />
               </div>
               <span className="truncate max-w-[200px]">{type.replace('file/', '')}</span>
@@ -280,7 +281,7 @@ export function MessageBubble({
 
           {/* Text Bubble */}
           {content && (
-            <div className={`${bubbleClass} ${bubbleModifiers} ${hasReactions ? 'chat-bubble-with-reaction' : ''} break-words`}>
+            <div className={`${bubbleClass} ${bubbleModifiers} ${hasReactions ? 'chat-bubble-with-reaction' : ''}`}>
               <p className="chat-bubble-text">{content}</p>
             </div>
           )}

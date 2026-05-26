@@ -4,6 +4,7 @@ export interface AccountSettings {
   toastNotifications: boolean;
   allowSearchProfile: boolean;
   allowFriendRequest: boolean;
+  allowMessagesFrom: 'everyone' | 'friends_only';
   showOnlineStatus: boolean;
 }
 
@@ -11,6 +12,7 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   toastNotifications: true,
   allowSearchProfile: true,
   allowFriendRequest: true,
+  allowMessagesFrom: 'everyone',
   showOnlineStatus: true,
 };
 
@@ -29,6 +31,7 @@ export function loadCachedAccountSettings(): AccountSettings {
       toastNotifications: parsed.toastNotifications ?? DEFAULT_ACCOUNT_SETTINGS.toastNotifications,
       allowSearchProfile: parsed.allowSearchProfile ?? DEFAULT_ACCOUNT_SETTINGS.allowSearchProfile,
       allowFriendRequest: parsed.allowFriendRequest ?? DEFAULT_ACCOUNT_SETTINGS.allowFriendRequest,
+      allowMessagesFrom: parsed.allowMessagesFrom ?? DEFAULT_ACCOUNT_SETTINGS.allowMessagesFrom,
       showOnlineStatus: parsed.showOnlineStatus ?? DEFAULT_ACCOUNT_SETTINGS.showOnlineStatus,
     };
   } catch {

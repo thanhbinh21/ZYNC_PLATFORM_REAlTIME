@@ -1,6 +1,7 @@
 import type { FriendUser } from '@/services/friends';
 import { useState } from 'react';
 import { FriendCard } from './friend-card';
+import { ButtonSpinner, PageSkeleton } from '@/components/shared/loading-system';
 
 interface FriendsListViewProps {
   friends: FriendUser[];
@@ -96,19 +97,7 @@ export function FriendsListView({
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="animate-pulse rounded-2xl border border-border bg-[var(--surface-muted)]/50 p-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="h-14 w-14 rounded-full bg-[var(--bg-hover)]" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 rounded bg-[var(--bg-hover)]" />
-                  <div className="h-3 w-16 rounded bg-[var(--bg-hover)]" />
-                </div>
-              </div>
-              <div className="mt-4 h-9 w-full rounded-full bg-[var(--bg-hover)]" />
-            </div>
+            <PageSkeleton key={i} rows={1} />
           ))}
         </div>
       )}
@@ -166,7 +155,7 @@ export function FriendsListView({
           >
             {isLoadingMore ? (
               <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-tertiary)]/30 border-t-[var(--text-tertiary)]" />
+                <ButtonSpinner size="sm" tone="muted" />
                 Đang tải...
               </>
             ) : (

@@ -1,34 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  StatusBar,
-  Alert
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  AlertTriangle,
-  Bell,
-  ChevronRight,
-  HelpCircle,
-  History,
-  KeyRound,
-  Lock,
-  LogOut,
-  Palette,
-  Shield,
-  Settings,
-  ShieldCheck,
+  AlertTriangle, Bell, ChevronRight, HelpCircle, History,
+  KeyRound, Lock, LogOut, Palette, Shield, Settings, ShieldCheck,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { socketService } from '../../src/services/socket';
 import api from '../../src/services/api';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../src/theme/colors';
+
+import { AppScreen } from '../../src/ui/AppScreen';
+import { AppCard } from '../../src/ui/AppCard';
+import { Avatar } from '../../src/ui/Avatar';
+import { fonts } from '../../src/theme/fonts';
+import { lightTheme } from '../../src/theme/colors';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -66,75 +51,64 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Call server logout endpoint
-              await api.post('/auth/logout').catch(() => {});
-              // Disconnect socket
-              socketService.disconnect();
-              // Clear local state
-              await logout();
-              // Navigate to login
-              router.replace('/(auth)/login');
-            } catch (e) {
-              console.error('Logout error:', e);
-              await logout();
-              router.replace('/(auth)/login');
-            }
-          },
+    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Đăng xuất',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.post('/auth/logout').catch(() => {});
+            socketService.disconnect();
+            await logout();
+            router.replace('/(auth)/login');
+          } catch (e) {
+            await logout();
+            router.replace('/(auth)/login');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const menuOptions = [
-    { title: 'Tài khoản và Bảo mật', Icon: ShieldCheck, color: colors.success },
-    { title: 'Quyền riêng tư', Icon: Lock, color: colors.info },
-    { title: 'Thông báo', Icon: Bell, color: colors.warning },
-    { title: 'Giao diện và Ngôn ngữ', Icon: Palette, color: colors.violet },
-    { title: 'Trợ giúp & Phản hồi', Icon: HelpCircle, color: colors.pink },
+    { title: 'Tài khoản và Bảo mật', Icon: ShieldCheck, color: '#10B981', route: '/settings' },
+    { title: 'Quyền riêng tư', Icon: Lock, color: '#2563EB', route: '/settings' },
+    { title: 'Thông báo', Icon: Bell, color: '#F59E0B', route: '/settings' },
+    { title: 'Giao diện và Ngôn ngữ', Icon: Palette, color: '#8B5CF6', route: '/settings' },
+    { title: 'Trợ giúp & Phản hồi', Icon: HelpCircle, color: '#EC4899', route: '/settings' },
   ];
-  const trustColor = trustScore >= 70 ? colors.success : trustScore >= 40 ? colors.warning : colors.error;
+  const trustColor = trustScore >= 70 ? '#10B981' : trustScore >= 40 ? '#F59E0B' : '#EF4444';
 
   return (
-    <LinearGradient
-      colors={[colors.backgroundSoft, colors.backgroundMid, colors.backgroundDeep]}
-      style={styles.safeArea}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarLarge}>
-            <Text style={styles.avatarText}>
-              {displayName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.userName}>{displayName}</Text>
-          {username ? <Text style={styles.userHandle}>{username}</Text> : null}
-          <Text style={styles.userEmail}>{email}</Text>
-          
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.editProfileBtn}>
-              <Text style={styles.editProfileText}>Chỉnh sửa hồ sơ</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
-              <Settings size={20} stroke={colors.text} />
-            </TouchableOpacity>
-          </View>
+    <AppScreen scrollable hideStatusBar={false}>
+      {/* Header Info */}
+      <View style={styles.profileHeader}>
+        <Avatar 
+          url={userInfo?.avatarUrl} 
+          name={displayName} 
+          size={100} 
+          style={styles.avatarMargin}
+          showStatus
+          status="online"
+        />
+        <Text style={styles.userName}>{displayName}</Text>
+        {username ? <Text style={styles.userHandle}>{username}</Text> : null}
+        <Text style={styles.userEmail}>{email}</Text>
+        
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/settings')}>
+            <Text style={styles.editProfileText}>Chỉnh sửa hồ sơ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings')}>
+            <Settings size={20} stroke={lightTheme.accent} />
+          </TouchableOpacity>
         </View>
+      </View>
 
+      <View style={styles.contentPadding}>
         {/* Stats Row */}
-        <View style={styles.statsRow}>
+        <AppCard style={styles.statsCard}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{friendCount}</Text>
             <Text style={styles.statLabel}>Bạn bè</Text>
@@ -149,123 +123,100 @@ export default function ProfileScreen() {
             <Text style={styles.statNumber}>{joinedYear}</Text>
             <Text style={styles.statLabel}>Tham gia</Text>
           </View>
-        </View>
+        </AppCard>
 
         {/* Menu Items */}
-        <View style={styles.menuContainer}>
+        <AppCard style={styles.menuCard}>
           {menuOptions.map((item, index) => (
-            <TouchableOpacity key={index} style={styles.menuItem}>
+            <TouchableOpacity 
+              key={index} 
+              style={[styles.menuItem, index < menuOptions.length - 1 && styles.menuItemBorder]} 
+              onPress={() => item.route && router.push(item.route as any)}
+            >
               <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
                 <item.Icon size={22} stroke={item.color} />
               </View>
               <Text style={styles.menuText}>{item.title}</Text>
-              <ChevronRight size={18} stroke={colors.textSubtle} />
+              <ChevronRight size={18} stroke="#64748B" />
             </TouchableOpacity>
           ))}
-        </View>
+        </AppCard>
 
         {/* Reputation & Security */}
-        <View style={styles.menuContainer}>
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Danh tiếng</Text>
-            <View style={styles.trustRow}>
-              <Text style={styles.trustLabel}>Điểm tin cậy</Text>
-              <Text style={[styles.trustValue, { color: trustColor }]}>{trustScore}%</Text>
-            </View>
-            <View style={styles.trustBarTrack}>
-              <View style={[styles.trustBarFill, { width: `${trustScore}%`, backgroundColor: trustColor }]} />
-            </View>
-            <View style={styles.violationRow}>
-              <Text style={styles.violationLabel}>Lần vi phạm toàn hệ thống</Text>
-              <Text style={[styles.violationValue, { color: violationCount >= 3 ? colors.error : violationCount > 0 ? colors.warning : colors.success }]}>
-                {violationCount}
-              </Text>
-            </View>
-            {violationCount >= 3 && (
-              <View style={styles.warningBox}>
-                <AlertTriangle size={16} stroke={colors.error} />
-                <Text style={styles.warningText}>Tài khoản có nguy cơ bị hạn chế nếu tiếp tục vi phạm.</Text>
-              </View>
-            )}
+        <AppCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Danh tiếng</Text>
+          <View style={styles.trustRow}>
+            <Text style={styles.trustLabel}>Điểm tin cậy</Text>
+            <Text style={[styles.trustValue, { color: trustColor }]}>{trustScore}%</Text>
           </View>
+          <View style={styles.trustBarTrack}>
+            <View style={[styles.trustBarFill, { width: `${trustScore}%`, backgroundColor: trustColor }]} />
+          </View>
+          <View style={styles.violationRow}>
+            <Text style={styles.violationLabel}>Lần vi phạm toàn hệ thống</Text>
+            <Text style={[styles.violationValue, { color: violationCount >= 3 ? '#EF4444' : violationCount > 0 ? '#F59E0B' : '#10B981' }]}>
+              {violationCount}
+            </Text>
+          </View>
+          {violationCount >= 3 && (
+            <View style={styles.warningBox}>
+              <AlertTriangle size={16} stroke="#EF4444" />
+              <Text style={styles.warningText}>Tài khoản có nguy cơ bị hạn chế nếu tiếp tục vi phạm.</Text>
+            </View>
+          )}
+        </AppCard>
 
-          <View style={[styles.sectionCard, { marginTop: 10 }]}>
-            <Text style={styles.sectionTitle}>Bảo mật</Text>
-            <View style={styles.securityItem}>
-              <Shield size={18} stroke={colors.success} />
-              <Text style={styles.securityText}>Xác thực hai bước: Đã bật</Text>
-            </View>
-            <View style={styles.securityItem}>
-              <KeyRound size={18} stroke={colors.info} />
-              <Text style={styles.securityText}>Đổi mật khẩu định kỳ mỗi 90 ngày</Text>
-            </View>
-            <View style={styles.securityItem}>
-              <History size={18} stroke={colors.warning} />
-              <Text style={styles.securityText}>Lịch sử đăng nhập: 1 thiết bị hoạt động</Text>
-            </View>
+        <AppCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Bảo mật</Text>
+          <View style={styles.securityItem}>
+            <Shield size={18} stroke="#10B981" />
+            <Text style={styles.securityText}>Xác thực hai bước: Đã bật</Text>
           </View>
-        </View>
+          <View style={styles.securityItem}>
+            <KeyRound size={18} stroke="#2563EB" />
+            <Text style={styles.securityText}>Đổi mật khẩu định kỳ mỗi 90 ngày</Text>
+          </View>
+          <View style={styles.securityItem}>
+            <History size={18} stroke="#F59E0B" />
+            <Text style={styles.securityText}>Lịch sử đăng nhập: 1 thiết bị hoạt động</Text>
+          </View>
+        </AppCard>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <LogOut size={22} stroke={colors.error} style={{ marginRight: 10 }} />
+          <LogOut size={22} stroke="#EF4444" style={{ marginRight: 10 }} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-    </SafeAreaView>
-   </LinearGradient>
+      </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  container: {
-    flex: 1,
-  },
   profileHeader: {
     alignItems: 'center',
     paddingVertical: 30,
-    backgroundColor: 'transparent',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingHorizontal: 20,
   },
-  avatarLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 35,
-    backgroundColor: colors.glassStrong,
-    borderWidth: 3,
-    borderColor: colors.success,
-    marginBottom: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: colors.success,
-    fontSize: 36,
-    fontFamily: 'BeVietnamPro_700Bold',
+  avatarMargin: {
+    marginBottom: 16,
   },
   userName: {
-    color: colors.text,
+    color: lightTheme.textPrimary,
     fontSize: 22,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontFamily: fonts.bold,
   },
   userHandle: {
-    color: colors.accentSoft,
+    color: lightTheme.accent,
     fontSize: 14,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontFamily: fonts.medium,
     marginTop: 4,
   },
   userEmail: {
-    color: colors.textMuted,
+    color: lightTheme.textTertiary,
     fontSize: 14,
-    fontFamily: 'BeVietnamPro_400Regular',
-    marginTop: 5,
+    fontFamily: fonts.regular,
+    marginTop: 4,
   },
   headerActions: {
     flexDirection: 'row',
@@ -273,191 +224,172 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editProfileBtn: {
-    backgroundColor: colors.success,
-    paddingHorizontal: 25,
+    backgroundColor: lightTheme.accent,
+    paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 20,
     marginRight: 10,
   },
   editProfileText: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 14,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    fontFamily: fonts.semiBold,
   },
   settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.glassPanel,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: '#E8ECEF',
   },
-  statsRow: {
+  contentPadding: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  statsCard: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 25,
-    marginHorizontal: 20,
-    marginTop: -25,
-    backgroundColor: colors.glassPanel,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    shadowColor: colors.glassShadow,
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+    paddingVertical: 20,
   },
   statItem: {
     alignItems: 'center',
   },
   statNumber: {
-    color: colors.text,
-    fontSize: 18,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontSize: 20,
+    fontFamily: fonts.bold,
+    color: lightTheme.textPrimary,
   },
   statLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontFamily: 'BeVietnamPro_400Regular',
-    marginTop: 2,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: lightTheme.textTertiary,
+    marginTop: 4,
   },
   dividerVertical: {
     width: 1,
-    backgroundColor: colors.divider,
-    height: '60%',
-    alignSelf: 'center',
+    backgroundColor: '#E8ECEF',
+    marginVertical: 4,
   },
-  menuContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
+  menuCard: {
+    padding: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  menuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F4F8',
+  },
+  menuIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  menuText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: fonts.semiBold,
+    color: lightTheme.textSecondary,
   },
   sectionCard: {
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: colors.glassSoft,
-    borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontFamily: 'BeVietnamPro_600SemiBold',
-    marginBottom: 10,
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    color: lightTheme.textPrimary,
+    marginBottom: 16,
   },
   trustRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   trustLabel: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: lightTheme.textSecondary,
   },
   trustValue: {
-    fontSize: 13,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontSize: 16,
+    fontFamily: fonts.bold,
   },
   trustBarTrack: {
     height: 8,
-    borderRadius: 999,
-    backgroundColor: colors.glassPanel,
+    borderRadius: 4,
+    backgroundColor: '#F0F4F8',
+    marginBottom: 16,
     overflow: 'hidden',
   },
   trustBarFill: {
     height: '100%',
-    borderRadius: 999,
+    borderRadius: 4,
   },
   violationRow: {
-    marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   violationLabel: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    color: lightTheme.textSecondary,
   },
   violationValue: {
-    fontSize: 14,
-    fontFamily: 'BeVietnamPro_700Bold',
+    fontSize: 15,
+    fontFamily: fonts.bold,
   },
   warningBox: {
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
-    backgroundColor: colors.dangerSoft,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 10,
   },
   warningText: {
     flex: 1,
-    color: colors.error,
-    fontSize: 12,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    color: '#EF4444',
   },
   securityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 8,
+    marginBottom: 14,
+    gap: 12,
   },
   securityText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontFamily: 'BeVietnamPro_500Medium',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: colors.glassSoft,
-    borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'transparent',
-  },
-  menuIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  menuText: {
-    color: colors.text,
-    fontSize: 16,
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: lightTheme.textSecondary,
     flex: 1,
   },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 20,
-    marginTop: 30,
-    paddingVertical: 15,
-    backgroundColor: colors.dangerSoft,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
+    backgroundColor: '#FEF2F2',
+    paddingVertical: 16,
+    borderRadius: 20,
+    marginTop: 8,
   },
   logoutText: {
-    color: colors.error,
-    fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
+    color: '#EF4444',
+    fontSize: 15,
+    fontFamily: fonts.bold,
   },
 });

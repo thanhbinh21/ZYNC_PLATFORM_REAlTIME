@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Code2,
@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   Rocket,
   CheckCircle2,
-  Loader2,
   Zap,
   MessageSquare,
   PenLine,
@@ -23,6 +22,8 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/services/api';
 import { PageLoading } from '@/components/shared/page-loading';
+import { ButtonSpinner } from '@/components/shared/loading-system';
+import { getAccessToken } from '@/utils/auth-token';
 
 const SKILL_TAGS = [
   'javascript', 'typescript', 'react', 'nextjs', 'vue', 'angular', 'svelte',
@@ -84,6 +85,12 @@ function OnboardingPageContent() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
+
+  useEffect(() => {
+    if (!getAccessToken()) {
+      router.replace('/auth');
+    }
+  }, [router]);
 
   const [devRole, setDevRole] = useState('developer');
   const [bio, setBio] = useState('');
@@ -448,7 +455,7 @@ function OnboardingPageContent() {
                 </button>
               ) : (
                 <button onClick={handleFinish} disabled={isSubmitting} className="zync-soft-button flex items-center gap-2 px-6 py-2.5 text-sm">
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                  {isSubmitting ? <ButtonSpinner size="sm" tone="light" /> : <Rocket className="h-4 w-4" />}
                   {isSubmitting ? 'Đang lưu...' : 'Bắt đầu!'}
                 </button>
               )}
