@@ -45,7 +45,7 @@ export default function CreateGroupScreen() {
       const res = await api.get('/friends');
       const friendsList = (res.data?.data || res.data?.friends || []).map((f: any) => ({
         _id: f._id || f.userId || f.id,
-        displayName: f.displayName || f.username || 'User',
+        displayName: f.displayName || f.username || 'Người dùng',
         avatarUrl: f.avatarUrl,
         username: f.username,
       }));
@@ -99,7 +99,7 @@ export default function CreateGroupScreen() {
     }
   }, [groupName, router, selectedIds, userInfo?.displayName]);
 
-  // Loc danh sach ban be theo tu khoa
+  // Lọc danh sách bạn bè theo từ khóa
   const filtered = search.trim()
     ? friends.filter(
         (f) =>

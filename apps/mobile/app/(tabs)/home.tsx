@@ -34,6 +34,9 @@ import { useNotificationsContext } from '../../src/context/notifications-context
 import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
 import { AppScreen } from '../../src/ui/AppScreen';
 import { AppCard } from '../../src/ui/AppCard';
+import { StatStrip } from '../../src/ui/StatStrip';
+import { ActionTile } from '../../src/ui/ActionTile';
+import { Avatar } from '../../src/ui/Avatar';
 
 // ============================================================
 // HELPERS
@@ -146,9 +149,9 @@ interface TrendingPostItemProps {
   theme: typeof lightTheme;
 }
 
-function TrendingPostItem({ post, index, theme }: TrendingPostItemProps) {
+function TrendingPostItem({ post, index, onPress, theme }: TrendingPostItemProps) {
   return (
-    <TouchableOpacity style={styles.trendingItem} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.trendingItem} activeOpacity={0.7} onPress={() => onPress(post)}>
       <View style={styles.trendingLeft}>
         <View style={[styles.trendingRank, { backgroundColor: lightTheme.accentLight }]}>
           <Text style={[styles.trendingRankText, { color: lightTheme.accent }]}>
@@ -258,8 +261,7 @@ export default function HomeScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
 
-  const displayName = userInfo?.displayName || userInfo?.username || 'User';
-  const currentUserId = userInfo?._id || userInfo?.id || '';
+  const displayName = userInfo?.displayName || userInfo?.username || 'bạn';
 
   // ============================================================
   // DATA LOADING
@@ -316,7 +318,12 @@ export default function HomeScreen() {
     try {
       const res = await api.get('/notifications?limit=10');
       const data = res.data?.notifications || res.data?.data || [];
-      setActivities(data);
+      setActivities(data
+        .map((item: any) => ({
+          ...item,
+          message: item.message || item.title || item.body || '',
+        }))
+        .filter((item: Activity) => typeof item.message === 'string' && item.message.trim().length > 0));
     } catch (e) {
       console.error('Activities load error:', e);
     } finally {
@@ -381,7 +388,7 @@ export default function HomeScreen() {
   }, [openNotificationSheet]);
 
   const handleTrendingPostPress = useCallback((post: TrendingPost) => {
-    router.push('/(tabs)/community');
+    router.push({ pathname: '/post-detail', params: { postId: post._id } });
   }, [router]);
 
   const handleRetry = useCallback(() => {
@@ -412,8 +419,11 @@ export default function HomeScreen() {
         {/* ============================================================ */}
         <View style={styles.headerContainer}>
           <View style={styles.headerLeft}>
+            <Avatar url={userInfo?.avatarUrl} name={displayName} size={44} style={styles.headerAvatar} />
+            <View style={styles.headerText}>
             <Text style={styles.headerGreeting}>{getGreeting()},</Text>
             <Text style={styles.headerName} numberOfLines={1}>{displayName}</Text>
+            </View>
           </View>
           <TouchableOpacity
             ref={notificationBtnRef}
@@ -474,29 +484,38 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.statsGrid}>
-                <StatCard
-                  label="Bạn bè"
-                  value={stats.friends}
-                  icon={<Users size={20} color={theme.accent} />}
-                  color={theme.accent}
-                  loading={statsLoading}
-                />
-                <StatCard
-                  label="Hội thoại"
-                  value={stats.conversations}
-                  icon={<MessageCircle size={20} color={theme.info} />}
-                  color={theme.info}
-                  loading={statsLoading}
-                />
-                <StatCard
-                  label="Tin nhắn mới"
-                  value={stats.unread}
-                  icon={<Mail size={20} color={theme.warning} />}
-                  color={theme.warning}
-                  loading={statsLoading}
-                />
-              </View>
+              <StatStrip
+                items={[
+                  {
+                    label: 'Bạn bè',
+                    value: stats.friends,
+                    icon: <Users size={18} color={theme.accent} />,
+                    tone: theme.accent,
+                    loading: statsLoading,
+                  },
+                  {
+                    label: 'Hội thoại',
+                    value: stats.conversations,
+                    icon: <MessageCircle size={18} color={theme.info} />,
+                    tone: theme.info,
+                    loading: statsLoading,
+                  },
+                  {
+                    label: 'Tin mới',
+                    value: stats.unread,
+                    icon: <Mail size={18} color={theme.warning} />,
+                    tone: theme.warning,
+                    loading: statsLoading,
+                  },
+                  {
+                    label: 'Thông báo',
+                    value: notificationUnread,
+                    icon: <Ionicons name="notifications-outline" size={18} color={theme.violet} />,
+                    tone: theme.violet,
+                    loading: statsLoading,
+                  },
+                ]}
+              />
             )}
           </View>
 
@@ -506,28 +525,28 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thao tác nhanh</Text>
             <View style={styles.quickGrid}>
-              <QuickAction
+              <ActionTile
                 label="Tin nhắn"
                 icon={<MessageCircle size={22} color={theme.accent} />}
-                color={theme.accent}
+                tone={theme.accent}
                 onPress={() => router.push('/(tabs)/chat')}
               />
-              <QuickAction
+              <ActionTile
                 label="Danh bạ"
                 icon={<Users size={22} color={theme.info} />}
-                color={theme.info}
+                tone={theme.info}
                 onPress={() => router.push('/(tabs)/friends')}
               />
-              <QuickAction
+              <ActionTile
                 label="Cộng đồng"
                 icon={<Globe size={22} color={theme.violet} />}
-                color={theme.violet}
+                tone={theme.violet}
                 onPress={() => router.push('/(tabs)/community')}
               />
-              <QuickAction
+              <ActionTile
                 label="Tạo nhóm"
                 icon={<Ionicons name="add-circle-outline" size={22} color={theme.pink} />}
-                color={theme.pink}
+                tone={theme.pink}
                 onPress={() => router.push('/create-group')}
               />
             </View>
@@ -590,14 +609,6 @@ export default function HomeScreen() {
                 <Calendar size={18} color={theme.accent} />
                 <Text style={[styles.sectionTitle, { marginLeft: 8 }]}>Hoạt động gần đây</Text>
               </View>
-              <TouchableOpacity
-                style={styles.seeAllBtn}
-                onPress={() => router.push('/(tabs)/notifications')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.seeAllText}>Xem tất cả</Text>
-                <ChevronRight size={14} color={theme.accent} />
-              </TouchableOpacity>
             </View>
 
             {activitiesLoading ? (
@@ -657,7 +668,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: 'transparent' },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 140 },
 
   // Header
   headerContainer: {
@@ -665,11 +676,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: lightTheme.border,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  headerLeft: { flex: 1, marginRight: 12 },
+  headerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    minWidth: 0,
+  },
+  headerAvatar: {
+    marginRight: 10,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
   headerGreeting: {
     fontFamily: fonts.medium,
     color: lightTheme.textSecondary,
@@ -685,7 +708,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: lightTheme.surfaceCard,
+    backgroundColor: lightTheme.surface,
     borderWidth: 1,
     borderColor: lightTheme.border,
     justifyContent: 'center',
@@ -700,7 +723,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: lightTheme.bgPrimary,
+    borderColor: lightTheme.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -711,7 +734,7 @@ const styles = StyleSheet.create({
   },
 
   // Section
-  section: { marginTop: 20 },
+  section: { marginTop: 16 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -773,7 +796,7 @@ const styles = StyleSheet.create({
   // Quick Actions
   quickGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 10,
   },
   quickAction: {
     alignItems: 'center',

@@ -45,12 +45,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: lightTheme.surfaceCard,
+    backgroundColor: lightTheme.surface,
     borderWidth: 1,
     borderColor: lightTheme.border,
   },
   chipActive: {
-    backgroundColor: lightTheme.accent,
+    backgroundColor: lightTheme.accentSoft,
     borderColor: lightTheme.accent,
   },
   label: {
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     fontFamily: fonts.semiBold,
-    color: lightTheme.textOnAccent,
+    color: lightTheme.accent,
   },
   iconWrap: {
     marginRight: 6,

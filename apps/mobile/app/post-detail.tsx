@@ -117,10 +117,10 @@ export default function PostDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.errorState}>
           <Text style={styles.errorText}>
-            {error || 'Khong tim thay bai viet'}
+            {error || 'Không tìm thấy bài viết'}
           </Text>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backLinkText}>Quay lai</Text>
+            <Text style={styles.backLinkText}>Quay lại</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -135,7 +135,7 @@ export default function PostDetailScreen() {
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          Bai viet
+          Bài viết
         </Text>
         <View style={styles.headerRight} />
       </View>
@@ -160,7 +160,7 @@ export default function PostDetailScreen() {
           )}
           <View style={styles.authorInfo}>
             <Text style={styles.authorName}>
-              {post.author?.displayName || 'Nguoi dung'}
+              {post.author?.displayName || 'Người dùng'}
             </Text>
             <Text style={styles.meta}>
               {formatDate(post.createdAt)}
@@ -212,8 +212,8 @@ export default function PostDetailScreen() {
         {/* Stats */}
         <View style={styles.statsRow}>
           <Text style={styles.statsText}>
-            {post.likesCount} luot thich · {post.commentsCount} binh luan ·{' '}
-            {post.viewsCount} luot xem
+            {post.likesCount} lượt thích · {post.commentsCount} bình luận ·{' '}
+            {post.viewsCount} lượt xem
           </Text>
         </View>
 
@@ -234,7 +234,7 @@ export default function PostDetailScreen() {
                 localLiked && { color: colors.danger },
               ]}
             >
-              {localLiked ? 'Da thich' : 'Thich'}
+              {localLiked ? 'Đã thích' : 'Thích'}
             </Text>
           </TouchableOpacity>
 
@@ -243,7 +243,7 @@ export default function PostDetailScreen() {
             style={styles.actionButton}
           >
             <MessageCircle size={20} color={colors.textMuted} />
-            <Text style={styles.actionText}>Binh luan</Text>
+            <Text style={styles.actionText}>Bình luận</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -256,20 +256,20 @@ export default function PostDetailScreen() {
               fill={localBookmarked ? colors.accentSoft : 'transparent'}
             />
             <Text style={styles.actionText}>
-              {localBookmarked ? 'Da luu' : 'Luu'}
+              {localBookmarked ? 'Đã lưu' : 'Lưu'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
             <Share size={20} color={colors.textMuted} />
-            <Text style={styles.actionText}>Chia se</Text>
+            <Text style={styles.actionText}>Chia sẻ</Text>
           </TouchableOpacity>
         </View>
 
         {/* Comments preview */}
         <View style={styles.commentsSection}>
           <Text style={styles.commentsSectionTitle}>
-            Binh luan ({post.commentsCount})
+            Bình luận ({post.commentsCount})
           </Text>
           {isLoadingComments ? (
             <View style={{ gap: 12, paddingVertical: 16 }}>
@@ -279,7 +279,7 @@ export default function PostDetailScreen() {
             </View>
           ) : comments.length === 0 ? (
             <Text style={styles.noCommentsText}>
-              Chua co binh luan nao. Hay la nguoi dau tien binh luan!
+              Chưa có bình luận nào. Hãy là người đầu tiên bình luận!
             </Text>
           ) : (
             comments.slice(0, 5).map((comment) => (
@@ -306,7 +306,7 @@ export default function PostDetailScreen() {
                 )}
                 <View style={styles.commentContent}>
                   <Text style={styles.commentAuthor}>
-                    {comment.author?.displayName || 'Nguoi dung'}
+                    {comment.author?.displayName || 'Người dùng'}
                   </Text>
                   <Text style={styles.commentText}>{comment.content}</Text>
                 </View>
@@ -319,7 +319,7 @@ export default function PostDetailScreen() {
               style={styles.viewAllComments}
             >
               <Text style={styles.viewAllText}>
-                Xem tat ca {comments.length} binh luan
+                Xem tất cả {comments.length} bình luận
               </Text>
             </TouchableOpacity>
           )}
@@ -333,7 +333,7 @@ export default function PostDetailScreen() {
           style={styles.floatingCommentBtn}
         >
           <Text style={styles.floatingCommentText}>
-            Viet binh luan...
+            Viết bình luận...
           </Text>
         </TouchableOpacity>
       </View>

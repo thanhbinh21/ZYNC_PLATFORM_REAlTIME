@@ -50,12 +50,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: lightTheme.surfaceCard,
+    backgroundColor: lightTheme.surface,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: lightTheme.border,
     paddingHorizontal: 16,
-    height: 48,
+    height: 46,
   },
   input: {
     flex: 1,

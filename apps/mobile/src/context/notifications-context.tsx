@@ -49,7 +49,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const navigateFromNotification = useCallback(
     (n: AppNotification) => {
-      // Prefer conversation
+      const postId = n.data?.postId || n.data?.communityPostId;
+
       if (n.conversationId) {
         router.push({
           pathname: '/chat-room',
@@ -65,7 +66,15 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
       if (n.type === 'friend_request' || n.type === 'friend_accepted') {
         router.push('/(tabs)/friends');
+        return;
       }
+
+      if (postId) {
+        router.push({ pathname: '/post-detail', params: { postId } });
+        return;
+      }
+
+      router.push('/(tabs)/community');
     },
     [router],
   );
@@ -206,6 +215,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         onClose={closeNotificationSheet}
         notifications={notificationsApi.notifications}
         isLoading={notificationsApi.isLoading}
+        error={notificationsApi.error}
         hasMore={notificationsApi.hasMore}
         onLoadMore={notificationsApi.loadMore}
         onMarkRead={notificationsApi.markRead}

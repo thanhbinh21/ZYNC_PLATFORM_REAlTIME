@@ -15,6 +15,7 @@ import {
 import { X, Send } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/fonts';
+import { mobileColors, mobileRadius } from '../theme/tokens';
 import type { Comment } from '../services/posts';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -35,10 +36,10 @@ function formatTimeAgo(dateString: string): string {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return 'Vua xong';
-  if (minutes < 60) return `${minutes} phut truoc`;
-  if (hours < 24) return `${hours} gio truoc`;
-  return `${days} ngay truoc`;
+  if (minutes < 1) return 'Vừa xong';
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (hours < 24) return `${hours} giờ trước`;
+  return `${days} ngày trước`;
 }
 
 function CommentItem({ comment }: { comment: Comment }) {
@@ -59,7 +60,7 @@ function CommentItem({ comment }: { comment: Comment }) {
       <View style={styles.commentBody}>
         <View style={styles.commentBubble}>
           <Text style={styles.authorName}>
-            {comment.author?.displayName || 'Nguoi dung'}
+            {comment.author?.displayName || 'Người dùng'}
           </Text>
           <Text style={styles.commentContent}>{comment.content}</Text>
           {comment.codeSnippet && (
@@ -69,7 +70,7 @@ function CommentItem({ comment }: { comment: Comment }) {
           )}
         </View>
         <Text style={styles.commentTime}>
-          {formatTimeAgo(comment.createdAt)} · Thich
+          {formatTimeAgo(comment.createdAt)} · Thích
         </Text>
       </View>
     </View>
@@ -117,7 +118,7 @@ export function CommentSheet({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>
-              Binh luan ({comments.length})
+              Bình luận ({comments.length})
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={20} color={colors.textMuted} />
@@ -134,7 +135,7 @@ export function CommentSheet({
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>
-                  {isLoading ? 'Dang tai binh luan...' : 'Chua co binh luan nao'}
+                  {isLoading ? 'Đang tải bình luận...' : 'Chưa có bình luận nào'}
                 </Text>
               </View>
             }
@@ -144,7 +145,7 @@ export function CommentSheet({
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="Viet binh luan..."
+              placeholder="Viết bình luận..."
               placeholderTextColor={colors.textSubtle}
               value={text}
               onChangeText={setText}
@@ -185,7 +186,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: mobileColors.bg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: '70%',
@@ -197,10 +198,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorder,
+    borderBottomColor: mobileColors.border,
   },
   headerTitle: {
-    color: colors.text,
+    color: mobileColors.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 18,
   },
@@ -234,12 +235,12 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatarFallback: {
-    backgroundColor: colors.primary,
+    backgroundColor: mobileColors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: colors.text,
+    color: mobileColors.textOnAccent,
     fontFamily: fonts.bold,
     fontSize: 12,
   },
@@ -250,29 +251,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: mobileColors.border,
     padding: 10,
   },
   authorName: {
-    color: colors.primary,
+    color: mobileColors.accent,
     fontFamily: fonts.semiBold,
     fontSize: 13,
     marginBottom: 3,
   },
   commentContent: {
-    color: colors.text,
+    color: mobileColors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 14,
     lineHeight: 20,
   },
   codeSnippet: {
-    backgroundColor: colors.backgroundDeep,
+    backgroundColor: mobileColors.surfaceSoft,
     borderRadius: 8,
     padding: 8,
     marginTop: 6,
   },
   codeText: {
-    color: colors.primary,
+    color: mobileColors.accent,
     fontFamily: 'JetBrainsMono-Regular',
     fontSize: 12,
   },
@@ -288,15 +289,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.glassBorder,
+    borderTopColor: mobileColors.border,
     gap: 10,
   },
   input: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: mobileColors.surface,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 20,
+    borderColor: mobileColors.border,
+    borderRadius: mobileRadius.radiusInput,
     paddingHorizontal: 16,
     paddingVertical: 10,
     color: colors.text,
