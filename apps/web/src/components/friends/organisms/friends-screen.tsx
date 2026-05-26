@@ -190,19 +190,19 @@ export function FriendsScreen({
       <div className="flex h-full w-full overflow-hidden">
         {/* Main column — mirrors /community feed */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="border-b border-border-light px-4 py-4 sm:px-6">
+          <div className="zync-page-header">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3 lg:block">
                   <div>
-                    <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
+                    <p className="zync-page-eyebrow">
                       Kết nối
                     </p>
-                    <h2 className="font-ui-title mt-1 flex items-center gap-2 text-xl text-text-primary">
+                    <h2 className="zync-page-title mt-1 flex items-center gap-2">
                       <UsersIcon className="h-5 w-5 shrink-0 text-accent" />
                       Bạn bè
                     </h2>
-                    <p className="font-ui-content mt-0.5 text-xs text-text-secondary">
+                    <p className="zync-page-subtitle mt-0.5">
                       {subtitleParts.join(" · ")}
                     </p>
                   </div>
@@ -240,7 +240,7 @@ export function FriendsScreen({
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          <div className="zync-dashboard-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             {activeTab === "all" && (
               <div className="space-y-4">
                 {friends.length === 0 && !isFriendsLoading ? (
@@ -269,7 +269,7 @@ export function FriendsScreen({
                     {Array.from({ length: 8 }).map((_, i) => (
                       <div
                         key={i}
-                        className="flex min-h-[9rem] w-full max-w-full animate-pulse flex-col rounded-[1.05rem] border border-border bg-bg-card p-3 sm:min-h-[9.25rem] sm:rounded-[1.1rem] sm:p-3.5"
+                        className="flex min-h-[8rem] w-full max-w-full animate-pulse flex-col rounded-[var(--radius-card)] border border-border-soft bg-[var(--surface)] p-3"
                       >
                         <div className="mx-auto mt-6 h-11 w-11 shrink-0 rounded-full bg-bg-hover" />
                         <div className="mt-3 w-full space-y-2 px-2 text-center">
@@ -376,7 +376,7 @@ export function FriendsScreen({
         </div>
 
         {/* Sidebar — mirrors /community aside */}
-        <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border-light p-4 lg:flex lg:flex-col">
+        <aside className="zync-dashboard-scroll hidden w-72 shrink-0 overflow-y-auto border-l border-border-soft bg-[var(--surface-muted)]/35 p-4 lg:flex lg:flex-col">
           <div className="mb-4">
             <h3 className="font-ui-title flex items-center gap-2 text-base text-text-primary">
               <SparklesIcon className="h-4 w-4 text-accent" />

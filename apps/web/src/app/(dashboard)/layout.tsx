@@ -315,7 +315,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={aiAssistant.openBox}
-                className="relative hidden md:inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary hover:bg-accent/10 transition"
+                className="relative hidden h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary transition hover:bg-[var(--accent-soft)] hover:text-text-primary md:inline-flex"
                 title="Zync AI Assistant"
                 aria-label="Mở AI Assistant"
               >
@@ -333,8 +333,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
         </Suspense>
 
-        <div className="flex-1 overflow-hidden px-2 pb-[76px] md:pb-2 sm:px-4 sm:pb-4">
-          <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
+        <div className="flex-1 overflow-hidden px-2 pb-[76px] sm:px-4 sm:pb-4 md:pb-2">
+          <div className="zync-dashboard-frame flex h-full flex-1 flex-col overflow-hidden">
             {children}
           </div>
         </div>

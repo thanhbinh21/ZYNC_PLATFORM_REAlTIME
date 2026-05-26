@@ -121,8 +121,8 @@ function HomePageContent(): React.JSX.Element {
 
   return (
     <ZyncPageTransition className="zync-app-surface flex h-full w-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-3 py-3 pb-20 sm:px-5 sm:py-5">
-        <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <div className="zync-dashboard-scroll flex-1 overflow-y-auto pb-20">
+        <div className="zync-page-content flex flex-col gap-4 sm:gap-5">
           <section className="zync-hero-card">
             <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="relative p-5 sm:p-7">
@@ -179,8 +179,8 @@ function HomePageContent(): React.JSX.Element {
             </div>
           </section>
 
-          <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-            <div className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+            <div className="space-y-4 sm:space-y-5">
               <DashboardCard
                 title="Cuộc trò chuyện gần đây"
                 icon={MessageSquareIcon}
@@ -254,7 +254,7 @@ function HomePageContent(): React.JSX.Element {
               </div>
             </div>
 
-            <aside className="space-y-4">
+            <aside className="space-y-4 sm:space-y-5">
               <DashboardCard
                 title="Cộng đồng"
                 icon={UsersIcon}

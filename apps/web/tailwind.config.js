@@ -33,9 +33,12 @@ module.exports = {
           DEFAULT: 'var(--border)',
           light: 'var(--border-light)',
           mint: 'var(--border-mint)',
+          soft: 'var(--border-soft)',
+          strong: 'var(--border-strong)',
         },
         surface: {
           DEFAULT: 'var(--surface-card)',
+          soft: 'var(--surface-soft)',
           strong: 'var(--surface-card-strong)',
           muted: 'var(--surface-muted)',
           tint: 'var(--surface-tint)',
@@ -92,6 +95,8 @@ module.exports = {
         md: 'var(--radius-md)',
         lg: 'var(--radius-lg)',
         xl: 'var(--radius-xl)',
+        card: 'var(--radius-card)',
+        pill: 'var(--radius-pill)',
       },
       animation: {
         // Ring & glow

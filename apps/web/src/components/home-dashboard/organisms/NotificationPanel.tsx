@@ -97,12 +97,12 @@ export function NotificationPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[380px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[1.6rem] zync-notification-panel"
+      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-card)] zync-notification-panel"
       style={{ animation: 'panelSlide 0.2s ease-out' }}
       role="dialog"
       aria-label="Danh sách thông báo"
     >
-      <div className="flex items-center justify-between border-b border-border-light px-4 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-soft bg-[var(--surface)] px-4 py-3">
         <div>
           <h3 className="font-ui-title text-base text-text-primary">Thông báo</h3>
           <p className="font-ui-content text-xs text-text-tertiary">{unreadCount} mục chưa đọc</p>
@@ -122,11 +122,17 @@ export function NotificationPanel({
         </div>
       </div>
 
-      <div ref={scrollRef} onScroll={handleScroll} className="max-h-[420px] overflow-y-auto px-2 py-2">
+      <div ref={scrollRef} onScroll={handleScroll} className="zync-scroll-area max-h-[70vh] overflow-y-auto px-2 py-2">
         {notifications.length === 0 && !isLoading && (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <span className="zync-soft-badge">Inbox zero</span>
             <p className="font-ui-content text-sm text-text-secondary">Không có thông báo nào</p>
+          </div>
+        )}
+
+        {notifications.length > 0 && unreadCount === 0 && !isLoading && (
+          <div className="mb-2 rounded-[1.1rem] border border-border-soft bg-[var(--surface-muted)] px-3 py-2 text-center text-xs font-medium text-text-secondary">
+            Tất cả thông báo đã đọc
           </div>
         )}
 
@@ -135,10 +141,10 @@ export function NotificationPanel({
             key={notification._id}
             type="button"
             onClick={() => handleClickItem(notification)}
-            className={`mb-2 flex w-full items-start gap-3 rounded-[1.2rem] border px-4 py-3 text-left transition ${
+            className={`mb-2 flex w-full items-start gap-3 rounded-[1.15rem] border px-3.5 py-3 text-left transition ${
               notification.read
                 ? 'border-transparent bg-[var(--surface-glass)] hover:border-border hover:bg-[var(--surface-glass-strong)]'
-                : 'border-border bg-accent-light hover:border-accent'
+                : 'border-border-soft bg-[var(--accent-soft)] hover:border-border-strong'
             }`}
           >
             <div className="mt-1.5 flex-shrink-0">

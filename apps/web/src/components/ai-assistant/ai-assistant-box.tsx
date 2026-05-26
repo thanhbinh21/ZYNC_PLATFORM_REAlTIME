@@ -191,13 +191,13 @@ export function AiAssistantBox({
       {/* Side panel */}
       <aside
         ref={panelRef}
-        className="fixed bottom-0 right-0 top-0 z-50 flex w-full flex-col bg-[var(--surface-card)] shadow-2xl transition-transform duration-300 ease-out md:w-[min(92vw,480px)]"
+        className="fixed bottom-0 right-0 top-0 z-50 flex w-full flex-col border-l border-border-soft bg-[var(--surface)] shadow-[var(--shadow-lg)] transition-transform duration-300 ease-out md:w-[min(92vw,448px)]"
         style={{ transform: 'translateX(0)' }}
         role="dialog"
         aria-label="Zync AI Assistant"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-4">
+        <div className="flex items-center justify-between border-b border-border-soft bg-[var(--surface)] px-4 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-accent" aria-hidden />
             <h2 className="font-ui-title text-lg font-bold text-text-primary">
@@ -215,7 +215,7 @@ export function AiAssistantBox({
         </div>
 
         {/* Tabs */}
-        <div className="flex overflow-x-auto border-b border-border px-3">
+        <div className="zync-page-tabs border-b border-border-soft bg-[var(--surface)] px-3">
           <button
             type="button"
             onClick={() => onTabChange('overview')}
@@ -284,7 +284,7 @@ export function AiAssistantBox({
         </div>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="zync-scroll-area flex-1 overflow-y-auto px-4 py-4">
           {activeTab === 'overview' && <OverviewTab items={items} total={total} />}
 
           {activeTab === 'catchup' && (
@@ -370,9 +370,9 @@ function OverviewTab({
       <div>
         <p className="mb-2 font-ui-title text-sm font-semibold text-text-primary">Trạng thái AI</p>
         <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Đã tóm tắt" value={readyCount} color="text-green-600" />
-          <StatCard label="Đang xử lý" value={processingCount} color="text-blue-500" />
-          <StatCard label="Chưa bắt đầu" value={notStartedCount} color="text-gray-400" />
+          <StatCard label="Đã tóm tắt" value={readyCount} color="text-accent-strong" />
+          <StatCard label="Đang xử lý" value={processingCount} color="text-accent" />
+          <StatCard label="Chưa bắt đầu" value={notStartedCount} color="text-text-tertiary" />
         </div>
       </div>
 
@@ -408,7 +408,7 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 function FeatureItem({ label, phase, done = false }: { label: string; phase: string; done?: boolean }) {
   return (
     <li className="flex items-center gap-2 text-sm">
-      <span className={`h-2 w-2 shrink-0 rounded-full ${done ? 'bg-green-500' : 'bg-gray-400'}`} aria-hidden />
+      <span className={`h-2 w-2 shrink-0 rounded-full ${done ? 'bg-accent' : 'bg-border'}`} aria-hidden />
       <span className={done ? 'text-text-secondary' : 'text-text-primary'}>{label}</span>
       <span className="ml-auto text-[11px] text-text-tertiary">{phase}</span>
     </li>
@@ -504,7 +504,7 @@ function CatchupTab({
         return (
           <div
             key={conv.conversationId}
-            className="rounded-xl border border-border bg-[var(--surface-card)] p-3 transition hover:border-border-strong"
+            className="rounded-[1.15rem] border border-border-soft bg-[var(--surface)] p-3 transition hover:border-border-strong"
           >
             {/* Header row */}
             <div className="flex items-start gap-3">
@@ -557,20 +557,20 @@ function CatchupTab({
 
             {isReady && actionItems.length > 0 && (
               <div className="mt-3 border-t border-border pt-3">
-                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-sky-700 dark:text-sky-300">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-accent">
                   <Bell className="h-3.5 w-3.5" aria-hidden />
                   Action items
                 </div>
                 {actionItems.slice(0, 3).map((actionItem, index) => (
                   <div key={`${actionItem.text}-${index}`} className="flex items-start gap-2 py-1.5">
-                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" aria-hidden />
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
                     <p className="min-w-0 flex-1 text-xs font-medium leading-relaxed text-text-secondary">
                       {actionItem.text}
                     </p>
                     <button
                       type="button"
                       onClick={() => onCreateTask(conv.conversationId, actionItem, detail?._id)}
-                      className="shrink-0 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100"
+                      className="shrink-0 rounded-md border border-border-soft bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-bold text-accent-strong transition hover:border-border-strong"
                     >
                       Nhắc tôi
                     </button>
@@ -581,7 +581,7 @@ function CatchupTab({
 
             {isReady && suggestedReplies.length > 0 && (
               <div className="mt-3 border-t border-border pt-3">
-                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-200">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-accent">
                   <Reply className="h-3.5 w-3.5" aria-hidden />
                   Suggested replies
                 </div>
@@ -591,7 +591,7 @@ function CatchupTab({
                     key={reply}
                     type="button"
                     onClick={() => onUseSuggestedReply(conv.conversationId, reply)}
-                    className="max-w-full rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-left text-xs font-semibold leading-relaxed text-emerald-900 transition hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100"
+                    className="max-w-full rounded-full border border-border-soft bg-[var(--accent-soft)] px-3 py-1.5 text-left text-xs font-semibold leading-relaxed text-accent-strong transition hover:border-border-strong hover:bg-accent-light"
                   >
                     {reply}
                   </button>
@@ -704,13 +704,13 @@ function TasksTab({
       {tasks.map((task) => (
         <div
           key={task._id}
-          className="rounded-2xl border border-border bg-[var(--surface-card)] p-4 transition hover:border-border-strong"
+          className="rounded-[1.15rem] border border-border-soft bg-[var(--surface)] p-4 transition hover:border-border-strong"
         >
           <div className="flex items-start gap-3">
             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
               task.status === 'suggested'
-                ? 'bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300'
-                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                ? 'bg-[var(--accent-soft)] text-accent'
+                : 'bg-[var(--success-bg)] text-[var(--success-text)]'
             }`}>
               {task.status === 'suggested' ? (
                 <Bell className="h-4 w-4" aria-hidden />
@@ -723,8 +723,8 @@ function TasksTab({
                 <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-text-primary">{task.title}</p>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
                   task.status === 'suggested'
-                    ? 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200'
-                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
+                    ? 'bg-[var(--accent-soft)] text-accent'
+                    : 'bg-[var(--success-bg)] text-[var(--success-text)]'
                 }`}>
                   {task.status === 'suggested' ? 'Suggested' : 'Reminder'}
                 </span>
@@ -749,7 +749,7 @@ function TasksTab({
               <button
                 type="button"
                 onClick={() => onAcceptTask(task._id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-hover"
               >
                 <Bell className="h-3 w-3" aria-hidden />
                 Nhắc tôi
@@ -758,7 +758,7 @@ function TasksTab({
               <button
                 type="button"
                 onClick={() => onCompleteTask(task._id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-hover"
               >
                 <Check className="h-3 w-3" aria-hidden />
                 Xong

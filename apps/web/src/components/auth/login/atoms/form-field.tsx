@@ -55,13 +55,13 @@ export function FormField({
       </div>
 
       <div
-        className={`relative flex min-h-12 items-center gap-3 rounded-2xl border bg-white px-4 transition duration-200 ${
+        className={`relative flex min-h-12 items-center gap-3 rounded-[var(--radius-card)] border bg-[var(--surface)] px-4 transition duration-200 ${
           error
             ? 'border-red-200 shadow-[0_0_0_4px_rgba(239,68,68,0.08)]'
-            : 'border-slate-200 group-focus-within:border-teal-300 group-focus-within:shadow-[0_0_0_4px_rgba(15,118,110,0.12)]'
+            : 'border-border-soft group-focus-within:border-border-strong group-focus-within:shadow-[0_0_0_4px_var(--ring-soft)]'
         } ${disabled ? 'bg-slate-50 opacity-70' : ''}`}
       >
-        <span className={`shrink-0 ${error ? 'text-red-500' : 'text-slate-400 group-focus-within:text-[#0F766E]'}`}>
+        <span className={`shrink-0 ${error ? 'text-red-500' : 'text-text-tertiary group-focus-within:text-accent'}`}>
           <FieldIcon label={label} type={type} />
         </span>
 
@@ -71,7 +71,7 @@ export function FormField({
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-12 w-full bg-transparent text-[15px] font-semibold text-[#082F49] outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+          className="h-12 w-full bg-transparent text-[15px] font-semibold text-text-primary outline-none placeholder:text-text-tertiary disabled:cursor-not-allowed"
         />
       </div>
 

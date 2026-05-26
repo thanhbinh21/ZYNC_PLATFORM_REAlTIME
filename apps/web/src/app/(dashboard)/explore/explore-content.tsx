@@ -72,10 +72,10 @@ function UserCard({
   const isLoading = friendRequestLoading && isSent;
 
   return (
-    <div className="zync-soft-card rounded-[1.6rem] p-4 transition hover:shadow-md">
+    <div className="zync-soft-card rounded-[var(--radius-card)] p-3.5 transition hover:border-border-strong hover:shadow-soft-hover">
       <div className="flex items-start gap-3">
         <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong cursor-pointer hover:opacity-80 transition"
+          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-accent-light text-sm font-bold text-accent-strong transition hover:opacity-80"
           onClick={() => onOpenProfile?.(user.id)}
         >
           {user.avatarUrl ? (
@@ -103,11 +103,11 @@ function UserCard({
       </div>
 
       {user.bio && (
-        <p className="font-ui-content mt-2.5 line-clamp-2 text-sm leading-relaxed text-text-secondary">{user.bio}</p>
+        <p className="font-ui-content mt-2 line-clamp-2 text-sm leading-relaxed text-text-secondary">{user.bio}</p>
       )}
 
       {(user.skills ?? []).length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-2.5 flex flex-wrap gap-1">
           {(user.skills ?? []).slice(0, 4).map((skill) => (
             <span key={skill} className="rounded-full border border-border bg-bg-hover px-2.5 py-0.5 text-xs text-text-secondary">{skill}</span>
           ))}
@@ -365,7 +365,7 @@ export default function ExploreContent() {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Header + Search */}
-      <div className="border-b border-border-light px-4 py-4 sm:px-6">
+      <div className="zync-page-header">
         {/* Banner gợi ý skills từ onboarding */}
         {suggestedSkills.length > 0 && (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-[1.2rem] border border-accent/30 bg-accent/5 p-3">
@@ -406,13 +406,13 @@ export default function ExploreContent() {
           />
         </div>
 
-        <div className="mt-3 flex gap-1.5 overflow-x-auto scrollbar-hide">
+        <div className="zync-page-tabs mt-3">
           {SECTION_TABS.map(({ id, label, Icon }) => (
             <button
               key={id}
               onClick={() => handleTabChange(id)}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                activeSection === id ? 'bg-accent text-[var(--bg-primary)] shadow-sm' : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
+              className={`zync-tab-pill ${
+                activeSection === id ? 'zync-tab-pill-active' : ''
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -423,7 +423,7 @@ export default function ExploreContent() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+      <div className="zync-dashboard-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         {/* Error state */}
         {loadError && (
           <div className="mb-4 flex flex-col items-center justify-center gap-3 rounded-[1.2rem] border border-red-500/20 bg-red-500/5 p-6 text-center">
@@ -439,7 +439,7 @@ export default function ExploreContent() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i}>
                 {activeSection === 'developers' && <DeveloperSkeleton key={i} />}
@@ -471,7 +471,7 @@ export default function ExploreContent() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:gap-4">
               {filteredUsers.map((user) => (
                 <UserCard
                   key={user.id}
@@ -537,7 +537,7 @@ export default function ExploreContent() {
 
       {/* Tags cloud */}
       {!loading && (
-        <div className="border-t border-border-light px-4 py-4 sm:px-6">
+        <div className="border-t border-border-soft bg-[var(--surface-muted)]/35 px-4 py-3 sm:px-6">
           <p className="font-ui-meta mb-2.5 flex items-center gap-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">
             <Tag className="h-3 w-3" />
             Thẻ phổ biến

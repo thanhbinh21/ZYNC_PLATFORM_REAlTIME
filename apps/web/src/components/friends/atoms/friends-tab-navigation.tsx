@@ -14,7 +14,7 @@ export function FriendsTabNavigation({ activeTab, onTabChange, pendingCount }: F
   ];
 
   return (
-    <nav className="flex gap-1.5 overflow-x-auto scrollbar-hide" aria-label="Điều hướng bạn bè">
+    <nav className="zync-page-tabs" aria-label="Điều hướng bạn bè">
       {tabs.map((tab) => {
         const Icon = tab.Icon;
         const isActive = activeTab === tab.id;
@@ -23,10 +23,10 @@ export function FriendsTabNavigation({ activeTab, onTabChange, pendingCount }: F
             key={tab.id}
             type="button"
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
+            className={`zync-tab-pill relative shrink-0 px-4 py-1.5 ${
               isActive
-                ? 'bg-accent text-[var(--bg-primary)] shadow-sm'
-                : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
+                ? 'zync-tab-pill-active'
+                : ''
             }`}
           >
             <Icon className="h-3.5 w-3.5" />
