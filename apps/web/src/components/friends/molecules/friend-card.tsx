@@ -89,7 +89,7 @@ export function FriendCard({
   };
 
   return (
-    <article className="group relative flex h-full min-h-0 w-full max-w-full min-w-0 flex-col gap-3 overflow-visible rounded-[1.05rem] border border-border bg-bg-card px-3 pb-3 pt-3 shadow-sm transition-all hover:border-accent/40 hover:shadow-md sm:gap-3.5 sm:rounded-[1.1rem] sm:px-3.5 sm:pb-3.5 sm:pt-3.5">
+    <article className="group relative flex h-full min-h-0 w-full max-w-full min-w-0 flex-col gap-2.5 overflow-visible rounded-[var(--radius-card)] border border-border-soft bg-[var(--surface)] px-3 pb-3 pt-3 shadow-soft transition-all hover:border-border-strong hover:shadow-soft-hover sm:px-3.5">
       <div className="absolute right-1.5 top-1.5 z-20 sm:right-2 sm:top-2">
         <button
           ref={menuTriggerRef}
@@ -150,7 +150,7 @@ export function FriendCard({
           ) as unknown as ReactNode)}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-0.5 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 px-0.5 text-center">
         <div className="relative isolate inline-flex shrink-0">
           <FriendsAvatar
             name={friend.displayName}
@@ -172,7 +172,7 @@ export function FriendCard({
             </p>
           ) : null}
           {friend.bio ? (
-            <p className="font-ui-content mt-1 line-clamp-2 text-[0.7rem] leading-relaxed text-text-secondary sm:text-xs">
+            <p className="font-ui-content mt-1 line-clamp-1 text-[0.7rem] leading-relaxed text-text-secondary sm:text-xs">
               {friend.bio}
             </p>
           ) : null}
@@ -184,7 +184,7 @@ export function FriendCard({
           type="button"
           onClick={() => onMessage(friend.id)}
           disabled={isLoading}
-          className="zync-soft-button !mx-auto flex w-[92%] shrink-0 items-center justify-center gap-1.5 !px-4 !py-2.5 text-sm font-semibold leading-none"
+          className="zync-soft-button !mx-auto flex w-[92%] shrink-0 items-center justify-center gap-1.5 !px-4 !py-2 text-sm font-semibold leading-none"
         >
           <MessageSquare className="h-4 w-4 shrink-0" aria-hidden />
           <span>Nhắn tin</span>

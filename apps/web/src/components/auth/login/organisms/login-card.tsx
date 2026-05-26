@@ -114,30 +114,30 @@ export function LoginCard({
   };
 
   return (
-    <section className="relative z-10 w-full rounded-[2rem] border border-white bg-white/90 p-5 shadow-[0_30px_90px_-52px_rgba(8,47,73,0.85)] backdrop-blur-xl sm:p-7">
+    <section className="zync-soft-card zync-soft-card-elevated relative z-10 w-full rounded-[var(--radius-card)] p-5 backdrop-blur-xl sm:p-7">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-[#DDFBF5] px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-[#0F766E]">
+          <p className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-accent-strong">
             <KeyRound size={14} aria-hidden />
             OTP secure
           </p>
-          <h2 className="font-ui-title mt-4 text-[clamp(1.8rem,3vw,2.35rem)] leading-tight text-[#06283D]">
+          <h2 className="font-ui-title mt-4 text-[clamp(1.8rem,3vw,2.35rem)] leading-tight text-text-primary">
             {displayTitle}
           </h2>
-          <p className="font-ui-content mt-2 text-sm leading-6 text-slate-600">
+          <p className="font-ui-content mt-2 text-sm leading-6 text-text-secondary">
             {displaySubtitle}
           </p>
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 rounded-full border border-slate-200 bg-slate-100 p-1">
+      <div className="mt-6 grid grid-cols-2 rounded-full border border-border-soft bg-[var(--surface-muted)] p-1">
         <button
           type="button"
           onClick={() => onModeChange('login')}
           className={`rounded-full px-4 py-2.5 text-sm font-black transition ${
             mode === 'login' && !isRecoveryFlow
-              ? 'bg-white text-[#082F49] shadow-sm'
-              : 'text-slate-500 hover:text-[#0F766E]'
+              ? 'bg-[var(--surface)] text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-accent'
           }`}
           aria-pressed={mode === 'login' && !isRecoveryFlow}
         >
@@ -148,8 +148,8 @@ export function LoginCard({
           onClick={() => onModeChange('register')}
           className={`rounded-full px-4 py-2.5 text-sm font-black transition ${
             mode === 'register'
-              ? 'bg-white text-[#082F49] shadow-sm'
-              : 'text-slate-500 hover:text-[#0F766E]'
+              ? 'bg-[var(--surface)] text-text-primary shadow-sm'
+              : 'text-text-tertiary hover:text-accent'
           }`}
           aria-pressed={mode === 'register'}
         >
@@ -219,7 +219,7 @@ export function LoginCard({
               <button
                 type="button"
                 onClick={onBackToInput}
-                className="text-xs font-black text-[#0F766E] transition hover:text-[#082F49]"
+                className="text-xs font-black text-accent transition hover:text-accent-strong"
               >
                 {isRecoveryFlow ? 'Hủy khôi phục' : 'Đổi thông tin'}
               </button>
@@ -231,14 +231,14 @@ export function LoginCard({
           <button
             type="button"
             onClick={isRecoveryFlow ? onCancelRecovery : onStartRecovery}
-            className="text-sm font-bold text-[#0F766E] transition hover:text-[#082F49]"
+            className="text-sm font-bold text-accent transition hover:text-accent-strong"
           >
             {isRecoveryFlow ? 'Quay lại đăng nhập' : 'Quên mật khẩu?'}
           </button>
         ) : null}
 
         {infoMessage ? (
-          <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-700">
+          <p className="rounded-2xl border border-[var(--success-border)] bg-[var(--success-bg)] px-4 py-3 text-sm font-semibold leading-6 text-[var(--success-text)]">
             {infoMessage}
           </p>
         ) : null}
@@ -252,8 +252,8 @@ export function LoginCard({
         <PrimaryButton isSubmitting={isSubmitting} label={submitLabel} />
 
         {currentUserName ? (
-          <div className="space-y-3 rounded-3xl border border-teal-100 bg-[#F0FDFA] p-4">
-            <p className="text-sm font-semibold leading-6 text-[#07544B]">
+          <div className="space-y-3 rounded-3xl border border-border-soft bg-[var(--accent-soft)] p-4">
+            <p className="text-sm font-semibold leading-6 text-accent-strong">
               Đang đăng nhập với tài khoản <span className="font-black">{currentUserName}</span>.
             </p>
             <button
@@ -261,7 +261,7 @@ export function LoginCard({
               onClick={() => {
                 void onLogout();
               }}
-              className="min-h-10 w-full rounded-full border border-teal-200 bg-white text-sm font-black text-[#0F766E] transition hover:bg-[#DDFBF5]"
+              className="min-h-10 w-full rounded-full border border-border-soft bg-[var(--surface)] text-sm font-black text-accent transition hover:bg-[var(--accent-soft)]"
             >
               Đăng xuất
             </button>
@@ -284,7 +284,7 @@ export function LoginCard({
         <button
           type="button"
           onClick={() => onModeChange(isRegister ? 'login' : 'register')}
-          className="font-black text-[#0F766E] transition hover:text-[#082F49]"
+          className="font-black text-accent transition hover:text-accent-strong"
         >
           {isRegister ? loginHintAction : registerHintAction}
         </button>
@@ -297,10 +297,10 @@ function StepPill({ active, done, label }: { active: boolean; done?: boolean; la
   return (
     <div
       className={`flex items-center justify-center gap-2 rounded-full px-3 py-2 ${
-        active || done ? 'bg-[#DDFBF5] text-[#0F766E]' : 'bg-slate-100 text-slate-400'
+        active || done ? 'bg-[var(--accent-soft)] text-accent' : 'bg-[var(--surface-muted)] text-text-tertiary'
       }`}
     >
-      {done ? <CheckCircle2 size={14} aria-hidden /> : <span className={`h-2 w-2 rounded-full ${active ? 'bg-[#0F766E]' : 'bg-slate-300'}`} />}
+      {done ? <CheckCircle2 size={14} aria-hidden /> : <span className={`h-2 w-2 rounded-full ${active ? 'bg-accent' : 'bg-border'}`} />}
       {label}
     </div>
   );

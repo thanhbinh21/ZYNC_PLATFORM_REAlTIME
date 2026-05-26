@@ -50,7 +50,7 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
     return (
       <div
         ref={panelRef}
-        className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[1.6rem] p-4 zync-notification-panel"
+        className="absolute right-0 top-[calc(100%+10px)] z-50 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-card)] p-4 zync-notification-panel"
       >
         <AppLoader layout="bare" size="sm" tone="teal" message="Đang tải..." className="py-6" />
       </div>
@@ -60,10 +60,10 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[1.6rem] zync-notification-panel"
+      className="absolute right-0 top-[calc(100%+10px)] z-50 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-card)] zync-notification-panel"
       style={{ animation: 'settingsSlide 0.2s ease-out' }}
     >
-      <div className="flex items-center justify-between border-b border-border-light px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border-soft bg-[var(--surface)] px-4 py-3">
         <button
           type="button"
           onClick={onClose}
@@ -97,7 +97,7 @@ export function NotificationSettings({ preferences, onUpdate, onClose }: Notific
       </div>
 
       {preferences.mutedConversations.length > 0 && (
-        <div className="border-t border-border-light px-4 py-3">
+        <div className="border-t border-border-soft px-4 py-3">
           <p className="font-ui-content text-xs text-text-secondary">
             {preferences.mutedConversations.length} cuộc trò chuyện đang tắt tiếng
           </p>

@@ -41,16 +41,16 @@ export function LoginScreen({
   onToastDismiss,
 }: LoginScreenProps) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#F4FAFB] text-[#082F49]">
-      <div className="absolute inset-x-0 top-0 h-[560px] bg-[linear-gradient(180deg,#E6FAF7_0%,#F4FAFB_76%,rgba(244,250,251,0)_100%)]" aria-hidden />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(15,118,110,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(15,118,110,0.055)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(180deg,black,transparent_72%)]" aria-hidden />
+    <main className="zync-auth-shell relative min-h-screen overflow-hidden text-text-primary">
+      <div className="absolute inset-x-0 top-0 h-[560px] bg-[linear-gradient(180deg,var(--accent-soft)_0%,var(--bg-primary)_76%,transparent_100%)]" aria-hidden />
+      <div className="absolute inset-0 bg-[linear-gradient(var(--accent-soft)_1px,transparent_1px),linear-gradient(90deg,var(--accent-soft)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(180deg,black,transparent_72%)]" aria-hidden />
 
       <header className="relative z-20">
         <div className="zync-page-container flex items-center justify-between py-5">
           <Link href="/" aria-label="Về trang chủ ZYNC">
             <ZyncLogo size="sm" />
           </Link>
-          <Link href="/" className="rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-sm font-bold text-slate-600 shadow-sm backdrop-blur transition hover:border-teal-200 hover:text-[#0F766E]">
+          <Link href="/" className="rounded-full border border-border-soft bg-[var(--surface-glass)] px-4 py-2 text-sm font-bold text-text-secondary shadow-sm backdrop-blur transition hover:border-border-strong hover:text-accent">
             Trang chủ
           </Link>
         </div>

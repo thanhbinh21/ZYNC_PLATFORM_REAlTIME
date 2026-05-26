@@ -31,7 +31,7 @@ export function SocialButton({ label, onClick, disabled = false }: SocialButtonP
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-black text-[#082F49] shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:text-[#0F766E] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-card)] border border-border-soft bg-[var(--surface)] px-3 text-sm font-black text-text-primary shadow-sm transition hover:-translate-y-0.5 hover:border-border-strong hover:text-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
     >
       <span className="text-text-secondary">
         <Icon />

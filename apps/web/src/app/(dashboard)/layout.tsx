@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
@@ -41,7 +41,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Profile state synced from module-level store
   const [profile, setProfile] = useState(profileStore.profile);
+  const [isLoading, setIsLoading] = useState(profileStore.isLoading);
   const [isReady, setIsReady] = useState(profileStore.isReady);
+  const [authError, setAuthError] = useState<string | null>(profileStore.error);
+  const [authPhase, setAuthPhase] = useState<'checking' | 'unauthenticated' | 'ready' | 'error'>('checking');
+  const [isHydrated, setIsHydrated] = useState(false);
+  const onboardingRedirectedRef = useRef(false);
 
   // Load appearance settings
   useEffect(() => {
@@ -68,36 +73,57 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     document.documentElement.dataset['zyncMessageSize'] = appearanceSettings.messageFontSize;
   }, [appearanceSettings.messageFontSize, appearanceSettings.theme]);
 
-  // Auth guard: load profile once via module store (persists across page navigations)
   useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Auth guard: hydrate, load profile, redirect unauthenticated, show fallback on errors
+  useEffect(() => {
+    if (!isHydrated) {
+      setAuthPhase('checking');
+      return;
+    }
+
     const token = getAccessToken();
     if (!token) {
       clearAccessToken();
-      profileStore.setProfile(null);
-      setProfile(null);
-      setIsReady(true);
+      profileStore.reset();
+      setAuthError(null);
+      setAuthPhase('unauthenticated');
       router.replace('/auth');
       return;
     }
 
-    if (profileStore.isReady || profileStore.isLoading) {
-      setProfile(profileStore.profile);
-      setIsReady(profileStore.isReady);
+    if (!isReady && !isLoading) {
+      profileStore.load();
+    }
+
+    if (isLoading || !isReady) {
+      setAuthPhase('checking');
       return;
     }
-    profileStore.load().then(() => {
-      setProfile(profileStore.profile);
-      setIsReady(profileStore.isReady);
-      if (profileStore.profile && !profileStore.profile.onboardingCompleted) {
-        router.push('/onboarding');
-      }
-    });
-  }, [router]);
+
+    if (profile) {
+      setAuthError(null);
+      setAuthPhase('ready');
+      return;
+    }
+
+    setAuthPhase('error');
+    setAuthError(authError ?? 'Không thể tải hồ sơ người dùng. Vui lòng thử lại.');
+  }, [authError, isHydrated, isLoading, isReady, profile, router]);
+
+  useEffect(() => {
+    if (authPhase !== 'ready' || !profile || profile.onboardingCompleted) return;
+    if (onboardingRedirectedRef.current) return;
+    onboardingRedirectedRef.current = true;
+    router.push('/onboarding');
+  }, [authPhase, profile, router]);
 
   // Initialize socket at layout level (singleton) – chat page will re-use it.
   // Chỉ init khi profile đã ready để đảm bảo user đã đăng nhập.
   useEffect(() => {
-    if (!isReady || !profileStore.profile) return;
+    if (!isReady || !profile) return;
 
     const token = getAccessToken();
     if (!token) return;
@@ -107,13 +133,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } catch {
       // Socket init sẽ throw nếu chưa login – ignore trong layout.
     }
-  }, [isReady]);
+  }, [isReady, profile]);
 
   // Subscribe to store updates (e.g. after login from another tab)
   useEffect(() => {
-    const unsub = subscribeToProfileStore((p, _loading, ready) => {
+    const unsub = subscribeToProfileStore((p, loading, ready, error) => {
       setProfile(p);
+      setIsLoading(loading);
       setIsReady(ready);
+      setAuthError(error);
     });
     return unsub;
   }, []);
@@ -216,6 +244,50 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/home');
   };
 
+  const handleRetryAuth = () => {
+    setAuthPhase('checking');
+    setAuthError(null);
+    profileStore.load(true);
+  };
+
+  const handleGoAuth = () => {
+    clearAccessToken();
+    profileStore.reset();
+    setAuthPhase('unauthenticated');
+    router.replace('/auth');
+  };
+
+  if (authPhase === 'unauthenticated') {
+    return (
+      <PageLoading
+        mode="page"
+        message="Đang chuyển hướng đến đăng nhập..."
+        description="Bạn cần đăng nhập để tiếp tục."
+      />
+    );
+  }
+
+  if (authPhase === 'error') {
+    return (
+      <main className="zync-page-shell flex min-h-screen items-center justify-center px-4 py-8 text-text-primary">
+        <div className="zync-soft-card zync-soft-card-elevated w-full max-w-md rounded-[2rem] p-6 text-center">
+          <h1 className="font-ui-title text-xl text-text-primary">Không thể tải hồ sơ</h1>
+          <p className="font-ui-content mt-2 text-sm text-text-secondary">
+            {authError ?? 'Không thể tải hồ sơ người dùng. Vui lòng thử lại.'}
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button type="button" onClick={handleRetryAuth} className="zync-soft-button inline-flex justify-center">
+              Thử lại
+            </button>
+            <button type="button" onClick={handleGoAuth} className="zync-soft-button-secondary inline-flex justify-center">
+              Về đăng nhập
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   // Update mock data user info from profile
   const headerData = {
     ...DASHBOARD_HOME_MOCK_DATA,
@@ -243,7 +315,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={aiAssistant.openBox}
-                className="relative hidden md:inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary hover:bg-accent/10 transition"
+                className="relative hidden h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary transition hover:bg-[var(--accent-soft)] hover:text-text-primary md:inline-flex"
                 title="Zync AI Assistant"
                 aria-label="Mở AI Assistant"
               >
@@ -261,8 +333,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
         </Suspense>
 
-        <div className="flex-1 overflow-hidden px-2 pb-[76px] md:pb-2 sm:px-4 sm:pb-4">
-          <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[2rem] bg-[var(--surface-card)]">
+        <div className="flex-1 overflow-hidden px-2 pb-[76px] sm:px-4 sm:pb-4 md:pb-2">
+          <div className="zync-dashboard-frame flex h-full flex-1 flex-col overflow-hidden">
             {children}
           </div>
         </div>

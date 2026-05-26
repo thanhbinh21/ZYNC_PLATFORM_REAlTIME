@@ -131,10 +131,10 @@ export function DashboardHeader({
                 <a
                   key={item.id}
                   href={getNavHref(item.id)}
-                  className={`rounded-full px-4 py-2 text-[0.95rem] font-ui-brand transition ${
+                  className={`zync-tab-pill px-4 py-2 text-[0.95rem] font-ui-brand ${
                     activeNavId === item.id
-                      ? "bg-accent text-[var(--bg-primary)] shadow-sm font-ui-title"
-                      : "border border-border bg-[var(--surface-glass)] text-text-primary hover:bg-[var(--surface-glass-strong)]"
+                      ? "zync-tab-pill-active font-ui-title"
+                      : "text-text-primary"
                   }`}
                 >
                   <span className="flex items-center gap-2">

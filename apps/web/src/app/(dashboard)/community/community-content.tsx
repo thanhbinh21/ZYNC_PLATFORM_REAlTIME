@@ -315,7 +315,7 @@ function PostCard({ post, onLike, onBookmark, onComment, onFavorite, onAuthorCli
   return (
     <article
       id={`community-post-${post._id}`}
-      className="group relative flex flex-col rounded-[1.4rem] border border-border bg-bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-accent/40"
+      className="group relative flex flex-col rounded-[var(--radius-card)] border border-border-soft bg-[var(--surface)] p-4 shadow-soft transition-all hover:border-border-strong hover:shadow-soft-hover sm:p-5"
       onClick={() => onComment(post)}
     >
       <div className="flex items-start gap-3">
@@ -624,7 +624,7 @@ export default function CommunityContent() {
       <div className="flex h-full w-full overflow-hidden">
         {/* Feed */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="border-b border-border-light px-4 py-4 sm:px-6">
+          <div className="zync-page-header">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.18em] text-text-tertiary">Khám phá</p>
@@ -640,13 +640,13 @@ export default function CommunityContent() {
               </button>
             </div>
 
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+            <div className="zync-page-tabs">
               {FEED_TABS.map(({ id, label, Icon }) => (
                 <button
                   key={id}
                   onClick={() => handleTabChange(id)}
-                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                    activeTab === id ? 'bg-accent text-[var(--bg-primary)] shadow-sm' : 'border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary'
+                  className={`zync-tab-pill ${
+                    activeTab === id ? 'zync-tab-pill-active' : ''
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -656,7 +656,7 @@ export default function CommunityContent() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          <div className="zync-dashboard-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             {loading ? (
               <div className="space-y-4">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -689,7 +689,7 @@ export default function CommunityContent() {
         </div>
 
         {/* Sidebar */}
-        <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border-light p-4 lg:flex lg:flex-col">
+        <aside className="zync-dashboard-scroll hidden w-72 shrink-0 overflow-y-auto border-l border-border-soft bg-[var(--surface-muted)]/35 p-4 lg:flex lg:flex-col">
           <div className="mb-4">
             <h3 className="font-ui-title flex items-center gap-2 text-base text-text-primary">
               <TrendingUp className="h-4 w-4 text-accent" />
