@@ -149,6 +149,7 @@ npm run dev:web
 - [x] Thêm hiệu ứng loading mở trang cho landing `/` và auth `/auth` (bao gồm luồng đăng nhập/đăng ký) <!-- done: 05/04/2026 -->
 - [x] Chuẩn hóa hiệu ứng loading chuyển trang bằng `PageLoading` dùng chung (Web) <!-- done: 07/05/2026 -->
 - [x] Sửa lỗi nháy trắng (white flash) khi tải trang ở Dark mode (Web) bằng inline script apply theme sớm <!-- done: 11/05/2026 -->
+- [x] Fix lỗi loading first-load Web đồng bộ theme sáng, tránh treo khi vào lần đầu <!-- done: 26/05/2026 -->
 
 ### Phase 2 – Authentication & User Management (Module F1–F4)
 - [x] POST /api/auth/register – gửi OTP qua Twilio/Email <!-- done: 15/03/2026 -->

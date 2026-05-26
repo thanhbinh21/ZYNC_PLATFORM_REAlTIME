@@ -26,6 +26,8 @@ export interface PageLoadingProps {
   minDurationMs?: number;
   mode?: 'page' | 'panel';
   className?: string;
+  message?: string;
+  description?: string;
   /** Render a specific page skeleton instead of the default generic card */
   variant?: PageLoadingVariant;
 }
@@ -56,6 +58,8 @@ export function PageLoading({
   minDurationMs,
   mode = 'page',
   className,
+  message,
+  description,
   variant = 'generic',
 }: PageLoadingProps) {
   const [visible, setVisible] = useState(!minDurationMs);
@@ -72,8 +76,8 @@ export function PageLoading({
   if (variant !== 'generic') {
     const containerClassName = [
       mode === 'panel'
-        ? 'flex h-full w-full overflow-hidden bg-bg-primary'
-        : 'flex min-h-screen w-full overflow-hidden bg-bg-primary',
+        ? 'flex h-full w-full overflow-hidden bg-[var(--loader-bg)]'
+        : 'flex min-h-screen w-full overflow-hidden bg-[var(--loader-bg)]',
       className,
     ]
       .filter(Boolean)
@@ -89,8 +93,8 @@ export function PageLoading({
   /* Generic loader card */
   const containerClassName = [
     mode === 'panel'
-      ? 'flex h-full w-full items-center justify-center px-4 text-text-primary bg-[var(--surface-card)]'
-      : 'flex min-h-screen w-full items-center justify-center px-4 text-text-primary bg-[var(--bg-primary)]',
+      ? 'flex h-full w-full items-center justify-center px-4 text-text-primary bg-[var(--loader-card)]'
+      : 'flex min-h-screen w-full items-center justify-center px-4 text-text-primary bg-[var(--loader-bg)]',
     className,
   ]
     .filter(Boolean)
@@ -101,7 +105,10 @@ export function PageLoading({
       {mode === 'panel' ? (
         <PageSkeleton className="max-w-md" rows={3} />
       ) : (
-        <AppLoader message="Đang tải ZYNC..." description="Chuẩn bị dữ liệu và giao diện." />
+        <AppLoader
+          message={message ?? 'Đang tải ZYNC...'}
+          description={description ?? 'Chuẩn bị dữ liệu và giao diện.'}
+        />
       )}
     </div>
   );

@@ -13,15 +13,15 @@ const spinnerSizeClass: Record<LoaderSize, string> = {
 };
 
 const spinnerTrackClass: Record<LoaderTone, string> = {
-  teal: 'border-[#1ED8B5]/20 border-t-[#1ED8B5] border-r-[#0F766E]',
-  light: 'border-white/25 border-t-white border-r-[#A7FFF0]',
-  muted: 'border-slate-300/40 border-t-[#0F766E] border-r-[#1ED8B5]',
+  teal: 'border-[var(--loader-track)] border-t-[var(--loader-ring)] border-r-[var(--loader-ring-strong)]',
+  light: 'border-[var(--loader-track-strong)] border-t-[var(--loader-ring-strong)] border-r-[var(--loader-ring)]',
+  muted: 'border-[var(--loader-track)] border-t-[var(--loader-dot-muted)] border-r-[var(--loader-ring)]',
 };
 
 const dotClass: Record<LoaderTone, string> = {
-  teal: 'bg-[#1ED8B5]',
-  light: 'bg-[#A7FFF0]',
-  muted: 'bg-[#0F766E]',
+  teal: 'bg-[var(--loader-dot)]',
+  light: 'bg-[var(--loader-ring-strong)]',
+  muted: 'bg-[var(--loader-dot-muted)]',
 };
 
 interface ButtonSpinnerProps {
@@ -71,7 +71,9 @@ export function AppLoader({
             spinnerTrackClass[tone],
           )}
         />
-        <span className={clsx('absolute rounded-full bg-[#082F49]/5', size === 'lg' ? 'h-7 w-7' : 'h-4 w-4')} />
+        <span
+          className={clsx('absolute rounded-full bg-[var(--loader-track)]', size === 'lg' ? 'h-7 w-7' : 'h-4 w-4')}
+        />
       </span>
 
       <span className="flex items-center justify-center gap-1.5" aria-hidden>
@@ -85,12 +87,12 @@ export function AppLoader({
       </span>
 
       {message ? (
-        <span className={clsx('text-center font-ui-title text-sm font-bold', tone === 'light' ? 'text-white' : 'text-[#082F49]')}>
+        <span className="text-center font-ui-title text-sm font-bold text-text-primary">
           {message}
         </span>
       ) : null}
       {description ? (
-        <span className={clsx('max-w-[18rem] text-center text-xs leading-5', tone === 'light' ? 'text-teal-50/75' : 'text-slate-500')}>
+        <span className="max-w-[18rem] text-center text-xs leading-5 text-text-tertiary">
           {description}
         </span>
       ) : null}
@@ -117,7 +119,7 @@ export function AppLoader({
   return (
     <div
       className={clsx(
-        'flex w-full max-w-[21rem] flex-col items-center justify-center gap-4 rounded-[1.7rem] border border-[#1ED8B5]/20 bg-[#06372F] px-8 py-8 shadow-[0_34px_90px_-50px_rgba(6,55,47,0.9)]',
+        'flex w-full max-w-[21rem] flex-col items-center justify-center gap-4 rounded-[1.7rem] border border-[var(--loader-card-border)] bg-[var(--loader-card)] px-8 py-8 shadow-[var(--loader-shadow)]',
         className,
       )}
       role="status"
@@ -146,7 +148,7 @@ export function LoadingOverlay({
 
   return (
     <div
-      className={clsx('fixed inset-0 z-[200] flex items-center justify-center bg-[#041F1A]/55 p-4 backdrop-blur-sm', className)}
+      className={clsx('fixed inset-0 z-[200] flex items-center justify-center bg-[var(--loader-overlay)] p-4 backdrop-blur-sm', className)}
       aria-modal="true"
       role="dialog"
     >

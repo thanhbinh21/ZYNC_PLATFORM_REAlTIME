@@ -54,7 +54,7 @@ function ProfilePageContent() {
   }, []);
 
   useEffect(() => {
-    const unsub = subscribeToProfileStore((nextProfile, isLoading, isReady) => {
+    const unsub = subscribeToProfileStore((nextProfile, isLoading, isReady, _error) => {
       setProfile(nextProfile);
       setLoading(isLoading || !isReady);
     });
