@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import {
   AlertTriangle,
@@ -116,14 +117,33 @@ interface RecentActivityItemProps {
 }
 
 export function RecentActivityItem({ item, onClick }: RecentActivityItemProps) {
+  const [imageError, setImageError] = useState(false);
+
+  const avatarUrl = item.avatarUrl || (item as any).avatar || (item as any).photoUrl || (item as any).imageUrl || (item as any).profile?.avatarUrl;
+  const showImage = avatarUrl && !imageError;
+  const hasImage = Boolean(avatarUrl && /^(https?:\/\/|\/)/.test(avatarUrl));
+
   return (
     <button
       type="button"
       onClick={onClick}
       className="zync-list-item grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[1.2rem] px-2.5 py-2.5 text-left active:scale-[0.99]"
     >
-      <span className="zync-icon-block relative h-11 w-11 rounded-2xl text-sm font-bold">
-        {item.icon ? <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" /> : item.initials}
+      <span className="zync-icon-block relative h-11 w-11 rounded-2xl text-sm font-bold flex items-center justify-center overflow-hidden border border-border-light">
+        {showImage && hasImage ? (
+          <Image
+            src={avatarUrl}
+            alt={item.title}
+            width={44}
+            height={44}
+            className="h-full w-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : item.icon ? (
+          <DashboardIcon name={item.icon} className="h-[18px] w-[18px]" />
+        ) : (
+          item.initials
+        )}
         {item.isUnread && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-bg-card bg-accent" />}
       </span>
 

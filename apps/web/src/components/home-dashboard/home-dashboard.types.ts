@@ -57,6 +57,7 @@ export interface DashboardActivityItem {
   isUnread?: boolean;
   icon?: DashboardIconName;
   conversationId?: string;
+  avatarUrl?: string;
 }
 
 /**

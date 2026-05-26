@@ -243,11 +243,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={aiAssistant.openBox}
-                className="zync-soft-badge relative hidden md:flex h-10 w-10 items-center justify-center p-0 text-accent hover:bg-accent/10"
+                className="relative hidden md:inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-[var(--surface-glass)] text-text-secondary hover:text-text-primary hover:bg-accent/10 transition"
                 title="Zync AI Assistant"
                 aria-label="Mở AI Assistant"
               >
-                <Sparkles className="h-5 w-5" />
+                <Sparkles className="h-4 w-4 text-accent" />
                 {aiAssistant.unreadDigestCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                     {aiAssistant.unreadDigestCount > 9 ? '9+' : aiAssistant.unreadDigestCount}

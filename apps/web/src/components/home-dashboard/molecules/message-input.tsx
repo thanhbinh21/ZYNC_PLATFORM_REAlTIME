@@ -449,23 +449,23 @@ export function MessageInput({
     <div className="chat-input-container">
       {/* Reply Banner */}
       {replyingTo && (
-        <div className="mb-2 mx-3 flex items-center justify-between rounded-lg border border-accent/20 bg-accent/5 px-4 py-2">
+        <div className="chat-reply-banner">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent/10">
-              <svg className="h-3 w-3 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-accent-light">
+              <svg className="h-3 w-3 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 17 4 12 9 7"/>
                 <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
               </svg>
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Đang trả lời</p>
-              <p className="truncate text-[13px] text-[#65676b]">{replyingTo.contentPreview || '[Tin nhắn]'}</p>
+              <p className="truncate text-[13px] text-text-secondary">{replyingTo.contentPreview || '[Tin nhắn]'}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onCancelReply}
-            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[#929292] hover:bg-[#f0f2f5] hover:text-[#050505] transition-all"
+            className="chat-reply-banner-cancel"
             title="Hủy trả lời"
           >
             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -478,13 +478,13 @@ export function MessageInput({
 
       {/* Emoji Picker */}
       {isEmojiPickerOpen && (
-        <div className="mb-2 mx-3 flex flex-wrap gap-1.5 rounded-2xl bg-[#ffffff] border border-[#e4e6eb] p-3 shadow-lg">
+        <div className="chat-quick-emoji-bar">
           {QUICK_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               type="button"
               onClick={() => handleSendEmoji(emoji)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-xl hover:bg-[#f0f2f5] hover:scale-110 transition-all active:scale-95"
+              className="chat-input-action-btn w-10 h-10 text-xl hover:bg-bg-hover hover:text-accent"
             >
               {emoji}
             </button>
@@ -526,7 +526,7 @@ export function MessageInput({
           <button
             onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
             disabled={disabled || isLoading}
-            className={`chat-input-action-btn ${isEmojiPickerOpen ? 'bg-[#f0f2f5] text-accent' : ''}`}
+            className={`chat-input-action-btn ${isEmojiPickerOpen ? 'active' : ''}`}
             title="Biểu tượng cảm xúc"
           >
             <EmojiIcon className="w-5 h-5" />
@@ -594,7 +594,7 @@ export function MessageInput({
               className={`max-w-[200px] rounded-xl shadow-sm ${uploading ? 'opacity-50' : ''}`}
             />
           ) : (
-            <div className={`inline-flex max-w-xs items-center gap-2 rounded-xl border border-[#e4e6eb] bg-[#f0f2f5] px-4 py-2.5 text-sm text-[#050505] shadow-sm ${uploading ? 'opacity-50' : ''}`}>
+            <div className={`inline-flex max-w-xs items-center gap-2 rounded-2xl border border-border-light bg-surface-muted px-4 py-2.5 text-sm text-text-primary shadow-sm ${uploading ? 'opacity-50' : ''}`}>
               <svg className="h-5 w-5 text-accent flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
@@ -620,7 +620,7 @@ export function MessageInput({
               setUploadedMedia(null);
             }}
             disabled={Boolean(queuedMediaSend)}
-            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#65676b] text-white shadow-md transition-all hover:bg-[#050505] hover:scale-110 disabled:opacity-50"
+            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--text-tertiary)] text-[var(--bg-primary)] shadow-md transition-all hover:bg-[var(--text-secondary)] hover:scale-110 disabled:opacity-50"
             title="Xóa tệp"
           >
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

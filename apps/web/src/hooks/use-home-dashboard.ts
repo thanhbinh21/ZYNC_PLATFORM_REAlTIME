@@ -1634,6 +1634,8 @@ export function useHomeDashboard() {
 
           if (conv.lastMessage && conv.lastMessage?.content) {
             const sender = conv.users?.find((u: any) => u._id === conv.lastMessage?.senderId);
+            const otherUser = conv.users?.find((u: any) => u._id !== user._id);
+            const avatarUrl = conv.type === 'group' ? conv.avatarUrl : otherUser?.avatarUrl;
 
             let title = sender?.displayName || 'Người dùng';
             let messageStr = conv.lastMessage.content || 'Tin nhắn media';
@@ -1644,12 +1646,11 @@ export function useHomeDashboard() {
             }
 
             let initials = 'U';
-            if (sender?.displayName) {
-              const parts = sender.displayName.split(' ');
-              initials = parts.length > 1
-                ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-                : parts[0].substring(0, 2).toUpperCase();
-            }
+            const nameToInitials = conv.type === 'group' ? (conv.name || 'Nhóm') : (otherUser?.displayName || 'Người dùng');
+            const parts = nameToInitials.split(' ');
+            initials = parts.length > 1
+              ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+              : parts[0].substring(0, 2).toUpperCase();
 
             const tones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
 
@@ -1660,6 +1661,7 @@ export function useHomeDashboard() {
               message: messageStr,
               timeLabel: new Date(conv.lastMessage.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
               initials,
+              avatarUrl,
               toneClass: tones[index % tones.length],
               isUnread: unreadForMe > 0,
             });
