@@ -208,7 +208,18 @@ export default function ChatScreen() {
         api.get('/notifications/preferences'),
         loadAllFriends(),
       ]);
-      const items = Array.isArray(res.data?.data) ? (res.data.data as Conversation[]) : [];
+      const rawItems = Array.isArray(res.data?.data) ? (res.data.data as Conversation[]) : [];
+      
+      const items = rawItems.map((conv) => {
+        if (conv.type !== 'group') {
+          const otherUser = conv.users?.find((u) => u._id !== userId);
+          if (otherUser?.avatarUrl) {
+            return { ...conv, avatarUrl: otherUser.avatarUrl };
+          }
+        }
+        return conv;
+      });
+
       const prefs = (prefRes.data?.data || {}) as NotificationPreferences;
       const pinnedIds = Array.isArray(prefs.pinnedConversations) ? prefs.pinnedConversations : [];
 
@@ -222,7 +233,7 @@ export default function ChatScreen() {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [joinAllConversations]);
+  }, [joinAllConversations, userId]);
 
   // Load conversations on mount + when auth changes
   useEffect(() => {

@@ -592,6 +592,7 @@ function VideoMessage({
   onOpenMedia: (url?: string) => Promise<void>;
 }) {
   const [started, setStarted] = useState(false);
+  const videoRef = useRef<any>(null);
   const player = useVideoPlayer(mediaUrl || null, (current: { pause: () => void }) => {
     current.pause();
   });
@@ -611,6 +612,7 @@ function VideoMessage({
   return (
     <View style={bubbleStyles.videoContainer}>
       <VideoView
+        ref={videoRef}
         style={bubbleStyles.mediaVideo}
         player={player}
         nativeControls
@@ -631,7 +633,9 @@ function VideoMessage({
       )}
       <TouchableOpacity
         onPress={() => {
-          void onOpenMedia(mediaUrl);
+          if (videoRef.current) {
+            videoRef.current.enterFullscreen();
+          }
         }}
         style={[bubbleStyles.videoOpenBtn, isMe && bubbleStyles.videoOpenBtnMe]}
       >
@@ -669,6 +673,41 @@ const typingStyles = StyleSheet.create({
   },
 });
 
+function ArchiveVideoItem({ mediaUrl }: { mediaUrl?: string }) {
+  const videoRef = useRef<any>(null);
+  const player = useVideoPlayer(mediaUrl || null, (current: { pause: () => void }) => {
+    current.pause();
+  });
+
+  return (
+    <View style={{ flex: 1, position: 'relative', overflow: 'hidden', borderRadius: 8, }}>
+      <VideoView
+        ref={videoRef}
+        style={{ width: '100%', height: '100%', borderRadius: 8, }}
+        player={player}
+        nativeControls={false}
+        contentFit="cover"
+        fullscreenOptions={{ enable: true }}
+        surfaceType="textureView"
+        onFullscreenExit={() => {
+          player.pause();
+        }}
+      />
+      <TouchableOpacity 
+        style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]} 
+        onPress={() => {
+          if (videoRef.current) {
+            player.play();
+            videoRef.current.enterFullscreen();
+          }
+        }}
+      >
+        <Ionicons name="play" size={24} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function ChatRoomScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -694,6 +733,8 @@ export default function ChatRoomScreen() {
   const [pendingMediaDraft, setPendingMediaDraft] = useState<PendingMediaDraft | null>(null);
   const [pendingMediaSend, setPendingMediaSend] = useState<PendingMediaSend | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [selectedMediaMessage, setSelectedMediaMessage] = useState<Message | null>(null);
+  const [showMediaOverlay, setShowMediaOverlay] = useState(true);
   const [conversationName, setConversationName] = useState(name || 'Chat');
   const [conversationAvatarUrl, setConversationAvatarUrl] = useState<string | undefined>(
     avatarUrl && avatarUrl.length > 0 ? avatarUrl : undefined,
@@ -874,12 +915,13 @@ export default function ChatRoomScreen() {
         setConversationAvatarUrl(currentConversation.avatarUrl);
       }
 
+      const users = Array.isArray(currentConversation.users) ? currentConversation.users : [];
+      setGroupMembers(users);
+
       if (isGroupChat) {
-        setGroupMembers(Array.isArray(currentConversation.users) ? currentConversation.users : []);
         setGroupAdminIds(Array.isArray(currentConversation.adminIds) ? currentConversation.adminIds : []);
         setGroupCreatorId(currentConversation.createdBy || currentConversation.adminIds?.[0]);
       } else {
-        const users = Array.isArray(currentConversation.users) ? currentConversation.users : [];
         const otherUser = users.find(u => u._id !== userId);
         if (otherUser) {
           setTargetUserId(otherUser._id);
@@ -2397,7 +2439,7 @@ export default function ChatRoomScreen() {
                 )
               ) : message.type === 'image' ? (
                 message.mediaUrl ? (
-                  <Pressable onPress={() => void handleOpenMedia(message.mediaUrl)}>
+                  <Pressable onPress={() => { setSelectedMediaMessage(message); setShowMediaOverlay(true); }}>
                     <Image source={{ uri: message.mediaUrl }} style={bubbleStyles.mediaImage} resizeMode="cover" />
                   </Pressable>
                 ) : (
@@ -2961,13 +3003,15 @@ export default function ChatRoomScreen() {
                     <View style={styles.archiveMediaGrid}>
                       {allMediaItems.length === 0 && <Text style={styles.archiveEmptyText}>Chưa có ảnh/video.</Text>}
                       {allMediaItems.map((item) => (
-                        <TouchableOpacity key={item._id} style={styles.archiveMediaItem} onPress={() => handleOpenMedia(item.mediaUrl)}>
+                        <View key={item._id} style={styles.archiveMediaItem}>
                           {item.type === 'image' ? (
-                            <Image source={{ uri: item.mediaUrl }} style={styles.archiveMediaImage} resizeMode="cover" />
+                            <TouchableOpacity style={{ flex: 1 }} onPress={() => { setSelectedMediaMessage(item); setShowMediaOverlay(true); }}>
+                              <Image source={{ uri: item.mediaUrl }} style={styles.archiveMediaImage} resizeMode="cover" />
+                            </TouchableOpacity>
                           ) : (
-                            <View style={styles.archiveVideoPlaceholder}><Ionicons name="play" size={16} color="#d1fae5" /></View>
+                            <ArchiveVideoItem mediaUrl={item.mediaUrl} />
                           )}
-                        </TouchableOpacity>
+                        </View>
                       ))}
                     </View>
                   )}
@@ -3556,6 +3600,65 @@ export default function ChatRoomScreen() {
             }}
             onForward={handleForwardToConversation}
           />
+
+          {/* Media Fullscreen Modal */}
+          <Modal
+            visible={!!selectedMediaMessage}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setSelectedMediaMessage(null)}
+          >
+            <Pressable
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => setShowMediaOverlay(!showMediaOverlay)}
+            >
+              {selectedMediaMessage?.mediaUrl && (
+                <Image
+                  source={{ uri: selectedMediaMessage.mediaUrl }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="contain"
+                />
+              )}
+
+              {showMediaOverlay && selectedMediaMessage && (() => {
+                const sId = getSenderId(selectedMediaMessage);
+                const sTemp = groupMembers.find(u => u._id === sId);
+                const displayName = sId === userId ? (userInfo?.displayName || 'Tôi') : (sTemp?.displayName || getSenderName(selectedMediaMessage) || 'Người dùng');
+                const avatar = sId === userId ? (userInfo as any)?.avatarUrl : sTemp?.avatarUrl;
+
+                return (
+                  <>
+                    <TouchableOpacity
+                      style={{ position: 'absolute', top: Math.max(insets.top, 20), right: 20, zIndex: 10, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 24 }}
+                      onPress={(e) => { e.stopPropagation(); setSelectedMediaMessage(null); }}
+                    >
+                      <Ionicons name="close" size={28} color="#fff" />
+                    </TouchableOpacity>
+                    
+                    <View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 20), left: 0, right: 0, paddingHorizontal: 20, paddingVertical: 16, backgroundColor: 'rgba(0,0,0,0.5)', flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#334155', justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' }}>
+                        {avatar ? (
+                          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        ) : (
+                          <Text style={{ color: '#fff', fontSize: 18, fontFamily: 'BeVietnamPro_600SemiBold' }}>
+                            {displayName.charAt(0).toUpperCase() || '?'}
+                          </Text>
+                        )}
+                      </View>
+                      <View>
+                        <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'BeVietnamPro_600SemiBold' }}>
+                          {displayName}
+                        </Text>
+                        <Text style={{ color: '#94a3b8', fontSize: 13, fontFamily: 'BeVietnamPro_400Regular', marginTop: 2 }}>
+                          {formatTime(selectedMediaMessage.createdAt)}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                );
+              })()}
+            </Pressable>
+          </Modal>
 
         </KeyboardAvoidingView>
       </SafeAreaView>
