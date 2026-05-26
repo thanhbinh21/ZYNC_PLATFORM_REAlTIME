@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { AxiosError } from 'axios';
 import { apiClient } from '@/services/api';
 import { sendFriendRequest as apiSendFriendRequest } from '@/services/friends';
+import { showSystemToast } from '@/components/notifications/InAppNotificationToasts';
 
 export interface UserProfileSummary {
   _id: string;
@@ -49,6 +51,46 @@ interface UseNavigationFlowReturn {
 
   // Explore skills
   navigateToExploreWithSkills: (skills: string[]) => void;
+}
+
+type ApiErrorPayload = {
+  success?: boolean;
+  error?: string;
+  code?: string;
+};
+
+function resolveDirectMessageErrorMessage(err: unknown): string {
+  const axiosError = err as AxiosError<ApiErrorPayload>;
+  const status = axiosError.response?.status;
+  const payload = axiosError.response?.data;
+  const code = payload?.code;
+  const rawMessage = payload?.error;
+
+  if (code === 'DIRECT_MESSAGE_BLOCKED') {
+    return 'Không thể nhắn tin vì một trong hai tài khoản đã chặn người còn lại.';
+  }
+
+  if (code === 'DIRECT_MESSAGE_FRIENDS_ONLY') {
+    return 'Người này chỉ nhận tin nhắn từ bạn bè.';
+  }
+
+  if (code === 'DIRECT_MESSAGE_USER_DEACTIVATED') {
+    return 'Không thể nhắn tin vì tài khoản này đã ngừng hoạt động.';
+  }
+
+  if (status === 429) {
+    return 'Bạn đang mở quá nhiều cuộc trò chuyện với người chưa kết bạn. Vui lòng thử lại sau.';
+  }
+
+  if (status === 404) {
+    return 'Không tìm thấy người dùng này.';
+  }
+
+  if (status === 400 && rawMessage?.toLowerCase().includes('yourself')) {
+    return 'Bạn không thể tự nhắn tin cho chính mình.';
+  }
+
+  return rawMessage || 'Không thể mở cuộc trò chuyện. Vui lòng thử lại.';
 }
 
 /**
@@ -108,6 +150,13 @@ export function useNavigationFlow(): UseNavigationFlowReturn {
       return null;
     } catch (err) {
       console.error('[useNavigationFlow] navigateToChat failed:', err);
+      showSystemToast({
+        id: 'direct-message-error',
+        type: 'new_message',
+        title: 'Không thể nhắn tin',
+        body: resolveDirectMessageErrorMessage(err),
+        variant: 'error',
+      });
       return null;
     } finally {
       setChatLoading(false);

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { apiClient } from '@/services/api';
+import { showSystemToast } from '@/components/notifications/InAppNotificationToasts';
 import { fetchFriends, type FriendUser } from '@/services/friends';
 import { getAccessToken } from '@/utils/auth-token';
 import {
@@ -176,6 +178,35 @@ interface ConversationSearchTarget {
   avatar?: string;
   avatarUrl?: string;
   conversationId?: string;
+}
+
+type ApiErrorPayload = {
+  error?: string;
+  code?: string;
+};
+
+function resolveDirectConversationErrorMessage(err: unknown): string {
+  const axiosError = err as AxiosError<ApiErrorPayload>;
+  const status = axiosError.response?.status;
+  const payload = axiosError.response?.data;
+
+  if (payload?.code === 'DIRECT_MESSAGE_BLOCKED') {
+    return 'Không thể nhắn tin vì một trong hai tài khoản đã chặn người còn lại.';
+  }
+
+  if (payload?.code === 'DIRECT_MESSAGE_FRIENDS_ONLY') {
+    return 'Người này chỉ nhận tin nhắn từ bạn bè.';
+  }
+
+  if (payload?.code === 'DIRECT_MESSAGE_USER_DEACTIVATED') {
+    return 'Không thể nhắn tin vì tài khoản này đã ngừng hoạt động.';
+  }
+
+  if (status === 429) {
+    return 'Bạn đang mở quá nhiều cuộc trò chuyện với người chưa kết bạn. Vui lòng thử lại sau.';
+  }
+
+  return payload?.error || 'Không thể mở cuộc trò chuyện. Vui lòng thử lại.';
 }
 
 function buildMessagePreview(message: Pick<Message, 'content' | 'type'>): string {
@@ -2234,9 +2265,22 @@ export function useHomeDashboard() {
       return;
     }
 
-    const response = await apiClient.post('/api/conversations/direct', { targetUserId: target.id });
-    const directConversation = response.data?.data as Conversation | undefined;
-    if (!directConversation?._id) {
+    let directConversation: Conversation | undefined;
+    try {
+      const response = await apiClient.post('/api/conversations/direct', { targetUserId: target.id });
+      directConversation = response.data?.data as Conversation | undefined;
+      if (!directConversation?._id) {
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to open direct conversation', error);
+      showSystemToast({
+        id: 'direct-message-error',
+        type: 'new_message',
+        title: 'Không thể nhắn tin',
+        body: resolveDirectConversationErrorMessage(error),
+        variant: 'error',
+      });
       return;
     }
 

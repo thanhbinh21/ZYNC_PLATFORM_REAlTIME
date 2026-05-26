@@ -96,10 +96,11 @@ export function HomeDashboardSettingsPanel() {
       settings.toastNotifications,
       settings.allowSearchProfile,
       settings.allowFriendRequest,
+      settings.allowMessagesFrom === 'everyone',
       settings.showOnlineStatus,
     ].filter(Boolean).length;
-    return `${enabled}/4 tùy chọn đang bật`;
-  }, [settings.allowFriendRequest, settings.allowSearchProfile, settings.showOnlineStatus, settings.toastNotifications]);
+    return `${enabled}/5 tùy chọn đang bật`;
+  }, [settings.allowFriendRequest, settings.allowMessagesFrom, settings.allowSearchProfile, settings.showOnlineStatus, settings.toastNotifications]);
 
   return (
     <section className="mt-5 space-y-5">
@@ -141,6 +142,14 @@ export function HomeDashboardSettingsPanel() {
             checked={settings.allowFriendRequest}
             disabled={isLoading}
             onChange={(value) => void applySettings({ allowFriendRequest: value })}
+          />
+
+          <SettingSwitch
+            label="Cho phép người lạ nhắn tin"
+            description="Tắt tùy chọn này để chỉ bạn bè có thể mở hội thoại 1-1 với bạn."
+            checked={settings.allowMessagesFrom === 'everyone'}
+            disabled={isLoading}
+            onChange={(value) => void applySettings({ allowMessagesFrom: value ? 'everyone' : 'friends_only' })}
           />
 
           <SettingSwitch

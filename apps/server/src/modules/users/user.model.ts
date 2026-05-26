@@ -37,7 +37,9 @@ export interface IUser extends Document {
   toastNotifications: boolean;
   allowSearchProfile: boolean;
   allowFriendRequest: boolean;
+  allowMessagesFrom: 'everyone' | 'friends_only';
   showOnlineStatus: boolean;
+  isDeactivated: boolean;
   isOnline: boolean;
   lastSeenAt?: Date | null;
 }
@@ -75,7 +77,9 @@ const userSchema = new Schema<IUser>(
     toastNotifications: { type: Boolean, default: true },
     allowSearchProfile: { type: Boolean, default: true },
     allowFriendRequest: { type: Boolean, default: true },
+    allowMessagesFrom: { type: String, enum: ['everyone', 'friends_only'], default: 'everyone' },
     showOnlineStatus: { type: Boolean, default: true },
+    isDeactivated: { type: Boolean, default: false },
     isOnline: { type: Boolean, default: false },
     lastSeenAt: { type: Date, default: null },
   },
