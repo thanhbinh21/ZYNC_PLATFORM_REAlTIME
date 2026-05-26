@@ -1597,6 +1597,7 @@ interface HomeDashboardChatPanelProps {
   onDisbandGroup?: (groupId: string) => Promise<void>;
   onLeaveGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
+  initialCreateGroupOpen?: boolean;
   onLoadMore?: () => Promise<void>;
   chatPanelProps?: Partial<ChatPanelProps>;
 }
@@ -2056,6 +2057,7 @@ export function HomeDashboardChatPanel({
   onDisbandGroup,
   onLeaveGroup,
   isCreatingGroup = false,
+  initialCreateGroupOpen = false,
   onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
@@ -2223,12 +2225,22 @@ export function HomeDashboardChatPanel({
     });
   };
 
-  const openCreateGroupModal = () => {
+  const openCreateGroupModal = useCallback(() => {
     setGroupName('');
     setGroupQuery('');
     setSelectedFriendIds([]);
     setIsCreateGroupOpen(true);
-  };
+  }, []);
+
+  const initialCreateGroupOpenRef = useRef(false);
+  useEffect(() => {
+    if (!initialCreateGroupOpen || initialCreateGroupOpenRef.current) {
+      return;
+    }
+
+    initialCreateGroupOpenRef.current = true;
+    openCreateGroupModal();
+  }, [initialCreateGroupOpen, openCreateGroupModal]);
 
   const handleCreateGroup = async () => {
     if (!onCreateGroup) {

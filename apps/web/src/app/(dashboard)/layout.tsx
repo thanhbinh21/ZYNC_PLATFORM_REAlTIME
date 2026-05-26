@@ -14,7 +14,7 @@ import { useLoginForm } from '@/hooks/use-login-form';
 import { profileStore, subscribeToProfileStore } from '@/stores/profile-store';
 import type { Notification } from '@/services/notifications';
 import { MediaViewerProvider } from '@/context/media-viewer-context';
-import { getAccessToken } from '@/utils/auth-token';
+import { clearAccessToken, getAccessToken } from '@/utils/auth-token';
 import { getSocket } from '@/services/socket';
 import { useAiAssistant } from '@/hooks/use-ai-assistant';
 import { AiAssistantBox } from '@/components/ai-assistant/ai-assistant-box';
@@ -70,6 +70,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth guard: load profile once via module store (persists across page navigations)
   useEffect(() => {
+    const token = getAccessToken();
+    if (!token) {
+      clearAccessToken();
+      profileStore.setProfile(null);
+      setProfile(null);
+      setIsReady(true);
+      router.replace('/auth');
+      return;
+    }
+
     if (profileStore.isReady || profileStore.isLoading) {
       setProfile(profileStore.profile);
       setIsReady(profileStore.isReady);
@@ -78,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     profileStore.load().then(() => {
       setProfile(profileStore.profile);
       setIsReady(profileStore.isReady);
-      if (!profileStore.profile?.onboardingCompleted) {
+      if (profileStore.profile && !profileStore.profile.onboardingCompleted) {
         router.push('/onboarding');
       }
     });

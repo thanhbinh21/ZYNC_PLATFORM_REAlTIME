@@ -21,6 +21,7 @@ function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [targetMessageRef, setTargetMessageRef] = useState<string | null>(null);
+  const [openCreateGroupOnMount, setOpenCreateGroupOnMount] = useState(false);
   const {
     loading,
     conversations,
@@ -121,6 +122,15 @@ function ChatPageContent() {
     router.replace('/chat');
   }, [searchParams, onSelectConversation, router]);
 
+  useEffect(() => {
+    if (searchParams.get('createGroup') !== '1') {
+      return;
+    }
+
+    setOpenCreateGroupOnMount(true);
+    router.replace('/chat');
+  }, [searchParams, router]);
+
   if (loading) {
     return <PageLoading variant="chat" mode="panel" />;
   }
@@ -159,6 +169,7 @@ function ChatPageContent() {
         onRequestAiCatchup={onRequestAiCatchup}
         onToggleAiCatchupSetting={onToggleAiCatchupSetting}
         isCreatingGroup={groupActionLoading}
+        initialCreateGroupOpen={openCreateGroupOnMount}
         onLoadMore={onLoadMore}
         chatPanelProps={{
           conversationId: selectedConversationId,

@@ -1,381 +1,372 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import React, { Suspense } from 'react';
-import { DashboardStoryItemRow } from '@/components/home-dashboard/molecules/dashboard-story-item';
-import { DashboardStatCard } from '@/components/home-dashboard/molecules/dashboard-stat-card';
-import { DashboardActivityItemRow } from '@/components/home-dashboard/molecules/dashboard-activity-item';
-import { DashboardNotificationItemRow } from '@/components/home-dashboard/molecules/dashboard-notification-item';
-import { DashboardFriendActivityItemRow } from '@/components/home-dashboard/molecules/dashboard-friend-activity-item';
-import { DASHBOARD_HOME_MOCK_DATA } from '@/components/home-dashboard/mock-data';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import type { ComponentType } from 'react';
+import {
+  Bell,
+  FolderOpen,
+  MessageSquare,
+  Plus,
+  Search,
+  Send,
+  Sparkles,
+  UserPlus,
+  Users,
+} from 'lucide-react';
+
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { PageLoading } from '@/components/shared/page-loading';
 import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
-import { 
-  Bell as LucideBell, 
-  Users as LucideUsers, 
-  ArrowRight as LucideArrowRight, 
-  MessageSquare as LucideMessageSquare, 
-  UserPlus as LucideUserPlus, 
-  FolderOpen as LucideFolderOpen 
-} from 'lucide-react';
+import {
+  DashboardCard,
+  EmptyState,
+  FriendActivityPill,
+  NotificationItem,
+  QuickActionCard,
+  RecentActivityItem,
+  StatCard,
+} from '@/components/home-dashboard/molecules/home-dashboard-widgets';
+import type {
+  DashboardActivityItem,
+  DashboardFriendActivityItem,
+  DashboardNotificationItem,
+  DashboardStatItem,
+} from '@/components/home-dashboard/home-dashboard.types';
 
-const Bell = LucideBell as any;
-const Users = LucideUsers as any;
-const ArrowRight = LucideArrowRight as any;
-const MessageSquare = LucideMessageSquare as any;
-const UserPlus = LucideUserPlus as any;
-const FolderOpen = LucideFolderOpen as any;
+type HomeIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+const BellIcon = Bell as HomeIcon;
+const FolderOpenIcon = FolderOpen as HomeIcon;
+const MessageSquareIcon = MessageSquare as HomeIcon;
+const PlusIcon = Plus as HomeIcon;
+const SendIcon = Send as HomeIcon;
+const UserPlusIcon = UserPlus as HomeIcon;
+const UsersIcon = Users as HomeIcon;
 
 function HomePageContent(): React.JSX.Element {
   const router = useRouter();
-  const { data } = useHomeDashboard();
-  const mockData = DASHBOARD_HOME_MOCK_DATA;
+  const { data, loading, error, conversations } = useHomeDashboard();
 
-/**
- * Xử lý click vào activity item - điều hướng đến chat với conversation được chọn
- */
-const handleActivityClick = (item: typeof data.activities[0]) => {
-  if (item.conversationId) {
-    router.push(`/chat?conversationId=${encodeURIComponent(item.conversationId)}`);
-  }
-};
+  const stats = normalizeStats(data.stats, data.unreadNotificationCount);
+  const activeGroups = conversations.filter((item) => item.isGroup).slice(0, 3);
+  const onlineFriends = data.friendActivities.filter((item) => item.action === 'online').slice(0, 4);
 
-/**
- * Xử lý click vào notification - điều hướng đến đúng nội dung
- */
-const handleNotificationClick = (item: typeof data.notifications[0]) => {
-  switch (item.type) {
-    case 'new_message':
-      if (item.conversationId) {
-        router.push(
-          `/chat?conversationId=${encodeURIComponent(item.conversationId)}&highlight=new`
-        );
-      } else {
-        router.push('/chat');
-      }
-      break;
-    case 'friend_request':
-    case 'friend_accepted':
-      // Đi đến trang bạn bè - tab lời mời
-      router.push('/friends?tab=requests');
-      break;
-    case 'group_invite':
-    case 'group_update':
-      // Đi đến trang cộng đồng - phần nhóm
-      if (item.action === 'group_deleted' || item.action === 'group_removed') {
-        router.push('/home');
-        break;
-      }
-      if (item.conversationId) {
-        router.push(`/chat?conversationId=${encodeURIComponent(item.conversationId)}`);
-      } else {
-        router.push('/chat');
-      }
-      break;
-    case 'story_reaction':
-    case 'story_reply':
-      // Đi đến stories - highlight story của người gửi
-      if (item.fromUserId) {
-        router.push(`/stories?user=${item.fromUserId}`);
-      } else {
-        router.push('/stories');
-      }
-      break;
-    case 'community_post':
-    case 'post_like':
-    case 'post_comment':
-    case 'post_bookmark':
-      if (item.postId) {
-        router.push(`/community?post=${encodeURIComponent(item.postId)}`);
-      } else {
-        router.push('/community');
-      }
-      break;
-    default:
-      router.push('/notifications');
-  }
-};
+  const navigate = (href: string) => router.push(href);
 
-/**
- * Xử lý click vào friend activity - điều hướng đến bạn bè cụ thể
- */
-const handleFriendActivityClick = (item: typeof data.friendActivities[0]) => {
-  // Đi đến trang bạn bè và highlight người đó
-  router.push(`/friends?user=${item.userId}`);
-};
+  const handleActivityClick = (item: DashboardActivityItem) => {
+    if (item.conversationId) {
+      navigate(`/chat?conversationId=${encodeURIComponent(item.conversationId)}`);
+      return;
+    }
+    navigate('/chat');
+  };
 
-  /**
-   * Xử lý click vào stat card
-   */
-  const handleStatClick = (statId: string) => {
-    switch (statId) {
-      case 'stat-1': // Tin nhắn mới
-        router.push('/chat');
-        break;
-      case 'stat-2': // Lời mời kết bạn
-        router.push('/friends');
-        break;
-      case 'stat-3': // Nhóm
-        router.push('/community');
-        break;
+  const handleNotificationClick = (item: DashboardNotificationItem) => {
+    switch (item.type) {
+      case 'new_message':
+        navigate(item.conversationId ? `/chat?conversationId=${encodeURIComponent(item.conversationId)}&highlight=new` : '/chat');
+        return;
+      case 'friend_request':
+      case 'friend_accepted':
+        navigate('/friends?tab=requests');
+        return;
+      case 'group_invite':
+      case 'group_update':
+        navigate(item.conversationId ? `/chat?conversationId=${encodeURIComponent(item.conversationId)}` : '/community');
+        return;
+      case 'community_post':
+      case 'post_like':
+      case 'post_comment':
+      case 'post_bookmark':
+        navigate(item.postId ? `/community?post=${encodeURIComponent(item.postId)}` : '/community');
+        return;
+      default:
+        navigate('/notifications');
     }
   };
 
-  return (
-    <ZyncPageTransition className="flex h-full w-full flex-col overflow-hidden">
-      <header className="border-b border-border-light px-4 py-4 sm:px-6 sm:py-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-text-tertiary">Trung tâm</p>
-            <h1 className="font-ui-title mt-1.5 text-2xl text-text-primary">{data.greeting}</h1>
-            <p className="font-ui-content mt-1 text-sm text-text-secondary">Chúc bạn một ngày làm việc hiệu quả</p>
-          </div>
-          <span className="zync-soft-badge">
-            <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Trực tuyến
-          </span>
-        </div>
-      </header>
+  const handleFriendActivityClick = (item: DashboardFriendActivityItem) => {
+    navigate(`/friends?user=${encodeURIComponent(item.userId)}`);
+  };
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-20 sm:px-6 sm:py-6">
-        <div className="w-full space-y-6">
-          {/* Stories */}
-          {data.stories.length > 0 && (
-            <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {data.stories.map((item) => (
-                  <DashboardStoryItemRow key={item.id} item={item} />
+  const handleStatClick = (statId: string) => {
+    const routes: Record<string, string> = {
+      'stat-1': '/chat',
+      'stat-2': '/friends?tab=requests',
+      'stat-3': '/community',
+      'stat-4': '/notifications',
+    };
+    navigate(routes[statId] ?? '/home');
+  };
+
+  if (loading) {
+    return <PageLoading variant="home" mode="panel" />;
+  }
+
+  if (error) {
+    return (
+      <ZyncPageTransition className="zync-app-surface flex h-full w-full items-center justify-center p-6">
+        <div className="zync-dashboard-card w-full max-w-md p-6">
+          <EmptyState
+            title="Không thể tải trang chủ"
+            description={error}
+            actionLabel="Thử lại"
+            onAction={() => window.location.reload()}
+          />
+        </div>
+      </ZyncPageTransition>
+    );
+  }
+
+  return (
+    <ZyncPageTransition className="zync-app-surface flex h-full w-full flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-3 py-3 pb-20 sm:px-5 sm:py-5">
+        <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+          <section className="zync-hero-card">
+            <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="relative p-5 sm:p-7">
+                <div className="zync-hero-accent-line absolute inset-x-0 top-0 h-1" />
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex min-w-0 gap-4">
+                    <UserAvatar
+                      name={data.user.displayName}
+                      initials={data.user.initials}
+                      avatarUrl={data.user.avatarUrl}
+                    />
+                    <div className="min-w-0">
+                      <p className="font-ui-meta text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">Trung tâm</p>
+                      <h1 className="font-ui-title mt-1 text-2xl leading-tight text-text-primary sm:text-3xl">
+                        Xin chào, {data.user.displayName}
+                      </h1>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="zync-status-badge gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+                          Trực tuyến
+                        </span>
+                        <span className="zync-soft-badge gap-1.5 px-3 py-1.5 text-xs font-bold">
+                          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                          Developer hub
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <AvatarGroup items={onlineFriends.length > 0 ? onlineFriends : data.friendActivities.slice(0, 4)} />
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-2.5">
+                  <button type="button" onClick={() => navigate('/chat')} className="zync-soft-button inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                    <MessageSquare className="h-4 w-4" aria-hidden />
+                    Mở chat
+                  </button>
+                  <button type="button" onClick={() => navigate('/chat?createGroup=1')} className="zync-soft-button-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                    <FolderOpen className="h-4 w-4" aria-hidden />
+                    Tạo nhóm
+                  </button>
+                  <button type="button" onClick={() => navigate('/friends')} className="zync-soft-button-ghost inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                    <Search className="h-4 w-4" aria-hidden />
+                    Tìm bạn
+                  </button>
+                </div>
+              </div>
+
+              <div className="zync-dashboard-card-muted grid grid-cols-2 gap-3 border-t p-4 sm:p-5 lg:border-l lg:border-t-0">
+                {stats.map((item) => (
+                  <StatCard key={item.id} item={item} compactLabel={statLabel(item.id)} onClick={() => handleStatClick(item.id)} />
                 ))}
               </div>
             </div>
-          )}
+          </section>
 
-          {/* Stats Grid - Clickable */}
-          <div className="grid shrink-0 grid-cols-3 gap-3 sm:grid-cols-3">
-            {data.stats.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleStatClick(item.id)}
-                className="w-full text-left"
-              >
-                <DashboardStatCard item={item} />
-              </button>
-            ))}
-          </div>
-
-          {/* Main Content: 2-column layout on desktop */}
-          <div className="grid shrink-0 gap-4 lg:grid-cols-2">
-            {/* Left Column: Activities + Notifications */}
+          <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
             <div className="space-y-4">
-              {/* Activity Feed */}
-              <section className="shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
-                <div className="mb-4 flex items-center justify-between gap-3 border-b border-border-light pb-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-accent" />
-                    <h2 className="font-ui-title text-lg text-text-primary">{data.activityTitle}</h2>
-                  </div>
-                  {data.activities.length > 0 && (
-                    <Link href="/chat" className="zync-soft-badge text-sm hover:text-text-primary flex items-center gap-1">
-                      {data.activityCtaLabel}
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  )}
-                </div>
-
+              <DashboardCard
+                title="Cuộc trò chuyện gần đây"
+                icon={MessageSquareIcon}
+                actionLabel="Chat"
+                onAction={() => navigate('/chat')}
+              >
                 {data.activities.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-10 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
-                      <MessageSquare className="h-6 w-6 text-text-tertiary" />
-                    </div>
-                    <div>
-                      <p className="font-ui-title text-sm font-semibold text-text-primary">Chưa có hoạt động nào</p>
-                      <p className="font-ui-content mt-1.5 text-xs font-medium text-text-secondary max-w-[200px] mx-auto">
-                        Bắt đầu trò chuyện để xem tin nhắn tại đây
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => router.push('/chat')}
-                      className="zync-soft-button mt-2 px-4 py-2 text-sm"
-                    >
-                      Bắt đầu chat
-                    </button>
-                  </div>
+                  <EmptyState
+                    icon={MessageSquareIcon}
+                    title="Chưa có cuộc trò chuyện"
+                    description="Bắt đầu nhắn tin để danh sách gần đây xuất hiện ở đây."
+                    actionLabel="Tin nhắn mới"
+                    onAction={() => navigate('/chat?compose=1')}
+                  />
                 ) : (
                   <div className="space-y-1">
-                    {data.activities.map((activityItem) => (
-                      <DashboardActivityItemRow
-                        key={activityItem.id}
-                        item={activityItem}
-                        onClick={() => handleActivityClick(activityItem)}
-                      />
+                    {data.activities.map((item) => (
+                      <RecentActivityItem key={item.id} item={item} onClick={() => handleActivityClick(item)} />
                     ))}
                   </div>
                 )}
-              </section>
+              </DashboardCard>
 
-              {/* Notifications */}
-              <section className="shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
-                <div className="mb-4 flex items-center justify-between gap-3 border-b border-border-light pb-3">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-accent" />
-                    <h2 className="font-ui-title text-lg text-text-primary">{data.notificationsTitle}</h2>
-                    {data.unreadNotificationCount > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-white">
-                        {data.unreadNotificationCount > 99 ? '99+' : data.unreadNotificationCount}
-                      </span>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <DashboardCard
+                  title="Thông báo"
+                  icon={BellIcon}
+                  badge={data.unreadNotificationCount}
+                  actionLabel="Xem tất cả"
+                  onAction={() => navigate('/notifications')}
+                >
+                  {data.notifications.length === 0 ? (
+                    <EmptyState
+                      icon={BellIcon}
+                      title="Không có thông báo mới"
+                      description="Tin nhắn, lời mời và hoạt động cộng đồng sẽ nằm ở đây."
+                      actionLabel="Mở thông báo"
+                      onAction={() => navigate('/notifications')}
+                    />
+                  ) : (
+                    <div className="space-y-1">
+                      {data.notifications.slice(0, 5).map((item) => (
+                        <NotificationItem key={item.id} item={item} onClick={() => handleNotificationClick(item)} />
+                      ))}
+                    </div>
+                  )}
+                </DashboardCard>
+
+                <DashboardCard
+                  title="Hoạt động bạn bè"
+                  icon={UserPlusIcon}
+                  actionLabel="Bạn bè"
+                  onAction={() => navigate('/friends')}
+                >
+                  {data.friendActivities.length === 0 ? (
+                    <EmptyState
+                      icon={UsersIcon}
+                      title="Chưa có bạn bè"
+                      description="Kết nối với developer khác để xem trạng thái của họ."
+                      actionLabel="Tìm bạn"
+                      onAction={() => navigate('/friends')}
+                    />
+                  ) : (
+                    <div className="space-y-1">
+                      {data.friendActivities.slice(0, 6).map((item) => (
+                        <FriendActivityPill key={item.id} item={item} onClick={() => handleFriendActivityClick(item)} />
+                      ))}
+                    </div>
+                  )}
+                </DashboardCard>
+              </div>
+            </div>
+
+            <aside className="space-y-4">
+              <DashboardCard
+                title="Cộng đồng"
+                icon={UsersIcon}
+                actionLabel="Mở"
+                onAction={() => navigate('/community')}
+              >
+                <div className="zync-community-highlight rounded-[1.35rem] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-ui-meta text-[0.7rem] uppercase tracking-[0.16em] text-status-text">Nhóm hoạt động</p>
+                      <p className="font-ui-title mt-1 text-3xl text-text-primary">{stats.find((item) => item.id === 'stat-3')?.value ?? '00'}</p>
+                    </div>
+                    <span className="zync-icon-block zync-icon-block-primary h-12 w-12 rounded-2xl">
+                      <Users className="h-5 w-5" aria-hidden />
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {activeGroups.length === 0 ? (
+                      <p className="zync-community-item rounded-2xl px-3 py-3 text-sm text-text-secondary">Chưa có nhóm hoạt động.</p>
+                    ) : (
+                      activeGroups.map((group) => (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => navigate(`/chat?conversationId=${encodeURIComponent(group.id)}`)}
+                          className="zync-community-item flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold">{group.name}</span>
+                            <span className="block text-xs text-text-tertiary">{group.memberCount ?? 0} thành viên</span>
+                          </span>
+                          <span className="zync-status-badge rounded-full px-2 py-1 text-[11px] font-bold">
+                            {group.unreadCount > 0 ? `${group.unreadCount} mới` : 'Active'}
+                          </span>
+                        </button>
+                      ))
                     )}
                   </div>
-                  {data.notifications.length > 0 && (
-                    <Link href="/notifications" className="zync-soft-badge text-sm hover:text-text-primary flex items-center gap-1">
-                      Xem tất cả
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  )}
                 </div>
+              </DashboardCard>
 
-                {data.notifications.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-10 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
-                      <Bell className="h-6 w-6 text-text-tertiary" />
-                    </div>
-                    <div>
-                      <p className="font-ui-title text-sm font-semibold text-text-primary">Không có thông báo mới</p>
-                      <p className="font-ui-content mt-1.5 text-xs font-medium text-text-secondary max-w-[200px] mx-auto">
-                        Bạn sẽ nhận thông báo khi có tin nhắn hoặc hoạt động mới
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => router.push('/notifications')}
-                      className="zync-soft-button mt-2 px-4 py-2 text-sm"
-                    >
-                      Mở thông báo
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {data.notifications.slice(0, 8).map((item) => (
-                      <DashboardNotificationItemRow
-                        key={item.id}
-                        item={item}
-                        onClick={() => handleNotificationClick(item)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-
-            {/* Right Column: Friend Activities */}
-            <div className="space-y-4">
-              <section className="shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
-                <div className="mb-4 flex items-center justify-between gap-3 border-b border-border-light pb-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-accent" />
-                    <h2 className="font-ui-title text-lg text-text-primary">{data.friendActivityTitle}</h2>
-                  </div>
-                  <Link href="/friends" className="zync-soft-badge text-sm hover:text-text-primary flex items-center gap-1">
-                    Bạn bè
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
+              <DashboardCard title="Thao tác nhanh" icon={PlusIcon}>
+                <div className="grid grid-cols-2 gap-3">
+                  <QuickActionCard title="Tin nhắn" label="Mở chat" icon={SendIcon} onClick={() => navigate('/chat?compose=1')} />
+                  <QuickActionCard title="Thêm bạn" label="Kết nối" icon={UserPlusIcon} onClick={() => navigate('/friends')} />
+                  <QuickActionCard title="Nhóm mới" label="Tạo group" icon={FolderOpenIcon} onClick={() => navigate('/chat?createGroup=1')} />
+                  <QuickActionCard title="Cộng đồng" label="Bài viết" icon={UsersIcon} onClick={() => navigate('/community')} />
                 </div>
-
-                {data.friendActivities.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-10 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-hover">
-                      <Users className="h-6 w-6 text-text-tertiary" />
-                    </div>
-                    <div>
-                      <p className="font-ui-title text-sm font-semibold text-text-primary">Không có hoạt động bạn bè</p>
-                      <p className="font-ui-content mt-1.5 text-xs font-medium text-text-secondary max-w-[200px] mx-auto">
-                        Kết bạn để xem hoạt động của họ tại đây
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => router.push('/friends')}
-                      className="zync-soft-button mt-2 px-4 py-2 text-sm"
-                    >
-                      Tìm bạn bè
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {data.friendActivities.map((item) => (
-                      <DashboardFriendActivityItemRow
-                        key={item.id}
-                        item={item}
-                        onClick={() => handleFriendActivityClick(item)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Quick Stats Card - Clickable */}
-              <section className="shrink-0 rounded-[1.8rem] p-5 shadow-sm zync-soft-card sm:p-6">
-                <h3 className="font-ui-title text-base text-text-primary mb-4">Tổng quan hôm nay</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/chat')}
-                    className="rounded-[1.2rem] border border-border bg-white/50 p-4 text-center transition hover:border-accent hover:bg-accent-light/20 active:scale-[0.98]"
-                  >
-                    <p className="font-ui-brand text-2xl text-accent-strong">{data.stats[0]?.value || '00'}</p>
-                    <p className="font-ui-meta text-xs text-text-tertiary mt-1">Tin nhắn mới</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/friends')}
-                    className="rounded-[1.2rem] border border-border bg-white/50 p-4 text-center transition hover:border-accent hover:bg-accent-light/20 active:scale-[0.98]"
-                  >
-                    <p className="font-ui-brand text-2xl text-accent-strong">{data.stats[1]?.value || '00'}</p>
-                    <p className="font-ui-meta text-xs text-text-tertiary mt-1">Lời mời kết bạn</p>
-                  </button>
-                </div>
-              </section>
-
-              {/* Quick Actions */}
-              <section className="shrink-0 rounded-[1.8rem] p-4 shadow-sm zync-soft-card-muted sm:p-5">
-                <h3 className="font-ui-title text-sm text-text-primary mb-3">Thao tác nhanh</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/chat')}
-                    className="zync-soft-button-secondary flex items-center gap-2 px-4 py-2.5 text-sm"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Tin nhắn mới
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/friends')}
-                    className="zync-soft-button-secondary flex items-center gap-2 px-4 py-2.5 text-sm"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Thêm bạn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/community')}
-                    className="zync-soft-button-secondary flex items-center gap-2 px-4 py-2.5 text-sm"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    Nhóm mới
-                  </button>
-                </div>
-              </section>
-            </div>
+              </DashboardCard>
+            </aside>
           </div>
-
-          <div className="h-10 shrink-0" tabIndex={-1} />
         </div>
       </div>
     </ZyncPageTransition>
+  );
+}
+
+function normalizeStats(stats: DashboardStatItem[], unreadNotificationCount: number): DashboardStatItem[] {
+  const statById = new Map(stats.map((item) => [item.id, item]));
+  const fallback: DashboardStatItem[] = [
+    { id: 'stat-1', value: '00', label: 'Tin nhắn mới', badge: '', icon: 'message' },
+    { id: 'stat-2', value: '00', label: 'Lời mời kết bạn', badge: '', icon: 'friends' },
+    { id: 'stat-3', value: '00', label: 'Nhóm hoạt động', badge: '', icon: 'group' },
+    {
+      id: 'stat-4',
+      value: unreadNotificationCount.toString().padStart(2, '0'),
+      label: 'Thông báo chưa đọc',
+      badge: unreadNotificationCount > 0 ? unreadNotificationCount.toString() : '',
+      icon: 'bell',
+    },
+  ];
+
+  return fallback.map((item) => ({ ...item, ...statById.get(item.id), label: statLabel(item.id) }));
+}
+
+function statLabel(statId: string): string {
+  const labels: Record<string, string> = {
+    'stat-1': 'Tin nhắn mới',
+    'stat-2': 'Lời mời kết bạn',
+    'stat-3': 'Nhóm hoạt động',
+    'stat-4': 'Thông báo chưa đọc',
+  };
+  return labels[statId] ?? 'Chỉ số';
+}
+
+function UserAvatar({ name, initials, avatarUrl }: { name: string; initials: string; avatarUrl?: string }) {
+  return (
+    <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.45rem] bg-accent-light text-lg font-bold text-accent-strong ring-1 ring-accent/20">
+      {avatarUrl ? <Image src={avatarUrl} alt={name} width={64} height={64} className="h-full w-full object-cover" /> : initials}
+    </span>
+  );
+}
+
+function AvatarGroup({ items }: { items: DashboardFriendActivityItem[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="zync-soft-badge flex items-center px-3 py-2">
+      <div className="flex -space-x-2">
+        {items.slice(0, 4).map((item) => (
+          <span key={item.id} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-bg-card bg-accent-light text-[10px] font-bold text-accent-strong">
+            {item.userAvatar ? <Image src={item.userAvatar} alt={item.userName} width={32} height={32} className="h-full w-full object-cover" /> : item.initials}
+          </span>
+        ))}
+      </div>
+      <span className="ml-3 text-xs font-bold text-text-secondary">
+        {items.filter((item) => item.action === 'online').length || items.length} online
+      </span>
+    </div>
   );
 }
 

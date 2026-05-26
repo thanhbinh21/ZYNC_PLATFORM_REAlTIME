@@ -27,5 +27,6 @@ export function getAccessToken(): string | null {
  */
 export function clearAccessToken(): void {
   Cookies.remove(ACCESS_TOKEN_COOKIE_KEY);
+  Cookies.remove(ACCESS_TOKEN_CLIENT_COOKIE_KEY);
   Cookies.remove('refreshToken');
 }

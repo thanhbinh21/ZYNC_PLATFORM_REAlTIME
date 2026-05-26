@@ -14,20 +14,22 @@
 }
 
 :root {
-	/* Light mode: Clean Minimal SaaS + soft glass */
-	--bg-primary: #eaf1f8; /* Toned down from white-ish to slightly grayish/blue */
-	--bg-secondary: #e8f0f6;
-	--bg-sidebar: rgba(255, 255, 255, 0.65);
-	--bg-hover: #d6dee4;
-	--bg-active: #d0e2ec;
-	--bg-code: #e1e7f0;
-	--bg-card: #f6f9fc;
+	/* Light mode: clean white/mint dashboard system */
+	--bg-primary: #f6fbfa;
+	--bg-secondary: #eef8f6;
+	--bg-sidebar: rgba(255, 255, 255, 0.82);
+	--bg-hover: #eef7f5;
+	--bg-active: #dff3ef;
+	--bg-code: #eef6f5;
+	--bg-card: #ffffff;
 
-	--surface-card: rgba(250, 252, 255, 0.84);
+	--surface-card: rgba(255, 255, 255, 0.92);
 	--surface-card-strong: rgba(255, 255, 255, 0.98);
-	--surface-muted: rgba(240, 244, 248, 0.82);
-	--surface-glass: rgba(250, 252, 255, 0.52);
-	--surface-glass-strong: rgba(255, 255, 255, 0.85);
+	--surface-muted: rgba(240, 253, 250, 0.72);
+	--surface-tint: #f0fdfa;
+	--surface-panel: #fbfefd;
+	--surface-glass: rgba(255, 255, 255, 0.68);
+	--surface-glass-strong: rgba(255, 255, 255, 0.9);
 
 	--text-primary: #0b1120; /* Darker for better emphasis */
 	--text-secondary: #1e293b; /* Darker secondary */
@@ -39,16 +41,21 @@
 	--accent-hover: #0b8073;
 	--accent-light: #ccebe6;
 	--accent-strong: #07544b;
+	--accent-gradient-mid: #17c8a6;
+	--accent-gradient-end: #36d399;
 
-	--border: #cad6de;
-	--border-light: #e6eff5;
+	--border: #d5e7e3;
+	--border-light: #e5f2ef;
+	--border-mint: #bbf7d0;
 	--ring-soft: rgba(20, 184, 166, 0.18);
-	--page-glow-1: rgba(84, 191, 255, 0.16);
+	--page-glow-1: rgba(16, 185, 129, 0.1);
 	--page-glow-2: rgba(20, 184, 166, 0.12);
 
-	--shadow-sm: 0 16px 40px -26px rgba(15, 23, 42, 0.22);
-	--shadow-md: 0 22px 56px -32px rgba(15, 23, 42, 0.24);
-	--shadow-lg: 0 32px 90px -42px rgba(15, 23, 42, 0.28);
+	--shadow-sm: 0 12px 34px -30px rgba(15, 23, 42, 0.24);
+	--shadow-md: 0 18px 48px -38px rgba(15, 23, 42, 0.28);
+	--shadow-lg: 0 28px 72px -48px rgba(15, 23, 42, 0.32);
+	--shadow-soft: 0 16px 42px -36px rgba(15, 23, 42, 0.24);
+	--shadow-soft-hover: 0 18px 42px -34px rgba(15, 157, 142, 0.28);
 
 	--success-bg: rgba(20, 184, 166, 0.12);
 	--success-border: rgba(15, 154, 139, 0.2);
@@ -61,9 +68,16 @@
 	--danger-border: rgba(239, 68, 68, 0.2);
 	--danger-text: #b91c1c;
 
-	--radius-sm: 8px;
-	--radius-md: 12px;
-	--radius-lg: 18px;
+	--radius-sm: 10px;
+	--radius-md: 14px;
+	--radius-lg: 22px;
+	--radius-xl: 28px;
+
+	--status-bg: #ecfdf5;
+	--status-border: #bbf7d0;
+	--status-text: #047857;
+	--icon-block-bg: #d1fae5;
+	--icon-block-text: #047857;
 
 	--font-body: var(--font-inter);
 	--font-display: var(--font-be-vietnam-pro);
@@ -110,6 +124,8 @@
 	--accent-hover: #1ab1a1;
 	--accent-light: rgba(34, 199, 181, 0.16);
 	--accent-strong: #7ee7dc;
+	--accent-gradient-mid: #20d0bc;
+	--accent-gradient-end: #34d399;
 
 	--border: #203149;
 	--border-light: #16253a;
@@ -285,6 +301,111 @@ html {
 }
 
 /* Header notification dropdown — opaque enough to read over dashboard content */
+.zync-app-surface {
+	background: var(--bg-primary);
+	color: var(--text-primary);
+}
+
+.zync-hero-card,
+.zync-dashboard-card,
+.zync-stat-card,
+.zync-quick-action-card {
+	border: 1px solid var(--border-light);
+	background: var(--surface-card-strong);
+	box-shadow: var(--shadow-soft);
+}
+
+.zync-hero-card {
+	border-radius: var(--radius-xl);
+	overflow: hidden;
+}
+
+.zync-hero-accent-line {
+	background: linear-gradient(90deg, var(--accent) 0%, #22c55e 58%, #a7f3d0 100%);
+}
+
+.zync-dashboard-card {
+	border-radius: var(--radius-xl);
+}
+
+.zync-dashboard-card-muted {
+	border: 1px solid var(--border-light);
+	background: var(--surface-panel);
+}
+
+.zync-stat-card,
+.zync-quick-action-card {
+	border-radius: var(--radius-lg);
+	transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.zync-stat-card:hover,
+.zync-quick-action-card:hover {
+	transform: translateY(-2px);
+	border-color: var(--border-mint);
+	background: var(--surface-panel);
+	box-shadow: var(--shadow-soft-hover);
+}
+
+.zync-icon-block {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--border-light);
+	background: var(--surface-tint);
+	color: var(--icon-block-text);
+	box-shadow: var(--shadow-sm);
+}
+
+.zync-icon-block-primary {
+	background: var(--icon-block-bg);
+	color: var(--icon-block-text);
+}
+
+.zync-status-badge,
+.zync-count-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--status-border);
+	background: var(--status-bg);
+	color: var(--status-text);
+}
+
+.zync-list-item {
+	border: 1px solid transparent;
+	transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.zync-list-item:hover {
+	border-color: var(--border-light);
+	background: var(--bg-hover);
+}
+
+.zync-community-highlight {
+	border: 1px solid var(--border-light);
+	background: linear-gradient(135deg, var(--surface-card-strong) 0%, var(--surface-tint) 100%);
+	color: var(--text-primary);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.zync-community-item {
+	border: 1px solid var(--border-light);
+	background: var(--surface-card-strong);
+	box-shadow: var(--shadow-sm);
+	transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.zync-community-item:hover {
+	border-color: var(--border-mint);
+	background: var(--surface-tint);
+}
+
+.zync-empty-state {
+	border: 1px dashed var(--border);
+	background: color-mix(in srgb, var(--bg-hover) 46%, transparent);
+}
+
 .zync-notification-panel {
 	border: 1px solid var(--border-light);
 	background: var(--surface-card-strong);
@@ -326,8 +447,8 @@ html {
 
 .zync-soft-badge-active {
 	border-color: transparent;
-	background: var(--text-primary);
-	color: #ffffff;
+	background: var(--accent);
+	color: var(--bg-card);
 }
 
 .zync-soft-stepper {
@@ -432,7 +553,7 @@ html {
 
 .zync-soft-button {
 	border: 1px solid transparent;
-	background: linear-gradient(135deg, var(--accent) 0%, #17c8a6 55%, #36d399 100%);
+	background: linear-gradient(135deg, var(--accent) 0%, var(--accent-gradient-mid) 55%, var(--accent-gradient-end) 100%);
 	color: #ffffff;
 	box-shadow: 0 18px 34px -22px rgba(20, 184, 166, 0.68);
 }

@@ -348,6 +348,7 @@ interface CallParticipantVideo {
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceState>>({});
@@ -1558,12 +1559,14 @@ export function useHomeDashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [meRes, requestsRes, convosRes, prefs, notifRes, friendsRes] = await Promise.all([
+        setError(null);
+        const [meRes, requestsRes, convosRes, prefs, notifRes, unreadNotifCount, friendsRes] = await Promise.all([
           apiClient.get('/api/users/me'),
           apiClient.get('/api/friends/requests'),
           apiClient.get('/api/conversations'),
           fetchPreferences(),
           fetchNotifications(undefined, 10),
+          fetchUnreadCount(),
           fetchFriends(),
         ]);
 
@@ -1689,9 +1692,7 @@ export function useHomeDashboard() {
             ? `${friendNameParts[0][0]}${friendNameParts[friendNameParts.length - 1][0]}`.toUpperCase()
             : friend.displayName.substring(0, 2).toUpperCase();
 
-          // Random activity for demo - in real app this would come from API
-          const actions: DashboardFriendActivityItem['action'][] = ['online', 'posted', 'reacted'];
-          const randomAction = actions[idx % actions.length];
+          const action: DashboardFriendActivityItem['action'] = friend.status === 'online' ? 'online' : 'offline';
 
           return {
             id: `friend-act-${friend.id}`,
@@ -1700,13 +1701,13 @@ export function useHomeDashboard() {
             userAvatar: friend.avatarUrl,
             initials: friendInitials,
             toneClass: friendTones[idx % friendTones.length],
-            action: randomAction,
-            target: randomAction === 'posted' ? 'bài viết mới' : randomAction === 'reacted' ? 'tin nhắn của bạn' : undefined,
-            timeLabel: `${Math.floor(Math.random() * 60) + 1} phút trước`,
+            action,
+            target: friend.username ? `@${friend.username}` : undefined,
+            timeLabel: friend.status === 'online' ? 'Đang hoạt động' : 'Ngoại tuyến',
           };
         });
 
-        const unreadNotificationCount = dashboardNotifications.filter(n => !n.isRead).length;
+        const unreadNotificationCount = unreadNotifCount;
 
         const userInitials = user.displayName.split(' ').length > 1
           ? `${user.displayName.split(' ')[0][0]}${user.displayName.split(' ').slice(-1)[0][0]}`.toUpperCase()
@@ -1743,6 +1744,13 @@ export function useHomeDashboard() {
               badge: '',
               icon: 'group'
             },
+            {
+              id: 'stat-4',
+              value: unreadNotificationCount.toString().padStart(2, '0'),
+              label: 'Thông báo chưa đọc',
+              badge: unreadNotificationCount > 0 ? unreadNotificationCount.toString() : '',
+              icon: 'bell'
+            },
           ],
           activities: activities.slice(0, 5),
           notifications: dashboardNotifications,
@@ -1751,6 +1759,7 @@ export function useHomeDashboard() {
         }));
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
+        setError('Không thể tải dữ liệu trang chủ. Vui lòng thử lại.');
       } finally {
         setLoading(false);
       }
@@ -3877,7 +3886,10 @@ export function useHomeDashboard() {
   // Refresh notifications
   const refreshNotifications = useCallback(async () => {
     try {
-      const notifRes = await fetchNotifications(undefined, 10);
+      const [notifRes, unreadNotifCount] = await Promise.all([
+        fetchNotifications(undefined, 10),
+        fetchUnreadCount(),
+      ]);
       const notificationTones = ['bg-[#97a7b8]', 'bg-[#88b3c8]', 'bg-[#1a6f58]', 'bg-[#0f5845]'];
       const dashboardNotifications: DashboardNotificationItem[] = notifRes.notifications.slice(0, 8).map((notif: Notification, idx: number) => ({
         id: notif._id,
@@ -3898,7 +3910,16 @@ export function useHomeDashboard() {
       setData(prev => ({
         ...prev,
         notifications: dashboardNotifications,
-        unreadNotificationCount: dashboardNotifications.filter(n => !n.isRead).length,
+        unreadNotificationCount: unreadNotifCount,
+        stats: prev.stats.map((stat) => (
+          stat.id === 'stat-4'
+            ? {
+              ...stat,
+              value: unreadNotifCount.toString().padStart(2, '0'),
+              badge: unreadNotifCount > 0 ? unreadNotifCount.toString() : '',
+            }
+            : stat
+        )),
       }));
     } catch (error) {
       console.error('Failed to refresh notifications', error);
@@ -3947,6 +3968,7 @@ export function useHomeDashboard() {
   return {
     data,
     loading,
+    error,
     userId,
     conversations: convertConversationsToListItems(),
     selectedConversationId,
