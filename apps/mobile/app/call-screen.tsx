@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -49,6 +49,7 @@ export default function CallScreen() {
 
   const [callDuration, setCallDuration] = useState(0);
   const [hasStartedCall, setHasStartedCall] = useState(false);
+  const wasCallActiveRef = useRef(false);
   const remoteStreamList = Array.from(remoteStreams.entries()).filter(([_, stream]) => Boolean((stream as any)?.toURL?.()));
 
   useEffect(() => {
@@ -86,10 +87,27 @@ export default function CallScreen() {
         } else {
            router.replace('/(tabs)/home');
         }
-      }, 1500);
+      }, 800);
       return () => clearTimeout(timer);
     }
   }, [activeCall?.status, router]);
+
+  useEffect(() => {
+    if (activeCall) {
+      wasCallActiveRef.current = true;
+    }
+  }, [activeCall]);
+
+  useEffect(() => {
+    // Fallback: If call was active but activeCall is suddenly reset to null, close immediately
+    if (wasCallActiveRef.current && !activeCall) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/home');
+      }
+    }
+  }, [activeCall, router]);
 
   const handleEndCall = () => {
     if (activeCall?.sessionId && activeCall?.callToken) {
@@ -128,7 +146,7 @@ export default function CallScreen() {
 
   const renderTile = (stream: MediaStream | null, peerId: string, isMe: boolean) => {
     const mediaState = isMe 
-      ? { isMicMuted, isCameraOff: !isCameraEnabled } 
+      ? { isMicMuted, isCameraOff: !isCameraEnabled, isScreenSharing: false } 
       : (participantMediaStates?.[peerId] || {});
       
     let displayName = isMe ? 'Bạn' : 'Người dùng';
@@ -146,11 +164,12 @@ export default function CallScreen() {
     if (!isMe && !activeCall?.isGroupCall && avatarUrl) avatar = avatarUrl;
     
     const isVideoOff = mediaState.isCameraOff || !stream || !(stream as any).toURL?.();
+    const isScreenShare = !isMe && mediaState.isScreenSharing;
 
     return (
       <View style={StyleSheet.absoluteFill}>
          {!isVideoOff && stream && (stream as any).toURL?.() ? (
-           <RTCView streamURL={(stream as any).toURL()} style={StyleSheet.absoluteFillObject} objectFit="cover" zOrder={isMe ? 1 : 0} />
+           <RTCView streamURL={(stream as any).toURL()} style={StyleSheet.absoluteFillObject} objectFit={isScreenShare ? "contain" : "cover"} zOrder={isMe ? 1 : 0} />
          ) : (
            <View style={styles.tileAvatarFallback}>
              {avatar ? (

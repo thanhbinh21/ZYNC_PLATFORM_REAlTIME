@@ -47,7 +47,7 @@ export function useVideoCall(userId: string) {
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
-  const [participantMediaStates, setParticipantMediaStates] = useState<Record<string, { isMicMuted?: boolean, isCameraOff?: boolean }>>({});
+  const [participantMediaStates, setParticipantMediaStates] = useState<Record<string, { isMicMuted?: boolean, isCameraOff?: boolean, isScreenSharing?: boolean }>>({});
   const [socketReadyVersion, setSocketReadyVersion] = useState(0);
 
   const activeCallRef = useRef<ActiveCallState | null>(null);
@@ -290,7 +290,11 @@ export function useVideoCall(userId: string) {
 
     stream.getTracks().forEach((track) => {
       if (!existingTrackIds.has(track.id)) {
-        pc.addTrack(track, stream);
+        try {
+          pc.addTrack(track, stream);
+        } catch (err) {
+          console.warn('[Call] Failed to add track to peer connection:', err);
+        }
       }
     });
   }, []);
@@ -325,6 +329,30 @@ export function useVideoCall(userId: string) {
           const next = new Map(prev);
           next.set(peerUserId, stream);
           return next;
+        });
+      }
+    };
+
+    (pc as any).onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection state change:', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        setActiveCall((prev) => {
+          if (prev && prev.status !== 'connected') {
+            return { ...prev, status: 'connected', startedAt: prev.startedAt ?? new Date().toISOString() };
+          }
+          return prev;
+        });
+      }
+    };
+
+    (pc as any).oniceconnectionstatechange = () => {
+      console.log('[WebRTC] ICE Connection state change:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setActiveCall((prev) => {
+          if (prev && prev.status !== 'connected') {
+            return { ...prev, status: 'connected', startedAt: prev.startedAt ?? new Date().toISOString() };
+          }
+          return prev;
         });
       }
     };
@@ -563,15 +591,17 @@ export function useVideoCall(userId: string) {
       setActiveCall((prev) => {
         if (!prev) return prev;
 
+        const nextStatus = prev.status === 'outgoing' || prev.status === 'incoming' ? 'connecting' : prev.status;
+
         if (Array.isArray(data.joinedParticipantIds) && data.joinedParticipantIds.length > 0) {
-          return { ...prev, participantIds: data.joinedParticipantIds };
+          return { ...prev, participantIds: data.joinedParticipantIds, status: nextStatus };
         }
 
         if (!prev.participantIds.includes(data.userId)) {
-          return { ...prev, participantIds: [...prev.participantIds, data.userId] };
+          return { ...prev, participantIds: [...prev.participantIds, data.userId], status: nextStatus };
         }
 
-        return prev;
+        return { ...prev, status: nextStatus };
       });
 
       if (data.userId !== userId) {
@@ -753,7 +783,7 @@ export function useVideoCall(userId: string) {
       }
     };
     
-    const onCallMediaState = (data: { sessionId: string; userId: string; isMicMuted?: boolean; isCameraOff?: boolean }) => {
+    const onCallMediaState = (data: { sessionId: string; userId: string; isMicMuted?: boolean; isCameraOff?: boolean; isScreenSharing?: boolean }) => {
       if (activeCallRef.current && activeCallRef.current.sessionId === data.sessionId) {
         setParticipantMediaStates((prev) => ({
           ...prev,
@@ -761,6 +791,7 @@ export function useVideoCall(userId: string) {
             ...prev[data.userId],
             isMicMuted: data.isMicMuted ?? prev[data.userId]?.isMicMuted,
             isCameraOff: data.isCameraOff ?? prev[data.userId]?.isCameraOff,
+            isScreenSharing: data.isScreenSharing ?? prev[data.userId]?.isScreenSharing,
           }
         }));
       }
