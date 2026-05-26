@@ -14,16 +14,17 @@ import {
 import { X, Image as ImageIcon } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/fonts';
+import { mobileColors, mobileRadius, mobileShadow } from '../theme/tokens';
 import { Button } from '../ui/Button';
 import type { CreatePostPayload, PostType } from '../services/posts';
 
 const POST_TYPES: { value: PostType; label: string }[] = [
-  { value: 'discussion', label: 'Thao luan' },
-  { value: 'question', label: 'Hoi dap' },
+  { value: 'discussion', label: 'Thảo luận' },
+  { value: 'question', label: 'Hỏi đáp' },
   { value: 'til', label: 'TIL' },
   { value: 'showcase', label: 'Showcase' },
-  { value: 'tutorial', label: 'Huong dan' },
-  { value: 'job', label: 'Tuyen dung' },
+  { value: 'tutorial', label: 'Hướng dẫn' },
+  { value: 'job', label: 'Tuyển dụng' },
 ];
 
 const POPULAR_TAGS = [
@@ -35,7 +36,6 @@ const POPULAR_TAGS = [
   'golang',
   'rust',
   'devops',
-  'ai',
   'mobile',
 ];
 
@@ -80,11 +80,11 @@ export function CreatePostSheet({
 
   const handleSubmit = useCallback(async () => {
     if (!title.trim()) {
-      setError('Vui long nhap tieu de');
+      setError('Vui lòng nhập tiêu đề');
       return;
     }
     if (!content.trim()) {
-      setError('Vui long nhap noi dung');
+      setError('Vui lòng nhập nội dung');
       return;
     }
 
@@ -125,7 +125,7 @@ export function CreatePostSheet({
         <View style={styles.sheet}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Tao bai viet</Text>
+            <Text style={styles.headerTitle}>Tạo bài viết</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <X size={20} color={colors.textMuted} />
             </TouchableOpacity>
@@ -136,7 +136,7 @@ export function CreatePostSheet({
             showsVerticalScrollIndicator={false}
           >
             {/* Post type selector */}
-            <Text style={styles.label}>Loai bai viet</Text>
+            <Text style={styles.label}>Loại bài viết</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -164,10 +164,10 @@ export function CreatePostSheet({
             </ScrollView>
 
             {/* Title */}
-            <Text style={styles.label}>Tieu de</Text>
+            <Text style={styles.label}>Tiêu đề</Text>
             <TextInput
               style={styles.titleInput}
-              placeholder="Nhap tieu de bai viet..."
+              placeholder="Nhập tiêu đề bài viết..."
               placeholderTextColor={colors.textSubtle}
               value={title}
               onChangeText={setTitle}
@@ -175,10 +175,10 @@ export function CreatePostSheet({
             />
 
             {/* Content */}
-            <Text style={styles.label}>Noi dung</Text>
+            <Text style={styles.label}>Nội dung</Text>
             <TextInput
               style={styles.contentInput}
-              placeholder="Chia se bai viet cua ban..."
+              placeholder="Chia sẻ bài viết của bạn..."
               placeholderTextColor={colors.textSubtle}
               value={content}
               onChangeText={setContent}
@@ -187,7 +187,7 @@ export function CreatePostSheet({
             />
 
             {/* Tags */}
-            <Text style={styles.label}>Tags (toi da 5)</Text>
+            <Text style={styles.label}>Tags (tối đa 5)</Text>
             <View style={styles.tagsGrid}>
               {POPULAR_TAGS.map((tag) => (
                 <TouchableOpacity
@@ -218,7 +218,7 @@ export function CreatePostSheet({
           {/* Submit */}
           <View style={styles.footer}>
             <Button
-              title={isSubmitting ? 'Dang dang...' : 'Dang bai'}
+              title={isSubmitting ? 'Đang đăng...' : 'Đăng bài'}
               onPress={handleSubmit}
               isLoading={isSubmitting}
               disabled={!title.trim() || !content.trim()}
@@ -240,11 +240,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: mobileColors.bg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
     paddingBottom: 34,
+    ...mobileShadow.shadowFloating,
   },
   header: {
     flexDirection: 'row',
@@ -252,10 +253,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorder,
+    borderBottomColor: mobileColors.border,
   },
   headerTitle: {
-    color: colors.text,
+    color: mobileColors.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 18,
   },
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   label: {
-    color: colors.text,
+    color: mobileColors.textPrimary,
     fontFamily: fonts.semiBold,
     fontSize: 14,
     marginTop: 16,
@@ -280,40 +281,40 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassSoft,
+    borderColor: mobileColors.border,
+    backgroundColor: mobileColors.surface,
     marginRight: 8,
   },
   typeChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: mobileColors.accent,
+    borderColor: mobileColors.accent,
   },
   typeChipText: {
-    color: colors.textMuted,
+    color: mobileColors.textSecondary,
     fontFamily: fonts.medium,
     fontSize: 13,
   },
   typeChipTextActive: {
-    color: colors.text,
+    color: mobileColors.textOnAccent,
     fontFamily: fonts.bold,
   },
   titleInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: mobileColors.surface,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 12,
+    borderColor: mobileColors.border,
+    borderRadius: mobileRadius.radiusInput,
     padding: 14,
-    color: colors.text,
+    color: mobileColors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 15,
   },
   contentInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: mobileColors.surface,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 12,
+    borderColor: mobileColors.border,
+    borderRadius: mobileRadius.radiusInput,
     padding: 14,
-    color: colors.text,
+    color: mobileColors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 15,
     minHeight: 140,
@@ -328,20 +329,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassUltra,
+    borderColor: mobileColors.border,
+    backgroundColor: mobileColors.surfaceSoft,
   },
   tagChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: mobileColors.accent,
+    borderColor: mobileColors.accent,
   },
   tagChipText: {
-    color: colors.primary,
+    color: mobileColors.accent,
     fontFamily: fonts.medium,
     fontSize: 13,
   },
   tagChipTextActive: {
-    color: colors.text,
+    color: mobileColors.textOnAccent,
     fontFamily: fonts.bold,
   },
   errorText: {
@@ -355,6 +356,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.glassBorder,
+    borderTopColor: mobileColors.border,
   },
 });

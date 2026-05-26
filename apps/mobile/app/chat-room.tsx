@@ -31,6 +31,7 @@ import { socketService } from '../src/services/socket';
 import api from '../src/services/api';
 import { colors, lightTheme } from '../src/theme/colors';
 import { fonts } from '../src/theme/fonts';
+import { radius, shadows } from '../src/theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useMessagePreview } from '../src/hooks/useMessagePreview';
@@ -301,7 +302,7 @@ function normalizeMessage(raw: unknown): Message | null {
       userId: String(rawUserId),
       displayName: typeof item.displayName === 'string' && item.displayName.trim().length > 0
         ? item.displayName
-        : 'Nguoi dung',
+        : 'Người dùng',
       avatarUrl: typeof item.avatarUrl === 'string' ? item.avatarUrl : undefined,
     };
   };
@@ -830,7 +831,7 @@ export default function ChatRoomScreen() {
       onClose: undefined,
       onConfirm,
       confirmLabel,
-      cancelLabel: 'Huy',
+      cancelLabel: 'Hủy',
     });
   };
 
@@ -2409,7 +2410,7 @@ export default function ChatRoomScreen() {
       const showSummaryPill = summaryTotalCount > 0;
       const showReactionTrigger = Boolean(myLastEmoji);
 
-      const isCallEvent = message.type === 'call' || message.type === 'call_history' || message.type === 'system' || (message.type === 'text' && message.content && message.content.toLowerCase().includes('cuoc goi'));
+      const isCallEvent = message.type === 'call' || message.type === 'call_history' || message.type === 'system' || (message.type === 'text' && message.content && message.content.toLowerCase().includes('cuộc gọi'));
 
       if (isCallEvent) {
         return (
@@ -2462,7 +2463,7 @@ export default function ChatRoomScreen() {
                   onPress={() => jumpToMessage(message.replyTo?.messageRef || '')}
                   style={[bubbleStyles.replyCard, isMe ? bubbleStyles.replyCardMe : bubbleStyles.replyCardOther]}
                 >
-                  <Text style={[bubbleStyles.replyLabel, isMe && bubbleStyles.replyLabelMe]}>Tra loi</Text>
+                  <Text style={[bubbleStyles.replyLabel, isMe && bubbleStyles.replyLabelMe]}>Trả lời</Text>
                   {message.replyTo.senderDisplayName && (
                     <Text style={[bubbleStyles.replySenderName, isMe && bubbleStyles.replySenderNameMe]} numberOfLines={1}>
                       {message.replyTo.senderDisplayName}
@@ -2500,7 +2501,7 @@ export default function ChatRoomScreen() {
                 ) : (
                   <View style={bubbleStyles.mediaPlaceholder}>
                     <Ionicons name="image-outline" size={28} color={isMe ? '#111827' : '#94a3b8'} />
-                    <Text style={[bubbleStyles.mediaLabel, isMe && bubbleStyles.mediaLabelMe]}>Anh</Text>
+                    <Text style={[bubbleStyles.mediaLabel, isMe && bubbleStyles.mediaLabelMe]}>Ảnh</Text>
                   </View>
                 )
               ) : message.type === 'video' ? (
@@ -2710,7 +2711,7 @@ export default function ChatRoomScreen() {
                 style={styles.actionIcon}
                 onPress={openGroupInfoEditor}
               >
-                <Ionicons name="information-circle-outline" size={22} color="#10b981" />
+                <Ionicons name="information-circle-outline" size={22} color={lightTheme.accent} />
               </TouchableOpacity>
             </View>
           </View>
@@ -2768,7 +2769,7 @@ export default function ChatRoomScreen() {
               ) : null}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={64} color="#334155" />
+                  <Ionicons name="chatbubble-ellipses-outline" size={64} color={lightTheme.textMuted} />
                   <Text style={styles.emptyText}>Chưa có tin nhắn nào</Text>
                   <Text style={styles.emptySubtext}>Hãy gửi lời chào đầu tiên!</Text>
                 </View>
@@ -2784,6 +2785,7 @@ export default function ChatRoomScreen() {
           >
             <View style={styles.groupModalOverlay}>
               <View style={styles.groupModalCard}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.groupModalScrollContent}>
                 <Text style={styles.groupModalTitle}>{isGroupChat ? 'Thông tin nhóm' : 'Thông tin hội thoại'}</Text>
 
                 {!isGroupChat && (
@@ -2813,7 +2815,7 @@ export default function ChatRoomScreen() {
                       handleMuteConversation();
                     }}
                   >
-                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color="#0f9d8e" />
+                    <Ionicons name={conversationMutedUntil ? 'notifications' : 'notifications-off'} size={18} color={lightTheme.accent} />
                     <Text style={styles.groupActionText}>{conversationMutedUntil ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
                   </TouchableOpacity>
 
@@ -2823,7 +2825,7 @@ export default function ChatRoomScreen() {
                       void handleToggleConversationPin();
                     }}
                   >
-                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color="#0f9d8e" />
+                    <Ionicons name={isConversationPinned ? 'pin' : 'pin-outline'} size={18} color={lightTheme.accent} />
                     <Text style={styles.groupActionText}>{isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}</Text>
                   </TouchableOpacity>
                 </View>
@@ -2836,7 +2838,7 @@ export default function ChatRoomScreen() {
                       setIsArchiveOpen(true);
                     }}
                   >
-                    <Ionicons name="images-outline" size={18} color="#0f9d8e" />
+                    <Ionicons name="images-outline" size={18} color={lightTheme.accent} />
                     <Text style={styles.groupActionText}>Ảnh/Video</Text>
                   </TouchableOpacity>
 
@@ -2847,7 +2849,7 @@ export default function ChatRoomScreen() {
                       setIsArchiveOpen(true);
                     }}
                   >
-                    <Ionicons name="document-text-outline" size={18} color="#0f9d8e" />
+                    <Ionicons name="document-text-outline" size={18} color={lightTheme.accent} />
                     <Text style={styles.groupActionText}>File</Text>
                   </TouchableOpacity>
                 </View>
@@ -2870,9 +2872,9 @@ export default function ChatRoomScreen() {
                       )}
                       <View style={styles.groupAvatarCameraBadge}>
                         {isUploadingGroupAvatar ? (
-                          <ActivityIndicator size="small" color="#0f172a" />
+                          <ActivityIndicator size="small" color={lightTheme.textPrimary} />
                         ) : (
-                          <Ionicons name="camera-outline" size={14} color="#0f172a" />
+                          <Ionicons name="camera-outline" size={14} color={lightTheme.textPrimary} />
                         )}
                       </View>
                     </TouchableOpacity>
@@ -2953,7 +2955,7 @@ export default function ChatRoomScreen() {
                       disabled={isSavingGroupInfo || isUploadingGroupAvatar}
                     >
                       {isSavingGroupInfo ? (
-                        <ActivityIndicator size="small" color="#0f172a" />
+                        <ActivityIndicator size="small" color={lightTheme.textPrimary} />
                       ) : (
                         <Text style={styles.groupModalSaveText}>Lưu</Text>
                       )}
@@ -2963,10 +2965,11 @@ export default function ChatRoomScreen() {
 
                 {isGroupChat && (
                   <TouchableOpacity style={styles.leaveGroupButton} onPress={() => { void handleLeaveGroup(); }}>
-                    <Ionicons name="exit-outline" size={16} color="#ef4444" style={{ marginRight: 6 }} />
+                    <Ionicons name="exit-outline" size={16} color={lightTheme.danger} style={{ marginRight: 6 }} />
                     <Text style={styles.leaveGroupText}>Rời nhóm</Text>
                   </TouchableOpacity>
                 )}
+                </ScrollView>
               </View>
             </View>
           </Modal>
@@ -2980,18 +2983,18 @@ export default function ChatRoomScreen() {
             <View style={styles.sheetOverlay}>
               <View style={[styles.sheetCard, styles.statusDetailsCard]}>
                 <View style={styles.sheetHeader}>
-                  <Text style={styles.sheetTitle}>Thong ke da xem</Text>
+                    <Text style={styles.sheetTitle}>Thống kê đã xem</Text>
                   <TouchableOpacity style={styles.sheetCloseBtn} onPress={closeStatusDetails}>
-                    <Text style={styles.sheetCloseText}>Dong</Text>
+                    <Text style={styles.sheetCloseText}>Đóng</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.statusSection}>
                   <Text style={styles.statusSectionTitle}>
-                    Da xem ({statusDetailsMessage?.readBy?.length || 0})
+                    Đã xem ({statusDetailsMessage?.readBy?.length || 0})
                   </Text>
                   {(statusDetailsMessage?.readBy?.length || 0) === 0 ? (
-                    <Text style={styles.statusEmptyText}>Chua co ai da xem.</Text>
+                    <Text style={styles.statusEmptyText}>Chưa có ai đã xem.</Text>
                   ) : (
                     <ScrollView style={styles.statusList}>
                       {(statusDetailsMessage?.readBy || []).map((item) => (
@@ -3019,10 +3022,10 @@ export default function ChatRoomScreen() {
 
                 <View style={styles.statusSection}>
                   <Text style={styles.statusSectionTitle}>
-                    Chua doc ({statusDetailsMessage?.sentTo?.length || 0})
+                    Chưa đọc ({statusDetailsMessage?.sentTo?.length || 0})
                   </Text>
                   {(statusDetailsMessage?.sentTo?.length || 0) === 0 ? (
-                    <Text style={styles.statusEmptyText}>Tat ca da doc.</Text>
+                    <Text style={styles.statusEmptyText}>Tất cả đã đọc.</Text>
                   ) : (
                     <ScrollView style={styles.statusList}>
                       {(statusDetailsMessage?.sentTo || []).map((item) => (
@@ -3170,7 +3173,7 @@ export default function ChatRoomScreen() {
                   style={[styles.dialogButton, styles.dialogCancelButton]}
                   onPress={() => setIsMuteDurationModalOpen(false)}
                 >
-                  <Text style={styles.dialogCancelText}>Dong</Text>
+                  <Text style={styles.dialogCancelText}>Đóng</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3193,7 +3196,7 @@ export default function ChatRoomScreen() {
                       style={[styles.dialogButton, styles.dialogCancelButton]}
                       onPress={closeInfoDialog}
                     >
-                      <Text style={styles.dialogCancelText}>{appDialog.cancelLabel || 'Huy'}</Text>
+                      <Text style={styles.dialogCancelText}>{appDialog.cancelLabel || 'Hủy'}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -3201,7 +3204,7 @@ export default function ChatRoomScreen() {
                     style={[styles.dialogButton, appDialog.tone === 'error' ? styles.dialogDangerButton : styles.dialogPrimaryButton]}
                     onPress={appDialog.mode === 'confirm' ? handleDialogConfirm : closeInfoDialog}
                   >
-                    <Text style={styles.dialogPrimaryText}>{appDialog.confirmLabel || 'Dong'}</Text>
+                    <Text style={styles.dialogPrimaryText}>{appDialog.confirmLabel || 'Đóng'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -3233,7 +3236,7 @@ export default function ChatRoomScreen() {
             {replyingTo && (
               <View style={styles.replyComposerBar}>
                 <View style={styles.replyComposerMeta}>
-                  <Text style={styles.replyComposerLabel}>Dang tra loi</Text>
+                  <Text style={styles.replyComposerLabel}>Đang trả lời</Text>
                   <Text style={styles.replyComposerPreview} numberOfLines={1}>
                     {replyingTo.contentPreview || '[Tin nhắn]'}
                   </Text>
@@ -3447,7 +3450,7 @@ export default function ChatRoomScreen() {
                       }}
                     >
                       <Ionicons name="return-up-back-outline" size={16} color="#e2e8f0" />
-                      <Text style={styles.reactionActionText}>Tra loi</Text>
+                      <Text style={styles.reactionActionText}>Trả lời</Text>
                     </Pressable>
 
                     <Pressable
@@ -3781,20 +3784,21 @@ const bubbleStyles = StyleSheet.create({
     marginLeft: 12,
   },
   bubble: {
-    borderRadius: 20,
+    borderRadius: radius.card,
     paddingHorizontal: 14,
     paddingVertical: 10,
     minWidth: 60,
   },
   bubbleMe: {
     backgroundColor: lightTheme.accent,
-    borderBottomRightRadius: 6,
+    borderBottomRightRadius: 8,
   },
   bubbleOther: {
-    backgroundColor: lightTheme.surfaceCard,
-    borderBottomLeftRadius: 6,
+    backgroundColor: lightTheme.surface,
+    borderBottomLeftRadius: 8,
     borderWidth: 1,
     borderColor: lightTheme.border,
+    ...shadows.soft,
   },
   replyCard: {
     borderRadius: 12,
@@ -4074,20 +4078,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 68,
-    backgroundColor: lightTheme.bgPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    height: 64,
+    backgroundColor: lightTheme.bg,
     borderBottomWidth: 1,
     borderBottomColor: lightTheme.border,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: lightTheme.surfaceCard,
+    backgroundColor: lightTheme.surface,
     borderWidth: 1,
     borderColor: lightTheme.border,
   },
@@ -4098,10 +4102,10 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   headerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: lightTheme.surfaceCard,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: lightTheme.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -4111,7 +4115,7 @@ const styles = StyleSheet.create({
   headerAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 22,
+    borderRadius: 20,
   },
   headerAvatarText: {
     color: colors.textSubtle,
@@ -4134,17 +4138,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: lightTheme.surfaceCard,
+    backgroundColor: lightTheme.surface,
     borderWidth: 1,
     borderColor: lightTheme.border,
   },
   messageList: {
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
     flexGrow: 1,
     justifyContent: 'flex-end',
   },
@@ -4183,9 +4188,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   composerContainer: {
-    borderTopWidth: 1,
-    borderTopColor: colors.glassBorder,
-    backgroundColor: colors.glassPanelStrong,
+    marginHorizontal: 10,
+    marginBottom: 8,
+    borderRadius: radius.large,
+    borderWidth: 1,
+    borderColor: lightTheme.border,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    overflow: 'hidden',
+    ...shadows.floating,
   },
   replyComposerBar: {
     flexDirection: 'row',
@@ -4195,9 +4205,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceSoft,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: lightTheme.border,
     gap: 10,
   },
   replyComposerMeta: {
@@ -4205,13 +4215,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   replyComposerLabel: {
-    color: colors.accentSoft,
+    color: lightTheme.accent,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   replyComposerPreview: {
     marginTop: 2,
-    color: colors.textSubtle,
+    color: lightTheme.textSecondary,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_400Regular',
   },
@@ -4221,7 +4231,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.glassSoft,
+    backgroundColor: lightTheme.surface,
   },
   mediaDraftBar: {
     flexDirection: 'row',
@@ -4230,9 +4240,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     padding: 8,
     borderRadius: 12,
-    backgroundColor: colors.glassPanel,
+    backgroundColor: lightTheme.surfaceSoft,
     borderWidth: 1,
-    borderColor: colors.glassBorderSoft,
+    borderColor: lightTheme.border,
     gap: 10,
   },
   mediaDraftPreview: {
@@ -4281,8 +4291,8 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingHorizontal: 10,
+    paddingTop: 8,
   },
   inputAction: {
     width: 36,
@@ -4295,12 +4305,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: lightTheme.bgPrimary,
+    backgroundColor: lightTheme.surfaceSoft,
     borderWidth: 1,
     borderColor: lightTheme.border,
-    borderRadius: 24,
+    borderRadius: radius.pill,
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 5,
     marginHorizontal: 8,
     maxHeight: 120,
   },
@@ -4329,17 +4339,17 @@ const styles = StyleSheet.create({
   },
   composerPickerTab: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: lightTheme.border,
-    backgroundColor: lightTheme.surfaceCard,
+    backgroundColor: lightTheme.surface,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
   composerPickerTabActive: {
     borderColor: lightTheme.accent,
-    backgroundColor: lightTheme.accentLight,
+    backgroundColor: lightTheme.accentSoft,
   },
   composerPickerTabText: {
     color: colors.textMuted,
@@ -4356,8 +4366,8 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassPanelStrong,
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.surface,
     padding: 10,
   },
   quickEmojiBtn: {
@@ -4366,7 +4376,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.glassSoft,
+    backgroundColor: lightTheme.surfaceSoft,
   },
   quickEmojiText: {
     fontSize: 22,
@@ -4375,8 +4385,8 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    backgroundColor: lightTheme.accent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 0,
@@ -4394,27 +4404,31 @@ const styles = StyleSheet.create({
   },
   groupModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
   groupModalCard: {
     width: '100%',
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    maxHeight: '88%',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    backgroundColor: lightTheme.bg,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 20,
+    borderColor: lightTheme.border,
+    padding: 16,
+    ...shadows.floating,
+  },
+  groupModalScrollContent: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    paddingBottom: 4,
   },
   groupModalTitle: {
-    color: '#0f172a',
+    color: lightTheme.textPrimary,
     fontSize: 18,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 16,
@@ -4423,7 +4437,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: lightTheme.surfaceSoft,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -4434,7 +4448,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   groupAvatarPlaceholder: {
-    color: '#64748b',
+    color: lightTheme.textSecondary,
     fontSize: 34,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4445,7 +4459,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#0f9d8e',
+    backgroundColor: lightTheme.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -4453,21 +4467,21 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    color: '#0f172a',
+    borderColor: lightTheme.border,
+    color: lightTheme.textPrimary,
     fontSize: 15,
     fontFamily: 'BeVietnamPro_500Medium',
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: lightTheme.surface,
   },
   directInfoCard: {
     width: '100%',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.surface,
     alignItems: 'center',
     paddingVertical: 12,
     marginBottom: 12,
@@ -4476,7 +4490,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: lightTheme.surfaceSoft,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -4487,19 +4501,19 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   directInfoAvatarText: {
-    color: '#0f9d8e',
+    color: lightTheme.accent,
     fontSize: 24,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   directInfoName: {
-    color: '#0f172a',
+    color: lightTheme.textPrimary,
     fontSize: 16,
     fontFamily: 'BeVietnamPro_700Bold',
     maxWidth: '90%',
   },
   directInfoMeta: {
     marginTop: 2,
-    color: '#64748b',
+    color: lightTheme.textSecondary,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
   },
@@ -4508,12 +4522,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.surface,
     padding: 10,
   },
   memberRoleTitle: {
-    color: '#334155',
+    color: lightTheme.textSecondary,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_700Bold',
     marginBottom: 8,
@@ -4527,8 +4541,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.bg,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 8,
@@ -4539,19 +4553,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   memberRoleName: {
-    color: '#0f172a',
+    color: lightTheme.textPrimary,
     fontSize: 13,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   memberRoleMeta: {
-    color: '#64748b',
+    color: lightTheme.textSecondary,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_500Medium',
     marginTop: 2,
   },
   memberRoleAction: {
     borderRadius: 8,
-    backgroundColor: '#e2f5f2',
+    backgroundColor: lightTheme.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -4561,18 +4575,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   memberRoleActionText: {
-    color: '#0f9d8e',
+    color: lightTheme.accent,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
   memberRemoveAction: {
     borderRadius: 8,
-    backgroundColor: '#fee2e2',
+    backgroundColor: lightTheme.dangerSoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   memberRemoveActionText: {
-    color: '#ef4444',
+    color: lightTheme.danger,
     fontSize: 11,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4589,18 +4603,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   groupModalCancelButton: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: lightTheme.surfaceSoft,
   },
   groupModalSaveButton: {
-    backgroundColor: '#0f9d8e',
+    backgroundColor: lightTheme.accent,
   },
   groupModalCancelText: {
-    color: '#475569',
+    color: lightTheme.textSecondary,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_600SemiBold',
   },
   groupModalSaveText: {
-    color: '#FFFFFF',
+    color: lightTheme.textOnAccent,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
   },
@@ -4613,16 +4627,16 @@ const styles = StyleSheet.create({
   groupActionItem: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: lightTheme.surface,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: lightTheme.border,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   groupActionText: {
-    color: '#334155',
+    color: lightTheme.textSecondary,
     fontSize: 12,
     fontFamily: 'BeVietnamPro_500Medium',
     textAlign: 'center',
@@ -4632,15 +4646,15 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fecaca',
-    backgroundColor: '#fee2e2',
+    borderColor: lightTheme.dangerBorder,
+    backgroundColor: lightTheme.dangerSoft,
     paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   leaveGroupText: {
-    color: '#ef4444',
+    color: lightTheme.danger,
     fontSize: 14,
     fontFamily: 'BeVietnamPro_700Bold',
   },

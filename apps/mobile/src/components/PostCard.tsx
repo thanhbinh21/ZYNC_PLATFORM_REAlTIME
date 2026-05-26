@@ -10,6 +10,7 @@ import { Heart, MessageCircle, Bookmark } from 'lucide-react-native';
 import type { Post } from '../services/posts';
 import { lightTheme } from '../theme/colors';
 import { fonts } from '../theme/fonts';
+import { radius, shadows } from '../theme/spacing';
 
 interface PostCardProps {
   post: Post;
@@ -187,17 +188,13 @@ export const PostCard = memo(PostCardComponent);
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 24,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.6)',
-    backgroundColor: lightTheme.surfaceCard,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: lightTheme.border,
+    backgroundColor: lightTheme.surface,
+    padding: 16,
+    marginBottom: 12,
+    ...shadows.soft,
   },
   authorRow: {
     flexDirection: 'row',
@@ -211,7 +208,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatarFallback: {
-    backgroundColor: lightTheme.bgHover,
+    backgroundColor: lightTheme.surfaceSoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -235,8 +232,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   typeTag: {
-    backgroundColor: 'rgba(15, 185, 129, 0.1)',
-    borderRadius: 16,
+    backgroundColor: lightTheme.accentSoft,
+    borderRadius: radius.pill,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -263,7 +260,7 @@ const styles = StyleSheet.create({
   },
   tag: {
     backgroundColor: lightTheme.bgSecondary,
-    borderRadius: 12,
+    borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
@@ -280,8 +277,9 @@ const styles = StyleSheet.create({
   },
   media: {
     width: '100%',
-    height: 200,
-    borderRadius: 20,
+    height: 180,
+    maxHeight: 220,
+    borderRadius: radius.medium,
     marginBottom: 14,
   },
   actions: {
@@ -290,7 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(226, 232, 240, 0.4)',
+    borderTopColor: lightTheme.borderLight,
   },
   actionButton: {
     flexDirection: 'row',
@@ -299,8 +297,8 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
+    borderRadius: radius.pill,
+    backgroundColor: lightTheme.surfaceSoft,
   },
   actionCount: {
     color: lightTheme.textSecondary,

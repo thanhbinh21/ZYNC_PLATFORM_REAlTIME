@@ -23,6 +23,7 @@ export function AppScreen({
   disableBottomSafeArea = false,
 }: AppScreenProps) {
   const insets = useSafeAreaInsets();
+  const bottomInset = disableBottomSafeArea ? 0 : insets.bottom;
   
   const edges: ('top' | 'right' | 'bottom' | 'left')[] = ['top', 'left', 'right'];
   if (!disableBottomSafeArea) {
@@ -32,7 +33,7 @@ export function AppScreen({
   const content = scrollable ? (
     <ScrollView
       style={styles.flex1}
-      contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: 112 + bottomInset }, contentContainerStyle]}
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
     >
@@ -58,12 +59,12 @@ export function AppScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: lightTheme.bgPrimary,
+    backgroundColor: lightTheme.bg,
   },
   flex1: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120, // Space for bottom tab
+    paddingBottom: 112,
   },
 });

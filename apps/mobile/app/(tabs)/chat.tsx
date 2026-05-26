@@ -33,6 +33,7 @@ import { AppScreen } from '../../src/ui/AppScreen';
 import { AppSearchBar } from '../../src/ui/AppSearchBar';
 import { AppIconButton } from '../../src/ui/AppIconButton';
 import { Avatar } from '../../src/ui/Avatar';
+import { ConversationItem } from '../../src/ui/ConversationItem';
 
 // ───────── Types ─────────
 interface ConversationMember {
@@ -132,18 +133,18 @@ function getConversationName(conv: Conversation, myUserId: string): string {
 }
 
 function getLastMessagePreview(msg?: LastMessage): string {
-  if (!msg) return 'Chua co tin nhan';
-  if (msg.type?.startsWith('file/')) return 'Tep dinh kem';
+  if (!msg) return 'Chưa có tin nhắn';
+  if (msg.type?.startsWith('file/')) return 'Tệp đính kèm';
 
   switch (msg.type) {
     case 'image':
-      return 'Anh';
+      return 'Ảnh';
     case 'video':
       return 'Video';
     case 'audio':
-      return 'Am thanh';
+      return 'Âm thanh';
     case 'sticker':
-      return 'Nhan dan';
+      return 'Nhãn dán';
     default:
       return msg.content || 'Tin nhắn mới';
   }
@@ -550,7 +551,7 @@ export default function ChatScreen() {
         <View style={s.header}>
           <View style={s.headerLeft}>
             <View style={s.logoContainer}>
-              <MessageSquare size={20} color="#0f9d8e" strokeWidth={2.5} />
+              <MessageSquare size={20} color={theme.accent} strokeWidth={2.5} />
             </View>
             <Text style={s.title}>Tin nhắn</Text>
           </View>
@@ -558,11 +559,10 @@ export default function ChatScreen() {
             <AppIconButton 
               icon={<Ionicons name="create-outline" size={24} color={lightTheme.accent} />}
               onPress={() => router.push('/create-group')}
-              style={{ marginRight: 8 }}
               size={36}
             />
             <AppIconButton 
-              icon={<Ionicons name="settings-outline" size={20} color="#64748B" />}
+              icon={<Ionicons name="settings-outline" size={20} color={lightTheme.textMuted} />}
               onPress={() => {}}
               size={36}
             />
@@ -570,7 +570,7 @@ export default function ChatScreen() {
         </View>
 
         {/* Search Bar */}
-        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <View style={s.searchWrap}>
           <AppSearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -608,32 +608,13 @@ export default function ChatScreen() {
               if (isSearchTarget(item)) {
                 const target = item;
                 return (
-                  <TouchableOpacity style={s.chatItem} onPress={() => { void openSearchTarget(target); }}>
-                    <View style={s.avatarContainer}>
-                      <View style={[s.avatar, target.type === 'group' && s.groupAvatar]}>
-                        {target.avatarUrl ? (
-                          <Image source={{ uri: target.avatarUrl }} style={s.avatarImage} resizeMode="cover" />
-                        ) : (
-                          <Text style={s.avatarText}>{target.name.charAt(0).toUpperCase()}</Text>
-                        )}
-                        {target.type === 'group' && (
-                          <View style={s.groupBadge}>
-                            <Ionicons name="people" size={10} color={theme.textOnAccent} />
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <View style={s.chatInfo}>
-                      <View style={s.chatHeader}>
-                        <Text style={s.chatName}>{target.name}</Text>
-                      </View>
-                      <View style={s.chatFooter}>
-                        <Text style={s.lastMsg} numberOfLines={1}>
-                          {target.type === 'group' ? 'Nhom' : 'Ban be'}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
+                  <ConversationItem
+                    title={target.name}
+                    preview={target.type === 'group' ? 'Nhóm' : 'Bạn bè'}
+                    avatarUrl={target.avatarUrl}
+                    isGroup={target.type === 'group'}
+                    onPress={() => { void openSearchTarget(target); }}
+                  />
                 );
               }
 
@@ -642,64 +623,22 @@ export default function ChatScreen() {
               const unread = conversationItem.unreadCount ?? conversationItem.unreadCounts?.[userId] ?? 0;
               const hasUnread = unread > 0;
 
+              const peerId = conversationItem.type !== 'group'
+                ? conversationItem.users?.find((u) => u._id !== userId)?._id
+                : undefined;
+
               return (
-                <TouchableOpacity style={s.chatItem} onPress={() => openChatRoom(conversationItem)}>
-                  <View style={s.avatarContainer}>
-                    <View style={[s.avatar, conversationItem.type === 'group' && s.groupAvatar]}>
-                      {conversationItem.avatarUrl ? (
-                        <Image source={{ uri: conversationItem.avatarUrl }} style={s.avatarImage} resizeMode="cover" />
-                      ) : (
-                        <Text style={s.avatarText}>
-                          {displayName.charAt(0).toUpperCase()}
-                        </Text>
-                      )}
-                      {conversationItem.type !== 'group' && (() => {
-                        const peerId = conversationItem.users?.find((u) => u._id !== userId)?._id;
-                        const presence = peerId ? getPresence(peerId) : undefined;
-                        return presence?.online ? (
-                          <View style={s.onlineDot} />
-                        ) : null;
-                      })()}
-                      {conversationItem.type === 'group' && (
-                        <View style={s.groupBadge}>
-                          <Ionicons name="people" size={10} color={theme.textOnAccent} />
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                  <View style={s.chatInfo}>
-                    <View style={s.chatHeader}>
-                      <Text style={[s.chatName, hasUnread && s.chatNameBold]}>
-                        {displayName}
-                      </Text>
-                      <View style={s.timeColumn}>
-                        <Text style={[s.chatTime, hasUnread && s.chatTimeActive]}>
-                          {formatRelativeTime(conversationItem.lastMessage?.sentAt || conversationItem.updatedAt)}
-                        </Text>
-                        {pinnedSet.has(conversationItem._id) && (
-                          <View style={s.pinBadge}>
-                            <Ionicons name="pin" size={14} color={lightTheme.textTertiary} />
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <View style={s.chatFooter}>
-                      <Text
-                        style={[s.lastMsg, hasUnread && s.lastMsgBold]}
-                        numberOfLines={1}
-                      >
-                        {getLastMessagePreview(conversationItem.lastMessage)}
-                      </Text>
-                      {hasUnread && (
-                        <View style={s.unreadBadge}>
-                          <Text style={s.unreadText}>
-                            {unread > 99 ? '99+' : unread}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                <ConversationItem
+                  title={displayName}
+                  preview={getLastMessagePreview(conversationItem.lastMessage)}
+                  time={formatRelativeTime(conversationItem.lastMessage?.sentAt || conversationItem.updatedAt)}
+                  avatarUrl={conversationItem.avatarUrl}
+                  unreadCount={unread}
+                  isGroup={conversationItem.type === 'group'}
+                  online={Boolean(peerId && getPresence(peerId)?.online)}
+                  pinned={pinnedSet.has(conversationItem._id)}
+                  onPress={() => openChatRoom(conversationItem)}
+                />
               );
             }}
             ListEmptyComponent={
@@ -707,7 +646,7 @@ export default function ChatScreen() {
                 variant={isSearchMode ? 'no-results' : 'no-messages'}
               />
             }
-            contentContainerStyle={(isSearchMode ? searchTargets.length : sortedConversations.length) === 0 ? { flex: 1 } : { paddingBottom: 100 }}
+            contentContainerStyle={(isSearchMode ? searchTargets.length : sortedConversations.length) === 0 ? { flex: 1 } : s.listContent}
           />
         )}
       </View>
@@ -719,12 +658,13 @@ const useStyles = (theme: typeof lightTheme) =>
   StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: 'transparent' },
     avatarImage: { width: '100%', height: '100%', borderRadius: 29 },
-    container: { flex: 1, paddingHorizontal: 20 },
+    container: { flex: 1, paddingHorizontal: 16 },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: 20,
+      paddingTop: 14,
+      paddingBottom: 10,
       paddingHorizontal: 4,
     },
     headerLeft: {
@@ -737,10 +677,10 @@ const useStyles = (theme: typeof lightTheme) =>
       gap: 8,
     },
     logoContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: theme.surfaceCard,
+      width: 38,
+      height: 38,
+      borderRadius: 14,
+      backgroundColor: theme.surface,
       borderWidth: 1,
       borderColor: theme.border,
       justifyContent: 'center',
@@ -751,6 +691,12 @@ const useStyles = (theme: typeof lightTheme) =>
       color: theme.textPrimary,
       fontSize: 24,
       fontFamily: fonts.bold,
+    },
+    searchWrap: {
+      marginBottom: 12,
+    },
+    listContent: {
+      paddingBottom: 132,
     },
     actionBtn: {
       width: 40,

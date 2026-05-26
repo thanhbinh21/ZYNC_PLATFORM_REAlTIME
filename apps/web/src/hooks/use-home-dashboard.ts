@@ -632,24 +632,16 @@ export function useHomeDashboard() {
 
     stream.getTracks().forEach((track) => {
       if (!existingTrackIds.has(track.id)) {
-        connection.addTrack(track, stream);
-      }
-    });
-  }, []);
-
-  const replacePeerVideoTrack = useCallback((videoTrack: MediaStreamTrack | null) => {
-    peerConnectionsRef.current.forEach((connection) => {
-      const videoSender = connection.getSenders().find((sender) => sender.track?.kind === 'video');
-      if (!videoSender) {
-        if (videoTrack && localStreamRef.current) {
-          connection.addTrack(videoTrack, localStreamRef.current);
+        try {
+          connection.addTrack(track, stream);
+        } catch (err) {
+          console.warn('[Call] Failed to add track to peer connection:', err);
         }
-        return;
       }
-
-      void videoSender.replaceTrack(videoTrack);
     });
   }, []);
+
+
 
   const flushPendingRemoteCandidates = useCallback(async (peerUserId: string, connection: RTCPeerConnection) => {
     const queuedCandidates = pendingRemoteCandidatesRef.current.get(peerUserId) ?? [];
@@ -734,11 +726,7 @@ export function useHomeDashboard() {
   }, []);
 
   const shouldCreateOfferForPeer = useCallback((callState: CallSessionState, peerUserId: string): boolean => {
-    if (!callState.isGroupCall) {
-      return callState.direction === 'outgoing';
-    }
-
-    return userId.localeCompare(peerUserId) < 0;
+    return userId.localeCompare(peerUserId) > 0;
   }, [userId]);
 
   const createOfferForPeer = useCallback(async (callState: CallSessionState, peerUserId: string) => {
@@ -760,6 +748,33 @@ export function useHomeDashboard() {
     await connection.setLocalDescription(offer);
     emitWebRtcOffer(callState.sessionId, peerUserId, callState.callToken, offer);
   }, [ensurePeerConnection, userId]);
+
+  const replacePeerVideoTrack = useCallback((videoTrack: MediaStreamTrack | null) => {
+    peerConnectionsRef.current.forEach((connection, peerUserId) => {
+      const videoSender = connection.getSenders().find((sender) => sender.track?.kind === 'video');
+      if (!videoSender) {
+        if (videoTrack && localStreamRef.current) {
+          try {
+            connection.addTrack(videoTrack, localStreamRef.current);
+            // Trigger renegotiation if track was newly added
+            const currentCall = activeCallRef.current;
+            if (currentCall && currentCall.status === 'connected') {
+              void createOfferForPeer(currentCall, peerUserId).catch((err) => {
+                console.error('[Call] Failed to renegotiate after adding video track:', err);
+              });
+            }
+          } catch (err) {
+            console.error('[Call] Failed to add video track to peer connection:', err);
+          }
+        }
+        return;
+      }
+
+      videoSender.replaceTrack(videoTrack).catch((err) => {
+        console.error('[Call] Failed to replace video track:', err);
+      });
+    });
+  }, [createOfferForPeer]);
 
   const ensureLocalMedia = useCallback(async (cameraEnabled: boolean = true) => {
     const insecureContextMessage = getWebRtcInsecureContextMessage();

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { lightTheme } from '../theme/colors';
-import { radius } from '../theme/spacing';
+import { radius, shadows } from '../theme/spacing';
 import { AnimatedPressable } from './AnimatedPressable';
 
 interface AppCardProps {
@@ -29,15 +29,11 @@ export function AppCard({ children, style, onPress, activeScale = 0.98 }: AppCar
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: lightTheme.surfaceCard,
-    borderRadius: radius.large,
+    backgroundColor: lightTheme.surface,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: lightTheme.border,
     padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+    ...shadows.soft,
   },
 });

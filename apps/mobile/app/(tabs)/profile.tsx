@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  AlertTriangle, Bell, ChevronRight, HelpCircle, History,
-  KeyRound, Lock, LogOut, Palette, Shield, Settings, ShieldCheck,
+  Bell, HelpCircle, Lock, LogOut, Palette, Settings, ShieldCheck,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { socketService } from '../../src/services/socket';
@@ -14,6 +13,8 @@ import { AppCard } from '../../src/ui/AppCard';
 import { Avatar } from '../../src/ui/Avatar';
 import { fonts } from '../../src/theme/fonts';
 import { lightTheme } from '../../src/theme/colors';
+import { ProfileMenuItem } from '../../src/ui/ProfileMenuItem';
+import { ConfirmDialog } from '../../src/ui/ConfirmDialog';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -22,27 +23,24 @@ export default function ProfileScreen() {
 
   const [friendCount, setFriendCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
-  const [trustScore, setTrustScore] = useState(100);
-  const [violationCount, setViolationCount] = useState(0);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const displayName = userInfo?.displayName || 'Zync User';
-  const email = userInfo?.email || 'user@zync.platform';
+  const displayName = userInfo?.displayName || userInfo?.username || 'Người dùng Zync';
+  const email = userInfo?.email || '';
   const username = userInfo?.username ? `@${userInfo.username}` : null;
   const joinedYear = userInfo?.createdAt ? new Date(userInfo.createdAt).getFullYear() : new Date().getFullYear();
 
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const [friendsRes, convsRes, meRes] = await Promise.all([
+        const [friendsRes, convsRes] = await Promise.all([
           api.get('/friends/count').catch(() => ({ data: { count: 0 } })),
           api.get('/conversations').catch(() => ({ data: { conversations: [] } })),
-          api.get('/users/me').catch(() => ({ data: { user: null } })),
         ]);
         setFriendCount(friendsRes.data?.count || 0);
-        setConversationCount(convsRes.data?.conversations?.length || 0);
-        const meUser = meRes.data?.user as { trustScore?: number; globalViolationCount?: number } | undefined;
-        setTrustScore(Math.max(0, Math.min(100, meUser?.trustScore ?? userInfo?.trustScore ?? 100)));
-        setViolationCount(Math.max(0, meUser?.globalViolationCount ?? userInfo?.globalViolationCount ?? 0));
+        const conversations = convsRes.data?.conversations || convsRes.data?.data || [];
+        setConversationCount(Array.isArray(conversations) ? conversations.length : 0);
       } catch (e) {
         console.error('Profile stats error:', e);
       }
@@ -51,35 +49,29 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', [
-      { text: 'Hủy', style: 'cancel' },
-      {
-        text: 'Đăng xuất',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.post('/auth/logout').catch(() => {});
-            socketService.disconnect();
-            await logout();
-            router.replace('/(auth)/login');
-          } catch (e) {
-            await logout();
-            router.replace('/(auth)/login');
-          }
-        },
-      },
-    ]);
+    setLogoutDialogOpen(true);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      await api.post('/auth/logout').catch(() => {});
+      socketService.disconnect();
+      await logout();
+      router.replace('/(auth)/login');
+    } finally {
+      setLogoutLoading(false);
+      setLogoutDialogOpen(false);
+    }
   };
 
   const menuOptions = [
-    { title: 'Tài khoản và Bảo mật', Icon: ShieldCheck, color: '#10B981', route: '/settings' },
-    { title: 'Quyền riêng tư', Icon: Lock, color: '#2563EB', route: '/settings' },
-    { title: 'Thông báo', Icon: Bell, color: '#F59E0B', route: '/settings' },
-    { title: 'Giao diện và Ngôn ngữ', Icon: Palette, color: '#8B5CF6', route: '/settings' },
-    { title: 'Trợ giúp & Phản hồi', Icon: HelpCircle, color: '#EC4899', route: '/settings' },
+    { title: 'Tài khoản và Bảo mật', Icon: ShieldCheck, color: lightTheme.success, route: '/settings' },
+    { title: 'Quyền riêng tư', Icon: Lock, color: lightTheme.info, route: '/settings' },
+    { title: 'Thông báo', Icon: Bell, color: lightTheme.warning, route: '/settings' },
+    { title: 'Giao diện và Ngôn ngữ', Icon: Palette, color: lightTheme.violet, route: '/settings' },
+    { title: 'Trợ giúp & Phản hồi', Icon: HelpCircle, color: lightTheme.pink, route: '/settings' },
   ];
-  const trustColor = trustScore >= 70 ? '#10B981' : trustScore >= 40 ? '#F59E0B' : '#EF4444';
-
   return (
     <AppScreen scrollable hideStatusBar={false}>
       {/* Header Info */}
@@ -94,7 +86,7 @@ export default function ProfileScreen() {
         />
         <Text style={styles.userName}>{displayName}</Text>
         {username ? <Text style={styles.userHandle}>{username}</Text> : null}
-        <Text style={styles.userEmail}>{email}</Text>
+        {email ? <Text style={styles.userEmail}>{email}</Text> : null}
         
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/settings')}>
@@ -128,66 +120,35 @@ export default function ProfileScreen() {
         {/* Menu Items */}
         <AppCard style={styles.menuCard}>
           {menuOptions.map((item, index) => (
-            <TouchableOpacity 
+            <ProfileMenuItem
               key={index} 
-              style={[styles.menuItem, index < menuOptions.length - 1 && styles.menuItemBorder]} 
+              title={item.title}
+              icon={<item.Icon size={20} stroke={item.color} />}
+              tone={item.color}
+              showBorder={index < menuOptions.length - 1}
               onPress={() => item.route && router.push(item.route as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
-                <item.Icon size={22} stroke={item.color} />
-              </View>
-              <Text style={styles.menuText}>{item.title}</Text>
-              <ChevronRight size={18} stroke="#64748B" />
-            </TouchableOpacity>
+            />
           ))}
-        </AppCard>
-
-        {/* Reputation & Security */}
-        <AppCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Danh tiếng</Text>
-          <View style={styles.trustRow}>
-            <Text style={styles.trustLabel}>Điểm tin cậy</Text>
-            <Text style={[styles.trustValue, { color: trustColor }]}>{trustScore}%</Text>
-          </View>
-          <View style={styles.trustBarTrack}>
-            <View style={[styles.trustBarFill, { width: `${trustScore}%`, backgroundColor: trustColor }]} />
-          </View>
-          <View style={styles.violationRow}>
-            <Text style={styles.violationLabel}>Lần vi phạm toàn hệ thống</Text>
-            <Text style={[styles.violationValue, { color: violationCount >= 3 ? '#EF4444' : violationCount > 0 ? '#F59E0B' : '#10B981' }]}>
-              {violationCount}
-            </Text>
-          </View>
-          {violationCount >= 3 && (
-            <View style={styles.warningBox}>
-              <AlertTriangle size={16} stroke="#EF4444" />
-              <Text style={styles.warningText}>Tài khoản có nguy cơ bị hạn chế nếu tiếp tục vi phạm.</Text>
-            </View>
-          )}
-        </AppCard>
-
-        <AppCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Bảo mật</Text>
-          <View style={styles.securityItem}>
-            <Shield size={18} stroke="#10B981" />
-            <Text style={styles.securityText}>Xác thực hai bước: Đã bật</Text>
-          </View>
-          <View style={styles.securityItem}>
-            <KeyRound size={18} stroke="#2563EB" />
-            <Text style={styles.securityText}>Đổi mật khẩu định kỳ mỗi 90 ngày</Text>
-          </View>
-          <View style={styles.securityItem}>
-            <History size={18} stroke="#F59E0B" />
-            <Text style={styles.securityText}>Lịch sử đăng nhập: 1 thiết bị hoạt động</Text>
-          </View>
         </AppCard>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <LogOut size={22} stroke="#EF4444" style={{ marginRight: 10 }} />
+          <LogOut size={22} stroke={lightTheme.danger} style={{ marginRight: 10 }} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
+
+      <ConfirmDialog
+        visible={logoutDialogOpen}
+        title="Đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?"
+        cancelLabel="Hủy"
+        confirmLabel="Đăng xuất"
+        danger
+        loading={logoutLoading}
+        onCancel={() => setLogoutDialogOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </AppScreen>
   );
 }
@@ -195,7 +156,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingVertical: 24,
     paddingHorizontal: 20,
   },
   avatarMargin: {
@@ -231,7 +192,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   editProfileText: {
-    color: '#FFFFFF',
+    color: lightTheme.textOnAccent,
     fontSize: 14,
     fontFamily: fonts.semiBold,
   },
@@ -239,15 +200,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: lightTheme.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E8ECEF',
+    borderColor: lightTheme.border,
   },
   contentPadding: {
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 132,
     gap: 16,
   },
   statsCard: {
@@ -271,7 +232,7 @@ const styles = StyleSheet.create({
   },
   dividerVertical: {
     width: 1,
-    backgroundColor: '#E8ECEF',
+    backgroundColor: lightTheme.border,
     marginVertical: 4,
   },
   menuCard: {
@@ -329,7 +290,7 @@ const styles = StyleSheet.create({
   trustBarTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F0F4F8',
+    backgroundColor: lightTheme.surfaceSoft,
     marginBottom: 16,
     overflow: 'hidden',
   },
@@ -354,7 +315,7 @@ const styles = StyleSheet.create({
   warningBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: lightTheme.dangerSoft,
     padding: 12,
     borderRadius: 12,
     marginTop: 16,
@@ -364,7 +325,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontFamily: fonts.medium,
-    color: '#EF4444',
+    color: lightTheme.danger,
   },
   securityItem: {
     flexDirection: 'row',
@@ -382,13 +343,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: lightTheme.dangerSoft,
     paddingVertical: 16,
     borderRadius: 20,
     marginTop: 8,
   },
   logoutText: {
-    color: '#EF4444',
+    color: lightTheme.danger,
     fontSize: 15,
     fontFamily: fonts.bold,
   },

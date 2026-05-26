@@ -1,9 +1,15 @@
 // Unified teal palette matching Web design tokens (--accent: #0f9d8e / #22c7b5)
 export const lightTheme = {
-  bgPrimary: '#F7FAFC',
-  bgSecondary: '#F5F8FA',
+  bg: '#F4FBF8',
+  surface: '#FFFFFF',
+  surfaceSoft: '#EAF8F4',
+  accentSoft: '#D8F3EC',
+  textMuted: '#8AA0A0',
+
+  bgPrimary: '#F4FBF8',
+  bgSecondary: '#EAF8F4',
   bgSidebar: 'rgba(255, 255, 255, 0.65)',
-  bgHover: '#E2E8F0',
+  bgHover: '#D8F3EC',
   bgActive: '#CBD5E1',
   bgCode: '#F1F5F9',
   bgCard: '#FFFFFF',
@@ -14,8 +20,9 @@ export const lightTheme = {
   textLink: '#0f9d8e',
 
   accent: '#0f9d8e',
+  accentDark: '#0b8073',
   accentHover: '#0b8073',
-  accentLight: '#ccebe6',
+  accentLight: '#D8F3EC',
   accentStrong: '#07544b',
   textOnAccent: '#FFFFFF',
 
@@ -29,12 +36,12 @@ export const lightTheme = {
   dangerSoft: 'rgba(239, 68, 68, 0.08)',
   dangerBorder: 'rgba(239, 68, 68, 0.2)',
 
-  border: '#DCEBE8',
-  borderLight: '#F1F5F9',
+  border: '#D7E8E3',
+  borderLight: '#ECF4F1',
 
   surfaceCard: '#FFFFFF',
   surfaceCardStrong: '#FFFFFF',
-  surfaceMuted: '#F8FAFC',
+  surfaceMuted: '#F2FAF7',
   surfaceGlass: 'rgba(255, 255, 255, 0.8)',
   surfaceGlassStrong: 'rgba(255, 255, 255, 0.95)',
 
@@ -97,8 +104,8 @@ export const colors = {
   primary: '#0f9d8e',
   primaryHover: '#0b8073',
   accent: '#0f9d8e',
-  accentLight: '#ccebe6',
-  accentSoft: '#ccebe6',
+  accentLight: '#D8F3EC',
+  accentSoft: '#D8F3EC',
   textOnAccent: '#FFFFFF',
   info: '#2563EB',
   warning: '#F59E0B',
@@ -107,14 +114,15 @@ export const colors = {
   pink: '#EC4899',
   neutral: '#64748B',
 
-  backgroundDeep: '#eaf1f8',
-  backgroundMid: '#f1f6fb',
+  backgroundDeep: '#E8F5F1',
+  backgroundMid: '#F4FBF8',
   backgroundSoft: '#ffffff',
   backgroundAuth: '#f6f9fc',
 
-  background: '#eaf1f8',
-  surface: 'rgba(250, 252, 255, 0.84)',
-  surfaceHover: 'rgba(224, 234, 243, 0.9)',
+  background: '#F4FBF8',
+  surface: '#FFFFFF',
+  surfaceSoft: '#EAF8F4',
+  surfaceHover: '#D8F3EC',
 
   glassUltra: 'rgba(15, 157, 142, 0.08)',
   glassSoft: 'rgba(255, 255, 255, 0.72)',
@@ -141,4 +149,39 @@ export const colors = {
   dangerBorder: 'rgba(239, 68, 68, 0.2)',
 
   border: '#D0D7DE',
+};
+
+export const mobileTokens = {
+  colors: {
+    bg: lightTheme.bg,
+    surface: lightTheme.surface,
+    surfaceSoft: lightTheme.surfaceSoft,
+    accent: lightTheme.accent,
+    accentDark: lightTheme.accentHover,
+    accentSoft: lightTheme.accentSoft,
+    textPrimary: lightTheme.textPrimary,
+    textSecondary: lightTheme.textSecondary,
+    textMuted: lightTheme.textMuted,
+    border: lightTheme.border,
+    danger: lightTheme.danger,
+    warning: lightTheme.warning,
+    info: lightTheme.info,
+    success: lightTheme.success,
+  },
+  shadow: {
+    soft: {
+      shadowColor: '#0F172A',
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
+    },
+    floating: {
+      shadowColor: '#0F172A',
+      shadowOpacity: 0.12,
+      shadowRadius: 22,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
+    },
+  },
 };

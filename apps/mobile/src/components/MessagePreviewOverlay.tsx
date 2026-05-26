@@ -220,7 +220,7 @@ function PreviewCard({
             <View style={cardStyles.actionBtns}>
               <TouchableOpacity style={cardStyles.actionBtn} onPress={handleOpenReply}>
                 <Ionicons name="return-down-back-outline" size={14} color="#88bca9" />
-                <Text style={cardStyles.actionText}>Tra loi</Text>
+                <Text style={cardStyles.actionText}>Trả lời</Text>
               </TouchableOpacity>
               <View style={cardStyles.actionDivider} />
               <TouchableOpacity style={cardStyles.actionBtn} onPress={onNavigate}>

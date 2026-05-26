@@ -94,7 +94,7 @@ function DeveloperCardComponent({
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.friendCount}>
-          {user.friendCount} ban be
+          {user.friendCount} bạn bè
         </Text>
         <View style={styles.actions}>
           {user.githubUrl && (

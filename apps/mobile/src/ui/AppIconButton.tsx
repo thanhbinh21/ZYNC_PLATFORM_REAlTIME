@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { lightTheme } from '../theme/colors';
+import { shadows } from '../theme/spacing';
 import { AnimatedPressable } from './AnimatedPressable';
 
 interface AppIconButtonProps {
@@ -15,7 +16,7 @@ export function AppIconButton({
   icon, 
   onPress, 
   style, 
-  backgroundColor = '#FFFFFF',
+  backgroundColor = lightTheme.surface,
   size = 44 
 }: AppIconButtonProps) {
   return (
@@ -44,10 +45,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: lightTheme.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    ...shadows.soft,
   },
 });

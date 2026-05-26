@@ -59,11 +59,11 @@ function ChannelCardComponent({
         <View style={styles.meta}>
           <Users size={12} color={colors.textSubtle} />
           <Text style={styles.memberCount}>
-            {channel.memberCount} thanh vien
+            {channel.memberCount} thành viên
           </Text>
           {channel.isPrivate && (
             <View style={styles.privateTag}>
-              <Text style={styles.privateTagText}>Rieng tu</Text>
+              <Text style={styles.privateTagText}>Riêng tư</Text>
             </View>
           )}
         </View>
@@ -81,7 +81,7 @@ function ChannelCardComponent({
       )}
       {isJoined && (
         <View style={styles.joinedBadge}>
-          <Text style={styles.joinedBadgeText}>Da tham gia</Text>
+          <Text style={styles.joinedBadgeText}>Đã tham gia</Text>
         </View>
       )}
     </TouchableOpacity>

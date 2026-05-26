@@ -1,7 +1,6 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Modal,
   StyleSheet,
@@ -11,39 +10,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, CheckCheck, ChevronRight, Heart, MessageCircle, UserCheck, Users, X } from 'lucide-react-native';
+import { Bell, CheckCheck, X } from 'lucide-react-native';
 import type { AppNotification, NotificationAnchorRect } from '../services/notifications';
-import { colors } from '../theme/colors';
-
-const SCREEN = Dimensions.get('window');
-const PANEL_MAX_W = 360;
-const GAP = 8;
-const HEADER_H = 44;
-const PANEL_MARGIN = 12;
-const LIST_MAX_CAP = 320;
-
-const TYPE_ICONS: Record<AppNotification['type'], React.ElementType> = {
-  new_message: MessageCircle,
-  friend_request: Users,
-  friend_accepted: UserCheck,
-  group_invite: Users,
-  group_update: Users,
-  story_reaction: Heart,
-  story_reply: MessageCircle,
-};
-
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'Vừa xong';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} phút trước`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ngày trước`;
-  return new Date(dateStr).toLocaleDateString('vi-VN');
-}
+import { fonts } from '../theme/fonts';
+import { mobileColors, mobileRadius, mobileShadow, mobileSpacing } from '../theme/tokens';
+import { NotificationItem } from '../ui/NotificationItem';
 
 interface NotificationsSheetProps {
   visible: boolean;
@@ -51,58 +22,52 @@ interface NotificationsSheetProps {
   onClose: () => void;
   notifications: AppNotification[];
   isLoading: boolean;
+  error?: string | null;
   hasMore: boolean;
   onLoadMore: () => void;
   onMarkRead: (ids: string[]) => void;
   onMarkAllRead: () => void;
 }
 
-function computeDropdownLayout(
-  anchor: NotificationAnchorRect | null,
-  insets: { top: number; bottom: number },
-): { top: number; left: number; width: number; listMaxHeight: number } {
-  const panelW = Math.min(PANEL_MAX_W, SCREEN.width - PANEL_MARGIN * 2);
+function resolveNotificationRoute(n: AppNotification) {
+  const data = n.data ?? {};
+  const conversationId = n.conversationId || data.conversationId || data.chatId;
+  const postId = data.postId || data.communityPostId;
+  const groupId = data.groupId || data.channelId;
 
-  const clampLeft = (left: number) =>
-    Math.max(PANEL_MARGIN, Math.min(left, SCREEN.width - PANEL_MARGIN - panelW));
-
-  // Fallback (không có anchor): đặt góc phải phía trên
-  if (!anchor) {
-    const top = insets.top + PANEL_MARGIN + 44;
-    const left = clampLeft(SCREEN.width - PANEL_MARGIN - panelW);
-    const availableBelow = SCREEN.height - top - insets.bottom - PANEL_MARGIN;
-    const listMaxHeight = Math.min(LIST_MAX_CAP, Math.max(160, availableBelow - HEADER_H));
-    return { top, left, width: panelW, listMaxHeight };
+  if (conversationId) {
+    return {
+      pathname: '/chat-room' as const,
+      params: {
+        conversationId,
+        name: n.title.replace(/^Tin nhắn mới từ\s+/i, '').replace(/^Nhóm:\s*/i, '') || 'Chat',
+        avatarUrl: '',
+        isGroup: n.type === 'group_invite' || n.type === 'group_update' ? 'true' : 'false',
+      },
+    };
   }
 
-  // Anchor: căn phải theo chuông (giống web)
-  const desiredLeft = anchor.pageX + anchor.width - panelW;
-  const left = clampLeft(desiredLeft);
-
-  const topDown = anchor.pageY + anchor.height + GAP;
-  const availableBelow = SCREEN.height - topDown - insets.bottom - PANEL_MARGIN;
-
-  // Nếu dưới không đủ chỗ, xổ lên trên (popover)
-  const availableAbove = anchor.pageY - insets.top - PANEL_MARGIN - GAP;
-  const preferUp = availableBelow < 220 && availableAbove > availableBelow;
-
-  if (preferUp) {
-    const listMaxHeight = Math.min(LIST_MAX_CAP, Math.max(160, availableAbove - HEADER_H));
-    const panelH = HEADER_H + listMaxHeight;
-    const top = Math.max(insets.top + PANEL_MARGIN, anchor.pageY - GAP - panelH);
-    return { top, left, width: panelW, listMaxHeight };
+  if (n.type === 'friend_request' || n.type === 'friend_accepted') {
+    return '/(tabs)/friends' as const;
   }
 
-  const listMaxHeight = Math.min(LIST_MAX_CAP, Math.max(160, availableBelow - HEADER_H));
-  return { top: topDown, left, width: panelW, listMaxHeight };
+  if (postId) {
+    return { pathname: '/post-detail' as const, params: { postId } };
+  }
+
+  if (groupId) {
+    return '/(tabs)/community' as const;
+  }
+
+  return '/(tabs)/community' as const;
 }
 
 export function NotificationsSheet({
   visible,
-  anchorRect,
   onClose,
   notifications,
   isLoading,
+  error,
   hasMore,
   onLoadMore,
   onMarkRead,
@@ -110,133 +75,77 @@ export function NotificationsSheet({
 }: NotificationsSheetProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  const layout = useMemo(
-    () => computeDropdownLayout(anchorRect, { top: insets.top, bottom: insets.bottom }),
-    [anchorRect, insets.top, insets.bottom],
-  );
-
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handlePressItem = useCallback(
-    (n: AppNotification) => {
-      if (!n.read) onMarkRead([n._id]);
+    (item: AppNotification) => {
+      if (!item.read) onMarkRead([item._id]);
       onClose();
-
-      if (n.conversationId) {
-        router.push({
-          pathname: '/chat-room',
-          params: {
-            conversationId: n.conversationId,
-            name: n.title.replace(/^Tin nhắn mới từ\s+/i, '').replace(/^Nhóm:\s*/i, '') || 'Chat',
-            avatarUrl: '',
-            isGroup: n.type === 'group_invite' || n.type === 'group_update' || n.title.toLowerCase().includes('nhóm') ? 'true' : 'false',
-          },
-        });
-        return;
-      }
-
-      if (n.type === 'friend_request' || n.type === 'friend_accepted') {
-        router.push('/(tabs)/friends');
-      }
+      router.push(resolveNotificationRoute(item) as any);
     },
     [onClose, onMarkRead, router],
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: AppNotification }) => (
-      <TouchableOpacity
-        style={[styles.row, !item.read && styles.rowUnread]}
-        onPress={() => handlePressItem(item)}
-        activeOpacity={0.75}
-      >
-        <View style={styles.dotCol}>
-          {!item.read ? <View style={styles.dot} /> : <View style={styles.dotPlaceholder} />}
-        </View>
-        <View style={styles.iconWrap}>
-          {(() => {
-            const Icon = TYPE_ICONS[item.type] ?? Bell;
-            return <Icon size={16} color={item.read ? colors.textMuted : colors.accent} />;
-          })()}
-        </View>
-        <View style={styles.textCol}>
-          <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={styles.body} numberOfLines={2}>
-            {item.body}
-          </Text>
-          <Text style={styles.time}>{relativeTime(item.createdAt)}</Text>
-        </View>
-        <ChevronRight size={18} color={colors.textMuted} />
-      </TouchableOpacity>
-    ),
-    [handlePressItem],
-  );
-
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      {/* `box-none` để không chặn tương tác với màn hình chính */}
-      <View style={styles.modalRoot} pointerEvents="box-none">
-        <View
-          style={[
-            styles.dropdown,
-            {
-              top: layout.top,
-              left: layout.left,
-              width: layout.width,
-              maxHeight: layout.listMaxHeight + HEADER_H + 8,
-            },
-          ]}
-          pointerEvents="auto"
-        >
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.root}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+          <View style={styles.handle} />
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Thông báo</Text>
-            <View style={styles.headerActions}>
-              {unreadCount > 0 && (
-                <TouchableOpacity onPress={onMarkAllRead} hitSlop={8}>
-                  <View style={styles.markAllWrap}>
-                    <CheckCheck size={14} color={colors.accent} />
-                    <Text style={styles.markAll}>Đọc hết</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityLabel="Đóng">
-                <X size={20} color={colors.text} />
-              </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityLabel="Đóng">
+              <X size={20} color={mobileColors.textPrimary} />
+            </TouchableOpacity>
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.headerTitle}>Thông báo</Text>
+              {unreadCount > 0 ? <Text style={styles.headerCount}>{unreadCount} chưa đọc</Text> : null}
             </View>
+            {unreadCount > 0 ? (
+              <TouchableOpacity onPress={onMarkAllRead} style={styles.markAllButton}>
+                <CheckCheck size={15} color={mobileColors.accent} />
+                <Text style={styles.markAllText}>Đọc hết</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.headerSpacer} />
+            )}
           </View>
 
-          {notifications.length === 0 && !isLoading && (
-            <View style={styles.empty}>
-              <Bell size={28} color={colors.textMuted} />
-              <Text style={styles.emptyText}>Không có thông báo</Text>
+          {isLoading && notifications.length === 0 ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator size="large" color={mobileColors.accent} />
             </View>
-          )}
-
-          <FlatList
-            data={notifications}
-            keyExtractor={(item) => item._id}
-            renderItem={renderItem}
-            onEndReached={() => {
-              if (hasMore && !isLoading) onLoadMore();
-            }}
-            onEndReachedThreshold={0.35}
-            style={[styles.list, { maxHeight: layout.listMaxHeight }]}
-            contentContainerStyle={styles.listContent}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-            ListFooterComponent={
-              isLoading && notifications.length > 0 ? (
-                <ActivityIndicator color={colors.accent} style={{ paddingVertical: 12 }} />
-              ) : null
-            }
-          />
-
-          {isLoading && notifications.length === 0 && (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={colors.accent} />
+          ) : error ? (
+            <View style={styles.stateBox}>
+              <Bell size={34} color={mobileColors.danger} />
+              <Text style={styles.emptyTitle}>Không thể tải thông báo</Text>
+              <Text style={styles.emptyText}>{error}</Text>
             </View>
+          ) : notifications.length === 0 ? (
+            <View style={styles.stateBox}>
+              <Bell size={34} color={mobileColors.textMuted} />
+              <Text style={styles.emptyTitle}>Không có thông báo</Text>
+              <Text style={styles.emptyText}>Các cập nhật mới sẽ xuất hiện tại đây.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={notifications}
+              keyExtractor={(item) => item._id}
+              renderItem={({ item }) => <NotificationItem item={item} onPress={handlePressItem} />}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+              onEndReached={() => {
+                if (hasMore && !isLoading) onLoadMore();
+              }}
+              onEndReachedThreshold={0.35}
+              ListFooterComponent={
+                isLoading ? (
+                  <ActivityIndicator color={mobileColors.accent} style={styles.footerLoader} />
+                ) : unreadCount === 0 ? (
+                  <Text style={styles.allReadText}>Bạn đã đọc hết thông báo.</Text>
+                ) : null
+              }
+            />
           )}
         </View>
       </View>
@@ -245,124 +154,113 @@ export function NotificationsSheet({
 }
 
 const styles = StyleSheet.create({
-  modalRoot: {
+  root: {
     flex: 1,
+    justifyContent: 'flex-end',
   },
-  dropdown: {
-    position: 'absolute',
-    backgroundColor: colors.glassPanelStrong,
-    borderRadius: 16,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.26)',
+  },
+  sheet: {
+    height: '88%',
+    backgroundColor: mobileColors.bg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 16,
+    borderColor: mobileColors.border,
+    paddingHorizontal: mobileSpacing.screenPadding,
+    ...mobileShadow.shadowFloating,
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 4,
+    borderRadius: mobileRadius.radiusPill,
+    backgroundColor: mobileColors.border,
+    marginTop: 10,
+    marginBottom: 8,
   },
   header: {
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorderSoft,
+    gap: 10,
+    marginBottom: 12,
   },
-  headerTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontFamily: 'BeVietnamPro_600SemiBold',
-  },
-  headerActions: {
-    flexDirection: 'row',
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: mobileRadius.radiusPill,
     alignItems: 'center',
-    gap: 14,
+    justifyContent: 'center',
+    backgroundColor: mobileColors.surface,
+    borderWidth: 1,
+    borderColor: mobileColors.border,
   },
-  markAllWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  markAll: {
-    color: colors.accent,
-    fontSize: 13,
-    fontFamily: 'BeVietnamPro_500Medium',
-  },
-  list: {},
-  listContent: {
-    paddingBottom: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorderSoft,
-    gap: 8,
-  },
-  rowUnread: {
-    backgroundColor: colors.glassUltra,
-  },
-  dotCol: {
-    width: 10,
-    paddingTop: 5,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-  },
-  dotPlaceholder: {
-    width: 7,
-    height: 7,
-  },
-  iconWrap: {
-    marginTop: 1,
-    width: 20,
-    alignItems: 'center',
-  },
-  textCol: {
+  headerTitleWrap: {
     flex: 1,
     minWidth: 0,
   },
-  title: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontFamily: 'BeVietnamPro_600SemiBold',
-    lineHeight: 18,
+  headerTitle: {
+    color: mobileColors.textPrimary,
+    fontFamily: fonts.bold,
+    fontSize: 20,
   },
-  titleUnread: {
-    color: colors.text,
+  headerCount: {
+    color: mobileColors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    marginTop: 2,
   },
-  body: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontFamily: 'BeVietnamPro_400Regular',
-    marginTop: 3,
-    lineHeight: 15,
-  },
-  time: {
-    color: colors.textSubtle,
-    fontSize: 10,
-    fontFamily: 'BeVietnamPro_400Regular',
-    marginTop: 4,
-  },
-  empty: {
+  markAllButton: {
+    minHeight: 36,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 28,
-    paddingHorizontal: 16,
+    gap: 5,
+    borderRadius: mobileRadius.radiusPill,
+    backgroundColor: mobileColors.accentSoft,
+    paddingHorizontal: 12,
+  },
+  markAllText: {
+    color: mobileColors.accent,
+    fontFamily: fonts.semiBold,
+    fontSize: 12,
+  },
+  headerSpacer: {
+    width: 72,
+  },
+  listContent: {
+    paddingBottom: 16,
+  },
+  stateBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  emptyTitle: {
+    color: mobileColors.textPrimary,
+    fontFamily: fonts.bold,
+    fontSize: 17,
+    marginTop: 14,
   },
   emptyText: {
-    color: colors.textMuted,
+    color: mobileColors.textSecondary,
+    fontFamily: fonts.regular,
     fontSize: 13,
-    fontFamily: 'BeVietnamPro_400Regular',
+    lineHeight: 19,
+    marginTop: 4,
+    textAlign: 'center',
   },
-  loadingBox: {
-    paddingVertical: 28,
-    alignItems: 'center',
+  footerLoader: {
+    paddingVertical: 18,
+  },
+  allReadText: {
+    color: mobileColors.textMuted,
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 18,
   },
 });

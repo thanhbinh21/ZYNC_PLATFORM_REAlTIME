@@ -99,7 +99,7 @@ export default function RootLayout() {
         return;
       }
 
-      router.push('/(tabs)/notifications');
+      router.push('/notifications');
     });
 
     return () => {
@@ -132,6 +132,7 @@ export default function RootLayout() {
             <Stack.Screen name="create-group" options={{ headerShown: false }} />
             <Stack.Screen name="post-detail" options={{ headerShown: false }} />
             <Stack.Screen name="explore" options={{ headerShown: false }} />
+            <Stack.Screen name="notifications" options={{ headerShown: false }} />
           </Stack>
           <IncomingCallOverlay />
           <ActiveCallBar />

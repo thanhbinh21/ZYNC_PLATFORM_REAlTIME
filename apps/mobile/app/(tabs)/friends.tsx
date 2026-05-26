@@ -26,6 +26,8 @@ import { AppChip } from '../../src/ui/AppChip';
 import { AppCard } from '../../src/ui/AppCard';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { SkeletonCardPreset } from '../../src/ui/ZyncSkeleton';
+import { SegmentTabs } from '../../src/ui/SegmentTabs';
+import { UserListItem } from '../../src/ui/UserListItem';
 
 interface Friend {
   _id: string;
@@ -75,7 +77,7 @@ export default function FriendsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'suggestions'>('friends');
 
   const loadFriendsData = useCallback(async () => {
     try {
@@ -190,37 +192,36 @@ export default function FriendsScreen() {
           <AppCard style={{ marginBottom: 16 }}>
             <Text style={styles.listTitle}>KẾT QUẢ TÌM KIẾM</Text>
             {searchResults.map((user) => (
-              <View key={user.id || user._id} style={styles.friendItem}>
-                <Avatar name={user.displayName || '?'} size={44} />
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{user.displayName}</Text>
-                  <Text style={styles.friendStatus}>{user.username ? `@${user.username}` : (user.email || '')}</Text>
-                </View>
-                <TouchableOpacity
+              <UserListItem
+                key={user.id || user._id}
+                name={user.displayName || 'Người dùng'}
+                subtitle={user.username ? `@${user.username}` : (user.email || '')}
+                avatarUrl={user.avatarUrl}
+                style={styles.searchResultItem}
+                action={(
+                  <TouchableOpacity
                   style={styles.addFriendBtn}
                   onPress={() => sendFriendRequest(user.id || user._id)}
-                >
-                  <UserPlus size={16} color={lightTheme.accent} />
-                </TouchableOpacity>
-              </View>
+                  >
+                    <UserPlus size={16} color={lightTheme.accent} />
+                  </TouchableOpacity>
+                )}
+              />
             ))}
           </AppCard>
         )}
 
         {/* Tabs */}
-        <View style={styles.tabRow}>
-          <AppChip 
-            label={`Bạn bè (${friendCount})`} 
-            active={activeTab === 'friends'}
-            onPress={() => setActiveTab('friends')}
-            style={{ marginRight: 10 }}
-          />
-          <AppChip 
-            label={`Lời mời ${requests.length > 0 ? `(${requests.length})` : ''}`} 
-            active={activeTab === 'requests'}
-            onPress={() => setActiveTab('requests')}
-          />
-        </View>
+        <SegmentTabs
+          value={activeTab}
+          onChange={setActiveTab}
+          style={styles.tabRow}
+          items={[
+            { key: 'friends', label: `Bạn bè (${friendCount})` },
+            { key: 'requests', label: `Lời mời ${requests.length > 0 ? `(${requests.length})` : ''}` },
+            { key: 'suggestions', label: 'Gợi ý' },
+          ]}
+        />
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -242,35 +243,33 @@ export default function FriendsScreen() {
             renderItem={({ item }) => {
               const friendId = (item._id || item.id) as string;
               return (
-                <TouchableOpacity
-                  style={styles.friendItem}
+                <UserListItem
+                  name={item.displayName}
+                  subtitle={item.status || 'Offline'}
+                  avatarUrl={item.avatarUrl}
                   onPress={() => { if (friendId) void openProfileSheet(friendId); }}
-                  activeOpacity={0.8}
-                >
-                  <Avatar name={item.displayName} size={44} />
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{item.displayName}</Text>
-                    <Text style={styles.friendStatus}>{item.status || 'Offline'}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.callBtn, chatLoading && styles.callBtnDisabled]}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      if (friendId) void navigateToChat(friendId);
-                    }}
-                    disabled={chatLoading}
-                  >
-                    <MessageCircle size={18} color={lightTheme.accent} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
+                  style={styles.friendItem}
+                  action={(
+                    <TouchableOpacity
+                      style={[styles.callBtn, chatLoading && styles.callBtnDisabled]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        if (friendId) void navigateToChat(friendId);
+                      }}
+                      disabled={chatLoading}
+                    >
+                      <MessageCircle size={18} color={lightTheme.accent} />
+                    </TouchableOpacity>
+                  )}
+                />
               );
             }}
             ListEmptyComponent={
               <EmptyState variant="no-friends" />
             }
-            contentContainerStyle={filteredFriends.length === 0 ? { flex: 1 } : { paddingBottom: 100 }}
+            contentContainerStyle={filteredFriends.length === 0 ? { flex: 1 } : { paddingBottom: 132 }}
           />
-        ) : (
+        ) : activeTab === 'requests' ? (
           /* Requests List */
           <FlatList
             data={requests}
@@ -281,40 +280,47 @@ export default function FriendsScreen() {
               const name = item.displayName || item.senderId?.displayName || 'User';
               const avatarUrl = item.avatarUrl || item.senderId?.avatarUrl;
               return (
-                <View style={styles.requestItem}>
-                  <Avatar url={avatarUrl} name={name} size={44} />
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{name}</Text>
-                    <Text style={styles.friendStatus}>
-                      {new Date(item.createdAt).toLocaleDateString('vi-VN')}
-                    </Text>
-                  </View>
-                  <View style={styles.requestActions}>
-                    <TouchableOpacity
-                      style={styles.acceptBtn}
-                      onPress={() => acceptRequest(reqId)}
-                    >
-                      <Check size={18} color="#FFFFFF" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.rejectBtn}
-                      onPress={() => rejectRequest(reqId)}
-                    >
-                      <X size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <UserListItem
+                  name={name}
+                  subtitle={new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                  avatarUrl={avatarUrl}
+                  style={styles.requestItem}
+                  action={(
+                    <View style={styles.requestActions}>
+                      <TouchableOpacity
+                        style={styles.acceptBtn}
+                        onPress={() => acceptRequest(reqId)}
+                      >
+                        <Check size={18} color={lightTheme.textOnAccent} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.rejectBtn}
+                        onPress={() => rejectRequest(reqId)}
+                      >
+                        <X size={18} color={lightTheme.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
               );
             }}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Mail size={56} color="#64748B" />
-                <Text style={styles.emptyText}>Không có lời mời</Text>
-                <Text style={styles.emptySubtext}>Bạn chưa nhận được lời mời kết bạn nào</Text>
-              </View>
+              <EmptyState
+                variant="no-results"
+                title="Không có lời mời"
+                description="Bạn chưa nhận được lời mời kết bạn nào"
+              />
             }
-            contentContainerStyle={requests.length === 0 ? { flex: 1 } : { paddingBottom: 100 }}
+            contentContainerStyle={requests.length === 0 ? { flex: 1 } : { paddingBottom: 132 }}
           />
+        ) : (
+          <View style={styles.suggestionEmpty}>
+            <EmptyState
+              variant="no-friends"
+              title="Tìm thêm bạn bè"
+              description="Nhập username hoặc email ở ô tìm kiếm để kết nối với mọi người."
+            />
+          </View>
         )}
       </View>
 
@@ -337,13 +343,14 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
   title: {
     color: lightTheme.textPrimary,
@@ -382,9 +389,7 @@ const styles = StyleSheet.create({
   },
   // ─ Tabs ─
   tabRow: {
-    flexDirection: 'row',
-    marginBottom: 15,
-    gap: 10,
+    marginBottom: 12,
   },
   tab: {
     flexDirection: 'row',
@@ -422,15 +427,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: lightTheme.surfaceCard,
-    borderWidth: 1,
-    borderColor: lightTheme.border,
+    marginBottom: 8,
+  },
+  searchResultItem: {
+    marginBottom: 8,
   },
   avatar: {
     width: 45,
@@ -463,8 +463,8 @@ const styles = StyleSheet.create({
   callBtn: {
     width: 38,
     height: 38,
-    borderRadius: 12,
-    backgroundColor: lightTheme.bgPrimary,
+    borderRadius: 14,
+    backgroundColor: lightTheme.surfaceSoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -474,8 +474,8 @@ const styles = StyleSheet.create({
   addFriendBtn: {
     width: 38,
     height: 38,
-    borderRadius: 12,
-    backgroundColor: lightTheme.bgPrimary,
+    borderRadius: 14,
+    backgroundColor: lightTheme.surfaceSoft,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -483,15 +483,7 @@ const styles = StyleSheet.create({
   },
   // ─ Request Items ─
   requestItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: lightTheme.surfaceCard,
-    borderWidth: 1,
-    borderColor: lightTheme.border,
+    marginBottom: 8,
   },
   requestActions: {
     flexDirection: 'row',
@@ -557,5 +549,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.regular,
     marginTop: 4,
+  },
+  suggestionEmpty: {
+    flex: 1,
   },
 });

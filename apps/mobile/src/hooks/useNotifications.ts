@@ -13,6 +13,7 @@ export function useNotifications(isAuthenticated: boolean) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const cursorRef = useRef<string | null>(null);
 
@@ -21,20 +22,21 @@ export function useNotifications(isAuthenticated: boolean) {
       const count = await fetchUnreadCount();
       setUnreadCount(count);
     } catch {
-      /* silent */
+      setError('Không thể tải số thông báo chưa đọc');
     }
   }, []);
 
   const loadNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
+      setError(null);
       cursorRef.current = null;
       const result = await fetchNotifications(undefined, 20);
       setNotifications(result.notifications);
       cursorRef.current = result.nextCursor;
       setHasMore(result.nextCursor !== null);
     } catch {
-      /* silent */
+      setError('Không thể tải thông báo');
     } finally {
       setIsLoading(false);
     }
@@ -44,12 +46,13 @@ export function useNotifications(isAuthenticated: boolean) {
     if (!hasMore || isLoading || !cursorRef.current) return;
     try {
       setIsLoading(true);
+      setError(null);
       const result = await fetchNotifications(cursorRef.current, 20);
       setNotifications((prev) => [...prev, ...result.notifications]);
       cursorRef.current = result.nextCursor;
       setHasMore(result.nextCursor !== null);
     } catch {
-      /* silent */
+      setError('Không thể tải thêm thông báo');
     } finally {
       setIsLoading(false);
     }
@@ -144,6 +147,7 @@ export function useNotifications(isAuthenticated: boolean) {
       notifications,
       unreadCount,
       isLoading,
+      error,
       hasMore,
       loadNotifications,
       loadMore,
@@ -155,6 +159,7 @@ export function useNotifications(isAuthenticated: boolean) {
       notifications,
       unreadCount,
       isLoading,
+      error,
       hasMore,
       loadNotifications,
       loadMore,
