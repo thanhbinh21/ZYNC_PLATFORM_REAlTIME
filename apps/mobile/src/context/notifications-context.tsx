@@ -125,11 +125,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
                 ? '🎉'
                 : notification.type === 'group_invite' || notification.type === 'group_update'
                   ? '👥'
-                  : notification.type === 'story_reaction'
-                    ? '❤️'
-                    : notification.type === 'story_reply'
-                      ? '💭'
-                      : '🔔';
+                  : '🔔';
 
         setToasts((prev) => {
           // Remove existing summary from the list for easier composing

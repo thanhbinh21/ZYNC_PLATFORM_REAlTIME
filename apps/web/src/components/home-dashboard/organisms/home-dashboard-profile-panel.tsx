@@ -13,13 +13,9 @@ interface HomeDashboardProfilePanelProps {
   loading: boolean;
   error: string | null;
   syncedPenaltyScore?: number;
-  myStories?: unknown[];
-  feed?: unknown[];
   friends?: FriendUser[];
   initialTab?: 'info';
   onProfileUpdated?: (user: MeUser) => void;
-  onOpenCreateStory?: () => void;
-  onViewStoryFeed?: (feedIndex: number) => void;
   onViewUserProfile?: (userId: string) => void;
 }
 
@@ -43,13 +39,9 @@ export function HomeDashboardProfilePanel({
   loading,
   error,
   syncedPenaltyScore = 0,
-  myStories = [],
-  feed = [],
   friends = [],
   initialTab,
   onProfileUpdated,
-  onOpenCreateStory,
-  onViewStoryFeed,
   onViewUserProfile,
 }: HomeDashboardProfilePanelProps) {
   const [isEditing, setIsEditing] = useState(false);

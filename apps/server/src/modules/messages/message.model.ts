@@ -1,16 +1,8 @@
 import { Schema, model, type Document } from 'mongoose';
-import { type StoryMediaType } from '../stories/story.model';
 
 export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'sticker' | `file/${string}` | 'system-recall' | 'call_history';
 export type MessageStatus = 'sent' | 'delivered' | 'read';
 export type DeleteType = 'unsend' | 'recall';
-
-export interface IStoryRef {
-  storyId: string;
-  ownerId: string;
-  mediaType: StoryMediaType;
-  thumbnail?: string;
-}
 
 export interface IReplyTo {
   messageRef: string;
@@ -47,7 +39,6 @@ export interface IMessage extends Document {
   type: MessageType;
   mediaUrl?: string;
   callHistory?: ICallHistory;
-  storyRef?: IStoryRef;
   replyTo?: IReplyTo;
   idempotencyKey: string;
   
@@ -70,16 +61,6 @@ const reactionSchema = new Schema(
   {
     type: { type: String, required: true },
     userId: { type: String, required: true },
-  },
-  { _id: false },
-);
-
-const storyRefSchema = new Schema<IStoryRef>(
-  {
-    storyId: { type: String, required: true },
-    ownerId: { type: String, required: true },
-    mediaType: { type: String, enum: ['text', 'image', 'video'], required: true },
-    thumbnail: { type: String },
   },
   { _id: false },
 );
@@ -136,7 +117,6 @@ const messageSchema = new Schema<IMessage>(
     },
     mediaUrl: { type: String },
     callHistory: { type: callHistorySchema },
-    storyRef: { type: storyRefSchema },
     replyTo: { type: replyToSchema },
     idempotencyKey: { type: String, required: true, unique: true },
     

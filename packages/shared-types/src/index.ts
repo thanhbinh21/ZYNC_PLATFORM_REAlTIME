@@ -114,20 +114,6 @@ export interface Message {
   sentTo?: MessageReadParticipant[];
 }
 
-// Kiểu dữ liệu Story
-export type StoryMediaType = 'text' | 'image';
-
-export interface Story {
-  _id: string;
-  userId: string;
-  mediaType: StoryMediaType;
-  mediaUrl?: string;
-  content?: string;
-  viewerIds: string[];
-  expiresAt: string;
-  createdAt: string;
-}
-
 // Payload cho Socket.IO events
 
 // Client gửi lên Server

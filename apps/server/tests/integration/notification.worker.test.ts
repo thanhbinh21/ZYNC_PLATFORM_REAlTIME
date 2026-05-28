@@ -279,9 +279,9 @@ describe('Notification Worker', () => {
 
     await processNotification({
       userId: USER_ID,
-      type: 'story_reaction',
+      type: 'post_like',
       title: 'Reaction',
-      body: 'Ai đó thả tim story',
+      body: 'Ai đó thả tim bài viết',
     });
 
     expect(mockSendWebPush).toHaveBeenCalledTimes(1);
@@ -333,9 +333,9 @@ describe('Notification Worker', () => {
 
     await processNotification({
       userId: USER_ID,
-      type: 'story_reply',
-      title: 'Reply',
-      body: 'Ai đó trả lời story',
+      type: 'post_comment',
+      title: 'Comment',
+      body: 'Ai đó bình luận bài viết',
     });
 
     const remaining = await DeviceTokenModel.findById(dt._id);

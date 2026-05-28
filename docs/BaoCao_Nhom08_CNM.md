@@ -168,7 +168,7 @@ Trong thời đại số hóa hiện nay, nhu cầu giao tiếp trực tuyến t
 
 Nhận thấy vấn đề này, nhóm chúng em quyết định thực hiện đề tài nghiên cứu và xây dựng **ZYNC Platform** – một ứng dụng nhắn tin thời gian thực phiên bản 2.0 (Production-Grade). ZYNC Platform được thiết kế dựa trên kiến trúc **Scaled Modular Monolith**, hướng tới Microservices trong tương lai. Hệ thống không chỉ đáp ứng nhu cầu nhắn tin cơ bản mà còn tích hợp các công nghệ hiện đại như **Apache Kafka**, **Redis** và **MongoDB** để đảm bảo hiệu suất cao, khả năng mở rộng linh hoạt và quản lý dữ liệu nội bộ an toàn.
 
-Hệ thống hỗ trợ quy mô vài nghìn người dùng đồng thời, với các tính năng bao gồm chat 1-1, nhóm, chia sẻ media, story 24h và quản lý bạn bè. Mục tiêu là thay thế ứng dụng chat thương mại với khả năng kiểm soát dữ liệu nội bộ và tối ưu chi phí vận hành.
+Hệ thống hỗ trợ quy mô vài nghìn người dùng đồng thời, với các tính năng bao gồm chat 1-1, nhóm, chia sẻ media, cộng đồng và quản lý bạn bè. Mục tiêu là thay thế ứng dụng chat thương mại với khả năng kiểm soát dữ liệu nội bộ và tối ưu chi phí vận hành.
 
 ### 1.2 Mục tiêu đề tài
 
@@ -231,7 +231,6 @@ Hệ thống ZYNC Platform được thiết kế để đáp ứng các yêu c�
 | F22 | Tìm kiếm bạn bè | Tìm kiếm theo tên/SĐT/email trên thanh search Dashboard |
 | F23 | Xem profile nhanh | Modal xem nhanh thông tin người dùng từ kết quả tìm kiếm |
 | F24 | Hiển thị online/offline | *(Đang phát triển)* Tracking presence qua Redis heartbeat 30s |
-| F25 | Story 24h | *(Đang phát triển)* Đăng story text/ảnh tự hủy sau 24 giờ (TTL index) |
 | F26 | Push notification | *(Đang phát triển)* Thông báo khi có tin nhắn mới + user offline (FCM/APNs) |
 
 ### 1.5 Yêu cầu phi chức năng
@@ -293,7 +292,6 @@ Trong ZYNC Platform, MongoDB 7 được sử dụng làm cơ sở dữ liệu ch
 | `conversation_members` | Thành viên hội thoại | `{conversationId, userId}` (unique) |
 | `messages` | Tin nhắn | `{conversationId, createdAt: -1}`, `idempotencyKey` (unique) |
 | `message_status` | Trạng thái tin nhắn | `{messageId, userId}` (unique) |
-| `stories` | Story 24h | `expiresAt` (TTL index), `userId` |
 
 ### 2.3 Redis (In-Memory Data Store)
 
@@ -624,20 +622,10 @@ classDiagram
         +String platform
     }
 
-    class Story {
-        +String _id
-        +String userId
-        +String mediaType
-        +String mediaUrl
-        +String text
-        +Date expiresAt
-    }
-
     User "1" -- "*" DeviceToken : has
     User "1" -- "*" Friendship : has
     User "1" -- "*" ConversationMember : participates
     User "1" -- "*" Message : sends
-    User "1" -- "*" Story : creates
     Conversation "1" -- "*" ConversationMember : contains
     Conversation "1" -- "*" Message : has
     Message "1" -- "*" MessageStatus : tracked by
@@ -999,7 +987,6 @@ zync-platform/
 │   │   │   │   ├── groups/       # Quan ly nhom (4 files)
 │   │   │   │   ├── conversations/# Hoi thoai 1-1 va nhom (5 files)
 │   │   │   │   ├── messages/     # Tin nhan, media, idempotency (6 files)
-│   │   │   │   ├── stories/      # Story 24h
 │   │   │   │   └── upload/       # Cloudinary signed upload
 │   │   │   ├── socket/
 │   │   │   │   └── gateway.ts    # Socket.IO gateway & event handlers
@@ -1047,7 +1034,7 @@ Mỗi module tuân theo pattern **Controller -> Service -> Model**:
 
 **Hình 4.5 – Giao diện Quản lý bạn bè (/friends):** Search users, incoming/outgoing requests, friend list, unfriend, block.
 
-**Hình 4.6 – Giao diện Profile:** Thông tin cá nhân, upload avatar, tabs thông tin/bạn bè/stories.
+**Hình 4.6 – Giao diện Profile:** Thông tin cá nhân, upload avatar, thông tin bạn bè và hồ sơ.
 
 ### 4.4 Kế hoạch và hiện thực kiểm thử
 

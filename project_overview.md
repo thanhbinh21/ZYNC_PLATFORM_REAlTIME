@@ -342,7 +342,7 @@ npm run dev:web
 - [x] Auto-login flow (detect saved token → verify → redirect)
 
 ### Phase M3 – Mobile Home & Chat (Lõi)
-- [x] Home tab: stats cards + recent activity list + story bar <!-- done: 12/04/2026 -->
+- [x] Home tab: stats cards + recent activity list <!-- done: 12/04/2026 -->
 - [x] Chat tab: conversation list (FlatList virtualized) <!-- done: 12/04/2026 -->
 - [x] Chat room: bubble UI, message status (sent/delivered/read ticks) <!-- done: 12/04/2026 -->
 - [x] Real-time messaging via Socket.IO <!-- done: 12/04/2026 -->
@@ -361,11 +361,8 @@ npm run dev:web
 - [x] Group info screen <!-- done: 26/04/2026 by binhdev -->
 
 ### Phase M5 – Mobile Stories & Profile (Nặng – không ảnh hưởng lõi)
-- [x] Story bar (horizontal FlatList, ring indicator) <!-- done: 26/04/2026 by binhdev -->
-- [x] Story viewer (full-screen modal, tap-to-advance, progress bar) <!-- done: 26/04/2026 by binhdev -->
-- [x] Story creation (text + image via expo-image-picker) <!-- done: 26/04/2026 by binhdev -->
 - [x] Profile screen: edit profile, avatar upload via camera/gallery <!-- done: 12/04/2026 -->
-- [x] Real stats (bạn bè count, stories count, joined year) <!-- done: 12/04/2026 -->
+- [x] Real stats (bạn bè count, kỹ năng count, joined year) <!-- done: 12/04/2026 -->
 - [ ] Friend list in profile, mutual friends, view profile modal
 
 ### Phase M6 – Mobile Polish & Deploy
@@ -631,7 +628,7 @@ npm run dev:web
 - [x] **Kafka DLQ & Retry:** Thêm topics `raw-messages.retry` + `raw-messages.dlq` + `notifications.retry` + `notifications.dlq`. Worker subscribe cả main topic và retry topic. Max 3 retries với exponential backoff → auto route sang DLQ. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Call:** Tách toàn bộ Call + WebRTC events (8 handlers) ra `socket/call.controller.ts`. <!-- done: 02/05/2026 -->
 - [x] **Socket Modularization – Chat:** Tách `send_message`, `message_read`, `message_delivered`, `delete_message_for_me`, `recall_message`, `forward_message` ra `socket/chat.controller.ts`. `gateway.ts` giảm từ 2184 → **2061 dòng**. <!-- done: 02/05/2026 -->
-- [x] **Socket Modularization – Reaction & Story:** Tách `reaction_upsert`, `reaction_remove_all_mine` ra `socket/reaction.controller.ts` và Story emit functions ra `socket/story.controller.ts`. `gateway.ts` giảm thêm ~370 dòng. <!-- done: 04/05/2026 -->
+- [x] **Socket Modularization – Reaction:** Tách `reaction_upsert`, `reaction_remove_all_mine` ra `socket/reaction.controller.ts`. <!-- done: 04/05/2026 -->
 
 ---
 
@@ -692,7 +689,6 @@ npm run dev:web
 - **Token Storage:** Access token được lưu trong `httpOnly` cookie (`accessToken`) do server set, không thể đọc bằng JavaScript (XSS-resistant). Refresh token trong `httpOnly` cookie (`refreshToken`). Client đọc access token qua `GET /api/auth/current-token` endpoint. <!-- done: 04/05/2026 -->
 - **Idempotency:** Client phải tự sinh UUID cho mỗi `send_message`. Server check Redis 5 phút trước khi ghi MongoDB.
 - **Cursor pagination:** Dùng `createdAt` + `_id` làm cursor, tránh `skip()`.
-- **Story expiry:** MongoDB TTL index trên `expiresAt`, không cần cronjob riêng.
 - **Presence refresh:** Client WebSocket heartbeat 30 giây để giữ online status trong Redis.
 - **AI context window:** 50 recent messages + top-5 pgvector similarity results.
 - **Moderation fail-open:** Khi AI unavailable → keyword filter → pass with logging (không block user khi AI lỗi).

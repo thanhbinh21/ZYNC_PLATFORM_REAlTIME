@@ -31,14 +31,6 @@ export interface DashboardNavItem {
   active?: boolean;
 }
 
-export interface DashboardStoryItem {
-  id: string;
-  name: string;
-  initials: string;
-  isOwner?: boolean;
-  toneClass: string;
-}
-
 export interface DashboardStatItem {
   id: string;
   value: string;
@@ -69,8 +61,6 @@ export type NotificationType =
   | 'friend_accepted'
   | 'group_invite'
   | 'group_update'
-  | 'story_reaction'
-  | 'story_reply'
   | 'community_post'
   | 'post_like'
   | 'post_comment'
@@ -122,7 +112,6 @@ export interface DashboardHomeMockData {
   primaryAction: string;
   navItems: DashboardNavItem[];
   sideFooterItems: DashboardNavItem[];
-  stories: DashboardStoryItem[];
   stats: DashboardStatItem[];
   activityTitle: string;
   activityCtaLabel: string;

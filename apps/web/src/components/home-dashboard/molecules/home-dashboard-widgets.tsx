@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Heart,
   MessageSquare,
-  Reply,
   UserPlus,
   Users,
   Wifi,
@@ -161,8 +160,7 @@ function notificationIcon(type: DashboardNotificationItem['type']): IconComponen
   if (type === 'new_message') return MessageSquare as IconComponent;
   if (type === 'friend_request' || type === 'friend_accepted') return UserPlus as IconComponent;
   if (type === 'group_invite' || type === 'group_update') return Users as IconComponent;
-  if (type === 'story_reaction' || type === 'post_like') return Heart as IconComponent;
-  if (type === 'story_reply') return Reply as IconComponent;
+  if (type === 'post_like') return Heart as IconComponent;
   if (type === 'post_bookmark') return Bookmark as IconComponent;
   return Bell as IconComponent;
 }

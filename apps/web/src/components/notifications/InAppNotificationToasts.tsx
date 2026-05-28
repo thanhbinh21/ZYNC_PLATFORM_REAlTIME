@@ -83,10 +83,8 @@ function IconForType({ type, isSummary }: { type?: Notification['type'], isSumma
     case 'group_invite':
     case 'group_update':
       return <UsersIcon className="h-5 w-5 text-indigo-500" />;
-    case 'story_reaction':
     case 'post_like':
       return <HeartIcon className="h-5 w-5 text-rose-500" />;
-    case 'story_reply':
     case 'post_comment':
       return <MessageSquareIcon className="h-5 w-5 text-purple-500" />;
     case 'post_bookmark': return <MessageSquareIcon className="h-5 w-5 text-amber-500" />;

@@ -9,10 +9,10 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | Actor | Vai trò | Ghi chú |
 |---|---|---|
 | Khách | Người chưa đăng nhập | Có thể đăng ký, đăng nhập, khôi phục mật khẩu |
-| Người dùng | Tài khoản đã xác thực | Actor chính sử dụng chat, bạn bè, hồ sơ, cộng đồng, story, thông báo và AI |
+| Người dùng | Tài khoản đã xác thực | Actor chính sử dụng chat, bạn bè, hồ sơ, cộng đồng, thông báo và AI |
 | Thành viên hội thoại | Người dùng thuộc một hội thoại 1-1 hoặc nhóm | Có quyền nhắn tin, xem lịch sử, gọi, dùng AI trong phạm vi hội thoại |
 | Quản trị nhóm | Thành viên có quyền quản trị nhóm/kênh | Quản lý thông tin nhóm, thành viên, vai trò và thiết lập duyệt thành viên |
-| Chủ nội dung | Người tạo bài viết hoặc story | Có quyền sửa/xóa nội dung của mình và xem tương tác liên quan |
+| Chủ nội dung | Người tạo bài viết cộng đồng | Có quyền sửa/xóa nội dung của mình và xem tương tác liên quan |
 | Quản trị viên | Vai trò quản trị hệ thống | Quản lý kiểm duyệt nội dung và gói sticker theo chức năng hiện có |
 
 ## 3. Use case chính
@@ -27,7 +27,6 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | UC06 | Nhắn tin | Gửi, xem, phản hồi, chuyển tiếp, thu hồi và xóa tin nhắn |
 | UC07 | Quản lý nhóm và kênh | Tạo nhóm/kênh, tham gia, rời, cập nhật thông tin và quản lý thành viên |
 | UC08 | Gọi thoại và video | Tạo, nhận, từ chối, kết thúc và theo dõi phiên gọi |
-| UC09 | Quản lý Story | Tạo, xem, phản hồi, trả lời, xóa story và xem người xem/tương tác |
 | UC10 | Quản lý bài viết cộng đồng | Tạo, xem, sửa, xóa, tương tác và bình luận bài viết |
 | UC11 | Khám phá nội dung cộng đồng | Xem feed, trending, tìm kênh, người dùng và bài viết liên quan |
 | UC12 | Quản lý thông báo | Xem, đánh dấu đã đọc, cài đặt thông báo, tắt/bật thông báo hội thoại |
@@ -95,16 +94,6 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | UC08.5 | Xem cuộc gọi đang hoạt động | Gọi thoại và video | extend | Chỉ khi người dùng có phiên gọi đang mở |
 | UC08.6 | Gọi nhóm | Gọi thoại và video | extend | Chỉ áp dụng trong hội thoại nhóm |
 | UC08.7 | Kiểm tra quyền thành viên hội thoại | Gọi thoại và video | include | Người gọi phải thuộc hội thoại liên quan |
-| UC09.1 | Xem story feed | Quản lý Story | association-only | Người dùng xem story của bạn bè/người liên quan |
-| UC09.2 | Xem story của mình | Quản lý Story | association-only | Người dùng xem danh sách story đã tạo |
-| UC09.3 | Tạo story | Quản lý Story | association-only | Người dùng đăng story ảnh/video/nội dung |
-| UC09.4 | Xóa story | Quản lý Story | extend | Chỉ chủ story được xóa story của mình |
-| UC09.5 | Đánh dấu đã xem story | Quản lý Story | association-only | Ghi nhận người dùng đã xem story |
-| UC09.6 | Thả phản ứng story | Quản lý Story | extend | Tùy chọn khi xem story |
-| UC09.7 | Gỡ phản ứng story | Quản lý Story | extend | Chỉ khi đã thả phản ứng trước đó |
-| UC09.8 | Trả lời story | Quản lý Story | extend | Tùy chọn gửi phản hồi qua hội thoại |
-| UC09.9 | Xem người xem story | Quản lý Story | extend | Chỉ chủ story xem danh sách người xem |
-| UC09.10 | Xem phản ứng story | Quản lý Story | extend | Chỉ chủ story xem danh sách phản ứng |
 | UC10.1 | Tạo bài viết | Quản lý bài viết cộng đồng | association-only | Người dùng đăng bài trong cộng đồng |
 | UC10.2 | Xem chi tiết bài viết | Quản lý bài viết cộng đồng | association-only | Người dùng đọc nội dung bài viết |
 | UC10.3 | Sửa bài viết | Quản lý bài viết cộng đồng | extend | Chỉ chủ nội dung được sửa bài viết của mình |
@@ -160,7 +149,6 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | Người dùng | Nhắn tin | association | Gửi, xem, tương tác với tin nhắn |
 | Người dùng | Quản lý nhóm và kênh | association | Tạo nhóm, tham gia kênh, rời nhóm |
 | Người dùng | Gọi thoại và video | association | Bắt đầu, nhận hoặc kết thúc cuộc gọi |
-| Người dùng | Quản lý Story | association | Tạo, xem và tương tác với story |
 | Người dùng | Quản lý bài viết cộng đồng | association | Tạo và tương tác với bài viết |
 | Người dùng | Khám phá nội dung cộng đồng | association | Xem feed, trending và tìm kiếm nội dung |
 | Người dùng | Quản lý thông báo | association | Xem và cấu hình thông báo |
@@ -170,7 +158,6 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | Thành viên hội thoại | Gọi thoại và video | association | Chỉ trong hội thoại mà actor là thành viên |
 | Thành viên hội thoại | Sử dụng trợ lý AI | association | Chỉ trên hội thoại có quyền truy cập |
 | Quản trị nhóm | Quản lý nhóm và kênh | association | Quản lý thông tin, thành viên và vai trò nhóm |
-| Chủ nội dung | Quản lý Story | association | Sửa/xóa nội dung story của mình và xem viewer/reaction |
 | Chủ nội dung | Quản lý bài viết cộng đồng | association | Sửa/xóa bài viết của mình |
 | Quản trị viên | Quản trị kiểm duyệt | association | Xử lý nội dung bị gắn cờ |
 | Quản trị viên | Quản trị sticker | association | Quản lý gói sticker |
@@ -186,7 +173,6 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | Gửi tin nhắn văn bản | Kiểm duyệt nội dung tin nhắn | Tin nhắn cần được kiểm tra nội dung trước hoặc trong quá trình xử lý |
 | Gửi media | Chuẩn bị media tải lên | Media phải được chuẩn bị trước khi gửi |
 | Gửi media | Xác nhận media đã tải lên | Media cần được xác nhận để sử dụng trong tin nhắn |
-| Tạo story | Chuẩn bị media tải lên | Story dạng media cần media hợp lệ |
 | Tạo bài viết | Kiểm duyệt nội dung bài viết | Bài viết cộng đồng cần kiểm duyệt nội dung |
 | Bình luận bài viết | Kiểm duyệt nội dung bài viết | Bình luận là nội dung cộng đồng cần kiểm duyệt |
 | Bắt đầu cuộc gọi | Kiểm tra quyền thành viên hội thoại | Người gọi phải có quyền trong hội thoại |
@@ -222,12 +208,6 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | Từ chối cuộc gọi | Gọi thoại và video | Khi có cuộc gọi đến |
 | Xem cuộc gọi đang hoạt động | Gọi thoại và video | Khi người dùng có cuộc gọi đang diễn ra |
 | Gọi nhóm | Gọi thoại và video | Khi cuộc gọi diễn ra trong hội thoại nhóm |
-| Xóa story | Quản lý Story | Khi chủ story muốn xóa story |
-| Thả phản ứng story | Quản lý Story | Khi người xem muốn tương tác |
-| Gỡ phản ứng story | Quản lý Story | Khi đã có phản ứng trước đó |
-| Trả lời story | Quản lý Story | Khi người xem muốn phản hồi qua DM |
-| Xem người xem story | Quản lý Story | Khi chủ story muốn xem viewers |
-| Xem phản ứng story | Quản lý Story | Khi chủ story muốn xem reactions |
 | Sửa bài viết | Quản lý bài viết cộng đồng | Khi chủ bài viết muốn cập nhật nội dung |
 | Xóa bài viết | Quản lý bài viết cộng đồng | Khi chủ bài viết muốn xóa nội dung |
 | Thích bài viết | Quản lý bài viết cộng đồng | Khi người dùng muốn tương tác |
@@ -304,7 +284,7 @@ Zync Platform - Nền tảng nhắn tin, cộng đồng và trợ lý AI cho dev
 | Trung tâm | Đặt system boundary tên "Zync Platform" |
 | Cột 1 trong boundary | Quản lý xác thực, Quản lý tài khoản, Khám phá người dùng, Quản lý bạn bè |
 | Cột 2 trong boundary | Quản lý hội thoại, Nhắn tin, Quản lý nhóm và kênh, Gọi thoại và video |
-| Cột 3 trong boundary | Quản lý Story, Quản lý bài viết cộng đồng, Khám phá nội dung cộng đồng |
+| Cột 3 trong boundary | Quản lý bài viết cộng đồng, Khám phá nội dung cộng đồng |
 | Cột 4 trong boundary | Quản lý thông báo, Sử dụng trợ lý AI, Quản lý media và sticker |
 | Cụm quản trị | Đặt Quản trị kiểm duyệt và Quản trị sticker gần actor Quản trị viên |
 | Use case con | Đặt gần use case chính tương ứng; không tách quá xa để tránh rối |

@@ -520,7 +520,6 @@ export class MessagesService {
               ...msg,
               content: '[Tin nhắn đã được thu hồi]',
               mediaUrl: undefined,
-              storyRef: undefined,
               type: 'system-recall' as const,
               isRecalled: true,
             };
@@ -1039,8 +1038,6 @@ export class MessagesService {
     message.deleteType = 'recall';
     message.content = undefined; // Clear content
     message.mediaUrl = undefined; // Clear media
-    message.storyRef = undefined; // Clear story ref
-
     await message.save();
 
     // Delete associated message status documents (optional cleanup)

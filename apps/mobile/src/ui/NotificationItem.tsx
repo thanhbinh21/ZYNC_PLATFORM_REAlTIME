@@ -3,7 +3,6 @@ import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import {
   Bell,
   ChevronRight,
-  Heart,
   MessageCircle,
   UserCheck,
   Users,
@@ -19,8 +18,6 @@ const TYPE_ICONS: Partial<Record<AppNotification['type'], React.ElementType>> = 
   friend_accepted: UserCheck,
   group_invite: Users,
   group_update: Users,
-  story_reaction: Heart,
-  story_reply: MessageCircle,
 };
 
 export function formatNotificationTime(dateStr: string): string {

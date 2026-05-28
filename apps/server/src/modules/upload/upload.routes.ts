@@ -22,7 +22,7 @@ uploadRouter.post('/sign', uploadRateLimiter, (req: Request, res: Response) => {
     return;
   }
 
-  const folder = (req.body as { folder?: string }).folder || 'stories';
+  const folder = (req.body as { folder?: string }).folder || 'uploads';
   const timestamp = Math.floor(Date.now() / 1000);
 
   const signature = cloudinary.utils.api_sign_request(
