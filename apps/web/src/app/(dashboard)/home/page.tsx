@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
+import { DownloadAppButton } from '@/components/shared/download-app-button';
 import { PageLoading } from '@/components/shared/page-loading';
 import { ZyncPageTransition } from '@/components/shared/ZyncPageTransition';
 import {
@@ -168,6 +169,7 @@ function HomePageContent(): React.JSX.Element {
                     <Search className="h-4 w-4" aria-hidden />
                     Tìm bạn
                   </button>
+                  <DownloadAppButton variant="secondary" />
                 </div>
               </div>
 

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Zync Mobile",
+    "name": "Zync",
     "slug": "zync-mobile",
     "scheme": "zyncmobile",
     "icon": "./assets/icon.png",

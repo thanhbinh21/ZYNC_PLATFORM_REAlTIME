@@ -10,6 +10,10 @@ build/
 out/
 .expo/
 
+# Large generated downloads
+apps/web/public/downloads/*.apk
+!apps/web/public/downloads/.gitkeep
+
 # Environment
 .env
 .env.local
@@ -55,3 +59,5 @@ output/
 
 #folder 
 Agent Skill/
+
+docs/
