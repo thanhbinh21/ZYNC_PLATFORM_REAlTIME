@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { ComponentType } from 'react';
-import { Bell, Bookmark, Check, Heart, MessageCircle, Settings, UserCheck, Users, X } from 'lucide-react';
+import { Bell, Bookmark, Heart, MessageCircle, Settings, UserCheck, Users, X } from 'lucide-react';
 import type { Notification } from '@/services/notifications';
 
 interface NotificationPanelProps {
@@ -20,7 +20,6 @@ interface NotificationPanelProps {
 type NotificationIcon = ComponentType<{ className?: string }>;
 const BellIcon = Bell as unknown as NotificationIcon;
 const BookmarkIcon = Bookmark as unknown as NotificationIcon;
-const CheckIcon = Check as unknown as NotificationIcon;
 const HeartIcon = Heart as unknown as NotificationIcon;
 const MessageCircleIcon = MessageCircle as unknown as NotificationIcon;
 const SettingsIcon = Settings as unknown as NotificationIcon;
@@ -34,8 +33,6 @@ const TYPE_ICONS: Record<Notification['type'], NotificationIcon> = {
   friend_accepted: UserCheckIcon,
   group_invite: UsersIcon,
   group_update: UsersIcon,
-  story_reaction: CheckIcon,
-  story_reply: MessageCircleIcon,
   post_like: HeartIcon,
   post_comment: MessageCircleIcon,
   post_bookmark: BookmarkIcon,

@@ -97,7 +97,6 @@ async function cleanupCloudinaryMedia(): Promise<void> {
   await deleteCloudinaryFolderIfExists('zync/images');
   await deleteCloudinaryFolderIfExists('zync/videos');
   await deleteCloudinaryFolderIfExists('zync/documents');
-  await deleteCloudinaryFolderIfExists('zync/stories');
   await deleteCloudinaryFolderIfExists('zync');
 
   logger.info(`Đã xóa ${deletedTotal} ảnh/video/file cũ trên Cloudinary prefix "${CLOUDINARY_PREFIX}"`);

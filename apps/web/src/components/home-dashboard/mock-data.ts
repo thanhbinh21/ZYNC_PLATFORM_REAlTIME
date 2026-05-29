@@ -22,7 +22,6 @@ export const DASHBOARD_HOME_MOCK_DATA: DashboardHomeMockData = {
     { id: 'settings', label: 'Cài đặt', icon: 'settings' },
     { id: 'logout', label: 'Đăng xuất', icon: 'logout' },
   ],
-  stories: [],
   stats: [
     { id: 'stat-1', value: '00', label: 'Tin nhắn mới', badge: '', icon: 'message' },
     { id: 'stat-2', value: '00', label: 'Lời mời kết bạn', badge: '', icon: 'friends' },

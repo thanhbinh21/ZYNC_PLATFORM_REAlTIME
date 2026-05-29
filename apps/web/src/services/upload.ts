@@ -14,7 +14,7 @@ interface UploadFileOptions {
 
 export async function uploadFile(
   file: File,
-  folder = 'stories',
+  folder = 'uploads',
   options?: UploadFileOptions,
 ): Promise<string> {
   const uploadType = file.type.startsWith('video/') ? 'video' : 'image';

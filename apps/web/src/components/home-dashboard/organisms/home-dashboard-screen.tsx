@@ -5,7 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { DashboardHomeMockData } from '../home-dashboard.types';
 import { DashboardIcon } from '../atoms/dashboard-icon';
-import { DashboardStoryItemRow } from '../molecules/dashboard-story-item';
 import { DashboardStatCard } from '../molecules/dashboard-stat-card';
 import { DashboardActivityItemRow } from '../molecules/dashboard-activity-item';
 
@@ -13,7 +12,6 @@ import type { DashboardActivityItem } from '../home-dashboard.types';
 
 interface HomeDashboardScreenProps {
   data: DashboardHomeMockData;
-  storySlot?: React.ReactNode;
   chatSlot?: React.ReactNode;
   profileSlot?: React.ReactNode;
   settingsSlot?: React.ReactNode;
@@ -32,7 +30,6 @@ interface HomeDashboardScreenProps {
 
 export function HomeDashboardScreen({
   data,
-  storySlot,
   chatSlot,
   profileSlot,
   settingsSlot,
@@ -275,17 +272,6 @@ export function HomeDashboardScreen({
               </div>
             ) : (
               <div className="w-full space-y-6">
-                {/* Stories — hidden when empty */}
-                {data.stories.length > 0 && (
-                  <div className="shrink-0 rounded-[1.6rem] p-3 zync-soft-card-muted">
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                      {data.stories.map((item) => (
-                        <DashboardStoryItemRow key={item.id} item={item} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Stats Grid */}
                 <div className="grid shrink-0 grid-cols-3 gap-3 sm:gap-4">
                   {data.stats.map((item) => (

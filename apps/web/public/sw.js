@@ -40,8 +40,6 @@ self.addEventListener('notificationclick', (event) => {
     targetUrl = `/home?conv=${data.conversationId}`;
   } else if (data.action === 'open_friend_requests') {
     targetUrl = '/home?tab=friends';
-  } else if (data.action === 'open_story' && data.storyId) {
-    targetUrl = `/home?tab=stories&story=${data.storyId}`;
   }
 
   event.waitUntil(

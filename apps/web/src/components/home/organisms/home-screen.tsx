@@ -15,6 +15,7 @@ import {
 import { HomeCta } from '../atoms/home-cta';
 import { HomeFeatureCard } from '../molecules/home-feature-card';
 import type { HomeScreenProps } from '../home.types';
+import { DownloadAppButton } from '@/components/shared/download-app-button';
 import { ZyncLogo } from '@/components/shared/zync-logo';
 
 export function HomeScreen({ data }: HomeScreenProps) {
@@ -72,6 +73,7 @@ export function HomeScreen({ data }: HomeScreenProps) {
             <div className="mt-8 flex flex-wrap gap-3">
               <HomeCta label={data.ctaPrimary} href="/auth" variant="primary" />
               <HomeCta label={data.ctaSecondary} href="#features" variant="secondary" />
+              <DownloadAppButton variant="secondary" />
             </div>
 
             <div className="mt-10 grid gap-3 sm:grid-cols-3">

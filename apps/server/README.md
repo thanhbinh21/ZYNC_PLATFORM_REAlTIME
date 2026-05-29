@@ -5,7 +5,7 @@ Backend real-time messaging cho Zync Platform.
 ## 1. Tong quan
 
 Server cung cap:
-- REST API (auth, users, friends, conversations, messages, upload, stories)
+- REST API (auth, users, friends, conversations, messages, upload, posts)
 - Socket.IO gateway cho giao tiep real-time
 - Kafka workers de xu ly bat dong bo
 - Redis cho cache, rate limit, presence, idempotency
@@ -62,7 +62,6 @@ apps/server/
       groups/
       conversations/
       messages/
-      stories/
       upload/
     shared/
       errors/

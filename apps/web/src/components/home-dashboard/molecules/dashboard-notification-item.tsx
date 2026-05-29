@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import type { ComponentType } from 'react';
 import type { DashboardNotificationItem } from '../home-dashboard.types';
-import { Bell, Bookmark, MessageSquare, UserPlus, Users, Heart, Reply } from 'lucide-react';
+import { Bell, Bookmark, MessageSquare, UserPlus, Users, Heart } from 'lucide-react';
 
 interface DashboardNotificationItemProps {
   item: DashboardNotificationItem;
@@ -17,7 +17,6 @@ const MessageSquareIcon = MessageSquare as unknown as DashboardNotificationIcon;
 const UserPlusIcon = UserPlus as unknown as DashboardNotificationIcon;
 const UsersIcon = Users as unknown as DashboardNotificationIcon;
 const HeartIcon = Heart as unknown as DashboardNotificationIcon;
-const ReplyIcon = Reply as unknown as DashboardNotificationIcon;
 
 /**
  * Lấy icon dựa trên loại notification
@@ -33,10 +32,6 @@ function getNotificationIcon(type: DashboardNotificationItem['type']) {
     case 'group_invite':
     case 'group_update':
       return UsersIcon;
-    case 'story_reaction':
-      return HeartIcon;
-    case 'story_reply':
-      return ReplyIcon;
     case 'community_post':
     case 'post_comment':
       return MessageSquareIcon;
@@ -62,10 +57,6 @@ function getNotificationColor(type: DashboardNotificationItem['type']): string {
     case 'group_invite':
     case 'group_update':
       return 'bg-[#f59e0b]';
-    case 'story_reaction':
-      return 'bg-[#ec4899]';
-    case 'story_reply':
-      return 'bg-[#3b82f6]';
     case 'community_post':
     case 'post_comment':
       return 'bg-[#0f9d8e]';

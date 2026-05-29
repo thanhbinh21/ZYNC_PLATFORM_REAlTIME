@@ -29,7 +29,6 @@ Real-time messaging platform – Zalo Clone.
 - Message status: sent, delivered, read
 - Typing indicators and online presence
 - Media upload via Cloudinary signed upload (no proxying through server)
-- 24-hour stories with auto-expiry
 - Push notifications via FCM / APNs
 - JWT authentication with OTP verification
 - Multi-device sync
@@ -211,7 +210,6 @@ All API routes are prefixed with `/api`.
 | `GET /api/messages/:conversationId` | Get messages (cursor-paginated) |
 | `GET /api/groups/:id` | Get group info |
 | `POST /api/upload/sign` | Get Cloudinary signature for direct upload |
-| `GET /api/stories` | Get stories from friends |
 
 ### Socket.IO Events
 

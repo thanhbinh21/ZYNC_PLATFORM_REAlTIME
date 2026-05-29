@@ -19,7 +19,6 @@ zync-platform/
 │   │   │   │   ├── groups/       # Quản lý nhóm, thành viên, phân quyền
 │   │   │   │   ├── conversations/# Hội thoại 1-1 và nhóm
 │   │   │   │   ├── messages/     # Tin nhắn, media, idempotency
-│   │   │   │   ├── stories/      # Story 24h
 │   │   │   │   ├── notifications/ # Push notification, preferences
 │   │   │   │   ├── calls/        # Realtime gọi 1-1/group (WebRTC signaling + session state)
 │   │   │   │   ├── ai/           # AI foundation + moderation (moderation/, guards/, fallback/, embeddings/)
@@ -82,18 +81,15 @@ zync-platform/
 │   │   │   │       ├── organisms/
 │   │   │   │       ├── home-dashboard.types.ts
 │   │   │   │       └── mock-data.ts
-│   │   │   │   └── stories/
 │   │   │   ├── hooks/
 │   │   │   │   ├── use-friends-dashboard.ts
 │   │   │   │   ├── use-home-dashboard.ts
-│   │   │   │   ├── use-stories.ts
 │   │   │   │   ├── use-notifications.ts
 │   │   │   │   └── use-login-form.ts
 │   │   │   └── services/
 │   │   │       ├── api.ts
 │   │   │       ├── auth.ts
 │   │   │       ├── friends.ts
-│   │   │       ├── stories.ts
 │   │   │       ├── notifications.ts
 │   │   │       ├── web-push.ts
 │   │   │       └── socket.ts
@@ -141,7 +137,6 @@ zync-platform/
 | `groups` | CRUD nhóm, quản lý thành viên | `conversations`, `conversation_members` |
 | `conversations` | Danh sách hội thoại, unread count | `conversations`, `conversation_members` |
 | `messages` | Gửi/nhận tin nhắn, media, idempotency | `messages`, `message_status` |
-| `stories` | CRUD story 24h, viewers | `stories` |
 | `notifications` | Push notification, preferences, mute/unmute | `notifications`, `notification_preferences` |
 | `calls` | Realtime calling rollout 2 bước: 1-1 P2P trước, group SFU sau; quản lý signaling + trạng thái phiên gọi | `call_sessions`, `call_participants`, `call_events` |
 | `ai` | Moderation, guard prompt injection, model fallback, embedding/vector services | `moderation_logs` + Neon pgvector tables |
@@ -366,8 +361,6 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `reaction_updated` | `{requestId, conversationId, messageRef, ...}` | Event reaction realtime chuẩn mới cho Web/Mobile |
 | `message_reacted` | `{messageId, conversationId, reactionType, userId, actionType, reactions[]}` | Cập nhật reaction realtime |
 | `user_penalty_updated` | `{conversationId, penaltyScore, mutedUntil}` | Đồng bộ điểm vi phạm/mute của user theo conversation |
-| `story_reaction` | `{storyId, userId, reactionType, displayName}` | Realtime reaction cho story owner |
-| `story_reply` | `{storyId, senderId, content, displayName}` | Realtime reply story về DM + notify |
 | `call_invited` | `{sessionId, conversationId?, targetUserId?, isGroupCall?, participantIds?, callType, timeoutAt, callToken, callTokenExpiresInSeconds}` | Xác nhận caller đã tạo phiên gọi + token ngắn hạn |
 | `call_incoming` | `{sessionId, conversationId?, fromUserId, isGroupCall?, participantIds?, callType, callToken, callTokenExpiresInSeconds}` | Sự kiện có cuộc gọi đến + token ngắn hạn |
 | `call_status` | `{sessionId, status, reason?}` | Đồng bộ trạng thái call: ringing/connected/rejected/missed/ended |
@@ -393,7 +386,7 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 
 | Method | Endpoint | Payload | Mô tả |
 |--------|----------|---------|-------|
-| POST | `/api/upload/sign` | `{folder}` | Cấp chữ ký upload tương thích luồng stories/profile cũ |
+| POST | `/api/upload/sign` | `{folder}` | Cấp chữ ký upload cho media/profile |
 | POST | `/api/upload/generate-signature` | `{type}` (`image`/`video`/`document`) | Cấp chữ ký upload cho chat/media flow |
 | POST | `/api/upload/verify` | `{publicId, type}` (`image`/`video`/`document`) | Xác minh upload thành công và trả URL an toàn |
 | DELETE | `/api/upload/:publicId` | - | Xóa file upload theo quyền sở hữu user |
@@ -411,7 +404,6 @@ Client A ◄─[message_sent]   Client B ◄─[receive_message]
 | `conversation_members` | `{conversationId, userId}` (unique), `userId`, fields moderation: `penaltyScore`, `penaltyWindowStartedAt`, `mutedUntil` |
 | `messages` | `{conversationId, createdAt: -1}`, `idempotencyKey` (unique, TTL 24h) |
 | `message_status` | `{messageId, userId}` (unique), `{messageId, status}` |
-| `stories` | `expiresAt` (TTL index – tự xóa sau 24h), `userId` |
 | `notifications` | `{userId, createdAt: -1}`, `{userId, read}`, `createdAt` (TTL 30 ngày) |
 | `notification_preferences` | `userId` (unique) |
 | `moderation_logs` | `{messageId, createdAt}`, `{reporterId, createdAt}`, `{status, createdAt}` |

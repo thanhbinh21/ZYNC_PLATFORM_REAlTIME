@@ -126,7 +126,7 @@ const AVATAR_URLS = [
   'https://res.cloudinary.com/binhdev/image/upload/v1775401939/avatars/p9asrwaclhspknl3koq8.jpg',
   'https://res.cloudinary.com/binhdev/image/upload/v1776614290/zync/images/69e2647d1680fe1676223bff/q2hgnnbvyn3xaodsgutu.jpg',
   'https://res.cloudinary.com/binhdev/image/upload/v1776618723/zync/images/69e2647d1680fe1676223c00/jhehlpuz4mkpolyidqpq.jpg',
-  'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
+  'https://res.cloudinary.com/binhdev/image/upload/v1775438102/media/nuuxxnjehlizhhxvam45.jpg',
   'https://res.cloudinary.com/binhdev/image/upload/v1775401939/avatars/p9asrwaclhspknl3koq8.jpg',
 ];
 
@@ -246,7 +246,7 @@ const GROUP_MESSAGES_POOL = [
   'Cuộc họp retrospective lúc 4h chiều nhé mọi người',
   'Mình xin nghỉ ngày mai, có task gì cần cover không?',
   'Mình cover được task API documentation',
-  'Lưu ý: deadline feature stories là thứ 6 tuần sau',
+  'Lưu ý: deadline feature cộng đồng là thứ 6 tuần sau',
   'Mình update progress: đã done 70%, ước tính thêm 2 ngày nữa',
   'Ai dùng Cursor AI để code chưa? Hay vẫn dùng Copilot?',
   'Mình dùng Cursor, khá cool, đặc biệt là tính năng agent',
@@ -488,7 +488,7 @@ const SEED_USER_DEFINITIONS = [
     skills: ['react-native', 'flutter', 'javascript', 'typescript', 'nodejs'],
     interests: ['mobile', 'frontend', 'startup'],
     githubUrl: 'https://github.com/quangminh',
-    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
+    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/media/nuuxxnjehlizhhxvam45.jpg',
   },
   {
     email: 'anhnt.tech@gmail.com',
@@ -532,7 +532,7 @@ const SEED_USER_DEFINITIONS = [
     skills: ['react', 'javascript', 'typescript', 'nextjs', 'git'],
     interests: ['frontend', 'open-source', 'freelance'],
     githubUrl: 'https://github.com/thanhhuong',
-    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
+    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/media/nuuxxnjehlizhhxvam45.jpg',
   },
   {
     email: 'vietphong.uit@gmail.com',
@@ -576,7 +576,7 @@ const SEED_USER_DEFINITIONS = [
     skills: ['typescript', 'react', 'nextjs', 'nodejs', 'postgresql', 'aws'],
     interests: ['fullstack', 'career', 'startup', 'backend'],
     githubUrl: 'https://github.com/huytran',
-    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
+    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/media/nuuxxnjehlizhhxvam45.jpg',
   },
   {
     email: 'nhattruong.mentor@gmail.com',
@@ -620,7 +620,7 @@ const SEED_USER_DEFINITIONS = [
     skills: ['javascript', 'react', 'typescript'],
     interests: ['frontend', 'career'],
     githubUrl: 'https://github.com/thienphuoc',
-    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/stories/nuuxxnjehlizhhxvam45.jpg',
+    avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775438102/media/nuuxxnjehlizhhxvam45.jpg',
   },
   {
     email: 'ngoclinh.recruit@gmail.com',

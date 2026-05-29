@@ -54,17 +54,14 @@ apps/web/
       home/
       friends/
       home-dashboard/
-      stories/
     hooks/
       use-login-form.ts
       use-home-dashboard.ts
       use-friends-dashboard.ts
-      use-stories.ts
     services/
       api.ts
       auth.ts
       friends.ts
-      stories.ts
       upload.ts
       socket.ts
   public/

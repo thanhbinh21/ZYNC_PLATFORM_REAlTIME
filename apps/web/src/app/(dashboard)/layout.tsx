@@ -185,7 +185,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleNotificationNavigate = (notification: Notification) => {
     const action = notification.data?.action;
     const conversationId = notification.conversationId ?? notification.data?.conversationId;
-    const storyId = notification.data?.storyId;
 
     if (action === 'group_deleted' || action === 'group_removed') {
       router.push('/home');
@@ -202,11 +201,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    if (action === 'open_story') {
-      router.push(storyId ? `/profile?tab=stories&storyId=${encodeURIComponent(storyId)}` : '/profile?tab=stories');
-      return;
-    }
-
     if (notification.type === 'new_message' || notification.type === 'group_invite' || notification.type === 'group_update') {
       router.push(conversationId ? `/chat?conversationId=${conversationId}` : '/chat');
       return;
@@ -214,11 +208,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
       router.push('/friends#requests');
-      return;
-    }
-
-    if (notification.type === 'story_reaction' || notification.type === 'story_reply') {
-      router.push('/profile?tab=stories');
       return;
     }
 
