@@ -12,18 +12,43 @@ import {
   logout,
 } from './auth.service';
 import { type AuthRequest } from '../../shared/middleware/auth.middleware';
+import { logger } from '../../shared/logger';
 
 const REFRESH_TOKEN_COOKIE = 'refreshToken';
 const ACCESS_TOKEN_COOKIE = 'accessToken';
 const ACCESS_TOKEN_CLIENT_COOKIE = 'accessToken_client'; // non-httpOnly side-channel for Socket.IO client
 const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 ngày (ms)
 
+/**
+ * Resolve cookie SameSite attribute based on environment.
+ * - Development: 'strict' (same-origin only, safest for localhost)
+ * - Production: configurable via COOKIE_SAME_SITE env, default 'lax'
+ *   Use 'none' when API domain ≠ web domain (cross-site), requires secure=true
+ *   Use 'lax' when API and web share the same site (e.g. api.zync.io + app.zync.io)
+ */
+function resolveCookieSameSite(): 'strict' | 'lax' | 'none' {
+  if (process.env['NODE_ENV'] !== 'production') return 'strict';
+  const configured = process.env['COOKIE_SAME_SITE'];
+  if (configured === 'none') return 'none';
+  if (configured === 'strict') return 'strict';
+  return 'lax';
+}
+
+function cookieSecure(): boolean {
+  // Must be true when sameSite is 'none', and generally true in production
+  return process.env['NODE_ENV'] === 'production';
+}
+
 function setAccessTokenCookie(res: Response, accessToken: string): void {
+  const sameSite = resolveCookieSameSite();
+  const secure = cookieSecure();
+
   // httpOnly cookie for REST API auth (cannot be read by JS)
   res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
     httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'strict',
+    secure,
+    sameSite,
+    path: '/',
     maxAge: 15 * 60 * 1000, // 15 phút, matching ACCESS_TOKEN_TTL
   });
 
@@ -31,21 +56,27 @@ function setAccessTokenCookie(res: Response, accessToken: string): void {
   // accessToken is short-lived (15m) so this is acceptable for Socket.IO only.
   res.cookie(ACCESS_TOKEN_CLIENT_COOKIE, accessToken, {
     httpOnly: false,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'strict',
+    secure,
+    sameSite,
+    path: '/',
     maxAge: 15 * 60 * 1000,
   });
 }
 
 function clearAccessTokenCookie(res: Response): void {
+  const sameSite = resolveCookieSameSite();
+  const secure = cookieSecure();
+
   res.clearCookie(ACCESS_TOKEN_COOKIE, {
     httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'strict',
+    secure,
+    sameSite,
+    path: '/',
   });
   res.clearCookie(ACCESS_TOKEN_CLIENT_COOKIE, {
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'strict',
+    secure,
+    sameSite,
+    path: '/',
   });
 }
 
@@ -93,8 +124,9 @@ export async function verifyOtpHandler(
     // Lưu refresh token vào http-only cookie
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'strict',
+      secure: cookieSecure(),
+      sameSite: resolveCookieSameSite(),
+      path: '/',
       maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
@@ -156,8 +188,9 @@ export async function loginPasswordVerifyOtpHandler(
 
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'strict',
+      secure: cookieSecure(),
+      sameSite: resolveCookieSameSite(),
+      path: '/',
       maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
@@ -235,8 +268,9 @@ export async function googleLoginHandler(
 
     res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'strict',
+      secure: cookieSecure(),
+      sameSite: resolveCookieSameSite(),
+      path: '/',
       maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
@@ -269,6 +303,7 @@ export async function refreshHandler(
     const refreshToken = (req.cookies[REFRESH_TOKEN_COOKIE] as string | undefined)
       ?? (typeof bodyRefreshToken === 'string' ? bodyRefreshToken : undefined);
     if (!refreshToken) {
+      logger.warn('[Auth] Refresh failed: no refresh token in cookie or body');
       res.status(401).json({ success: false, error: 'Refresh token not found' });
       return;
     }
@@ -279,6 +314,7 @@ export async function refreshHandler(
 
     res.json({ success: true, accessToken });
   } catch (err) {
+    logger.warn('[Auth] Refresh token verification failed', err instanceof Error ? err.message : err);
     next(err);
   }
 }
@@ -327,8 +363,9 @@ export async function logoutHandler(
     // Xóa refresh token cookie
     res.clearCookie(REFRESH_TOKEN_COOKIE, {
       httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'strict',
+      secure: cookieSecure(),
+      sameSite: resolveCookieSameSite(),
+      path: '/',
     });
 
     res.json({ success: true, message: 'Logged out successfully' });

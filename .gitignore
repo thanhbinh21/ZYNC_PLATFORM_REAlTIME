@@ -18,6 +18,12 @@ apps/web/public/downloads/*.apk
 .env
 .env.local
 .env.*.local
+.env.production.local
+.env.production
+.env.development.local
+.env.development
+.env.test.local
+.env.test
 
 # Logs
 logs/
@@ -61,3 +67,6 @@ output/
 Agent Skill/
 
 docs/
+apps/mobile/eas.json
+apps/mobile/eas.json
+apps/server/scripts/seed-month-data.ts

@@ -155,6 +155,23 @@ export function disconnectSocket(): void {
   }
 }
 
+/**
+ * Update the socket's auth token after a token refresh.
+ * This ensures that socket reconnections use the new access token
+ * instead of the expired old one stored in memory.
+ */
+export function updateSocketToken(newToken: string): void {
+  if (!socket || !newToken) return;
+
+  currentToken = newToken;
+  (socket.auth as Record<string, string>).token = newToken;
+
+  // If socket is disconnected, reconnect with the new token
+  if (socket.disconnected && !socket.active) {
+    socket.connect();
+  }
+}
+
 export function joinConversation(conversationId: string): void {
   if (!socket) return;
 

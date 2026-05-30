@@ -51,7 +51,7 @@ const ONE_MONTH = ONE_DAY * 30;
 const ACCOUNT_AGE_MIN = ONE_MONTH;
 const ACCOUNT_AGE_MAX = ONE_DAY * 3;
 
-const DEFAULT_PASSWORD = '12345678';
+const DEFAULT_PASSWORD = '123123123';
 const PASSWORD_HASH = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
 
 // Giữ seed gọn để dễ test UI/dev local.
@@ -447,7 +447,7 @@ interface SeedUser {
 
 const SEED_USER_DEFINITIONS = [
   {
-    email: 'binhdeviuh@gmail.com',
+    email: 'binhcodeiuh@gmail.com',
     username: 'binhdev',
     displayName: 'Nguyễn Thanh Bình',
     bio: 'Fullstack Developer | TypeScript & React | HCM City | Building Zync',
@@ -458,7 +458,7 @@ const SEED_USER_DEFINITIONS = [
     avatarUrl: 'https://res.cloudinary.com/binhdev/image/upload/v1775401939/avatars/p9asrwaclhspknl3koq8.jpg',
   },
   {
-    email: 'minhdu.khtn@gmail.com',
+    email: 'binhmm02004@gmail.com',
     username: 'duoccho',
     displayName: 'Nguyễn Minh Đức',
     bio: 'Backend Engineer | Go & Python | HCM City | Scale systems',
@@ -686,22 +686,22 @@ const EXTRA_USER_TEMPLATES: Array<{
   skills: string[];
   interests: string[];
 }> = [
-  { prefix: 'dev01', name: 'Phạm Hùng Cường', role: 'developer', bio_template: 'Fullstack Dev | %skill1% & %skill2% | HCM City', skills: ['typescript', 'react', 'nodejs', 'mongodb'], interests: ['fullstack', 'career'] },
-  { prefix: 'dev02', name: 'Ngô Hoàng Nam', role: 'developer', bio_template: 'Backend Dev | Go enthusiast | HCM City', skills: ['go', 'postgresql', 'redis', 'docker'], interests: ['backend', 'devops'] },
-  { prefix: 'dev03', name: 'Trương Minh Tuấn', role: 'developer', bio_template: 'React Native Developer | Mobile-first | HCM City', skills: ['react-native', 'javascript', 'typescript'], interests: ['mobile', 'frontend'] },
-  { prefix: 'dev04', name: 'Lý Thanh Vân', role: 'developer', bio_template: 'Python Developer | Data lover | HCM City', skills: ['python', 'postgresql', 'data-science'], interests: ['backend', 'data'] },
-  { prefix: 'dev05', name: 'Đinh Gia Bảo', role: 'developer', bio_template: 'Cloud Engineer | AWS Certified | HCM City', skills: ['aws', 'docker', 'kubernetes', 'ci-cd'], interests: ['devops', 'cloud'] },
-  { prefix: 'dev06', name: 'Võ Thị Mai Lan', role: 'developer', bio_template: 'Frontend Dev | Next.js Wizard | HCM City', skills: ['react', 'vue', 'javascript', 'typescript'], interests: ['frontend', 'freelance'] },
-  { prefix: 'dev07', name: 'Bùi Đình Phong', role: 'student', bio_template: 'Student @ VNU | Learning coding | HCM City', skills: ['javascript', 'python', 'git'], interests: ['frontend', 'backend', 'career'] },
-  { prefix: 'dev08', name: 'Nguyễn Hữu Thắng', role: 'developer', bio_template: 'Tech Lead | 7+ years | Team management | HCM City', skills: ['typescript', 'react', 'nodejs', 'postgresql'], interests: ['fullstack', 'career', 'startup'] },
-  { prefix: 'dev09', name: 'Chu Thị Hương Giang', role: 'developer', bio_template: 'QA Engineer | Test automation | HCM City', skills: ['testing', 'python', 'docker', 'ci-cd'], interests: ['devops', 'security', 'career'] },
-  { prefix: 'dev10', name: 'Hồ Quang Vinh', role: 'developer', bio_template: 'Blockchain Dev | Web3 enthusiast | Remote', skills: ['javascript', 'react', 'security'], interests: ['open-source', 'startup'] },
-  { prefix: 'dev11', name: 'Trịnh Minh Châu', role: 'student', bio_template: 'CS Student @ BK | Algorithms & CP | HCM City', skills: ['python', 'javascript', 'git'], interests: ['backend', 'open-source'] },
-  { prefix: 'dev12', name: 'Phan Thị Thu Hà', role: 'developer', bio_template: 'Product Manager & Dev | Building products | HCM City', skills: ['typescript', 'react', 'nodejs'], interests: ['fullstack', 'startup', 'career'] },
-  { prefix: 'dev13', name: 'Đặng Nhật Minh', role: 'developer', bio_template: 'iOS Developer | Swift & SwiftUI | HCM City', skills: ['swift', 'kotlin'], interests: ['mobile', 'career'] },
-  { prefix: 'dev14', name: 'Lê Khánh Vy', role: 'developer', bio_template: 'Freelance Dev | WordPress & React | Remote', skills: ['javascript', 'react', 'typescript'], interests: ['frontend', 'freelance'] },
-  { prefix: 'dev15', name: 'Trần Đăng Khoa', role: 'developer', bio_template: 'System Admin | Linux lover | HCM City', skills: ['docker', 'kubernetes', 'security', 'aws'], interests: ['devops', 'security', 'cloud'] },
-];
+    { prefix: 'dev01', name: 'Phạm Hùng Cường', role: 'developer', bio_template: 'Fullstack Dev | %skill1% & %skill2% | HCM City', skills: ['typescript', 'react', 'nodejs', 'mongodb'], interests: ['fullstack', 'career'] },
+    { prefix: 'dev02', name: 'Ngô Hoàng Nam', role: 'developer', bio_template: 'Backend Dev | Go enthusiast | HCM City', skills: ['go', 'postgresql', 'redis', 'docker'], interests: ['backend', 'devops'] },
+    { prefix: 'dev03', name: 'Trương Minh Tuấn', role: 'developer', bio_template: 'React Native Developer | Mobile-first | HCM City', skills: ['react-native', 'javascript', 'typescript'], interests: ['mobile', 'frontend'] },
+    { prefix: 'dev04', name: 'Lý Thanh Vân', role: 'developer', bio_template: 'Python Developer | Data lover | HCM City', skills: ['python', 'postgresql', 'data-science'], interests: ['backend', 'data'] },
+    { prefix: 'dev05', name: 'Đinh Gia Bảo', role: 'developer', bio_template: 'Cloud Engineer | AWS Certified | HCM City', skills: ['aws', 'docker', 'kubernetes', 'ci-cd'], interests: ['devops', 'cloud'] },
+    { prefix: 'dev06', name: 'Võ Thị Mai Lan', role: 'developer', bio_template: 'Frontend Dev | Next.js Wizard | HCM City', skills: ['react', 'vue', 'javascript', 'typescript'], interests: ['frontend', 'freelance'] },
+    { prefix: 'dev07', name: 'Bùi Đình Phong', role: 'student', bio_template: 'Student @ VNU | Learning coding | HCM City', skills: ['javascript', 'python', 'git'], interests: ['frontend', 'backend', 'career'] },
+    { prefix: 'dev08', name: 'Nguyễn Hữu Thắng', role: 'developer', bio_template: 'Tech Lead | 7+ years | Team management | HCM City', skills: ['typescript', 'react', 'nodejs', 'postgresql'], interests: ['fullstack', 'career', 'startup'] },
+    { prefix: 'dev09', name: 'Chu Thị Hương Giang', role: 'developer', bio_template: 'QA Engineer | Test automation | HCM City', skills: ['testing', 'python', 'docker', 'ci-cd'], interests: ['devops', 'security', 'career'] },
+    { prefix: 'dev10', name: 'Hồ Quang Vinh', role: 'developer', bio_template: 'Blockchain Dev | Web3 enthusiast | Remote', skills: ['javascript', 'react', 'security'], interests: ['open-source', 'startup'] },
+    { prefix: 'dev11', name: 'Trịnh Minh Châu', role: 'student', bio_template: 'CS Student @ BK | Algorithms & CP | HCM City', skills: ['python', 'javascript', 'git'], interests: ['backend', 'open-source'] },
+    { prefix: 'dev12', name: 'Phan Thị Thu Hà', role: 'developer', bio_template: 'Product Manager & Dev | Building products | HCM City', skills: ['typescript', 'react', 'nodejs'], interests: ['fullstack', 'startup', 'career'] },
+    { prefix: 'dev13', name: 'Đặng Nhật Minh', role: 'developer', bio_template: 'iOS Developer | Swift & SwiftUI | HCM City', skills: ['swift', 'kotlin'], interests: ['mobile', 'career'] },
+    { prefix: 'dev14', name: 'Lê Khánh Vy', role: 'developer', bio_template: 'Freelance Dev | WordPress & React | Remote', skills: ['javascript', 'react', 'typescript'], interests: ['frontend', 'freelance'] },
+    { prefix: 'dev15', name: 'Trần Đăng Khoa', role: 'developer', bio_template: 'System Admin | Linux lover | HCM City', skills: ['docker', 'kubernetes', 'security', 'aws'], interests: ['devops', 'security', 'cloud'] },
+  ];
 
 // ─── Main Seeding Logic ────────────────────────────────────────────────────────
 
