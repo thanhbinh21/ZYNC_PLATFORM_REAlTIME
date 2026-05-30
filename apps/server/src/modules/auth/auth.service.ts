@@ -384,9 +384,17 @@ export async function loginWithGoogle(
   idToken: string,
   deviceInfo?: { deviceToken?: string; platform?: 'ios' | 'android' | 'web' },
 ): Promise<VerifyOtpResult> {
-  const audience = process.env['GOOGLE_CLIENT_ID'];
-  if (!audience) {
+  const webClientId = process.env['GOOGLE_CLIENT_ID'];
+  const mobileClientId = process.env['GOOGLE_CLIENT_ID_MOBILE'];
+
+  if (!webClientId) {
     throw new BadRequestError('GOOGLE_CLIENT_ID chưa được cấu hình', 'GOOGLE_CLIENT_NOT_CONFIGURED');
+  }
+
+  // Build audience array: web client ID + optional mobile client ID
+  const audience = [webClientId];
+  if (mobileClientId && mobileClientId !== webClientId) {
+    audience.push(mobileClientId);
   }
 
   let ticket: { getPayload: () => { email?: string; email_verified?: boolean; name?: string; picture?: string } | undefined };
@@ -397,7 +405,11 @@ export async function loginWithGoogle(
       idToken,
       audience,
     });
-  } catch {
+  } catch (err) {
+    logger.warn('[Auth] Google token verification failed', {
+      error: err instanceof Error ? err.message : err,
+      audienceCount: audience.length,
+    });
     throw new UnauthorizedError('Google token không hợp lệ', 'GOOGLE_TOKEN_INVALID');
   }
 

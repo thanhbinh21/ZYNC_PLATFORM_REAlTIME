@@ -85,12 +85,23 @@ apiClient.interceptors.response.use(
           {},
           { withCredentials: true },
         );
+        // Set the client-readable access token cookie.
+        // Note: js-cookie does NOT support httpOnly (it's browser-only). Use 'expires' (Date) instead of 'maxAge'.
+        const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
         Cookies.set(ACCESS_TOKEN_COOKIE_KEY, data.accessToken, {
-          httpOnly: false,
-          secure: process.env['NODE_ENV'] === 'production',
-          sameSite: 'strict',
-          maxAge: 15 * 60,
+          secure: window.location.protocol === 'https:',
+          sameSite: 'Lax',
+          expires,
         });
+
+        // Update socket auth token so reconnects use the new token
+        try {
+          const { updateSocketToken } = await import('@/services/socket');
+          updateSocketToken(data.accessToken);
+        } catch {
+          // socket module may not be loaded yet – ignore
+        }
+
         return apiClient(requestConfig ?? { url: '/' });
       } catch {
         handleAuthFailure();
@@ -100,3 +111,4 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
