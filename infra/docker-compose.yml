@@ -33,7 +33,7 @@ services:
     container_name: zync_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     command: >
       redis-server
       --appendonly yes
@@ -72,8 +72,8 @@ services:
       - --smp 1
       - --default-log-level=warn
     ports:
-      - "9092:9092"    # Kafka bootstrap (cung port cu, khong doi .env)
-      - "18082:18082"  # HTTP Proxy
+      - "127.0.0.1:9092:9092"    # Kafka bootstrap cho app tren host
+      - "127.0.0.1:18082:18082"  # HTTP Proxy chi dung tu host
     volumes:
       - redpanda_data:/var/lib/redpanda/data
     networks:
@@ -95,7 +95,7 @@ services:
     depends_on:
       - redpanda
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       KAFKA_BROKERS: redpanda:29092
     networks:

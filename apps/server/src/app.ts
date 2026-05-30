@@ -21,11 +21,17 @@ import { globalErrorHandler } from './shared/middleware/error-handler.middleware
 
 export function createApp(): Application {
   const app = express();
+  const configuredCorsOrigins = (process.env['CORS_ORIGINS'] ?? 'http://localhost:3001')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const isLanMode = process.env['NODE_ENV'] !== 'production'
+    && process.env['HOST'] === '0.0.0.0';
 
   // Middleware bảo mật
   app.use(helmet());
   app.use(cors({
-    origin: true,
+    origin: isLanMode ? true : configuredCorsOrigins,
     credentials: true,
   }));
 
