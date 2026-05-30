@@ -36,13 +36,13 @@ messagesRouter.get('/:conversationId', getMessageHistoryHandler);
 
 messagesRouter.put('/:messageId/status', updateMessageStatusHandler);
 
-// ─── POST /api/messages/:messageId/read ──── Mark single message as read
-
-messagesRouter.post('/:messageId/read', markAsReadHandler);
-
 // ─── POST /api/messages/batch/read ──── Batch mark multiple messages as read
 
 messagesRouter.post('/batch/read', markMultipleAsReadHandler);
+
+// ─── POST /api/messages/:messageId/read ──── Mark single message as read
+
+messagesRouter.post('/:messageId/read', markAsReadHandler);
 
 // ─── POST /api/messages/:messageId/react ──── Add a reaction
 

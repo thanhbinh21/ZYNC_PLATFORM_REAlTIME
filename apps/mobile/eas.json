@@ -4,16 +4,21 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "android": { "buildType": "apk" }
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "android": { "buildType": "apk" }
     },
     "installable": {
       "distribution": "internal",
+      "environment": "production",
       "android": { "buildType": "apk" }
     },
-    "production": {}
+    "production": {
+      "environment": "production"
+    }
   }
 }
