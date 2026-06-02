@@ -97,7 +97,7 @@ function NotificationsPageContent() {
       }
 
       if (action === 'open_friend_requests') {
-        router.push('/friends#requests');
+        router.push('/friends?tab=requests');
         return;
       }
 
@@ -107,7 +107,7 @@ function NotificationsPageContent() {
       }
 
       if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
-        router.push('/friends#requests');
+        router.push('/friends?tab=requests');
         return;
       }
 

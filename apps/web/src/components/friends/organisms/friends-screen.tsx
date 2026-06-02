@@ -1,6 +1,6 @@
 "use client";
 
-import { type ComponentType, useEffect, useState } from "react";
+import { type ComponentType, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Bell,
@@ -129,6 +129,7 @@ export function FriendsScreen({
     openProfileModal,
     closeProfileModal,
   } = useNavigationFlow();
+  const openedProfileUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -138,6 +139,21 @@ export function FriendsScreen({
       setActiveTab("search");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const userId = searchParams.get("user");
+    if (!userId || openedProfileUserRef.current === userId) {
+      return;
+    }
+
+    openedProfileUserRef.current = userId;
+    void openProfileModal(userId);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("user");
+    const query = params.toString();
+    window.history.replaceState(window.history.state, "", query ? `/friends?${query}` : "/friends");
+  }, [openProfileModal, searchParams]);
 
   useEffect(() => {
     if (infoMessage) {

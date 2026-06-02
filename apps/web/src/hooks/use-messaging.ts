@@ -49,6 +49,8 @@ interface MessageStatusMap {
 
 type MessagesByConversationId = Record<string, Message[]>;
 type MessageStatusByConversationId = Record<string, MessageStatusMap>;
+const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_MESSAGE_STATUS: MessageStatusMap = {};
 
 export interface TypingUser {
   userId: string;
@@ -104,8 +106,8 @@ export function useChat({
   const [messageStatusByConversationId, setMessageStatusByConversationId] = useState<MessageStatusByConversationId>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const messages = messagesByConversationId[conversationId] ?? [];
-  const messageStatus = messageStatusByConversationId[conversationId] ?? {};
+  const messages = messagesByConversationId[conversationId] ?? EMPTY_MESSAGES;
+  const messageStatus = messageStatusByConversationId[conversationId] ?? EMPTY_MESSAGE_STATUS;
 
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -121,7 +123,7 @@ export function useChat({
     if (!targetConversationId) return;
 
     setMessagesByConversationId((prev) => {
-      const currentMessages = prev[targetConversationId] ?? [];
+      const currentMessages = prev[targetConversationId] ?? EMPTY_MESSAGES;
       const nextMessages = typeof updater === "function"
         ? updater(currentMessages)
         : updater;
@@ -926,7 +928,7 @@ export function useMessageHistory({
   const activeConversationIdRef = useRef(conversationId);
   activeConversationIdRef.current = conversationId;
 
-  const messages = messagesByConversationId[conversationId] ?? [];
+  const messages = messagesByConversationId[conversationId] ?? EMPTY_MESSAGES;
   const cursor = cursorByConversationId[conversationId];
   const hasMore = hasMoreByConversationId[conversationId] ?? true;
   const loading = loadingByConversationId[conversationId] ?? false;
@@ -939,7 +941,7 @@ export function useMessageHistory({
     if (!targetConversationId) return;
 
     setMessagesByConversationId((prev) => {
-      const currentMessages = prev[targetConversationId] ?? [];
+      const currentMessages = prev[targetConversationId] ?? EMPTY_MESSAGES;
       const nextMessages = typeof updater === "function"
         ? updater(currentMessages)
         : updater;
