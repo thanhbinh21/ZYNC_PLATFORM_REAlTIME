@@ -219,6 +219,8 @@ interface ChatPanelProps {
   participantAvatar?: string;
   participantAvatarUrl?: string;
   isGroupConversation?: boolean;
+  groupMemberCount?: number;
+  activeGroupMembers?: GroupMember[];
   isOnline?: boolean;
   messages?: Message[];
   targetMessageRef?: string | null;
@@ -311,7 +313,8 @@ interface ConversationItem {
   memberApprovalEnabled?: boolean;
   removedFromGroup?: boolean;
   memberCount?: number;
-  members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
+  members?: GroupMember[];
+  activeMembers?: GroupMember[];
   online?: boolean;
   active?: boolean;
   activeCall?: ConversationActiveCall | null;
@@ -322,6 +325,12 @@ interface ConversationItem {
 
 interface GroupFriendOption {
   id: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+interface GroupMember {
+  _id: string;
   displayName: string;
   avatarUrl?: string;
 }
@@ -342,6 +351,42 @@ function getDisplayFileName(message: Message): string {
   }
 
   return 'Tệp đính kèm';
+}
+
+function ActiveMemberAvatars({
+  members,
+  size = 'sm',
+}: {
+  members: GroupMember[];
+  size?: 'sm' | 'md';
+}) {
+  if (members.length === 0) return null;
+
+  const visibleMembers = members.slice(0, 3);
+  const avatarSize = size === 'md' ? 'h-8 w-8 text-[10px]' : 'h-5 w-5 text-[8px]';
+
+  return (
+    <div className="flex -space-x-1.5" aria-label={`${members.length} thành viên đang hoạt động`}>
+      {visibleMembers.map((member) => (
+        <span
+          key={member._id}
+          className={`inline-flex ${avatarSize} items-center justify-center overflow-hidden rounded-full border-2 border-bg-card bg-accent-light font-bold text-accent-strong`}
+          title={member.displayName}
+        >
+          {member.avatarUrl ? (
+            <img src={member.avatarUrl} alt={member.displayName} className="h-full w-full object-cover" />
+          ) : (
+            member.displayName.substring(0, 2).toUpperCase()
+          )}
+        </span>
+      ))}
+      {members.length > visibleMembers.length && (
+        <span className={`inline-flex ${avatarSize} items-center justify-center rounded-full border-2 border-bg-card bg-bg-active font-bold text-text-secondary`}>
+          +{members.length - visibleMembers.length}
+        </span>
+      )}
+    </div>
+  );
 }
 
 // ==================== CONVERSATION LIST ====================
@@ -544,6 +589,8 @@ function ChatPanel({
   participantAvatar,
   participantAvatarUrl,
   isGroupConversation = false,
+  groupMemberCount = 0,
+  activeGroupMembers = [],
   isOnline = false,
   messages = [],
   targetMessageRef = null,
@@ -1079,14 +1126,33 @@ function ChatPanel({
                 isGroupConversation ? 'cursor-pointer hover:text-accent' : 'cursor-default'
               }`}
               onClick={isGroupConversation ? onNameClick : undefined}
-              title={isGroupConversation ? 'Doi ten nhom' : undefined}
+              title={isGroupConversation ? 'Đổi tên nhóm' : undefined}
             >
               {participantName}
             </button>
-            <div className="chat-header-status">
-              {isConversationActiveCall ? <span className="online-dot" /> : <span className={`online-dot ${isOnline ? '' : 'offline'}`} />}
-              {isConversationActiveCall ? 'Đang gọi' : (isOnline ? 'Đang hoạt động' : 'Ngoại tuyến')}
-            </div>
+            {isGroupConversation ? (
+              <div className="chat-header-status flex items-center gap-2">
+                {isConversationActiveCall ? (
+                  <>
+                    <span className="online-dot" />
+                    <span>Đang gọi</span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {groupMemberCount} thành viên
+                      {activeGroupMembers.length > 0 && ` • ${activeGroupMembers.length} đang hoạt động`}
+                    </span>
+                    <ActiveMemberAvatars members={activeGroupMembers} />
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="chat-header-status">
+                <span className={`online-dot ${isOnline ? '' : 'offline'}`} />
+                {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1640,10 +1706,12 @@ interface ManageGroupModalProps {
   isSubmitting: boolean;
   groupName: string;
   onClose: () => void;
-  onAssignRole: (memberId: string, role: 'admin' | 'member') => Promise<void>;
-  onRemoveMember: (memberId: string) => Promise<void>;
-  onDisbandGroup: () => Promise<void>;
+  onAssignRole: (memberId: string, role: 'admin' | 'member') => void;
+  onRemoveMember: (memberId: string) => void;
+  onDisbandGroup: () => void;
 }
+
+type ActiveGroupModal = 'manage' | 'add-member' | 'grant-role' | 'remove-member' | 'disband-confirm' | 'leave-confirm' | null;
 
 function CreateGroupModal({
   open,
@@ -1670,7 +1738,7 @@ function CreateGroupModal({
   const canSubmit = selectedFriendIds.length >= 2 && selectedFriendIds.length <= 100 && !isCreatingGroup;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4">
       <div className="w-full max-w-4xl rounded-2xl border border-border bg-bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h3 className="text-2xl font-semibold text-text-primary">Tạo nhóm</h3>
@@ -1805,7 +1873,7 @@ function AddMembersModal({
   const canSubmit = selectedMemberIds.length > 0 && !isSubmitting;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4">
       <div className="w-full max-w-2xl rounded-2xl border border-border bg-bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h3 className="text-2xl font-semibold text-text-primary">Thêm thành viên</h3>
@@ -1949,7 +2017,7 @@ function ManageGroupModal({
   const adminSet = new Set(adminIds);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4">
       <div className="w-full max-w-3xl rounded-2xl border border-border bg-bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h3 className="text-2xl font-semibold text-text-primary">Quản lý nhóm</h3>
@@ -2068,20 +2136,17 @@ export function HomeDashboardChatPanel({
   const conversationItems = conversations ?? [];
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
-  const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
-  const [isManageGroupOpen, setIsManageGroupOpen] = useState(false);
+  const [activeGroupModal, setActiveGroupModal] = useState<ActiveGroupModal>(null);
+  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
+  const [pendingMemberRole, setPendingMemberRole] = useState<'admin' | 'member' | null>(null);
   const [isRenameGroupOpen, setIsRenameGroupOpen] = useState(false);
   const [renameGroupDraft, setRenameGroupDraft] = useState('');
   const [isMuteModalOpen, setIsMuteModalOpen] = useState(false);
-  const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isMembersViewOpen, setIsMembersViewOpen] = useState(false);
   const [archiveTab, setArchiveTab] = useState<'media' | 'files' | 'links'>('media');
   const [groupManageError, setGroupManageError] = useState<string | null>(null);
   const [groupManageSuccess, setGroupManageSuccess] = useState<string | null>(null);
-  const [isRemoveMemberConfirmOpen, setIsRemoveMemberConfirmOpen] = useState(false);
-  const [removeMemberTargetId, setRemoveMemberTargetId] = useState<string | null>(null);
-  const [isDisbandConfirmOpen, setIsDisbandConfirmOpen] = useState(false);
   const [locallyRemovedConversationIds, setLocallyRemovedConversationIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupQuery, setGroupQuery] = useState('');
@@ -2093,7 +2158,9 @@ export function HomeDashboardChatPanel({
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setIsManageGroupOpen(false);
+    setActiveGroupModal(null);
+    setSelectedMember(null);
+    setPendingMemberRole(null);
     setGroupManageError(null);
     setGroupManageSuccess(null);
     setIsArchiveOpen(false);
@@ -2260,7 +2327,7 @@ export function HomeDashboardChatPanel({
   const openAddMembersModal = () => {
     setMemberSearchQuery('');
     setSelectedAddMemberIds([]);
-    setIsAddMembersOpen(true);
+    setActiveGroupModal('add-member');
   };
 
   const toggleAddMemberSelection = (friendId: string) => {
@@ -2280,7 +2347,7 @@ export function HomeDashboardChatPanel({
     try {
       setGroupManageError(null);
       await onAddGroupMembers(selectedConversationId, selectedAddMemberIds);
-      setIsAddMembersOpen(false);
+      setActiveGroupModal(null);
     } catch {
       setGroupManageError(memberApprovalEnabled
         ? 'Nhóm đang bật duyệt thành viên. Chỉ chủ nhóm mới có thể duyệt và thêm thành viên.'
@@ -2301,49 +2368,64 @@ export function HomeDashboardChatPanel({
     }
   };
 
-  const handleAssignMemberRole = async (memberId: string, role: 'admin' | 'member') => {
-    if (!onUpdateGroupMemberRole || !selectedConversationId) {
+  const handleAssignMemberRole = (memberId: string, role: 'admin' | 'member') => {
+    const member = groupMemberPreview.find((item) => item._id === memberId);
+    if (!member) {
+      return;
+    }
+
+    setSelectedMember(member);
+    setPendingMemberRole(role);
+    setActiveGroupModal('grant-role');
+  };
+
+  const handleConfirmAssignMemberRole = async () => {
+    if (!onUpdateGroupMemberRole || !selectedConversationId || !selectedMember || !pendingMemberRole) {
       return;
     }
 
     try {
       setGroupManageError(null);
-      await onUpdateGroupMemberRole(selectedConversationId, memberId, role);
+      await onUpdateGroupMemberRole(selectedConversationId, selectedMember._id, pendingMemberRole);
+      setSelectedMember(null);
+      setPendingMemberRole(null);
+      setActiveGroupModal('manage');
     } catch {
       setGroupManageError('Không thể cập nhật quyền thành viên. Vui lòng thử lại.');
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!onRemoveGroupMember || !selectedConversationId) {
+  const handleRemoveMember = (memberId: string) => {
+    const member = groupMemberPreview.find((item) => item._id === memberId);
+    if (!member) {
       return;
     }
 
-    setRemoveMemberTargetId(memberId);
-    setIsRemoveMemberConfirmOpen(true);
+    setSelectedMember(member);
+    setActiveGroupModal('remove-member');
   };
 
   const handleConfirmRemoveMember = async () => {
-    if (!onRemoveGroupMember || !selectedConversationId || !removeMemberTargetId) {
+    if (!onRemoveGroupMember || !selectedConversationId || !selectedMember) {
       return;
     }
 
     try {
       setGroupManageError(null);
-      await onRemoveGroupMember(selectedConversationId, removeMemberTargetId);
-      setIsRemoveMemberConfirmOpen(false);
-      setRemoveMemberTargetId(null);
+      await onRemoveGroupMember(selectedConversationId, selectedMember._id);
+      setSelectedMember(null);
+      setActiveGroupModal('manage');
     } catch {
       setGroupManageError('Không thể xóa thành viên. Vui lòng thử lại.');
     }
   };
 
-  const handleDisbandGroup = async () => {
+  const handleDisbandGroup = () => {
     if (!onDisbandGroup || !selectedConversationId) {
       return;
     }
 
-    setIsDisbandConfirmOpen(true);
+    setActiveGroupModal('disband-confirm');
   };
 
   const handleConfirmDisbandGroup = async () => {
@@ -2364,9 +2446,8 @@ export function HomeDashboardChatPanel({
         .find((conversation) => conversation.id !== selectedConversationId)?.id;
       onSelectConversation(fallbackConversationId ?? '');
 
-      setIsManageGroupOpen(false);
+      setActiveGroupModal(null);
       setIsInfoOpen(false);
-      setIsDisbandConfirmOpen(false);
       setGroupManageSuccess('Nhóm đã giải tán');
     } catch {
       setGroupManageError('Không thể giải tán nhóm. Vui lòng thử lại.');
@@ -2378,7 +2459,7 @@ export function HomeDashboardChatPanel({
       return;
     }
 
-    setIsLeaveGroupModalOpen(true);
+    setActiveGroupModal('leave-confirm');
   };
 
   const handleConfirmLeaveGroup = async () => {
@@ -2389,9 +2470,8 @@ export function HomeDashboardChatPanel({
     try {
       setGroupManageError(null);
       await onLeaveGroup(selectedConversationId);
-      setIsLeaveGroupModalOpen(false);
+      setActiveGroupModal(null);
       setIsInfoOpen(false);
-      setIsManageGroupOpen(false);
     } catch {
       setGroupManageError('Không thể rời nhóm. Vui lòng thử lại.');
     }
@@ -2466,6 +2546,7 @@ export function HomeDashboardChatPanel({
   };
 
   const groupMemberPreview = selectedConversation?.members ?? [];
+  const activeGroupMembers = selectedConversation?.activeMembers ?? [];
   const groupAdminIds = selectedConversation?.adminIds ?? [];
   const existingMemberIds = groupMemberPreview.map((member) => member._id);
   const isGroupConversation = Boolean(selectedConversation?.isGroup);
@@ -2543,6 +2624,8 @@ export function HomeDashboardChatPanel({
           <ChatPanel
             {...chatPanelProps}
             isGroupConversation={isGroupConversation}
+            groupMemberCount={selectedConversation?.memberCount ?? 0}
+            activeGroupMembers={activeGroupMembers}
             onLoadMore={onLoadMore}
             inputDisabled={isRemovedFromGroup}
             inputDisabledReason={isRemovedFromGroup ? 'Bạn đã bị xóa khỏi nhóm' : undefined}
@@ -2556,13 +2639,13 @@ export function HomeDashboardChatPanel({
         </div>
 
         {isInfoOpen && (
-          <aside className="relative hidden h-full w-[320px] shrink-0 border-l border-border bg-bg-card xl:flex xl:flex-col shadow-inner">
-            <div className="border-b border-border px-5 py-4">
+          <aside className="relative hidden h-full w-[320px] shrink-0 border-l border-border-soft bg-[var(--surface-muted)]/35 xl:flex xl:flex-col">
+            <div className="border-b border-border-soft bg-[var(--surface)] px-5 py-4">
               <h3 className="text-xl font-semibold text-text-primary">{isMembersViewOpen ? 'Thành viên' : isArchiveOpen ? 'Kho lưu trữ' : infoTitle}</h3>
             </div>
 
             <div className={`flex-1 overflow-y-auto px-5 py-5 ${(isArchiveOpen || isMembersViewOpen) ? 'hidden' : ''}`}>
-              <div className="mb-6 flex flex-col items-center text-center">
+              <div className="mb-5 flex flex-col items-center rounded-2xl border border-border-soft bg-[var(--surface)] p-4 text-center shadow-soft">
                 <button
                   type="button"
                   className={`mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-bg-hover text-lg font-bold text-accent border-2 border-accent/20 ${isGroupConversation ? 'cursor-pointer hover:border-accent transition-all' : 'cursor-default'}`}
@@ -2590,6 +2673,12 @@ export function HomeDashboardChatPanel({
                     ? `${selectedConversation.memberCount ?? 0} thành viên`
                     : 'Hội thoại cá nhân'}
                 </p>
+                {isGroupConversation && activeGroupMembers.length > 0 && (
+                  <div className="mt-3 flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-accent-strong">
+                    <ActiveMemberAvatars members={activeGroupMembers} size="md" />
+                    <span>Đang hoạt động: {activeGroupMembers.length}</span>
+                  </div>
+                )}
               </div>
 
               <div className="mb-5 grid grid-cols-3 gap-2">
@@ -2618,7 +2707,7 @@ export function HomeDashboardChatPanel({
                     ? 'border-accent-light bg-accent/10 text-accent'
                     : 'border-transparent bg-bg-hover text-text-primary hover:bg-bg-active'}`}
                 >
-                  {isAiCatchupEnabled ? 'Tat AI' : 'Bat AI'}
+                  {isAiCatchupEnabled ? 'Tắt AI' : 'Bật AI'}
                 </button>
                 {isGroupConversation ? (
                   <>
@@ -2632,7 +2721,7 @@ export function HomeDashboardChatPanel({
                     {canManageGroup ? (
                       <button
                         type="button"
-                        onClick={() => setIsManageGroupOpen(true)}
+                        onClick={() => setActiveGroupModal('manage')}
                         className="col-span-3 rounded-xl bg-accent px-2 py-2 text-xs font-semibold text-white hover:bg-accent-hover transition"
                       >
                         Quản lý nhóm
@@ -2688,7 +2777,7 @@ export function HomeDashboardChatPanel({
                       <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                     </div>
                     <div className="space-y-2 rounded-2xl border border-border bg-bg-card p-4">
-                      <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">File</p>
+                      <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Tệp</p>
                       {fileItems.length > 0 ? (
                         fileItems.map((file) => {
                           const fileName = getDisplayFileName(file);
@@ -2705,7 +2794,7 @@ export function HomeDashboardChatPanel({
                           );
                         })
                       ) : (
-                        <p className="text-xs text-text-tertiary">Chưa có file nào</p>
+                        <p className="text-xs text-text-tertiary">Chưa có tệp nào</p>
                       )}
                       <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                     </div>
@@ -2717,10 +2806,13 @@ export function HomeDashboardChatPanel({
 
                 {isGroupConversation && (
                   <>
-                    <div className="mb-4 space-y-3 rounded-2xl border border-border bg-bg-card p-4">
+                    {isCurrentUserGroupCreator && (
+                    <div className="mb-4 space-y-3 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
                       <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Duyệt thành viên</p>
+                      <p className="text-xs text-text-tertiary">
+                        {memberApprovalEnabled ? 'Đang bật duyệt thành viên mới.' : 'Thành viên mới được thêm trực tiếp vào nhóm.'}
+                      </p>
                       <div className="flex items-center justify-between gap-3">
-                        {isCurrentUserGroupCreator && (
                           <button
                             type="button"
                             disabled={isCreatingGroup}
@@ -2731,14 +2823,11 @@ export function HomeDashboardChatPanel({
                           >
                             {memberApprovalEnabled ? 'Tắt duyệt' : 'Bật duyệt'}
                           </button>
-                        )}
                       </div>
-                      {!isCurrentUserGroupCreator && (
-                        <p className="text-xs text-text-tertiary">Chỉ chủ nhóm có thể bật/tắt duyệt thành viên.</p>
-                      )}
                     </div>
+                    )}
 
-                    <div className="mb-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
+                    <div className="mb-4 space-y-2 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
                       <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Thành viên nhóm</p>
                       <p className="text-sm text-text-primary">{selectedConversation?.memberCount ?? 0} thành viên</p>
                       <button
@@ -2749,7 +2838,7 @@ export function HomeDashboardChatPanel({
                         Xem thành viên
                       </button>
                     </div>
-                    <div className="space-y-2 rounded-2xl border border-border bg-bg-card p-4">
+                    <div className="space-y-2 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
                       <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Ảnh/Video</p>
                       <div className="grid grid-cols-4 gap-2">
                         {mediaItems.length > 0 ? (
@@ -2782,8 +2871,8 @@ export function HomeDashboardChatPanel({
                       <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                     </div>
                     {/* File section for group */}
-                    <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
-                      <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">File</p>
+                    <div className="mt-4 space-y-2 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
+                      <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Tệp</p>
                       {fileItems.length > 0 ? (
                         fileItems.map((file) => {
                           const fileName = getDisplayFileName(file);
@@ -2800,7 +2889,7 @@ export function HomeDashboardChatPanel({
                           );
                         })
                       ) : (
-                        <p className="text-xs text-text-tertiary">Chưa có file nào</p>
+                        <p className="text-xs text-text-tertiary">Chưa có tệp nào</p>
                       )}
                       <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                     </div>
@@ -2824,8 +2913,8 @@ export function HomeDashboardChatPanel({
                   </div>
                   <div className="flex gap-2 border-b border-border px-4 py-3 text-sm">
                     <button type="button" onClick={() => setArchiveTab('media')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'media' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Ảnh/Video</button>
-                    <button type="button" onClick={() => setArchiveTab('files')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'files' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Files</button>
-                    <button type="button" onClick={() => setArchiveTab('links')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'links' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Links</button>
+                    <button type="button" onClick={() => setArchiveTab('files')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'files' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Tệp</button>
+                    <button type="button" onClick={() => setArchiveTab('links')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'links' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Liên kết</button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4">
                     {archiveTab === 'media' && (
@@ -2856,7 +2945,7 @@ export function HomeDashboardChatPanel({
                     )}
                     {archiveTab === 'files' && (
                       <div className="space-y-2">
-                        {allFileItems.length === 0 && <p className="text-sm text-text-tertiary">Chưa có file nào.</p>}
+                        {allFileItems.length === 0 && <p className="text-sm text-text-tertiary">Chưa có tệp nào.</p>}
                         {allFileItems.map((file) => (
                           <a key={file._id} href={file.mediaUrl} target="_blank" rel="noreferrer" className="block rounded-lg bg-bg-hover px-3 py-2 text-sm text-text-primary hover:text-accent">
                             {getDisplayFileName(file)}
@@ -2866,7 +2955,7 @@ export function HomeDashboardChatPanel({
                     )}
                     {archiveTab === 'links' && (
                       <div className="space-y-2">
-                        {allLinkItems.length === 0 && <p className="text-sm text-text-tertiary">Chưa có link nào.</p>}
+                        {allLinkItems.length === 0 && <p className="text-sm text-text-tertiary">Chưa có liên kết nào.</p>}
                         {allLinkItems.map((msg) => {
                           const content = typeof msg.content === 'string' ? msg.content : '';
                           return (
@@ -2928,7 +3017,7 @@ export function HomeDashboardChatPanel({
 
       {isInfoOpen && (
         <div className="fixed inset-0 z-40 bg-black/45 xl:hidden">
-          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider bg-bg-card border-border p-5">
+          <aside className="zync-glass-panel zync-glass-panel-strong relative ml-auto h-full w-[88%] max-w-sm overflow-y-auto border-l zync-glass-divider border-border-soft bg-[var(--surface-muted)]/80 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-text-primary">{isMembersViewOpen ? 'Thành viên' : isArchiveOpen ? 'Kho lưu trữ' : infoTitle}</h3>
               <button
@@ -2941,7 +3030,7 @@ export function HomeDashboardChatPanel({
             </div>
 
             <div className={(isArchiveOpen || isMembersViewOpen) ? 'hidden' : ''}>
-            <div className="mb-5 flex flex-col items-center text-center">
+            <div className="mb-5 flex flex-col items-center rounded-2xl border border-border-soft bg-[var(--surface)] p-4 text-center shadow-soft">
               <button
                 type="button"
                 className={`mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-bg-hover text-lg font-bold text-text-primary ${isGroupConversation ? 'cursor-pointer' : 'cursor-default'}`}
@@ -2969,6 +3058,12 @@ export function HomeDashboardChatPanel({
                   ? `${selectedConversation.memberCount ?? 0} thành viên`
                   : 'Hội thoại cá nhân'}
               </p>
+              {isGroupConversation && activeGroupMembers.length > 0 && (
+                <div className="mt-3 flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-accent-strong">
+                  <ActiveMemberAvatars members={activeGroupMembers} size="md" />
+                  <span>Đang hoạt động: {activeGroupMembers.length}</span>
+                </div>
+              )}
             </div>
 
             <div className="mb-5 grid grid-cols-3 gap-2">
@@ -2990,6 +3085,15 @@ export function HomeDashboardChatPanel({
               >
                 {isConversationPinned ? 'Bỏ ghim' : 'Ghim hội thoại'}
               </button>
+              <button
+                type="button"
+                onClick={handleToggleAiCatchup}
+                className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${isAiCatchupEnabled
+                  ? 'border-accent-light bg-accent/10 text-accent'
+                  : 'border-transparent bg-bg-hover text-text-primary'}`}
+              >
+                {isAiCatchupEnabled ? 'Tắt AI' : 'Bật AI'}
+              </button>
               {isGroupConversation ? (
                 <>
                   <button
@@ -3002,7 +3106,7 @@ export function HomeDashboardChatPanel({
                   {canManageGroup ? (
                     <button
                       type="button"
-                      onClick={() => setIsManageGroupOpen(true)}
+                      onClick={() => setActiveGroupModal('manage')}
                       className="col-span-3 rounded-xl bg-accent px-2 py-2 text-xs font-semibold text-text-primary"
                     >
                       Quản lý nhóm
@@ -3059,7 +3163,7 @@ export function HomeDashboardChatPanel({
                   <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                 </div>
                 <div className="space-y-2 rounded-2xl border border-border bg-bg-card p-4">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">File</p>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Tệp</p>
                   {fileItems.length > 0 ? (
                     fileItems.map((file) => {
                       const fileName = getDisplayFileName(file);
@@ -3076,7 +3180,7 @@ export function HomeDashboardChatPanel({
                       );
                     })
                   ) : (
-                    <p className="text-xs text-text-tertiary">Chưa có file nào</p>
+                    <p className="text-xs text-text-tertiary">Chưa có tệp nào</p>
                   )}
                   <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                 </div>
@@ -3085,12 +3189,12 @@ export function HomeDashboardChatPanel({
 
             {isGroupConversation && (
               <>
-                <div className="mb-4 space-y-3 rounded-2xl border border-border bg-bg-card p-4">
+                {isCurrentUserGroupCreator && (
+                <div className="mb-4 space-y-3 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
                   <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Duyệt thành viên</p>
                   <p className="text-sm text-text-primary">
-                    Trạng thái: {memberApprovalEnabled ? 'ON - cần chủ nhóm duyệt' : 'OFF - thêm thẳng vào nhóm'}
+                    {memberApprovalEnabled ? 'Đang bật duyệt thành viên mới.' : 'Thành viên mới được thêm trực tiếp vào nhóm.'}
                   </p>
-                  {isCurrentUserGroupCreator ? (
                     <button
                       type="button"
                       disabled={isCreatingGroup}
@@ -3101,12 +3205,10 @@ export function HomeDashboardChatPanel({
                     >
                       {memberApprovalEnabled ? 'Tắt duyệt' : 'Bật duyệt'}
                     </button>
-                  ) : (
-                    <p className="text-xs text-text-tertiary">Chỉ chủ nhóm có thể bật/tắt duyệt thành viên.</p>
-                  )}
                 </div>
+                )}
 
-                <div className="mb-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
+                <div className="mb-4 space-y-2 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
                   <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Thành viên nhóm</p>
                   <p className="text-sm text-text-primary">{selectedConversation?.memberCount ?? 0} thành viên</p>
                   <button
@@ -3117,7 +3219,7 @@ export function HomeDashboardChatPanel({
                     Xem thành viên
                   </button>
                 </div>
-                <div className="space-y-2 rounded-2xl border border-border bg-bg-card p-4">
+                <div className="space-y-2 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
                   <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Ảnh/Video</p>
                   <div className="grid grid-cols-4 gap-2">
                     {mediaItems.length > 0 ? (
@@ -3150,8 +3252,8 @@ export function HomeDashboardChatPanel({
                   <button type="button" onClick={() => openArchiveView('media')} className="w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                 </div>
                 {/* File section for group (mobile view) */}
-                <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-card p-4">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">File</p>
+                <div className="mt-4 space-y-2 rounded-2xl border border-border-soft bg-[var(--surface)] p-4 shadow-soft">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Tệp</p>
                   {fileItems.length > 0 ? (
                     fileItems.map((file) => {
                       const fileName = getDisplayFileName(file);
@@ -3168,7 +3270,7 @@ export function HomeDashboardChatPanel({
                       );
                     })
                   ) : (
-                    <p className="text-xs text-text-tertiary">Chưa có file nào</p>
+                    <p className="text-xs text-text-tertiary">Chưa có tệp nào</p>
                   )}
                   <button type="button" onClick={() => openArchiveView('files')} className="mt-2 w-full rounded-lg bg-bg-hover px-3 py-2 text-sm font-semibold text-text-primary">Xem tất cả</button>
                 </div>
@@ -3192,8 +3294,8 @@ export function HomeDashboardChatPanel({
                 </div>
                 <div className="mb-3 flex gap-2 text-sm">
                   <button type="button" onClick={() => setArchiveTab('media')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'media' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Ảnh/Video</button>
-                  <button type="button" onClick={() => setArchiveTab('files')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'files' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Files</button>
-                  <button type="button" onClick={() => setArchiveTab('links')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'links' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Links</button>
+                  <button type="button" onClick={() => setArchiveTab('files')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'files' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Tệp</button>
+                  <button type="button" onClick={() => setArchiveTab('links')} className={`rounded-lg px-3 py-1.5 ${archiveTab === 'links' ? 'bg-accent text-text-primary' : 'bg-bg-hover text-text-primary'}`}>Liên kết</button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                   {archiveTab === 'media' && (
@@ -3224,7 +3326,7 @@ export function HomeDashboardChatPanel({
                   )}
                   {archiveTab === 'files' && (
                     <div className="space-y-2">
-                      {allFileItems.length === 0 && <p className="text-sm text-text-tertiary">Chưa có file nào.</p>}
+                      {allFileItems.length === 0 && <p className="text-sm text-text-tertiary">Chưa có tệp nào.</p>}
                       {allFileItems.map((file) => (
                         <a key={file._id} href={file.mediaUrl} target="_blank" rel="noreferrer" className="block rounded-lg bg-bg-hover px-3 py-2 text-sm text-text-primary hover:text-accent">
                           {getDisplayFileName(file)}
@@ -3234,7 +3336,7 @@ export function HomeDashboardChatPanel({
                   )}
                   {archiveTab === 'links' && (
                     <div className="space-y-2">
-                      {allLinkItems.length === 0 && <p className="text-sm text-text-secondary">Chưa có link nào.</p>}
+                      {allLinkItems.length === 0 && <p className="text-sm text-text-secondary">Chưa có liên kết nào.</p>}
                       {allLinkItems.map((msg) => {
                         const content = typeof msg.content === 'string' ? msg.content : '';
                         return (
@@ -3291,7 +3393,7 @@ export function HomeDashboardChatPanel({
       )}
 
       {isRenameGroupOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
             <h4 className="text-lg font-semibold text-text-primary">Đổi tên nhóm</h4>
             <input
@@ -3310,7 +3412,7 @@ export function HomeDashboardChatPanel({
       )}
 
       {isMuteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
             <h4 className="text-lg font-semibold text-text-primary mb-4">Tắt thông báo</h4>
             <div className="space-y-2">
@@ -3324,15 +3426,15 @@ export function HomeDashboardChatPanel({
         </div>
       )}
 
-      {isLeaveGroupModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      {activeGroupModal === 'leave-confirm' && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
             <h4 className="text-lg font-semibold text-text-primary">Rời nhóm</h4>
             <p className="mt-2 text-sm text-text-secondary leading-relaxed">Bạn có chắc muốn rời nhóm này? Bạn sẽ không còn nhận được tin nhắn từ nhóm này nữa.</p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsLeaveGroupModalOpen(false)}
+                onClick={() => setActiveGroupModal(null)}
                 className="rounded-lg bg-bg-hover px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-active border border-border"
               >
                 Hủy
@@ -3349,17 +3451,51 @@ export function HomeDashboardChatPanel({
         </div>
       )}
 
-      {isRemoveMemberConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      {activeGroupModal === 'grant-role' && selectedMember && pendingMemberRole && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
-            <h4 className="text-lg font-semibold text-text-primary">Xóa thành viên</h4>
-            <p className="mt-2 text-sm text-text-secondary leading-relaxed">Bạn có chắc muốn xóa thành viên này khỏi nhóm?</p>
+            <h4 className="text-lg font-semibold text-text-primary">
+              {pendingMemberRole === 'admin' ? 'Gán quyền quản trị' : 'Gỡ quyền quản trị'}
+            </h4>
+            <p className="mt-2 text-sm text-text-secondary leading-relaxed">
+              Xác nhận {pendingMemberRole === 'admin' ? 'gán quyền quản trị cho' : 'gỡ quyền quản trị của'} {selectedMember.displayName}?
+            </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => {
-                  setIsRemoveMemberConfirmOpen(false);
-                  setRemoveMemberTargetId(null);
+                  setSelectedMember(null);
+                  setPendingMemberRole(null);
+                  setActiveGroupModal('manage');
+                }}
+                className="rounded-lg border border-border bg-bg-hover px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-active"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isCreatingGroup}
+                onClick={() => { void handleConfirmAssignMemberRole(); }}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-hover disabled:opacity-60"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeGroupModal === 'remove-member' && selectedMember && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold text-text-primary">Xóa thành viên</h4>
+            <p className="mt-2 text-sm text-text-secondary leading-relaxed">Bạn có chắc muốn xóa {selectedMember.displayName} khỏi nhóm?</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMember(null);
+                  setActiveGroupModal('manage');
                 }}
                 className="rounded-lg bg-bg-hover px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-active border border-border"
               >
@@ -3377,15 +3513,15 @@ export function HomeDashboardChatPanel({
         </div>
       )}
 
-      {isDisbandConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      {activeGroupModal === 'disband-confirm' && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
             <h4 className="text-lg font-semibold text-text-primary">Giải tán nhóm</h4>
             <p className="mt-2 text-sm text-text-secondary leading-relaxed">Giải tán nhóm sẽ xóa toàn bộ nhóm. Bạn có chắc muốn tiếp tục?</p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsDisbandConfirmOpen(false)}
+                onClick={() => setActiveGroupModal('manage')}
                 className="rounded-lg bg-bg-hover px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-active border border-border"
               >
                 Hủy
@@ -3403,14 +3539,14 @@ export function HomeDashboardChatPanel({
       )}
 
       {groupManageError && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card p-6 shadow-2xl">
+        <div className="fixed left-1/2 top-4 z-[90] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2">
+          <div className="rounded-2xl border border-red-500/20 bg-bg-card p-4 shadow-2xl">
             <h4 className="text-lg font-semibold text-red-500">Thông báo</h4>
             <p className="mt-2 text-sm text-text-secondary leading-relaxed">{groupManageError}</p>
             <button
               type="button"
               onClick={() => setGroupManageError(null)}
-              className="mt-6 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition"
+              className="mt-4 w-full rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition"
             >
               Đóng
             </button>
@@ -3419,8 +3555,8 @@ export function HomeDashboardChatPanel({
       )}
 
       {groupManageSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card p-5">
+        <div className="fixed left-1/2 top-4 z-[90] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2">
+          <div className="rounded-2xl border border-accent/20 bg-bg-card p-4 shadow-2xl">
             <h4 className="text-lg font-semibold text-text-primary">Thành công</h4>
             <p className="mt-2 text-sm text-text-primary">{groupManageSuccess}</p>
             <button
@@ -3435,13 +3571,13 @@ export function HomeDashboardChatPanel({
       )}
 
       <ManageGroupModal
-        open={isManageGroupOpen}
+        open={activeGroupModal === 'manage'}
         members={groupMemberPreview}
         adminIds={groupAdminIds}
         creatorId={groupCreatorId}
         isSubmitting={isCreatingGroup}
         groupName={selectedConversation?.name ?? 'Nhóm'}
-        onClose={() => setIsManageGroupOpen(false)}
+        onClose={() => setActiveGroupModal(null)}
         onAssignRole={handleAssignMemberRole}
         onRemoveMember={handleRemoveMember}
         onDisbandGroup={handleDisbandGroup}
@@ -3462,13 +3598,13 @@ export function HomeDashboardChatPanel({
       />
 
       <AddMembersModal
-        open={isAddMembersOpen}
+        open={activeGroupModal === 'add-member'}
         friends={friends}
         existingMemberIds={existingMemberIds}
         selectedMemberIds={selectedAddMemberIds}
         query={memberSearchQuery}
         isSubmitting={isCreatingGroup}
-        onClose={() => setIsAddMembersOpen(false)}
+        onClose={() => setActiveGroupModal(null)}
         onChangeQuery={setMemberSearchQuery}
         onToggleMember={toggleAddMemberSelection}
         onSubmit={handleConfirmAddMembers}

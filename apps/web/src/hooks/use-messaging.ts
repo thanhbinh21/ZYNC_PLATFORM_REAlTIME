@@ -47,6 +47,9 @@ interface MessageStatusMap {
   [messageId: string]: MessageStatus;
 }
 
+type MessagesByConversationId = Record<string, Message[]>;
+type MessageStatusByConversationId = Record<string, MessageStatusMap>;
+
 export interface TypingUser {
   userId: string;
   displayName: string;
@@ -67,7 +70,6 @@ export interface SendMessageOptions {
 
 interface UseChatReturn {
   messages: Message[];
-  unsetMessages_Status: () => void
   typingUsers: TypingUser[];
   messageStatus: MessageStatusMap;
   sendMessage: (
@@ -97,17 +99,66 @@ export function useChat({
   token,
   displayName,
 }: UseChatOptions): UseChatReturn {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesByConversationId, setMessagesByConversationId] = useState<MessagesByConversationId>({});
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
-  const [messageStatus, setMessageStatus] = useState<MessageStatusMap>({});
+  const [messageStatusByConversationId, setMessageStatusByConversationId] = useState<MessageStatusByConversationId>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messages = messagesByConversationId[conversationId] ?? [];
+  const messageStatus = messageStatusByConversationId[conversationId] ?? {};
 
   // Track typing users with TTL (auto-remove after 4s)
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const previousConversationId = useRef<string>("");
+  const pendingConversationByIdempotencyKey = useRef<Map<string, string>>(new Map());
   // Luu callback theo event de co the cleanup dung callback thay vi xoa tat ca.
   const socketCallbackRefs = useRef<Record<string, (...args: unknown[]) => void>>({});
+
+  const updateMessagesForConversation = useCallback((
+    targetConversationId: string,
+    updater: SetStateAction<Message[]>,
+  ) => {
+    if (!targetConversationId) return;
+
+    setMessagesByConversationId((prev) => {
+      const currentMessages = prev[targetConversationId] ?? [];
+      const nextMessages = typeof updater === "function"
+        ? updater(currentMessages)
+        : updater;
+
+      if (nextMessages === currentMessages) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [targetConversationId]: nextMessages,
+      };
+    });
+  }, []);
+
+  const updateMessageStatusForConversation = useCallback((
+    targetConversationId: string,
+    updater: SetStateAction<MessageStatusMap>,
+  ) => {
+    if (!targetConversationId) return;
+
+    setMessageStatusByConversationId((prev) => {
+      const currentStatus = prev[targetConversationId] ?? {};
+      const nextStatus = typeof updater === "function"
+        ? updater(currentStatus)
+        : updater;
+
+      if (nextStatus === currentStatus) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [targetConversationId]: nextStatus,
+      };
+    });
+  }, []);
 
   // Initialize socket on mount or when token changes
   useEffect(() => {
@@ -152,6 +203,10 @@ export function useChat({
 
     return () => {
       sock.off("connect", doJoin);
+      if (previousConversationId.current === conversationId) {
+        leaveConversation(conversationId);
+        previousConversationId.current = "";
+      }
     };
   }, [conversationId, token]);
 
@@ -189,11 +244,12 @@ export function useChat({
         createdAt: data.createdAt,
       };
 
-      setMessages((prev) => {
+      updateMessagesForConversation(data.conversationId, (prev) => {
         const index = prev.findIndex(
           (msg) =>
-            msg._id === data.messageId ||
-            msg.idempotencyKey === data.idempotencyKey,
+            msg.conversationId === data.conversationId
+            && (msg._id === data.messageId
+              || msg.idempotencyKey === data.idempotencyKey),
         );
 
         if (index === -1) {
@@ -210,7 +266,7 @@ export function useChat({
         return next;
       });
 
-      setMessageStatus((prev) => ({
+      updateMessageStatusForConversation(data.conversationId, (prev) => ({
         ...prev,
         [data.idempotencyKey]: "delivered",
         [data.messageId]: "delivered",
@@ -232,11 +288,17 @@ export function useChat({
       idempotencyKey: string;
       createdAt: string;
     }) => {
+      const targetConversationId = pendingConversationByIdempotencyKey.current.get(data.idempotencyKey);
+      if (!targetConversationId) {
+        return;
+      }
+
       // Replace optimistic message (idempotency key) with real server message id.
-      setMessages((prev) =>
+      updateMessagesForConversation(targetConversationId, (prev) =>
         prev.map((msg) =>
-          msg._id === data.idempotencyKey ||
-          msg.idempotencyKey === data.idempotencyKey
+          msg.conversationId === targetConversationId
+          && (msg._id === data.idempotencyKey
+            || msg.idempotencyKey === data.idempotencyKey)
             ? {
                 ...msg,
                 _id: data.messageId,
@@ -246,7 +308,7 @@ export function useChat({
         ),
       );
 
-      setMessageStatus((prev) => {
+      updateMessageStatusForConversation(targetConversationId, (prev) => {
         const next = { ...prev };
         const previousStatus = next[data.idempotencyKey] ?? "sent";
         
@@ -258,11 +320,12 @@ export function useChat({
         delete next[data.idempotencyKey];
         return next;
       });
+      pendingConversationByIdempotencyKey.current.delete(data.idempotencyKey);
     };
 
     const handleMessageReacted = (data: any) => {
       if (data.conversationId !== conversationId) return;
-      setMessages((prev) =>
+      updateMessagesForConversation(conversationId, (prev) =>
         prev.map((msg) =>
           msg._id === data.messageId
             ? { ...msg, reactions: data.reactions }
@@ -282,15 +345,15 @@ export function useChat({
 
     return () => {
       try {
-        unlistenToMessages();
-        unlistenToMessageReacted();
+        unlistenToMessages(handleReceiveMessage);
+        unlistenToMessageReacted(handleMessageReacted);
         const socket = getSocket(token);
         socket.off("message_sent", handleMessageSent);
       } catch (err) {
         console.error("Failed to cleanup message listener:", err);
       }
     };
-  }, [conversationId, token, userId]);
+  }, [conversationId, token, updateMessagesForConversation, updateMessageStatusForConversation, userId]);
 
   // Setup status update listener
   useEffect(() => {
@@ -309,17 +372,18 @@ export function useChat({
         readAt: string;
       };
     }) => {
-      if (data.conversationId && data.conversationId !== conversationId) {
+      if (!data.conversationId) {
         return;
       }
 
+      const targetConversationId = data.conversationId;
       const ids = data.messageIds || [];
       const idems = data.idempotencyKeys || [];
 
       // Single message status update (sent event)
       if (ids.length === 0 && data.messageId) {
         const messageId = data.messageId;
-        setMessageStatus((prev) => ({
+        updateMessageStatusForConversation(targetConversationId, (prev) => ({
           ...prev,
           [messageId]: data.status,
         }));
@@ -328,7 +392,7 @@ export function useChat({
 
       // Batch status update (auto-mark from getMessageHistory)
       // Backend sends idempotencyKeys = frontend mockIds (now guaranteed to match)
-      setMessageStatus((prev) => {
+      updateMessageStatusForConversation(targetConversationId, (prev) => {
         const updated = { ...prev };
         ids.forEach((id, i) => {
           if (updated[idems[i]]) {
@@ -354,8 +418,12 @@ export function useChat({
           return;
         }
 
-        setMessages((prev) =>
+        updateMessagesForConversation(targetConversationId, (prev) =>
           prev.map((msg) => {
+            if (msg.conversationId !== targetConversationId) {
+              return msg;
+            }
+
             const messageRefs = [
               String(msg._id),
               String(msg.idempotencyKey || ""),
@@ -401,15 +469,17 @@ export function useChat({
 
     return () => {
       try {
-        unlistenToStatusUpdates();
+        unlistenToStatusUpdates(handleStatusUpdate);
       } catch (err) {
         console.error("Failed to cleanup status listener:", err);
       }
     };
-  }, [conversationId, token]);
+  }, [token, updateMessagesForConversation, updateMessageStatusForConversation]);
 
   // Setup typing indicator listener
   useEffect(() => {
+    setTypingUsers([]);
+
     const handleTypingIndicator = (data: {
       userId: string;
       conversationId: string;
@@ -461,7 +531,7 @@ export function useChat({
       typingTimeouts.current.clear();
 
       try {
-        unlistenToTypingIndicators();
+        unlistenToTypingIndicators(handleTypingIndicator);
       } catch (err) {
         console.error("Failed to cleanup typing listener:", err);
       }
@@ -489,6 +559,13 @@ export function useChat({
       const idempotencyKey = options?.idempotencyKey || uuidv4();
       const shouldEmitNow = !options?.deferEmit;
       const timestamp = new Date().toISOString();
+      // A deferred media upload can finish after the user switches chats.
+      // Keep the final emit attached to the conversation where the optimistic bubble was created.
+      const targetConversationId = pendingConversationByIdempotencyKey.current.get(idempotencyKey) ?? conversationId;
+
+      if (!targetConversationId) {
+        return null;
+      }
 
       console.debug(`[useChat] handleSendMessage: content="${content.substring(0, 30)}...", type=${type}, shouldEmitNow=${shouldEmitNow}`);
 
@@ -501,7 +578,7 @@ export function useChat({
         // Chi tao optimistic message neu thuc su co the gui
         const optimisticMessage: Message = {
           _id: idempotencyKey,
-          conversationId,
+          conversationId: targetConversationId,
           senderId: userId,
           sender: {
             senderId: userId,
@@ -517,7 +594,9 @@ export function useChat({
           createdAt: timestamp,
         };
 
-        setMessages((prev) => {
+        pendingConversationByIdempotencyKey.current.set(idempotencyKey, targetConversationId);
+
+        updateMessagesForConversation(targetConversationId, (prev) => {
           const index = prev.findIndex(
             (msg) =>
               msg.idempotencyKey === idempotencyKey ||
@@ -538,14 +617,14 @@ export function useChat({
           return next;
         });
 
-        setMessageStatus((prev) => ({
+        updateMessageStatusForConversation(targetConversationId, (prev) => ({
           ...prev,
           [idempotencyKey]: "sent",
         }));
 
         if (shouldEmitNow) {
           emitSendMessage(
-            conversationId,
+            targetConversationId,
             content,
             type,
             idempotencyKey,
@@ -553,24 +632,25 @@ export function useChat({
             options?.replyTo,
           );
 
-          emitClearPendingTyping(conversationId);
+          emitClearPendingTyping(targetConversationId);
         }
 
         return idempotencyKey;
       } catch (err) {
         // Rollback optimistic message khi co loi
-        setMessages((prev) =>
+        updateMessagesForConversation(targetConversationId, (prev) =>
           prev.filter(
             (msg) =>
               msg.idempotencyKey !== idempotencyKey &&
               msg._id !== idempotencyKey,
           ),
         );
-        setMessageStatus((prev) => {
+        updateMessageStatusForConversation(targetConversationId, (prev) => {
           const next = { ...prev };
           delete next[idempotencyKey];
           return next;
         });
+        pendingConversationByIdempotencyKey.current.delete(idempotencyKey);
 
         const errorMsg =
           err instanceof Error ? err.message : "Khong the gui tin nhan";
@@ -583,18 +663,20 @@ export function useChat({
         }
       }
     },
-    [conversationId, userId],
+    [conversationId, updateMessagesForConversation, updateMessageStatusForConversation, userId],
   );
 
   const handleCancelPendingMessage = useCallback((idempotencyKey: string) => {
-    setMessages((prev) =>
+    const targetConversationId = pendingConversationByIdempotencyKey.current.get(idempotencyKey) ?? conversationId;
+
+    updateMessagesForConversation(targetConversationId, (prev) =>
       prev.filter(
         (msg) =>
           msg.idempotencyKey !== idempotencyKey && msg._id !== idempotencyKey,
       ),
     );
 
-    setMessageStatus((prev) => {
+    updateMessageStatusForConversation(targetConversationId, (prev) => {
       if (!prev[idempotencyKey]) {
         return prev;
       }
@@ -603,7 +685,8 @@ export function useChat({
       delete next[idempotencyKey];
       return next;
     });
-  }, []);
+    pendingConversationByIdempotencyKey.current.delete(idempotencyKey);
+  }, [conversationId, updateMessagesForConversation, updateMessageStatusForConversation]);
 
   // Mark as read
   const handleMarkAsRead = useCallback(
@@ -611,7 +694,7 @@ export function useChat({
       try {
         markAsRead(conversationId, messageIds);
         messageIds.forEach((id) => {
-          setMessageStatus((prev) => ({
+          updateMessageStatusForConversation(conversationId, (prev) => ({
             ...prev,
             [id]: "read",
           }));
@@ -620,7 +703,7 @@ export function useChat({
         console.error("Mark as read error:", err);
       }
     },
-    [conversationId],
+    [conversationId, updateMessageStatusForConversation],
   );
 
   // Start typing
@@ -655,7 +738,7 @@ export function useChat({
       if (data.conversationId !== conversationId) return;
 
       // Remove from realtime message state so merge layer cannot resurrect it.
-      setMessages((prev) =>
+      updateMessagesForConversation(data.conversationId, (prev) =>
         prev.filter((msg) => {
           const matchesById =
             msg._id === data.messageId || msg.idempotencyKey === data.messageId;
@@ -669,7 +752,7 @@ export function useChat({
       );
 
       // Remove from status map
-      setMessageStatus((prev) => {
+      updateMessageStatusForConversation(data.conversationId, (prev) => {
         const newStatus = { ...prev };
         delete newStatus[data.messageId];
         if (data.idempotencyKey) {
@@ -690,7 +773,7 @@ export function useChat({
       if (data.conversationId !== conversationId) return;
 
       // Keep message body in recalled state so later realtime merges cannot resurrect content.
-      setMessages((prev) =>
+      updateMessagesForConversation(data.conversationId, (prev) =>
         prev.map((msg) => {
           const matches =
             msg._id === data.messageId ||
@@ -715,7 +798,7 @@ export function useChat({
       );
 
       // Update status
-      setMessageStatus((prev) => ({
+      updateMessageStatusForConversation(data.conversationId, (prev) => ({
         ...prev,
         [data.messageId]: "read",
       }));
@@ -743,7 +826,7 @@ export function useChat({
       delete socketCallbackRefs.current['message_deleted_for_me'];
       delete socketCallbackRefs.current['message_recalled'];
     };
-  }, [conversationId, token]);
+  }, [conversationId, token, updateMessagesForConversation, updateMessageStatusForConversation]);
 
   // Delete for me
   const handleDeleteForMe = useCallback(
@@ -755,7 +838,7 @@ export function useChat({
 
       try {
         // Optimistic remove to avoid temporary resurrection while waiting server ack.
-        setMessages((prev) =>
+        updateMessagesForConversation(conversationId, (prev) =>
           prev.filter(
             (msg) =>
               msg._id !== messageId &&
@@ -765,7 +848,7 @@ export function useChat({
           ),
         );
 
-        setMessageStatus((prev) => {
+        updateMessageStatusForConversation(conversationId, (prev) => {
           const next = { ...prev };
           delete next[messageId];
           delete next[idempotencyKey];
@@ -778,7 +861,7 @@ export function useChat({
         setError("Failed to delete message");
       }
     },
-    [conversationId],
+    [conversationId, updateMessagesForConversation, updateMessageStatusForConversation],
   );
 
   // Recall message
@@ -799,14 +882,6 @@ export function useChat({
     [conversationId],
   );
 
-  const unsetMessages_Status = useCallback(
-    () => {
-      setMessages([])
-      setMessageStatus({})
-    },
-    []
-  )
-
   return {
     messages,
     typingUsers,
@@ -818,7 +893,6 @@ export function useChat({
     stopTyping: handleStopTyping,
     deleteMessageForMe: handleDeleteForMe,
     recallMessage: handleRecall,
-    unsetMessages_Status,
     isLoading,
     error,
   };
@@ -844,32 +918,74 @@ interface UseMessageHistoryReturn {
 export function useMessageHistory({
   conversationId,
 }: UseMessageHistoryOptions): UseMessageHistoryReturn {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [checkChange, setCheckChange] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [messagesByConversationId, setMessagesByConversationId] = useState<MessagesByConversationId>({});
+  const [cursorByConversationId, setCursorByConversationId] = useState<Record<string, string | undefined>>({});
+  const [hasMoreByConversationId, setHasMoreByConversationId] = useState<Record<string, boolean>>({});
+  const [loadingByConversationId, setLoadingByConversationId] = useState<Record<string, boolean>>({});
+  const [errorByConversationId, setErrorByConversationId] = useState<Record<string, string | null>>({});
+  const activeConversationIdRef = useRef(conversationId);
+  activeConversationIdRef.current = conversationId;
+
+  const messages = messagesByConversationId[conversationId] ?? [];
+  const cursor = cursorByConversationId[conversationId];
+  const hasMore = hasMoreByConversationId[conversationId] ?? true;
+  const loading = loadingByConversationId[conversationId] ?? false;
+  const error = errorByConversationId[conversationId] ?? null;
+
+  const setMessagesForConversation = useCallback((
+    targetConversationId: string,
+    updater: SetStateAction<Message[]>,
+  ) => {
+    if (!targetConversationId) return;
+
+    setMessagesByConversationId((prev) => {
+      const currentMessages = prev[targetConversationId] ?? [];
+      const nextMessages = typeof updater === "function"
+        ? updater(currentMessages)
+        : updater;
+
+      if (nextMessages === currentMessages) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [targetConversationId]: nextMessages,
+      };
+    });
+  }, []);
+
+  const setMessages = useCallback<Dispatch<SetStateAction<Message[]>>>((updater) => {
+    setMessagesForConversation(conversationId, updater);
+  }, [conversationId, setMessagesForConversation]);
 
   const fetchMessages = useCallback(
     async (overrideCursor?: string) => {
-      if (!conversationId || loading) return;
+      const targetConversationId = conversationId;
+      if (!targetConversationId || loadingByConversationId[targetConversationId]) return;
 
-      const currentCursor = overrideCursor ?? cursor;
-      if (currentCursor && !hasMore) return;
+      const currentCursor = overrideCursor ?? cursorByConversationId[targetConversationId];
+      if (currentCursor && hasMoreByConversationId[targetConversationId] === false) return;
 
       try {
-        setLoading(true);
-        setError(null);
+        setLoadingByConversationId((prev) => ({ ...prev, [targetConversationId]: true }));
+        setErrorByConversationId((prev) => ({ ...prev, [targetConversationId]: null }));
 
-        const response = await getMessages(conversationId, currentCursor, 20);
+        const response = await getMessages(targetConversationId, currentCursor, 20);
         const { messages, nextCursor } = response;
 
+        if (activeConversationIdRef.current !== targetConversationId) {
+          return;
+        }
+
         if (messages && Array.isArray(messages)) {
-          const reversedMessages = messages.reverse();
-          setMessages((prev) => {
+          const reversedMessages = [...messages]
+            .filter((msg) => msg.conversationId === targetConversationId)
+            .reverse();
+          setMessagesForConversation(targetConversationId, (prev) => {
+            const scopedPreviousMessages = prev.filter((msg) => msg.conversationId === targetConversationId);
             if (currentCursor) {
-              return [...reversedMessages, ...prev];
+              return [...reversedMessages, ...scopedPreviousMessages];
             }
             // Merge with any real-time messages already present in prev
             const merged = new Map<string, Message>();
@@ -877,7 +993,7 @@ export function useMessageHistory({
               const key = String(msg.idempotencyKey || msg._id);
               merged.set(key, msg);
             });
-            prev.forEach((msg) => {
+            scopedPreviousMessages.forEach((msg) => {
               const key = String(msg.idempotencyKey || msg._id);
               if (!merged.has(key)) {
                 merged.set(key, msg);
@@ -887,47 +1003,38 @@ export function useMessageHistory({
               (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
             );
           });
-          setCursor(nextCursor);
-          setHasMore(Boolean(nextCursor));
+          setCursorByConversationId((prev) => ({ ...prev, [targetConversationId]: nextCursor }));
+          setHasMoreByConversationId((prev) => ({ ...prev, [targetConversationId]: Boolean(nextCursor) }));
         } else {
-          setMessages([]);
-          setCursor(undefined);
-          setHasMore(false);
+          setMessagesForConversation(targetConversationId, []);
+          setCursorByConversationId((prev) => ({ ...prev, [targetConversationId]: undefined }));
+          setHasMoreByConversationId((prev) => ({ ...prev, [targetConversationId]: false }));
         }
       } catch (err) {
         const errorMsg =
           err instanceof Error ? err.message : "Failed to fetch messages";
-        setError(errorMsg);
+        if (activeConversationIdRef.current === targetConversationId) {
+          setErrorByConversationId((prev) => ({ ...prev, [targetConversationId]: errorMsg }));
+        }
         console.error("Fetch messages error:", err);
       } finally {
-        setLoading(false);
+        setLoadingByConversationId((prev) => ({ ...prev, [targetConversationId]: false }));
       }
     },
-    [conversationId, cursor, hasMore, loading],
+    [conversationId, cursorByConversationId, hasMoreByConversationId, loadingByConversationId, setMessagesForConversation],
   );
 
   useEffect(() => {
     if (!conversationId) {
-      setMessages([]);
-      setCursor(undefined);
-      setHasMore(true);
-      setError(null);
       return;
     }
 
-    setMessages([]);
-    setCursor(undefined);
-    setHasMore(true);
-    setError(null);
-    setCheckChange((prev) => !prev);
+    setMessagesForConversation(conversationId, []);
+    setCursorByConversationId((prev) => ({ ...prev, [conversationId]: undefined }));
+    setHasMoreByConversationId((prev) => ({ ...prev, [conversationId]: true }));
+    setErrorByConversationId((prev) => ({ ...prev, [conversationId]: null }));
+    void fetchMessages("");
   }, [conversationId]);
-
-  // Auto-fetch initial messages when conversationId changes
-  useEffect(() => {
-    if (conversationId && !loading) {
-      fetchMessages("");
-    }
-  }, [checkChange]);
 
   // Load more (fetch with current cursor)
   const loadMore = useCallback(async () => {
@@ -949,7 +1056,7 @@ export function useMessageHistory({
       if (data.conversationId !== conversationId) return;
 
       // Remove from messages state
-      setMessages((prev) =>
+      setMessagesForConversation(data.conversationId, (prev) =>
         prev.filter((msg) => {
           const matchesById =
             msg._id === data.messageId || msg.idempotencyKey === data.messageId;
@@ -974,7 +1081,7 @@ export function useMessageHistory({
       if (data.conversationId !== conversationId) return;
 
       // Update message to placeholder
-      setMessages((prev) =>
+      setMessagesForConversation(data.conversationId, (prev) =>
         prev.map((msg) =>
           msg.idempotencyKey === data.idempotencyKey ||
           msg._id === data.messageId ||
@@ -1017,12 +1124,12 @@ export function useMessageHistory({
       try {
         unlistenToMessageDeletion(handleMessageDeletedForMe);
         unlistenToMessageRecall(handleMessageRecalled);
-        unlistenToMessageForwarded();
+        unlistenToMessageForwarded(handleMessageForwarded);
       } catch (err) {
         console.error("Failed to cleanup deletion listeners:", err);
       }
     };
-  }, [conversationId]);
+  }, [conversationId, setMessagesForConversation]);
 
   return {
     messages,
@@ -1054,6 +1161,8 @@ export function useTypingIndicator({
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
+    setTypingUsers([]);
+
     const handleTypingIndicator = (data: {
       userId: string;
       conversationId: string;
@@ -1103,7 +1212,7 @@ export function useTypingIndicator({
       typingTimeouts.current.clear();
 
       try {
-        unlistenToTypingIndicators();
+        unlistenToTypingIndicators(handleTypingIndicator);
       } catch (err) {
         console.error("Failed to cleanup typing listener:", err);
       }

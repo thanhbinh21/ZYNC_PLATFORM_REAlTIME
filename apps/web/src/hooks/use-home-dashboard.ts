@@ -158,6 +158,7 @@ interface ConversationListItem {
   removedFromGroup?: boolean;
   memberCount?: number;
   members?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
+  activeMembers?: Array<{ _id: string; displayName: string; avatarUrl?: string }>;
   online?: boolean;
   active?: boolean;
   activeCall?: ConversationActiveCall | null;
@@ -935,7 +936,6 @@ export function useHomeDashboard() {
     stopTyping,
     deleteMessageForMe,
     recallMessage,
-    unsetMessages_Status,
     isLoading: chatLoading,
   } = useChat({
     conversationId: selectedConversationId,
@@ -957,14 +957,16 @@ export function useHomeDashboard() {
     const statusMap: Record<string, string> = { ...messageStatus };
 
     // Extract status from loaded messages (both real-time and history)
-    messageHistory.messages.forEach((msg) => {
+    messageHistory.messages
+      .filter((msg) => msg.conversationId === selectedConversationId)
+      .forEach((msg) => {
       if (msg.status && !statusMap[msg._id]) {
         statusMap[msg._id] = msg.status;
       }
-    });
+      });
 
     setCombinedMessageStatus(statusMap);
-  }, [messageHistory.messages, messageStatus]);
+  }, [messageHistory.messages, messageStatus, selectedConversationId]);
 
   const {notifications} = useNotifications()
 
@@ -990,7 +992,9 @@ export function useHomeDashboard() {
   }, [notifications]);
 
   useEffect(() => {
-    const lastMessage = messageHistory.messages[messageHistory.messages.length - 1]
+    const lastMessage = messageHistory.messages
+      .filter((message) => message.conversationId === selectedConversationId)
+      .at(-1)
     if (!lastMessage) return;
     setConversations((prev) => prev.map((conv) => {
         if (conv._id !== lastMessage.conversationId) return conv
@@ -1002,7 +1006,7 @@ export function useHomeDashboard() {
         }}
       })
     )
-  }, [messageHistory.messages]);
+  }, [messageHistory.messages, selectedConversationId]);
 
   const resolveMessageRef = useCallback((message: Message): string => {
     return message.idempotencyKey || message._id;
@@ -1021,7 +1025,7 @@ export function useHomeDashboard() {
 
     const latestMessage = [...messageHistory.messages]
       .reverse()
-      .find((message) => !isCallSummaryMessage(message));
+      .find((message) => message.conversationId === conversationId && !isCallSummaryMessage(message));
 
     return latestMessage ? resolveMessageRef(latestMessage) : undefined;
   }, [messageHistory.messages, resolveMessageRef, selectedConversationId]);
@@ -1302,7 +1306,8 @@ export function useHomeDashboard() {
 
   // Subscribe to new messages from useChat and add them to messageHistory
   useEffect(() => {
-    if (messages.length === 0) {
+    const activeMessages = messages.filter((msg) => msg.conversationId === selectedConversationId);
+    if (!selectedConversationId || activeMessages.length === 0) {
       return;
     }
 
@@ -1310,14 +1315,14 @@ export function useHomeDashboard() {
       const merged = new Map<string, Message>();
 
       prev.forEach((msg) => {
-        if (isCallSummaryMessage(msg)) {
+        if (msg.conversationId !== selectedConversationId || isCallSummaryMessage(msg)) {
           return;
         }
         const key = String(msg.idempotencyKey || msg._id);
         merged.set(key, msg);
       });
 
-      messages.forEach((msg) => {
+      activeMessages.forEach((msg) => {
         if (isCallSummaryMessage(msg)) {
           return;
         }
@@ -1361,17 +1366,21 @@ export function useHomeDashboard() {
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
     });
-  }, [messages, messageHistory.setMessages]);
+  }, [messages, messageHistory.setMessages, selectedConversationId]);
 
   useEffect(() => {
     hydratedReactionStateRefsRef.current.clear();
     setConversations((prev) => prev.map((conv) => {
+        if (conv._id !== selectedConversationId) {
+          return conv;
+        }
+
         const unreadCounts = conv.unreadCounts? new Map(Object.entries(conv.unreadCounts)): new Map<string, number>() 
         unreadCounts.delete(userId)
         return {...conv, unreadCounts: Object.fromEntries(unreadCounts.entries())}
       })
     )
-  }, [selectedConversationId]);
+  }, [selectedConversationId, userId]);
 
   useEffect(() => {
     if (!selectedConversationId || !userId || messageHistory.messages.length === 0) {
@@ -1379,6 +1388,10 @@ export function useHomeDashboard() {
     }
 
     const candidates = messageHistory.messages.filter((msg) => {
+      if (msg.conversationId !== selectedConversationId) {
+        return false;
+      }
+
       const totalCount = msg.reactionSummary?.totalCount || 0;
       if (totalCount <= 0) {
         return false;
@@ -1790,15 +1803,14 @@ export function useHomeDashboard() {
       return;
     }
 
-    const directPeerIds = Array.from(new Set(
+    const conversationMemberIds = Array.from(new Set(
       conversations
-        .filter((conversation) => conversation.type === 'direct')
         .flatMap((conversation) => conversation.users
           .map((member) => member._id)
           .filter((memberId) => memberId !== userId)),
     ));
 
-    if (directPeerIds.length === 0) {
+    if (conversationMemberIds.length === 0) {
       setPresenceByUserId({});
       return;
     }
@@ -1811,11 +1823,14 @@ export function useHomeDashboard() {
         const payload = (response.data?.presence ?? {}) as Record<string, { online?: boolean; lastSeen?: string | null }>;
         const nextPresence: Record<string, PresenceState> = {};
 
-        for (const peerId of directPeerIds) {
-          const presence = payload[peerId];
-          nextPresence[peerId] = {
-            online: Boolean(presence?.online),
-            lastSeen: presence?.lastSeen ?? null,
+        for (const [memberId, presence] of Object.entries(payload)) {
+          if (!conversationMemberIds.includes(memberId)) {
+            continue;
+          }
+
+          nextPresence[memberId] = {
+            online: Boolean(presence.online),
+            lastSeen: presence.lastSeen ?? null,
           };
         }
 
@@ -1838,7 +1853,7 @@ export function useHomeDashboard() {
 
     const socket = getSocket(token);
     const handlePresenceChanged = (payload: { userId: string; status: 'online' | 'offline'; lastSeen?: string | null }) => {
-      if (!directPeerIds.includes(payload.userId)) {
+      if (!conversationMemberIds.includes(payload.userId)) {
         return;
       }
 
@@ -1863,8 +1878,8 @@ export function useHomeDashboard() {
   useEffect(() => {
     if (messages.length === 0) return;
 
-    const latestMessage = messages[messages.length - 1];
-    if (isCallSummaryMessage(latestMessage)) {
+    const latestMessage = messages.filter((msg) => msg.conversationId === selectedConversationId).at(-1);
+    if (!latestMessage || isCallSummaryMessage(latestMessage)) {
       return;
     }
     setConversations(prev => prev.map(conv => {
@@ -1884,7 +1899,7 @@ export function useHomeDashboard() {
       }
       return conv;
     }));
-  }, [messages]);
+  }, [messages, selectedConversationId]);
 
   const updatePreviewConversation = (message: Message) => {
     if (isCallSummaryMessage(message)) {
@@ -2090,6 +2105,9 @@ export function useHomeDashboard() {
       removedFromGroup: conv.removedFromGroup,
       memberCount: conv.users.length,
       members: conv.users,
+      activeMembers: conv.type === 'group'
+        ? conv.users.filter((member) => presenceByUserId[member._id]?.online)
+        : undefined,
       online: getConversationPresence(conv).online,
       active: conv._id === selectedConversationId,
       activeCall: conv.activeCall ?? null,
@@ -2097,7 +2115,7 @@ export function useHomeDashboard() {
       unreadCount: unreadCounts.get(userId) ?? 0,
       aiCatchupEnabled: conv.aiPreferences?.catchupEnabled !== false,
     }});
-  }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, selectedConversationId, userId]);
+  }, [conversations, getConversationPresence, mutedUntilByConversation, pinnedConversationIds, presenceByUserId, selectedConversationId, userId]);
 
   const createGroupConversation = useCallback(
     async (name: string, memberIds: string[]) => {
@@ -3820,8 +3838,6 @@ export function useHomeDashboard() {
       // Emit forward message
       emitForwardMessage(forwardingMessage._id, toConversationId, idempotencyKey);
 
-      unsetMessages_Status()
-
       // Comment để chuyển qua conversation khác trước khi server chưa kịp gửi socket về
       // Nếu muốn có loading ở nút thì mới uncomment
       // 700ms là có thể truy vấn được từ database, 500ms nữa là chờ một người trong conversation read
@@ -3997,7 +4013,9 @@ export function useHomeDashboard() {
     onCreateReminder: createReminderFromAiActionItem,
     searchTargets: searchTargets(),
     onSelectSearchTarget: openConversationFromSearch,
-    messages: messageHistory.messages.filter(isVisibleChatMessage),
+    messages: messageHistory.messages.filter(
+      (message) => message.conversationId === selectedConversationId && isVisibleChatMessage(message),
+    ),
     messageStatus: combinedMessageStatus,
     messagesLoading: messageHistory.loading,
     messagesHasMore: messageHistory.hasMore,
