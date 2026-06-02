@@ -197,7 +197,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     if (action === 'open_friend_requests') {
-      router.push('/friends#requests');
+      router.push('/friends?tab=requests');
       return;
     }
 
@@ -207,7 +207,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
-      router.push('/friends#requests');
+      router.push('/friends?tab=requests');
       return;
     }
 

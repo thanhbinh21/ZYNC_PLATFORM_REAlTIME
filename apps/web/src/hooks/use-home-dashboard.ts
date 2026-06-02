@@ -301,6 +301,14 @@ function formatTimeLabel(dateString: string): string {
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
 
+function areStringRecordsEqual(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => left[key] === right[key]);
+}
+
 function getWebRtcInsecureContextMessage(): string | null {
   if (!LAN_DEMO_WARN_ENABLED) {
     return null;
@@ -965,7 +973,9 @@ export function useHomeDashboard() {
       }
       });
 
-    setCombinedMessageStatus(statusMap);
+    setCombinedMessageStatus((prev) => (
+      areStringRecordsEqual(prev, statusMap) ? prev : statusMap
+    ));
   }, [messageHistory.messages, messageStatus, selectedConversationId]);
 
   const {notifications} = useNotifications()

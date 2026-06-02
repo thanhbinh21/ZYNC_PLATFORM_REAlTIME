@@ -66,7 +66,7 @@ function HomePageContent(): React.JSX.Element {
   const handleNotificationClick = (item: DashboardNotificationItem) => {
     switch (item.type) {
       case 'new_message':
-        navigate(item.conversationId ? `/chat?conversationId=${encodeURIComponent(item.conversationId)}&highlight=new` : '/chat');
+        navigate(item.conversationId ? `/chat?conversationId=${encodeURIComponent(item.conversationId)}` : '/chat');
         return;
       case 'friend_request':
       case 'friend_accepted':
@@ -165,7 +165,7 @@ function HomePageContent(): React.JSX.Element {
                     <FolderOpen className="h-4 w-4" aria-hidden />
                     Tạo nhóm
                   </button>
-                  <button type="button" onClick={() => navigate('/friends')} className="zync-soft-button-ghost inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+                  <button type="button" onClick={() => navigate('/friends?tab=search')} className="zync-soft-button-ghost inline-flex items-center gap-2 px-5 py-2.5 text-sm">
                     <Search className="h-4 w-4" aria-hidden />
                     Tìm bạn
                   </button>
@@ -243,7 +243,7 @@ function HomePageContent(): React.JSX.Element {
                       title="Chưa có bạn bè"
                       description="Kết nối với developer khác để xem trạng thái của họ."
                       actionLabel="Tìm bạn"
-                      onAction={() => navigate('/friends')}
+                      onAction={() => navigate('/friends?tab=search')}
                     />
                   ) : (
                     <div className="space-y-1">
@@ -302,7 +302,7 @@ function HomePageContent(): React.JSX.Element {
               <DashboardCard title="Thao tác nhanh" icon={PlusIcon}>
                 <div className="grid grid-cols-2 gap-3">
                   <QuickActionCard title="Tin nhắn" label="Mở chat" icon={SendIcon} onClick={() => navigate('/chat?compose=1')} />
-                  <QuickActionCard title="Thêm bạn" label="Kết nối" icon={UserPlusIcon} onClick={() => navigate('/friends')} />
+                  <QuickActionCard title="Thêm bạn" label="Kết nối" icon={UserPlusIcon} onClick={() => navigate('/friends?tab=search')} />
                   <QuickActionCard title="Nhóm mới" label="Tạo group" icon={FolderOpenIcon} onClick={() => navigate('/chat?createGroup=1')} />
                   <QuickActionCard title="Cộng đồng" label="Bài viết" icon={UsersIcon} onClick={() => navigate('/community')} />
                 </div>

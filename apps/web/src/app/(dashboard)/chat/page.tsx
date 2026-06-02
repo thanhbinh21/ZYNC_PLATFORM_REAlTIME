@@ -22,6 +22,7 @@ function ChatPageContent() {
   const searchParams = useSearchParams();
   const [targetMessageRef, setTargetMessageRef] = useState<string | null>(null);
   const [openCreateGroupOnMount, setOpenCreateGroupOnMount] = useState(false);
+  const [focusConversationSearchOnMount, setFocusConversationSearchOnMount] = useState(false);
   const {
     loading,
     conversations,
@@ -131,11 +132,20 @@ function ChatPageContent() {
     router.replace('/chat');
   }, [searchParams, router]);
 
+  useEffect(() => {
+    if (searchParams.get('compose') !== '1') {
+      return;
+    }
+
+    setFocusConversationSearchOnMount(true);
+    router.replace('/chat');
+  }, [searchParams, router]);
+
   if (loading) {
     return <PageLoading variant="chat" mode="panel" />;
   }
 
-  if (conversations.length === 0) {
+  if (conversations.length === 0 && !openCreateGroupOnMount && !focusConversationSearchOnMount) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <EmptyState variant="no-messages" />
@@ -170,6 +180,7 @@ function ChatPageContent() {
         onToggleAiCatchupSetting={onToggleAiCatchupSetting}
         isCreatingGroup={groupActionLoading}
         initialCreateGroupOpen={openCreateGroupOnMount}
+        initialConversationSearchFocus={focusConversationSearchOnMount}
         onLoadMore={onLoadMore}
         chatPanelProps={{
           conversationId: selectedConversationId,

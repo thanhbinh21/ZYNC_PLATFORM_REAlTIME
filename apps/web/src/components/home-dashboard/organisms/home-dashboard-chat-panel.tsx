@@ -399,6 +399,7 @@ interface ConversationListProps {
   onRequestAiCatchup?: (conversationId: string) => Promise<void> | void;
   searchTargets?: ConversationSearchTarget[];
   onSelectSearchTarget?: (target: ConversationSearchTarget) => void;
+  initialSearchFocus?: boolean;
 }
 
 interface ConversationSearchTarget {
@@ -418,6 +419,7 @@ function ConversationList({
   onRequestAiCatchup,
   searchTargets = [],
   onSelectSearchTarget = () => {},
+  initialSearchFocus = false,
 }: ConversationListProps) {
   const getMuteTimeLabel = (mutedUntil: Date | null | undefined): string => {
     if (!mutedUntil) {
@@ -445,6 +447,18 @@ function ConversationList({
 
   const [query, setQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const initialSearchFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialSearchFocus || initialSearchFocusRef.current) {
+      return;
+    }
+
+    initialSearchFocusRef.current = true;
+    searchInputRef.current?.focus();
+  }, [initialSearchFocus]);
+
   const normalizedQuery = query.trim().toLowerCase();
   const filteredConversations = normalizedQuery
     ? conversations.filter((item) => {
@@ -469,6 +483,7 @@ function ConversationList({
       }`}>
         <SearchIcon className="shrink-0 h-4 w-4" />
         <input
+          ref={searchInputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -1667,6 +1682,7 @@ interface HomeDashboardChatPanelProps {
   onLeaveGroup?: (groupId: string) => Promise<void>;
   isCreatingGroup?: boolean;
   initialCreateGroupOpen?: boolean;
+  initialConversationSearchFocus?: boolean;
   onLoadMore?: () => Promise<void>;
   chatPanelProps?: Partial<ChatPanelProps>;
 }
@@ -2129,6 +2145,7 @@ export function HomeDashboardChatPanel({
   onLeaveGroup,
   isCreatingGroup = false,
   initialCreateGroupOpen = false,
+  initialConversationSearchFocus = false,
   onLoadMore,
   chatPanelProps = {},
 }: HomeDashboardChatPanelProps = {}) {
@@ -2613,6 +2630,7 @@ export function HomeDashboardChatPanel({
             onRequestAiCatchup={onRequestAiCatchup}
             searchTargets={visibleSearchTargets}
             onSelectSearchTarget={onSelectSearchTarget}
+            initialSearchFocus={initialConversationSearchFocus}
           />
         </div>
 
