@@ -348,7 +348,7 @@ export function listenToStatusUpdates(
   listenerRegistry.delete(event);
   listenerRegistry.set(event, callback as (...args: unknown[]) => void);
   socket.off(event);
-  socket.on(event, (data) => callback(data));
+  socket.on(event, callback);
 }
 
 /**
