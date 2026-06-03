@@ -354,6 +354,13 @@ interface CallParticipantVideo {
   stream: MediaStream;
 }
 
+function playVideoElement(video: HTMLVideoElement): void {
+  const playPromise = video.play();
+  if (playPromise) {
+    void playPromise.catch(() => undefined);
+  }
+}
+
 export function useHomeDashboard() {
   const [data, setData] = useState<DashboardHomeMockData>(DASHBOARD_HOME_MOCK_DATA);
   const [loading, setLoading] = useState(true);
@@ -506,6 +513,7 @@ export function useHomeDashboard() {
     if (localVideoRef.current.srcObject !== localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
+    playVideoElement(localVideoRef.current);
   }, []);
 
   const syncScreenSharePreview = useCallback(() => {
@@ -516,6 +524,7 @@ export function useHomeDashboard() {
     if (screenShareVideoRef.current.srcObject !== screenShareStreamRef.current) {
       screenShareVideoRef.current.srcObject = screenShareStreamRef.current;
     }
+    playVideoElement(screenShareVideoRef.current);
   }, []);
 
   const syncRemoteParticipantsPreview = useCallback((nextCall?: CallSessionState | null) => {
@@ -536,6 +545,7 @@ export function useHomeDashboard() {
       if (remoteVideoRef.current.srcObject !== primaryStream) {
         remoteVideoRef.current.srcObject = primaryStream;
       }
+      playVideoElement(remoteVideoRef.current);
     }
   }, [resolvePeerInfo]);
 
@@ -688,6 +698,15 @@ export function useHomeDashboard() {
 
     const connection = new RTCPeerConnection(getRtcConfiguration());
 
+    try {
+      connection.addTransceiver('audio', { direction: 'sendrecv' });
+      if (currentCall.callType !== 'audio') {
+        connection.addTransceiver('video', { direction: 'sendrecv' });
+      }
+    } catch (err) {
+      console.warn('[Call] Failed to pre-negotiate media transceivers:', err);
+    }
+
     connection.onicecandidate = (event) => {
       const latestCall = activeCallRef.current;
       if (!event.candidate || !latestCall || !latestCall.sessionId || !latestCall.callToken || !peerUserId) {
@@ -718,6 +737,10 @@ export function useHomeDashboard() {
         if (!existingStream.getTracks().some((currentTrack) => currentTrack.id === track.id)) {
           existingStream.addTrack(track);
         }
+
+        track.onunmute = () => {
+          syncRemoteParticipantsPreview(latestCallWithFallback(currentCall));
+        };
       });
 
       remoteStreamsRef.current.set(peerUserId, existingStream);
