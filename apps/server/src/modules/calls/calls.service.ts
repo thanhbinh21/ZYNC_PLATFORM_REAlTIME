@@ -20,6 +20,7 @@ import {
   recordCallMissed,
   recordCallRejected,
 } from './calls.metrics';
+import { logger } from '../../shared/logger';
 
 const ACTIVE_SESSION_STATUSES: CallSessionStatus[] = ['ringing', 'connecting', 'connected'];
 export const ACTIVE_CALL_EXISTS_CODE = 'ACTIVE_CALL_EXISTS';
@@ -718,7 +719,8 @@ export class CallsService {
 
     await ensureParticipant(sessionId, userId);
     if (!ACTIVE_SESSION_STATUSES.includes(session.status)) {
-      throw new BadRequestError('Call session is no longer active');
+      logger.warn(`[Calls] call session already ended/rejected: ${sessionId} status=${session.status} event=reject actor=${userId}`);
+      return buildCallSessionDetail(sessionId);
     }
     await ensureUserNotInOtherActiveCall(userId, sessionId);
 
@@ -842,6 +844,7 @@ export class CallsService {
     await ensureParticipant(sessionId, userId);
 
     if (session.status === 'ended' || session.status === 'missed' || session.status === 'rejected') {
+      logger.warn(`[Calls] call session already ended/rejected: ${sessionId} status=${session.status} event=end actor=${userId}`);
       return buildCallSessionDetail(sessionId);
     }
 
@@ -914,6 +917,7 @@ export class CallsService {
     }
 
     if (session.status !== 'ringing') {
+      logger.info(`[Calls] call session already ended/rejected: ${sessionId} status=${session.status} event=missed_timeout`);
       return null;
     }
 
