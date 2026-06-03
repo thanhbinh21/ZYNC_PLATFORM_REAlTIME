@@ -9,6 +9,7 @@ const listenerRegistry = new Map<string, unknown>();
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
 const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
+const ACCESS_TOKEN_CLIENT_COOKIE_KEY = 'accessToken_client';
 const HEARTBEAT_INTERVAL_MS = 50_000;
 
 function stopHeartbeat(): void {
@@ -30,7 +31,7 @@ function startHeartbeat(targetSocket: Socket): void {
 
 function getTokenFromCookie(): string | null {
   if (typeof window === 'undefined') return null;
-  return Cookies.get(ACCESS_TOKEN_COOKIE_KEY) ?? null;
+  return Cookies.get(ACCESS_TOKEN_COOKIE_KEY) ?? Cookies.get(ACCESS_TOKEN_CLIENT_COOKIE_KEY) ?? null;
 }
 
 function resolveWebSocketUrl(): string {

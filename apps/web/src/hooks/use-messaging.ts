@@ -214,6 +214,10 @@ export function useChat({
 
   // Setup message listener
   useEffect(() => {
+    if (!conversationId || !token) {
+      return;
+    }
+
     const handleReceiveMessage = (data: {
       messageId: string;
       conversationId?: string;
@@ -359,6 +363,10 @@ export function useChat({
 
   // Setup status update listener
   useEffect(() => {
+    if (!token) {
+      return;
+    }
+
     const handleStatusUpdate = (data: {
       messageId?: string;
       messageIds?: string[];
@@ -481,6 +489,9 @@ export function useChat({
   // Setup typing indicator listener
   useEffect(() => {
     setTypingUsers([]);
+    if (!conversationId || !token) {
+      return;
+    }
 
     const handleTypingIndicator = (data: {
       userId: string;
@@ -538,7 +549,7 @@ export function useChat({
         console.error("Failed to cleanup typing listener:", err);
       }
     };
-  }, [conversationId, userId]);
+  }, [conversationId, token, userId]);
 
   // Send message
   const handleSendMessage = useCallback(

@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
-import { clearAccessToken } from '@/utils/auth-token';
+import { clearAccessToken, getAccessToken } from '@/utils/auth-token';
 
 function resolveApiBaseUrl(): string {
   const explicitUrl = process.env['NEXT_PUBLIC_API_URL'];
@@ -36,6 +36,7 @@ function resolveApiBaseUrl(): string {
 const apiBaseUrl = resolveApiBaseUrl();
 
 const ACCESS_TOKEN_COOKIE_KEY = 'accessToken';
+const ACCESS_TOKEN_CLIENT_COOKIE_KEY = 'accessToken_client';
 const AUTH_ROUTE = '/auth';
 
 function shouldRedirectToAuth(): boolean {
@@ -57,9 +58,10 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach access token from httpOnly cookie (read via js-cookie)
+// Attach access token from the client-readable side-channel when available.
+// The server still receives httpOnly cookies through withCredentials as fallback.
 apiClient.interceptors.request.use((config) => {
-  const token = Cookies.get(ACCESS_TOKEN_COOKIE_KEY);
+  const token = getAccessToken();
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 });
@@ -93,6 +95,11 @@ apiClient.interceptors.response.use(
           sameSite: 'Lax',
           expires,
         });
+        Cookies.set(ACCESS_TOKEN_CLIENT_COOKIE_KEY, data.accessToken, {
+          secure: window.location.protocol === 'https:',
+          sameSite: 'Lax',
+          expires,
+        });
 
         // Update socket auth token so reconnects use the new token
         try {
@@ -111,4 +118,3 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
-
