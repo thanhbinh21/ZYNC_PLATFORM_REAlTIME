@@ -63,6 +63,24 @@ function isActiveConversationCall(call?: ConversationActiveCall | null): call is
   );
 }
 
+function playAttachedVideo(video: HTMLVideoElement): void {
+  const playPromise = video.play();
+  if (playPromise) {
+    void playPromise.catch(() => undefined);
+  }
+}
+
+function attachMediaStream(node: HTMLVideoElement | null, stream?: MediaStream | null): void {
+  if (!node || !stream) {
+    return;
+  }
+
+  if (node.srcObject !== stream) {
+    node.srcObject = stream;
+  }
+  playAttachedVideo(node);
+}
+
 // ==================== CALL UI ICONS ====================
 
 function MicIcon({ className }: { className: string }) {
@@ -1386,6 +1404,7 @@ function ChatPanel({
                           autoPlay
                           muted
                           playsInline
+                          onLoadedMetadata={(event) => playAttachedVideo(event.currentTarget)}
                           className="absolute inset-0 h-full w-full object-contain"
                         />
                       ) : (
@@ -1394,12 +1413,7 @@ function ChatPanel({
                           playsInline
                           className="absolute inset-0 h-full w-full object-contain"
                           ref={(node) => {
-                            if (!node || !remoteScreenShareParticipant) {
-                              return;
-                            }
-                            if (node.srcObject !== remoteScreenShareParticipant.stream) {
-                              node.srcObject = remoteScreenShareParticipant.stream;
-                            }
+                            attachMediaStream(node, remoteScreenShareParticipant?.stream);
                           }}
                         />
                       )}
@@ -1415,12 +1429,7 @@ function ChatPanel({
                           playsInline
                           className="absolute inset-0 h-full w-full object-contain"
                           ref={(node) => {
-                            if (!node) {
-                              return;
-                            }
-                            if (node.srcObject !== mainStageParticipant.stream) {
-                              node.srcObject = mainStageParticipant.stream;
-                            }
+                            attachMediaStream(node, mainStageParticipant.stream);
                           }}
                         />
                       ) : (
@@ -1430,13 +1439,8 @@ function ChatPanel({
                           playsInline
                           className="absolute inset-0 h-full w-full object-contain"
                           ref={(node) => {
-                            if (!node) {
-                              return;
-                            }
                             const localStream = localVideoRef?.current?.srcObject;
-                            if (localStream && node.srcObject !== localStream) {
-                              node.srcObject = localStream;
-                            }
+                            attachMediaStream(node, localStream instanceof MediaStream ? localStream : null);
                           }}
                         />
                       )}
@@ -1453,6 +1457,7 @@ function ChatPanel({
                         ref={remoteVideoRef}
                         autoPlay
                         playsInline
+                        onLoadedMetadata={(event) => playAttachedVideo(event.currentTarget)}
                         className="absolute inset-0 h-full w-full object-contain"
                       />
                       {callPeerName && (
@@ -1472,6 +1477,7 @@ function ChatPanel({
                         autoPlay
                         muted
                         playsInline
+                        onLoadedMetadata={(event) => playAttachedVideo(event.currentTarget)}
                         className="absolute inset-0 h-full w-full object-contain"
                       />
                       <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-2 pointer-events-none">
@@ -1493,12 +1499,7 @@ function ChatPanel({
                           playsInline
                           className="absolute inset-0 h-full w-full object-contain"
                           ref={(node) => {
-                            if (!node) {
-                              return;
-                            }
-                            if (node.srcObject !== participant.stream) {
-                              node.srcObject = participant.stream;
-                            }
+                            attachMediaStream(node, participant.stream);
                           }}
                         />
                         <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-2 pointer-events-none">
