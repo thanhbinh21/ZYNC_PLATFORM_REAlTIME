@@ -374,15 +374,22 @@ export function useHomeDashboard() {
   const [aiCatchupByConversation, setAiCatchupByConversation] = useState<Record<string, AiCatchupDigest>>({});
   const [aiCatchupRequestingByConversation, setAiCatchupRequestingByConversation] = useState<Record<string, boolean>>({});
   const [aiReminders, setAiReminders] = useState<AiReminder[]>([]);
+  const activeCallRef = useRef<CallSessionState | null>(callStore.activeCall);
 
   useEffect(() => {
     return subscribeToCallStore((call) => {
+      activeCallRef.current = call;
       setActiveCallState(call);
     });
   }, []);
 
   const setActiveCall = useCallback((updater: CallSessionState | null | ((prev: CallSessionState | null) => CallSessionState | null)) => {
-    callStore.setActiveCall(updater);
+    const nextCall = typeof updater === 'function'
+      ? updater(activeCallRef.current)
+      : updater;
+
+    activeCallRef.current = nextCall;
+    callStore.setActiveCall(nextCall);
   }, []);
   const [callError, setCallError] = useState<string | null>(null);
   const [callFriendError, setCallFriendError] = useState<string | null>(null);
@@ -394,7 +401,6 @@ export function useHomeDashboard() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingReactionRequestsRef = useRef<Map<string, PendingReactionRequest>>(new Map());
   const hydratedReactionStateRefsRef = useRef<Set<string>>(new Set());
-  const activeCallRef = useRef<CallSessionState | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenShareVideoRef = useRef<HTMLVideoElement>(null);
@@ -702,8 +708,13 @@ export function useHomeDashboard() {
 
     connection.ontrack = (event) => {
       const existingStream = remoteStreamsRef.current.get(peerUserId) ?? new MediaStream();
+      const incomingTracks = event.streams.flatMap((stream) => stream.getTracks());
 
-      event.streams[0]?.getTracks().forEach((track) => {
+      if (event.track && !incomingTracks.some((track) => track.id === event.track.id)) {
+        incomingTracks.push(event.track);
+      }
+
+      incomingTracks.forEach((track) => {
         if (!existingStream.getTracks().some((currentTrack) => currentTrack.id === track.id)) {
           existingStream.addTrack(track);
         }
@@ -923,8 +934,9 @@ export function useHomeDashboard() {
 
   useEffect(() => {
     syncLocalPreview();
+    syncScreenSharePreview();
     syncRemoteParticipantsPreview(activeCall);
-  }, [activeCall, syncLocalPreview, syncRemoteParticipantsPreview]);
+  }, [activeCall, syncLocalPreview, syncRemoteParticipantsPreview, syncScreenSharePreview]);
 
   useEffect(() => {
     if (isScreenSharing) {
