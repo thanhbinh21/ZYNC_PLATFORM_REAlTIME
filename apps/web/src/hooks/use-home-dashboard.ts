@@ -772,7 +772,11 @@ export function useHomeDashboard() {
     return userId.localeCompare(peerUserId) > 0;
   }, [userId]);
 
-  const createOfferForPeer = useCallback(async (callState: CallSessionState, peerUserId: string) => {
+  const createOfferForPeer = useCallback(async (
+    callState: CallSessionState,
+    peerUserId: string,
+    options?: { force?: boolean },
+  ) => {
     if (!callState.callToken || !callState.sessionId || !peerUserId || peerUserId === userId) {
       return;
     }
@@ -784,6 +788,11 @@ export function useHomeDashboard() {
     }
 
     if (connection.signalingState !== 'stable') {
+      return;
+    }
+
+    const isAlreadyNegotiated = Boolean(connection.localDescription && connection.remoteDescription);
+    if (isAlreadyNegotiated && !options?.force) {
       return;
     }
 
@@ -802,7 +811,7 @@ export function useHomeDashboard() {
             // Trigger renegotiation if track was newly added
             const currentCall = activeCallRef.current;
             if (currentCall && currentCall.status === 'connected') {
-              void createOfferForPeer(currentCall, peerUserId).catch((err) => {
+              void createOfferForPeer(currentCall, peerUserId, { force: true }).catch((err) => {
                 console.error('[Call] Failed to renegotiate after adding video track:', err);
               });
             }
@@ -960,6 +969,73 @@ export function useHomeDashboard() {
     syncScreenSharePreview();
     syncRemoteParticipantsPreview(activeCall);
   }, [activeCall, syncLocalPreview, syncRemoteParticipantsPreview, syncScreenSharePreview]);
+
+  useEffect(() => {
+    if (
+      !activeCall
+      || !activeCall.sessionId
+      || !activeCall.callToken
+      || (activeCall.status !== 'connecting' && activeCall.status !== 'connected')
+      || !activeCall.joinedParticipantIds.includes(userId)
+    ) {
+      return;
+    }
+
+    const peerIds = activeCall.joinedParticipantIds.filter((participantId) => (
+      participantId && participantId !== userId
+    ));
+
+    if (peerIds.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await ensureLocalMedia(activeCall.callType === 'audio' ? false : isCameraEnabled);
+        if (cancelled) {
+          return;
+        }
+
+        const latestCall = activeCallRef.current;
+        if (!latestCall || latestCall.sessionId !== activeCall.sessionId) {
+          return;
+        }
+
+        for (const peerUserId of peerIds) {
+          const connection = ensurePeerConnection(latestCall, peerUserId);
+          if (!connection) {
+            continue;
+          }
+
+          await flushPendingRemoteCandidates(peerUserId, connection);
+
+          if (
+            shouldCreateOfferForPeer(latestCall, peerUserId)
+            && (!connection.localDescription || !connection.remoteDescription)
+          ) {
+            await createOfferForPeer(latestCall, peerUserId);
+          }
+        }
+      } catch (error) {
+        console.warn('[Call] Failed to reconcile WebRTC peers', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCall,
+    createOfferForPeer,
+    ensureLocalMedia,
+    ensurePeerConnection,
+    flushPendingRemoteCandidates,
+    isCameraEnabled,
+    shouldCreateOfferForPeer,
+    userId,
+  ]);
 
   useEffect(() => {
     if (isScreenSharing) {
