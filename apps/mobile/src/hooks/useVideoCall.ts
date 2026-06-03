@@ -53,6 +53,7 @@ export function useVideoCall(userId: string) {
   const activeCallRef = useRef<ActiveCallState | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const remoteTrackStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const sentOfferKeysRef = useRef<Set<string>>(new Set());
   const processingOfferKeysRef = useRef<Set<string>>(new Set());
   const answeredOfferKeysRef = useRef<Set<string>>(new Set());
@@ -225,6 +226,7 @@ export function useVideoCall(userId: string) {
       sentOfferKeysRef.current.delete(peerKey);
       negotiatedPeerKeysRef.current.delete(peerKey);
     }
+    remoteTrackStreamsRef.current.delete(peerUserId);
   }, [getPeerKey]);
 
   const closeAllPeerConnections = useCallback(() => {
@@ -247,6 +249,7 @@ export function useVideoCall(userId: string) {
     answeredOfferKeysRef.current.clear();
     negotiatedPeerKeysRef.current.clear();
     pendingIceCandidatesRef.current.clear();
+    remoteTrackStreamsRef.current.clear();
 
     setRemoteStreams((prev) => {
       prev.forEach((stream) => {
@@ -255,6 +258,7 @@ export function useVideoCall(userId: string) {
       return new Map();
     });
 
+    activeCallRef.current = null;
     setActiveCall(null);
     setIsMicMuted(false);
     setIsCameraEnabled(true);
@@ -322,15 +326,53 @@ export function useVideoCall(userId: string) {
       }
     };
 
+    const publishRemoteStream = (stream: MediaStream) => {
+      setRemoteStreams((prev) => {
+        const next = new Map(prev);
+        next.set(peerUserId, stream);
+        return next;
+      });
+    };
+
     (pc as any).ontrack = (event: any) => {
-      if (event.streams?.[0]) {
-        const stream = event.streams[0] as MediaStream;
-        setRemoteStreams((prev) => {
-          const next = new Map(prev);
-          next.set(peerUserId, stream);
-          return next;
-        });
+      const eventStream = event.streams?.[0] as MediaStream | undefined;
+      if (eventStream) {
+        remoteTrackStreamsRef.current.set(peerUserId, eventStream);
+        publishRemoteStream(eventStream);
+        return;
       }
+
+      const track = event.track;
+      if (!track) {
+        return;
+      }
+
+      let stream = remoteTrackStreamsRef.current.get(peerUserId);
+      if (!stream) {
+        stream = new MediaStream();
+        remoteTrackStreamsRef.current.set(peerUserId, stream);
+      }
+
+      const hasTrack = stream.getTracks().some((existingTrack) => existingTrack.id === track.id);
+      if (!hasTrack) {
+        try {
+          stream.addTrack(track);
+        } catch (err) {
+          console.warn('[Call] Failed to add remote track to stream:', err);
+        }
+      }
+
+      publishRemoteStream(stream);
+    };
+
+    (pc as any).onaddstream = (event: any) => {
+      const stream = event.stream as MediaStream | undefined;
+      if (!stream) {
+        return;
+      }
+
+      remoteTrackStreamsRef.current.set(peerUserId, stream);
+      publishRemoteStream(stream);
     };
 
     (pc as any).onconnectionstatechange = () => {
@@ -459,14 +501,10 @@ export function useVideoCall(userId: string) {
       return;
     }
     await initLocalStream(type === 'video');
-    callService.acceptCall(sessionId, callToken);
 
-    setActiveCall((prev) => {
-      if (prev) {
-        return { ...prev, status: 'connecting' };
-      }
-
-      return {
+    const nextCall: ActiveCallState = current
+      ? { ...current, status: 'connecting' as const }
+      : {
         sessionId,
         callToken,
         initiatedBy: callerId,
@@ -477,7 +515,10 @@ export function useVideoCall(userId: string) {
         callType: type,
         startedAt: new Date().toISOString(),
       };
-    });
+
+    activeCallRef.current = nextCall;
+    setActiveCall(nextCall);
+    callService.acceptCall(sessionId, callToken);
   }, [initLocalStream, showActiveCallConflict, userId]);
 
   const rejectCall = useCallback((sessionId: string, callToken: string) => {
@@ -511,7 +552,7 @@ export function useVideoCall(userId: string) {
         return;
       }
 
-      setActiveCall({
+      const nextCall: ActiveCallState = {
         sessionId: data.sessionId,
         conversationId: data.conversationId,
         conversationName: data.conversationName,
@@ -523,7 +564,10 @@ export function useVideoCall(userId: string) {
         status: 'incoming',
         callToken: data.callToken,
         callType: data.callType ?? 'video',
-      });
+      };
+
+      activeCallRef.current = nextCall;
+      setActiveCall(nextCall);
     };
 
     const onCallInvited = (data: {
@@ -537,7 +581,7 @@ export function useVideoCall(userId: string) {
       callType?: 'audio' | 'video';
       callToken: string;
     }) => {
-      setActiveCall({
+      const nextCall: ActiveCallState = {
         sessionId: data.sessionId,
         conversationId: data.conversationId,
         conversationName: data.conversationName,
@@ -550,23 +594,29 @@ export function useVideoCall(userId: string) {
         callToken: data.callToken,
         callType: data.callType ?? 'video',
         startedAt: new Date().toISOString(),
-      });
+      };
+
+      activeCallRef.current = nextCall;
+      setActiveCall(nextCall);
     };
 
     const onCallStatus = async (data: {
       sessionId: string;
-      status: CallUiStatus;
+      status: CallUiStatus | 'ringing';
       reason?: string;
     }) => {
       const currentCall = activeCallRef.current;
       if (!currentCall || currentCall.sessionId !== data.sessionId) return;
 
-      setActiveCall((prev) => (prev ? {
-        ...prev,
-        status: data.status,
+      const nextStatus: CallUiStatus = data.status === 'ringing' ? currentCall.status : data.status;
+      const nextCall = {
+        ...currentCall,
+        status: nextStatus,
         reason: data.reason,
-        startedAt: data.status === 'connected' ? (prev.startedAt ?? new Date().toISOString()) : prev.startedAt,
-      } : null));
+        startedAt: nextStatus === 'connected' ? (currentCall.startedAt ?? new Date().toISOString()) : currentCall.startedAt,
+      };
+      activeCallRef.current = nextCall;
+      setActiveCall(nextCall);
 
       if (data.status === 'connecting' || data.status === 'connected') {
         // Both sides attempt to create offers. The polite peer guard inside
@@ -588,21 +638,17 @@ export function useVideoCall(userId: string) {
       const currentCall = activeCallRef.current;
       if (!currentCall || currentCall.sessionId !== data.sessionId) return;
 
-      setActiveCall((prev) => {
-        if (!prev) return prev;
+      const nextStatus = currentCall.status === 'outgoing' || currentCall.status === 'incoming'
+        ? 'connecting'
+        : currentCall.status;
+      const nextCall = Array.isArray(data.joinedParticipantIds) && data.joinedParticipantIds.length > 0
+        ? { ...currentCall, participantIds: data.joinedParticipantIds, status: nextStatus }
+        : currentCall.participantIds.includes(data.userId)
+          ? { ...currentCall, status: nextStatus }
+          : { ...currentCall, participantIds: [...currentCall.participantIds, data.userId], status: nextStatus };
 
-        const nextStatus = prev.status === 'outgoing' || prev.status === 'incoming' ? 'connecting' : prev.status;
-
-        if (Array.isArray(data.joinedParticipantIds) && data.joinedParticipantIds.length > 0) {
-          return { ...prev, participantIds: data.joinedParticipantIds, status: nextStatus };
-        }
-
-        if (!prev.participantIds.includes(data.userId)) {
-          return { ...prev, participantIds: [...prev.participantIds, data.userId], status: nextStatus };
-        }
-
-        return { ...prev, status: nextStatus };
-      });
+      activeCallRef.current = nextCall;
+      setActiveCall(nextCall);
 
       if (data.userId !== userId) {
         await createOfferForPeer(data.userId, currentCall);
@@ -758,7 +804,10 @@ export function useVideoCall(userId: string) {
       if (!currentCall || currentCall.sessionId !== data.sessionId) return;
 
       const pc = peerConnectionsRef.current.get(data.fromUserId);
-      if (!pc) return;
+      if (!pc) {
+        queueIceCandidate(data.fromUserId, data.candidate);
+        return;
+      }
 
       if (!hasRemoteDescription(pc)) {
         queueIceCandidate(data.fromUserId, data.candidate);
