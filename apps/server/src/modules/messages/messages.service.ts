@@ -54,6 +54,11 @@ interface ReadParticipant {
   avatarUrl?: string;
 }
 
+interface CallHistoryMessageResult {
+  message: IMessage;
+  created: boolean;
+}
+
 export class MessagesService {
   private static readonly IDEMPOTENCY_TTL = 5 * 60; // 5 minutes
   /** Repository singleton – all DB queries go through here */
@@ -121,22 +126,45 @@ export class MessagesService {
     conversationId: string,
     callHistory: ICallHistory,
   ): Promise<IMessage> {
+    const result = await this.createCallHistoryMessageIfAbsent(conversationId, callHistory);
+    return result.message;
+  }
+
+  static async createCallHistoryMessageIfAbsent(
+    conversationId: string,
+    callHistory: ICallHistory,
+  ): Promise<CallHistoryMessageResult> {
     const idempotencyKey = `call-history:${callHistory.callSessionId}:${callHistory.status}`;
     const existing = await MessagesService.repo.findByIdempotencyKey(idempotencyKey);
     if (existing) {
-      return existing as unknown as IMessage;
+      logger.warn(`[CallHistory] duplicate call history skipped: ${idempotencyKey}`);
+      return { message: existing as unknown as IMessage, created: false };
     }
 
     const content = this.getCallHistoryPreview(callHistory);
-    const message = await MessageModel.create({
-      conversationId,
-      senderId: callHistory.callerId,
-      content,
-      type: 'call_history',
-      callHistory,
-      idempotencyKey,
-      createdAt: callHistory.endedAt ?? new Date(),
-    });
+    let message: IMessage;
+    try {
+      const createdMessage = await MessageModel.create({
+        conversationId,
+        senderId: callHistory.callerId,
+        content,
+        type: 'call_history',
+        callHistory,
+        idempotencyKey,
+        createdAt: callHistory.endedAt ?? new Date(),
+      });
+      message = createdMessage;
+    } catch (err) {
+      if ((err as { code?: number }).code === 11000) {
+        const duplicated = await MessagesService.repo.findByIdempotencyKey(idempotencyKey);
+        if (duplicated) {
+          logger.warn(`[CallHistory] duplicate call history skipped: ${idempotencyKey}`);
+          return { message: duplicated as unknown as IMessage, created: false };
+        }
+      }
+
+      throw err;
+    }
 
     const members = await ConversationMemberModel.find({ conversationId }).select('userId').lean();
     await MessageStatusModel.insertMany(
@@ -166,7 +194,7 @@ export class MessagesService {
 
     await this.enqueueMessageEmbedding(message);
 
-    return message.toObject() as unknown as IMessage;
+    return { message: message.toObject() as unknown as IMessage, created: true };
   }
 
   /**

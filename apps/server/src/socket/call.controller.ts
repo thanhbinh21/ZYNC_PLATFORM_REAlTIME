@@ -119,6 +119,10 @@ function emitCallStatus(
   }
 }
 
+function isTerminalCallStatus(status: string): status is 'ended' | 'missed' | 'rejected' {
+  return status === 'ended' || status === 'missed' || status === 'rejected';
+}
+
 function buildConversationActiveCallPayload(session: {
   sessionId: string;
   conversationId: string | null;
@@ -230,7 +234,10 @@ async function emitCallHistoryMessage(
     callerId: params.callerId,
     participantIds: params.participantIds,
   };
-  const message = await MessagesService.createCallHistoryMessage(params.conversationId, callHistory);
+  const { message, created } = await MessagesService.createCallHistoryMessageIfAbsent(params.conversationId, callHistory);
+  if (!created) {
+    return;
+  }
 
   io.to(`conv:${params.conversationId}`).emit('receive_message', {
     messageId: message._id,
@@ -563,6 +570,12 @@ async function handleCallReject(io: Server, socket: AuthSocket, payload: unknown
     return;
   }
 
+  if (isTerminalCallStatus(session.status) && session.status !== 'rejected') {
+    emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: session.status, reason: session.endedReason });
+    emitConversationActiveCallUpdate(io, session);
+    return;
+  }
+
   await emitCallHistoryMessage(io, {
     sessionId: session.sessionId, status: 'rejected',
     conversationId: session.conversationId ?? undefined,
@@ -594,6 +607,12 @@ async function handleCallEnd(io: Server, socket: AuthSocket, payload: unknown): 
     for (const participantId of session.participantIds) {
       io.to(`user:${participantId}`).emit('call_participant_left', { sessionId: session.sessionId, userId, reason: input.reason ?? 'left' });
     }
+    emitConversationActiveCallUpdate(io, session);
+    return;
+  }
+
+  if (isTerminalCallStatus(session.status) && session.status !== 'ended') {
+    emitCallStatus(io, session.participantIds, { sessionId: session.sessionId, status: session.status, reason: session.endedReason });
     emitConversationActiveCallUpdate(io, session);
     return;
   }
